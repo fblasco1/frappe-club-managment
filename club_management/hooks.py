@@ -120,13 +120,17 @@ app_license = "mit"
 # -----------
 # Permissions evaluated in scripted ways
 
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
-#
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
+permission_query_conditions = {
+	"Socio": "club_management.members.permissions.socio_query_conditions",
+	"Tutor No Socio": "club_management.members.permissions.tutor_no_socio_query_conditions",
+	"Grupo Familiar": "club_management.members.permissions.grupo_familiar_query_conditions",
+}
+
+has_permission = {
+	"Socio": "club_management.members.permissions.socio_has_permission",
+	"Tutor No Socio": "club_management.members.permissions.tutor_no_socio_has_permission",
+	"Grupo Familiar": "club_management.members.permissions.grupo_familiar_has_permission",
+}
 
 # Document Events
 # ---------------
@@ -234,9 +238,9 @@ app_license = "mit"
 # Authentication and authorization
 # --------------------------------
 
-# auth_hooks = [
-# 	"club_management.auth.validate"
-# ]
+auth_hooks = [
+	"club_management.members.auth.dual_login.resolve_login_user",
+]
 
 # Automatically update python controller files with type annotations for this app.
 export_python_type_annotations = True
