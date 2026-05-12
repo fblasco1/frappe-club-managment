@@ -38,11 +38,9 @@
   "dni_dorso",
   "ficha_medica",
   "auditoria_section",
-  "alta_validada_por",
-  "alta_validada_en",
-  "column_break_auditoria",
   "ultimo_cambio_estado_por",
   "ultimo_cambio_estado_en",
+  "column_break_auditoria",
   "motivo_ultimo_cambio_estado"
  ],
  "fields": [
@@ -77,12 +75,10 @@
   { "fieldname": "column_break_documentos", "fieldtype": "Column Break" },
   { "fieldname": "dni_dorso", "fieldtype": "Attach", "label": "DNI - dorso", "reqd": 1 },
   { "fieldname": "ficha_medica", "fieldtype": "Attach", "label": "Ficha m\u00e9dica", "reqd": 1 },
-  { "fieldname": "auditoria_section", "fieldtype": "Section Break", "label": "Auditor\u00eda", "collapsible": 1 },
-  { "fieldname": "alta_validada_por", "fieldtype": "Link", "label": "Alta validada por", "options": "User", "read_only": 1 },
-  { "fieldname": "alta_validada_en", "fieldtype": "Datetime", "label": "Alta validada en", "read_only": 1 },
-  { "fieldname": "column_break_auditoria", "fieldtype": "Column Break" },
+  { "fieldname": "auditoria_section", "fieldtype": "Section Break", "label": "Auditor\u00eda del estado", "collapsible": 1, "description": "Auditor\u00eda de las transiciones del estado del Socio. La auditor\u00eda de la validaci\u00f3n del alta vive en `Solicitud de Asociaci\u00f3n` (`validado_por` / `validado_en`)." },
   { "fieldname": "ultimo_cambio_estado_por", "fieldtype": "Link", "label": "\u00daltimo cambio de estado por", "options": "User", "read_only": 1 },
   { "fieldname": "ultimo_cambio_estado_en", "fieldtype": "Datetime", "label": "\u00daltimo cambio de estado en", "read_only": 1 },
+  { "fieldname": "column_break_auditoria", "fieldtype": "Column Break" },
   { "fieldname": "motivo_ultimo_cambio_estado", "fieldtype": "Data", "label": "Motivo \u00faltimo cambio de estado", "read_only": 1 }
  ],
  "index_web_pages_for_search": 1,
