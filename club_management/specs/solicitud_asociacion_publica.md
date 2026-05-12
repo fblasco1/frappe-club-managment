@@ -16,6 +16,36 @@ email con motivos detallados`.
 
 ---
 
+## Decisión sobre el `name` técnico del DocType
+
+El `name` técnico del DocType es **`Solicitud Asociacion`** (ASCII puro,
+sin tilde y sin "de"). Esto es por dos motivos:
+
+1. Frappe deriva el path del módulo Python con `frappe.scrub(name)`, que no
+   normaliza tildes ni mayúsculas. `scrub("Solicitud de Asociación") =
+   "solicitud_de_asociación"`, lo que forzaría un folder con tilde en el
+   filesystem (frágil entre Windows / Linux / Git).
+2. El name interno se mantiene ASCII puro para evitar problemas de encoding
+   entre sistemas, BD, URLs y serializaciones.
+
+El **concepto de negocio** sigue siendo "Solicitud de Asociación". El
+**label visible** en Desk se va a traducir a "Solicitud de Asociación" vía
+`<app>/translations/es.csv` cuando se haga el sprint de i18n. Mientras
+tanto, Desk muestra el `name` técnico.
+
+Esta decisión se refleja en:
+- Folder físico: `members/doctype/solicitud_asociacion/`
+- Clase Python: `SolicitudAsociacion`
+- Slug del módulo: `solicitud_asociacion`
+- Tabla DB: `tabSolicitud Asociacion`
+- API REST: `/api/resource/Solicitud Asociacion/<name>`
+
+En el resto del documento "Solicitud de Asociación" se sigue usando como
+nombre conceptual (más legible), pero técnicamente refiere al DocType
+`Solicitud Asociacion`.
+
+---
+
 ## Decisión de auth: flujo **híbrido**
 
 - El formulario público se envía como **Guest** (sin cuenta previa).

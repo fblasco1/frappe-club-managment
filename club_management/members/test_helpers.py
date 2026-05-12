@@ -196,6 +196,80 @@ def add_miembro_socio(
     return grupo
 
 
+def make_solicitud_asociacion_payload(**overrides: Any) -> dict[str, Any]:
+    """Defaults para una `Solicitud Asociacion` adulta válida (categoría `Activo`).
+
+    Refleja la spec `solicitud_asociacion_publica.md` Sprint 1: campos del
+    solicitante completos, sin bloque tutor (`mandatory_depends_on` no
+    aplica para `Activo`).
+
+    Nota: el `name` técnico del DocType es `Solicitud Asociacion` (ASCII
+    puro, sin tilde y sin "de"). En UX el label final será "Solicitud de
+    Asociación" vía traducción (i18n) en un sprint dedicado.
+    """
+    payload: dict[str, Any] = {
+        "doctype": "Solicitud Asociacion",
+        "nombre": "Ana",
+        "apellido": "Pérez",
+        "dni": "30123456",
+        "nacionalidad": "Argentina",
+        "fecha_nacimiento": adult_birthdate(35),
+        "genero": "Femenino",
+        "categoria_solicitada": "Activo",
+        "email": "ana@example.com",
+        "telefono": "+541112345678",
+        "domicilio": "Calle Falsa 123",
+        "localidad": "CABA",
+        "provincia": "CABA",
+        "codigo_postal": "1414",
+        "dni_frente": DUMMY_DNI_FRENTE,
+        "dni_dorso": DUMMY_DNI_DORSO,
+        "foto_perfil": DUMMY_FOTO_PERFIL,
+        "ficha_medica": DUMMY_FICHA_MEDICA,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def make_solicitud_menor_payload(**overrides: Any) -> dict[str, Any]:
+    """Defaults para una `Solicitud de Asociación` de un menor con bloque tutor.
+
+    Por default usa el caso "tutor no Socio" con email distinto al del menor
+    (regla 2 de la "Decisión sobre `User` para menores"). Los tests pueden
+    sobreescribir `email_tutor` para forzar el caso "email compartido".
+    """
+    payload = make_solicitud_asociacion_payload()
+    payload.update(
+        {
+            "categoria_solicitada": "Menor",
+            "fecha_nacimiento": minor_birthdate(12),
+            "email": "ana.hija@example.com",
+            "dni_tutor": "20111111",
+            "nombre_tutor": "Juan",
+            "apellido_tutor": "Pérez",
+            "fecha_nacimiento_tutor": adult_birthdate(45),
+            "nacionalidad_tutor": "Argentina",
+            "genero_tutor": "Masculino",
+            "email_tutor": "papa@example.com",
+            "telefono_tutor": "+541198765432",
+            "domicilio_tutor": "Calle Falsa 123",
+            "localidad_tutor": "CABA",
+            "provincia_tutor": "CABA",
+            "codigo_postal_tutor": "1414",
+            "rol_tutor": "Padre",
+        }
+    )
+    payload.update(overrides)
+    return payload
+
+
+def insert_solicitud_asociacion(**overrides: Any) -> "frappe.model.document.Document":
+    """Inserta una `Solicitud de Asociación` adulta con defaults válidos."""
+    doc = frappe.get_doc(make_solicitud_asociacion_payload(**overrides))
+    doc.insert(ignore_permissions=True)
+    return doc
+
+
 def ensure_role_socio_exists() -> None:
     """Asegura que el rol Frappe `Socio` exista con `desk_access = 0`.
 
