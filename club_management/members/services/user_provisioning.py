@@ -41,7 +41,7 @@ def _provision_user(*, email: str, username: str) -> str:
 			_("El email ya tiene cuenta en el portal; usá un email distinto o coordiná con Secretaría")
 		)
 
-	_assert_rol_existe(ROL_PORTAL)
+	_ensure_rol_portal_sin_desk(ROL_PORTAL)
 
 	user = frappe.get_doc(
 		{
@@ -59,9 +59,21 @@ def _provision_user(*, email: str, username: str) -> str:
 	return user.name
 
 
-def _assert_rol_existe(rol: str) -> None:
-	if frappe.db.exists("Role", rol):
+def _ensure_rol_portal_sin_desk(rol: str) -> None:
+	"""Garantiza que el rol del portal exista y tenga ``desk_access = 0``.
+
+	En Frappe v15+, el ``User.update_user_type`` auto-promueve a
+	``"System User"`` cualquier ``User`` que tenga al menos un rol con
+	``desk_access = 1``. Como el portal de socios sólo debe acceder al
+	Website, forzamos ``desk_access = 0`` en este rol independientemente de
+	cómo lo haya creado Frappe al sincronizar los DocPerms (que puede
+	hacerlo con default ``desk_access = 1``).
+	"""
+	if not frappe.db.exists("Role", rol):
+		frappe.get_doc(
+			{"doctype": "Role", "role_name": rol, "desk_access": 0}
+		).insert(ignore_permissions=True)
 		return
-	frappe.get_doc({"doctype": "Role", "role_name": rol, "desk_access": 0}).insert(
-		ignore_permissions=True
-	)
+
+	if frappe.db.get_value("Role", rol, "desk_access"):
+		frappe.db.set_value("Role", rol, "desk_access", 0, update_modified=False)

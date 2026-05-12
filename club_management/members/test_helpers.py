@@ -197,9 +197,19 @@ def add_miembro_socio(
 
 
 def ensure_role_socio_exists() -> None:
-    """Asegura que el rol Frappe `Socio` exista para que `provision_user_*`
-    pueda asignarlo y los tests de aislamiento puedan setear el `frappe.session.user`."""
+    """Asegura que el rol Frappe `Socio` exista con `desk_access = 0`.
+
+    En Frappe v15+, el `User.update_user_type` auto-promueve a `"System User"`
+    cualquier `User` que tenga al menos un rol con `desk_access = 1`. Como el
+    portal de socios sólo debe acceder al Website, garantizamos
+    `desk_access = 0` independientemente de cómo lo haya creado Frappe al
+    sincronizar los DocPerms.
+    """
     if not frappe.db.exists("Role", "Socio"):
         frappe.get_doc(
             {"doctype": "Role", "role_name": "Socio", "desk_access": 0}
         ).insert(ignore_permissions=True)
+        return
+
+    if frappe.db.get_value("Role", "Socio", "desk_access"):
+        frappe.db.set_value("Role", "Socio", "desk_access", 0, update_modified=False)
