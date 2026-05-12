@@ -30,6 +30,41 @@ y simplifica el anti-abuso al concentrar la creación de `User` en una acción a
 
 ---
 
+## Decisión sobre `User` para menores
+
+Política unificada al validar un menor:
+
+1. Si `solicitud.email == solicitud.email_tutor` (mismo email para menor y tutor),
+   **no** se crea `User` para el menor. El menor se gestiona vía el `User` del
+   tutor. `Socio.user` queda vacío.
+2. Si `solicitud.email != solicitud.email_tutor` y `solicitud.email` **no** está
+   tomado por otro `User`, se crea un `User` propio para el menor con `name =
+   solicitud.email`, `username = solicitud.dni`, rol `Socio`. `Socio.user` queda
+   poblado.
+3. Si `solicitud.email != solicitud.email_tutor` pero `solicitud.email` **ya
+   está tomado** por otro `User`, la transición `Validar` falla con
+   `frappe.ValidationError` y el solicitante debe usar otro email para el menor
+   (o compartir el del tutor).
+
+Esta política es opt-out: por defecto se crea `User` si los datos lo permiten.
+Aun cuando el menor tenga `User` propio, el **email de pago** se envía al
+`email_tutor` porque el tutor es el responsable financiero.
+
+---
+
+## Decisión sobre auditoría de validación
+
+La auditoría de la transición (`validado_por`, `validado_en`, `rechazado_por`,
+`rechazado_en`, `correccion_solicitada_por`, `correccion_solicitada_en`) vive
+**exclusivamente** en la `Solicitud de Asociación`.
+
+El `Socio` generado **no** duplica esos campos. La trazabilidad se obtiene vía
+`Socio.solicitud_origen` → `Solicitud.validado_por` / `Solicitud.validado_en`.
+
+Esto evita duplicación y mantener dos puntos sincronizados.
+
+---
+
 ## Campos propuestos del DocType `Solicitud de Asociación`
 
 ### Datos del solicitante
@@ -219,6 +254,15 @@ And se registra el intento en `frappe.log_error` (sin volcar PII en el log).
 
 (Umbral inicial: 5/10min por IP. Ajustable en `Club Settings` futuro.)
 
+> **Identificación de IP detrás de proxy:** en producción el bench corre detrás
+> de nginx, por lo que `frappe.local.request.remote_addr` devuelve la IP del
+> proxy. La función de identificación de cliente debe preferir el primer valor
+> del header `X-Forwarded-For` (si está presente y el proxy es confiable) y caer
+> a `remote_addr` si no. La IP resuelta se persiste en `enviado_desde_ip` y se
+> usa como clave del rate-limit. Esto se cubre con un test que mockea
+> `frappe.local.request.headers` con `X-Forwarded-For` y verifica que la IP
+> usada en `enviado_desde_ip` sea la del cliente, no la del proxy.
+
 ---
 
 ## Scenario: el solicitante consulta el estado con su `token_seguimiento`
@@ -260,8 +304,8 @@ Then en una sola transacción:
   - se crea un `Socio` con `estado = "Pendiente de Pago"`, `dni`, `email`,
     `nacionalidad`, `categoria = <categoria_solicitada>`,
     `user = <name del User>`, `solicitud_origen = <name de la solicitud>`,
-    `alta_validada_por = frappe.session.user`,
-    `alta_validada_en = frappe.utils.now()`,
+    (la auditoría de la validación queda en la propia Solicitud,
+    cf. sección "Decisión sobre auditoría de validación"),
   - se crea un `Grupo Familiar` nuevo con `titulares` = una sola fila
     `{tipo_titular: "Socio", titular: <Socio>, es_principal: 1, rol: "Titular"}`,
   - el `Socio` queda automáticamente en `miembros` con `rol = "Titular"` (por la
@@ -275,6 +319,28 @@ Then en una sola transacción:
   - se encola un email al solicitante con el **link stub** de pago de primera cuota.
 And si **cualquier paso** falla, la transacción se aborta (no queda `User` huérfano
 sin `Socio`, ni grupo huérfano sin titulares, ni viceversa).
+
+---
+
+## Scenario: validar adulto con `familiares_existentes_dnis` NO une grupos automáticamente
+
+Given una `Solicitud de Asociación` con `categoria_solicitada = "Activo"`,
+`tiene_familiares_socios = 1`, `familiares_existentes_dnis = "20111111,30222222"`
+And ya existen `Socio`s con esos DNIs, titulares activos de un `Grupo Familiar`
+preexistente `G_familia`
+When `Secretaria` ejecuta `Validar`
+Then se crea un `Grupo Familiar` **nuevo** `G_nuevo` para el solicitante
+(no se reutiliza `G_familia`)
+And el solicitante queda como único titular principal de `G_nuevo`
+And el campo `familiares_existentes_dnis` queda persistido en la `Solicitud`
+para revisión posterior
+And la `Solicitud.observaciones_secretaria` puede ser actualizada por Secretaría
+para registrar la decisión de unión manual posterior.
+
+> En Sprint 1, `familiares_existentes_dnis` es **puramente declarativo**: el
+> sistema lo persiste pero no actúa sobre él. Secretaría decide manualmente, vía
+> Desk, si agrega al nuevo Socio como cotitular del grupo existente o mantiene
+> el grupo nuevo. La unión automática queda fuera de scope.
 
 ---
 
@@ -293,24 +359,25 @@ solicitante reenvíe con email propio.
 
 ---
 
-## Scenario: validar menor con tutor que ya es `Socio` — sin crear `User` para el menor
+## Scenario: validar menor con tutor que ya es `Socio` — email compartido, sin `User` para el menor
 
 Given una `Solicitud de Asociación` con `categoria_solicitada = "Menor"`,
 `dni = "55222222"`, `email = "familia@example.com"`,
-`dni_tutor = "20111111"`, `rol_tutor = "Padre"`
+`dni_tutor = "20111111"`, `email_tutor = "familia@example.com"` (mismo email),
+`rol_tutor = "Padre"`
 And ya existe un `Socio` `S_tutor` con `dni = "20111111"`, mayor de edad,
 titular activo (`es_principal = 1`) de `Grupo Familiar` `G` (vía una fila
 `{tipo_titular: "Socio", titular: S_tutor}` en `G.titulares`)
 And ya existe un `User` con `name = "familia@example.com"` (del tutor)
 When `Secretaria` ejecuta la acción `Validar`
 Then en una sola transacción:
-  - **no** se crea `User` para el menor (no hay email técnico),
+  - **no** se crea `User` para el menor (regla 1 de "Decisión sobre `User`
+    para menores": `solicitud.email == solicitud.email_tutor`),
   - se crea un `Socio` con `dni = "55222222"`, `categoria = "Menor"`,
     `email = "familia@example.com"`, `user = ""` (vacío),
     `tipo_tutor = "Socio"`, `tutor = <S_tutor.name>`,
     `grupo_familiar = G`,
     `estado = "Pendiente de Pago"`, `solicitud_origen = <name>`,
-    auditoría poblada,
   - se agrega una nueva fila a `G.miembros` con `socio = <Socio menor>`,
     `rol = "Hijo"` (derivado de `rol_tutor = "Padre"`), `desde = hoy`,
   - la solicitud queda `Validada`, `socio_generado` poblado, `user_generado` vacío,
@@ -320,42 +387,110 @@ Then en una sola transacción:
 
 ---
 
-## Scenario: validar menor con tutor **no Socio** — crea `Tutor No Socio` y `Grupo Familiar`
+## Scenario: validar menor con tutor `Socio` — email único, **sí** se crea `User` para el menor
+
+Given una `Solicitud de Asociación` con `categoria_solicitada = "Menor"`,
+`dni = "55222222"`, `email = "ana@example.com"` (email propio del menor),
+`dni_tutor = "20111111"`, `email_tutor = "papa@example.com"` (email distinto),
+`rol_tutor = "Padre"`
+And ya existe un `Socio` `S_tutor` con `dni = "20111111"`, mayor de edad,
+titular activo de `Grupo Familiar` `G`
+And **no** existe ningún `User` con `name = "ana@example.com"` ni `username = "55222222"`
+When `Secretaria` ejecuta la acción `Validar`
+Then en una sola transacción:
+  - **se crea** un `User` para el menor con `name = "ana@example.com"`,
+    `username = "55222222"`, `enabled = 1`, `user_type = "Website User"`, rol
+    `Socio` (regla 2 de "Decisión sobre `User` para menores"),
+  - se crea un `Socio` con `dni = "55222222"`, `categoria = "Menor"`,
+    `email = "ana@example.com"`, `user = "ana@example.com"`,
+    `tipo_tutor = "Socio"`, `tutor = <S_tutor.name>`,
+    `grupo_familiar = G`, `estado = "Pendiente de Pago"`,
+    `solicitud_origen = <name>`,
+  - se agrega una nueva fila a `G.miembros` con `socio = <Socio menor>`,
+    `rol = "Hijo"`, `desde = hoy`,
+  - la solicitud queda `Validada`, `socio_generado` y `user_generado` poblados,
+    `grupo_familiar_generado = G`,
+  - el email del stub de pago se envía a `"papa@example.com"` (el **tutor**
+    recibe el link aun cuando el menor tenga `User` propio: el tutor sigue
+    siendo el responsable financiero).
+
+---
+
+## Scenario: validar menor con email ya tomado bloquea
+
+Given una `Solicitud de Asociación` con `categoria_solicitada = "Menor"`,
+`dni = "55222222"`, `email = "ana@example.com"`
+And `email_tutor = "papa@example.com"` (email distinto al del menor)
+And ya existe un `User` con `name = "ana@example.com"` (de otra persona ajena
+al grupo familiar)
+When `Secretaria` ejecuta la acción `Validar`
+Then la transición falla con `frappe.ValidationError`
+(mensaje: "El email del menor ya tiene cuenta en el portal; usá el mismo email
+del tutor o pedí al solicitante uno distinto")
+And no se crea `Socio`, ni `User`, ni `Grupo Familiar`
+And la solicitud permanece en `workflow_state = "Pendiente"`.
+
+---
+
+## Scenario: validar menor con tutor **no Socio** — email compartido con tutor
 
 Given una `Solicitud de Asociación` con `categoria_solicitada = "Menor"`,
 `dni = "55222222"`, `email = "familia@example.com"`,
 `dni_tutor = "20111111"`, `nombre_tutor = "Juan"`, `apellido_tutor = "Pérez"`,
-`email_tutor = "papa@example.com"`, `rol_tutor = "Padre"` (más demás datos de
-contacto y `fecha_nacimiento_tutor` mayor de 18)
+`email_tutor = "familia@example.com"` (mismo email que el menor),
+`rol_tutor = "Padre"` (más demás datos de contacto y
+`fecha_nacimiento_tutor` mayor de 18)
 And **no** existe ningún `Socio` con `dni = "20111111"`
 And **no** existe ningún `Tutor No Socio` con `dni = "20111111"`
-And no existe `User` con `name = "papa@example.com"` ni `username = "20111111"`
+And no existe `User` con `name = "familia@example.com"` ni `username = "20111111"`
 When `Secretaria` ejecuta la acción `Validar`
 Then en una sola transacción:
   - se crea un `Tutor No Socio` `T_padre` con todos los datos declarados del tutor,
-  - se provisiona un `User` para `T_padre` con `name = "papa@example.com"`,
+  - se provisiona un `User` para `T_padre` con `name = "familia@example.com"`,
     `username = "20111111"` (el tutor podrá pagar y gestionar desde el portal),
   - se crea un `Grupo Familiar` `G` con `titulares` = una sola fila
     `{tipo_titular: "Tutor No Socio", titular: T_padre, es_principal: 1, rol: <rol_tutor>}`,
+  - **no** se crea `User` para el menor (regla 1: email compartido con tutor),
   - se crea un `Socio` `S_menor` con `dni = "55222222"`, `categoria = "Menor"`,
     `email = "familia@example.com"`, `user = ""` (vacío),
     `tipo_tutor = "Tutor No Socio"`, `tutor = T_padre`,
     `grupo_familiar = G`, `estado = "Pendiente de Pago"`,
-    `solicitud_origen = <name>`, auditoría poblada,
+    `solicitud_origen = <name>`,
   - se agrega una fila a `G.miembros` con `socio = S_menor`, `rol = "Hijo"`,
     `desde = hoy`,
   - la solicitud queda `Validada`, `socio_generado = S_menor`,
     `user_generado = ""`, `grupo_familiar_generado = G`,
-  - el email del stub de pago se envía a `papa@example.com` (el tutor recibe el
-    link para pagar la primera cuota del menor).
+  - el email del stub de pago se envía a `familia@example.com`.
 And si **cualquier paso** falla, la transacción se aborta (no queda
 `Tutor No Socio` huérfano sin grupo, ni grupo sin titulares, etc.).
+
+---
+
+## Scenario: validar menor con tutor **no Socio** — email único para el menor
+
+Given una `Solicitud de Asociación` con `categoria_solicitada = "Menor"`,
+`dni = "55222222"`, `email = "ana@example.com"` (email propio del menor),
+`dni_tutor = "20111111"`, `nombre_tutor = "Juan"`, `apellido_tutor = "Pérez"`,
+`email_tutor = "papa@example.com"`, `rol_tutor = "Padre"`
+And **no** existen ni `Socio` ni `Tutor No Socio` con `dni = "20111111"`
+And no existen `User` con `name` en `{"papa@example.com", "ana@example.com"}`
+ni con `username` en `{"20111111", "55222222"}`
+When `Secretaria` ejecuta `Validar`
+Then en una sola transacción:
+  - se crea `T_padre` (`Tutor No Socio`) + su `User` (`name = "papa@example.com"`,
+    `username = "20111111"`),
+  - se crea `G` (`Grupo Familiar`) con `T_padre` como único titular activo,
+  - **se crea** un `User` para el menor con `name = "ana@example.com"`,
+    `username = "55222222"`, rol `Socio` (regla 2: email único y no tomado),
+  - se crea `S_menor` con `user = "ana@example.com"`, demás datos como en el
+    escenario anterior,
+  - el email del stub de pago se envía a `papa@example.com` (al tutor, no al menor).
 
 > **Nota sobre cotitulares (padre + madre):** la Solicitud carga **un** tutor.
 > Si ambos padres son adultos responsables del grupo, Secretaría agrega al
 > segundo como cotitular (`es_principal = 0`) editando el `Grupo Familiar`
-> después de validar al primer menor. No se carga directamente desde el Web Form
-> público en Sprint 1.
+> después de validar al primer menor. No se carga directamente desde el Web
+> Form público en Sprint 1.
 
 ---
 
@@ -422,14 +557,35 @@ And no se reenvía el email automáticamente (debe haber acción explícita "Ree
 
 ---
 
-## Scenario: validación con DNI ya asociado bloquea
+## Scenario: validar con DNI ya registrado como `Socio` bloquea
 
 Given una `Solicitud de Asociación` con `dni` = "30123456"
 And ya existe un `Socio` con ese `dni`
 When `Secretaria` intenta `Validar` la solicitud
-Then la transición falla con `frappe.ValidationError` ("DNI ya registrado como Socio")
+Then la transición falla con `frappe.ValidationError`
+(mensaje: "DNI ya registrado como Socio")
 And la solicitud permanece en `Pendiente` (no pasa a `Validada`)
 And Secretaría puede pasarla a `Rechazada` con motivo "DNI duplicado".
+
+---
+
+## Scenario: validar con DNI ya registrado como `Tutor No Socio` bloquea
+
+Given una `Solicitud de Asociación` con `categoria_solicitada` ≠ `"Menor"`,
+`dni` = "30123456"
+And ya existe un `Tutor No Socio` activo con ese `dni` (es el caso del padre
+que asoció a sus hijos al club y ahora quiere asociarse él mismo)
+When `Secretaria` intenta `Validar` la solicitud
+Then la transición falla con `frappe.ValidationError`
+(mensaje: "DNI ya está registrado como Tutor No Socio; Secretaría debe migrar
+manualmente el registro a Socio antes de validar")
+And no se crea `Socio`, ni `User`, ni `Grupo Familiar`
+And la solicitud permanece en `Pendiente`.
+
+> La promoción automática `Tutor No Socio` → `Socio` (reutilizando `User`,
+> reasignando referencias de `Socio.tutor` apuntando al nuevo Socio y
+> transfiriendo titularidad del grupo) queda **fuera de scope Sprint 1**. Se
+> cubre en un sprint dedicado de migración.
 
 ---
 
@@ -461,6 +617,72 @@ And el solicitante puede actualizar adjuntos/datos vía un endpoint público aut
 (scope: solo la misma solicitud)
 And al reenviar, `workflow_state` vuelve a `Pendiente`
 And los adjuntos anteriores no se pierden silenciosamente (quedan en el historial / versiones).
+
+---
+
+## Scenario: endpoint público `actualizar_solicitud` con token válido permite reenvío
+
+Given una `Solicitud de Asociación` `SOL-2026-0001` con
+`workflow_state = "Requiere Corrección"`, `token_seguimiento = "tk-abc"`
+And un endpoint whitelisted `actualizar_solicitud(token, payload)` con
+`allow_guest=True`
+When un Guest llama al endpoint con `token = "tk-abc"` y un `payload` que
+actualiza `dni_dorso` (Attach) y `telefono`
+Then la solicitud queda actualizada con los nuevos valores
+And `workflow_state` pasa nuevamente a `"Pendiente"` (re-entra en la cola)
+And los adjuntos anteriores quedan referenciados en el historial / versiones
+de Frappe (auditoría)
+And el endpoint responde 200 OK con un mensaje de confirmación
+(sin exponer el `name` del documento).
+
+---
+
+## Scenario: endpoint público `actualizar_solicitud` rechaza campos no editables
+
+Given una `Solicitud de Asociación` `SOL-2026-0001` con
+`workflow_state = "Requiere Corrección"`, `token_seguimiento = "tk-abc"`
+When un Guest llama al endpoint con `token = "tk-abc"` y un `payload` que
+intenta modificar `workflow_state`, `validado_por`, `socio_generado`,
+`enviado_desde_ip` o cualquier otro campo de auditoría / sistema
+Then el endpoint **ignora silenciosamente** esos campos (no los aplica) o
+falla con `frappe.ValidationError` (decisión de implementación: lista blanca
+explícita de campos editables por Guest)
+And nunca se exfiltra el estado actual de esos campos en la respuesta de error
+And el resto de los campos editables sí se aplican (degradación segura: el
+ataque no rompe el flujo legítimo).
+
+(La lista blanca de campos editables vive en el código del endpoint y se
+documenta como constante: `CAMPOS_EDITABLES_POR_GUEST = {"telefono",
+"domicilio", "localidad", "provincia", "codigo_postal", "dni_frente",
+"dni_dorso", "foto_perfil", "ficha_medica", "comprobante_domicilio", ...}`.)
+
+---
+
+## Scenario: endpoint público `actualizar_solicitud` rechaza token inválido o vencido
+
+Given una `Solicitud de Asociación` con `token_seguimiento = "tk-abc"`,
+`workflow_state = "Requiere Corrección"`
+When un Guest llama al endpoint con `token = "tk-otra"` (no existe ninguna
+solicitud con ese token), o con un token correcto pero la solicitud está en
+un estado distinto de `"Requiere Corrección"` (p. ej. `"Pendiente"` o
+`"Validada"`)
+Then el endpoint responde `404 Not Found` (sin distinguir entre "token
+inexistente" y "estado no permite corrección"; evita oracle attack)
+And no se aplica ningún cambio
+And no se filtra información de existencia/estado del documento.
+
+---
+
+## Scenario: endpoint público `actualizar_solicitud` aplica el mismo rate-limit
+
+Given el mismo umbral de rate-limit del alta (`5/10min por IP`)
+When una IP X envía 6 llamadas al endpoint `actualizar_solicitud` en menos
+de 10 minutos
+Then la sexta es rechazada con HTTP 429
+And se registra el intento en `frappe.log_error`.
+
+(Implementación: el rate-limit se aplica a la combinación `IP + endpoint`,
+no globalmente al sitio.)
 
 ---
 
@@ -501,6 +723,22 @@ And esto se cubre con un test sobre la función de render del email.
 
 ---
 
+## Plan de commits (Sprint 1)
+
+| # | Tema | Tests rojos primero |
+|---|---|---|
+| 1 | DocType `Solicitud de Asociación` (JSON + autoname + permisos) + tests unitarios | sí — `test_solicitud_asociacion.py::test_doctype_*` |
+| 2 | Web Form público + validaciones server-side (incluye rate-limit, token, IP detrás de proxy, IP en `enviado_desde_ip`) | sí — `test_solicitud_asociacion.py::test_web_form_*` |
+| 3 | Workflow fixture (`Pendiente / Requiere Corrección / Validada / Rechazada`) + `before_save` de auditoría (`validado_por/en`, etc.) | sí — `test_workflow_solicitud_asociacion.py` |
+| 4 | Service `ensure_grupo_for_socio` + `validar_solicitud` (adulto, menor-con-Socio, menor-con-TNS, los 3 sub-flujos de email del menor) + bloqueos (G2 DNI ya TNS, G3 email ya tomado, etc.) | sí — `test_workflow_solicitud_asociacion.py::test_validar_*` |
+| 5 | Email templates + stub de pago (`pago_stub`) + tests de escape XSS en `motivos_rechazo` + endpoint público `solicitar_correccion` por token | sí — `test_solicitud_asociacion_emails.py`, `test_correccion_publica.py` |
+| 6 | Migrar `Socio.solicitud_origen` de `Data` → `Link "Solicitud de Asociación"` + test que verifica la integridad referencial | sí — `test_socio_referencia_solicitud.py` (nuevo) |
+
+Cada commit con sus tests en verde antes de pasar al siguiente. La rama
+`develop` debe quedar siempre estable.
+
+---
+
 ## Notas de implementación (no testeables aquí)
 
 - DocType: `members/doctype/solicitud_asociacion/solicitud_asociacion.{json,py,js}`.
@@ -516,11 +754,23 @@ And esto se cubre con un test sobre la función de render del email.
   stub de pago se inserta vía Jinja con `token` firmado/expirado.
 - `validar_solicitud` reutiliza:
   - `members/services/user_provisioning.py::provision_user_for_socio(socio_doc)` —
-    crea `User` si y solo si el email no está tomado; **nunca** genera email técnico;
-    devuelve `None` si el menor queda sin User.
+    crea `User` si y solo si el email no está tomado y no comparte el del tutor;
+    **nunca** genera email técnico; devuelve `None` si el menor queda sin User.
+    Es el servicio que ejecuta la "Decisión sobre `User` para menores" (3 reglas).
   - `members/services/grupo_familiar.py::ensure_grupo_for_socio(socio_doc, tutor_doc=None)` —
     crea `Grupo Familiar` nuevo si el solicitante es adulto, o agrega al menor al
-    `Grupo Familiar` del tutor existente.
+    `Grupo Familiar` del tutor existente. **Este servicio no existe todavía; se
+    crea en el commit 4 del Sprint 1.**
+
+- **Migración de `Socio.solicitud_origen` (commit 6 del sprint):** hoy es `Data
+  (string)` porque el DocType `Solicitud de Asociación` no existía en Sprint 0.
+  En Sprint 1 commit 6 se migra a `Link → "Solicitud de Asociación"`. La
+  migración requiere:
+  - actualizar `socio.json` con el nuevo `fieldtype` y `options`,
+  - un patch en `patches.txt` que mapee strings huérfanos a `name`s del nuevo
+    DocType (o los limpie si no se encuentran),
+  - test que verifica que un `Socio` con `solicitud_origen` apuntando a una
+    `Solicitud de Asociación` válida puede leerse y la referencia es navegable.
 - Auditoría:
   - `before_save` del DocType setea `validado_por/en`, `rechazado_por/en`,
     `correccion_solicitada_por/en` según la transición de `workflow_state`.
@@ -528,14 +778,31 @@ And esto se cubre con un test sobre la función de render del email.
     (no se sobreescriben en saves "intrascendentes").
 - Tests:
   - `members/doctype/solicitud_asociacion/test_solicitud_asociacion.py`
-    → alta Guest, validaciones de campos, rate-limit, validación MIME de ficha médica.
+    → alta Guest, validaciones de campos, rate-limit, validación MIME de ficha
+    médica, IP detrás de proxy (`X-Forwarded-For`), `token_seguimiento` no
+    enumerable, autoname.
   - `members/doctype/solicitud_asociacion/test_workflow_solicitud_asociacion.py`
-    → transiciones (validar adulto / validar menor con tutor / rechazar / corrección),
-    idempotencia, auditoría de timestamps.
-  - `tests/test_solicitud_asociacion_isolation.py`
+    → transiciones (validar adulto / validar menor con tutor Socio / validar
+    menor con tutor No Socio / validar segundo menor / rechazar / corrección),
+    los 3 sub-flujos de email del menor (compartido, único+libre, único+tomado),
+    bloqueo por DNI ya Socio, bloqueo por DNI ya Tutor No Socio,
+    idempotencia, auditoría de timestamps, `familiares_existentes_dnis`
+    declarativo.
+  - `members/tests/test_solicitud_asociacion_isolation.py`
     → Guest no lee, Socio no lee, Secretaría sí.
-  - `tests/test_solicitud_asociacion_emails.py`
-    → escape XSS en `motivos_rechazo`, contenido del email validada.
+  - `members/tests/test_solicitud_asociacion_emails.py`
+    → escape XSS en `motivos_rechazo`, contenido del email validada, link de
+    pago stub no adivinable por enumeración.
+  - `members/tests/test_correccion_publica.py` (Sprint 1 mantiene endpoint
+    público de corrección)
+    → token válido + estado `Requiere Corrección` permite actualizar adjuntos;
+    token inválido o vencido → 404; scope limitado a la misma solicitud
+    (no se puede modificar otra); campos no editables por Guest están
+    protegidos (`workflow_state`, auditoría, etc.).
+  - `members/tests/test_socio_referencia_solicitud.py` (commit 6)
+    → migración `Socio.solicitud_origen` de Data → Link funciona; integridad
+    referencial; lectura del Socio sigue accesible vía las reglas de aislamiento
+    de Sprint 0.
 
 - En `hooks.py` (al implementar):
   - `has_website_permission` / `permission_query_conditions` para
