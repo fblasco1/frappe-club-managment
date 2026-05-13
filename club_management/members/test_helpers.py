@@ -43,11 +43,41 @@ class MembersTestCase(FrappeTestCase):
 
 
 # Paths simbólicos para campos Attach.
-# Frappe no exige que el archivo exista físicamente para guardar el campo.
+# Frappe NO exige que el archivo exista físicamente para guardar el campo en
+# DocTypes propios (Socio, Tutor No Socio, Grupo Familiar, Solicitud
+# Asociacion al insertarse via `insert_solicitud_asociacion`); el campo
+# `Attach` solo almacena la URL como string. Estos paths son útiles para
+# probar invariantes que NO atraviesan `validate_ficha_medica_from_url`
+# (que SÍ lee el archivo del disco). Para tests que entran al endpoint
+# público `submit_solicitud` usar `make_test_file(...)` con un PDF
+# válido como `MINIMAL_VALID_PDF`.
 DUMMY_FOTO_PERFIL = "/files/test_foto_perfil.jpg"
 DUMMY_DNI_FRENTE = "/files/test_dni_frente.jpg"
 DUMMY_DNI_DORSO = "/files/test_dni_dorso.jpg"
 DUMMY_FICHA_MEDICA = "/files/test_ficha_medica.pdf"
+
+
+# PDF mínimo estructuralmente válido (~180 bytes). pypdf 6.x lo parsea sin
+# error: tiene header, 3 objetos (catalog, pages, page), xref table,
+# trailer y %%EOF. Para tests del endpoint público y de
+# `validate_ficha_medica_from_url` que necesitan que Frappe acepte el
+# File sin romper en el hook de procesamiento de PDFs.
+MINIMAL_VALID_PDF: bytes = (
+    b"%PDF-1.0\n"
+    b"1 0 obj<</Pages 2 0 R>>endobj\n"
+    b"2 0 obj<</Kids[3 0 R]/Count 1>>endobj\n"
+    b"3 0 obj<</Parent 2 0 R>>endobj\n"
+    b"xref\n"
+    b"0 4\n"
+    b"0000000000 65535 f \n"
+    b"0000000009 00000 n \n"
+    b"0000000044 00000 n \n"
+    b"0000000083 00000 n \n"
+    b"trailer<</Root 1 0 R/Size 4>>\n"
+    b"startxref\n"
+    b"112\n"
+    b"%%EOF\n"
+)
 
 
 def adult_birthdate(years: int = 35) -> datetime.date:
@@ -268,6 +298,36 @@ def insert_solicitud_asociacion(**overrides: Any) -> "frappe.model.document.Docu
     doc = frappe.get_doc(make_solicitud_asociacion_payload(**overrides))
     doc.insert(ignore_permissions=True)
     return doc
+
+
+def make_test_file(filename: str, content: bytes, is_private: int = 1) -> str:
+    """Crea un `File` de Frappe con contenido binario y devuelve su `file_url`.
+
+    Útil para tests que validan `ficha_medica` por magic numbers o tamaño:
+    el helper `validate_ficha_medica_from_url` necesita un archivo real en
+    disco para leer los primeros bytes y `os.path.getsize`.
+
+    Por defecto el archivo se crea como **privado** (`is_private=1`,
+    almacenado en `/private/files/`). Esto evita los hooks de
+    procesamiento automático que Frappe v15 ejecuta sobre archivos
+    públicos (p. ej. `pypdf` para PDFs), que rompen si el contenido no
+    es estructuralmente válido. Para tests que necesitan un PDF
+    "real" pasar `MINIMAL_VALID_PDF` como `content`.
+
+    No se asocia a ningún DocType padre. El SAVEPOINT del `MembersTestCase`
+    hace rollback del `File` doc en tearDown, pero el archivo físico en
+    `/private/files/` queda en disco; eso es inocuo para el suite.
+    """
+    file_doc = frappe.get_doc(
+        {
+            "doctype": "File",
+            "file_name": filename,
+            "content": content,
+            "is_private": is_private,
+            "decode": False,
+        }
+    ).insert(ignore_permissions=True)
+    return file_doc.file_url
 
 
 def ensure_role_socio_exists() -> None:

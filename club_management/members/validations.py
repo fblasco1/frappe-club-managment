@@ -5,6 +5,11 @@ Helpers reutilizables entre DocTypes, Web Forms y servicios:
 - `validate_ficha_medica`: política canónica de MIME y tamaño de la ficha
   médica. La usan `Socio` y el Web Form de `Solicitud de Asociación` para
   garantizar la misma regla en Desk y portal.
+- `validate_ficha_medica_from_url`: variante que resuelve el `File` por
+  URL, detecta el MIME real con magic numbers (anti-spoofing por
+  extensión) y delega a `validate_ficha_medica`. Pensado para el endpoint
+  público `submit_solicitud` que recibe URLs de archivos subidos
+  previamente por Guest vía `frappe.client.upload_file`.
 - `enforce_mandatory_depends_on`: valida server-side las expresiones
   `mandatory_depends_on` declaradas en el JSON del DocType. Frappe v15
   solo las valida en JS (Desk); este helper cubre los inserts vía Python,
@@ -13,6 +18,7 @@ Helpers reutilizables entre DocTypes, Web Forms y servicios:
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 import frappe
@@ -47,6 +53,54 @@ def validate_ficha_medica(
 				TAMANO_MAX_BYTES // (1024 * 1024)
 			)
 		)
+
+
+def _detect_mime_by_magic_numbers(head: bytes) -> str:
+	"""Detecta MIME por los primeros bytes del archivo (anti-spoofing).
+
+	Sólo reconoce los formatos aceptados por la política de ficha médica
+	(`MIMES_PERMITIDOS`); cualquier otro devuelve
+	`application/octet-stream`, que `validate_ficha_medica` rechaza.
+
+	No depende de `python-magic`/`libmagic`: la inspección es nativa y
+	suficiente para PDF, JPEG y PNG.
+	"""
+	if head.startswith(b"%PDF"):
+		return "application/pdf"
+	if head.startswith(b"\xff\xd8\xff"):
+		return "image/jpeg"
+	if head.startswith(b"\x89PNG\r\n\x1a\n"):
+		return "image/png"
+	return "application/octet-stream"
+
+
+def validate_ficha_medica_from_url(file_url: str) -> None:
+	"""Valida MIME + tamaño de la ficha médica a partir de su `file_url`.
+
+	Pensado para el endpoint público `submit_solicitud` y cualquier flujo
+	que reciba el archivo ya subido vía `frappe.client.upload_file`.
+
+	Flujo:
+	1. Resuelve el `File` doc por `file_url`.
+	2. Obtiene el path local con `get_full_path()`.
+	3. Lee los primeros 8 bytes y detecta el MIME por magic numbers.
+	4. Lee el tamaño con `os.path.getsize`.
+	5. Delega a `validate_ficha_medica` (política única para Desk y portal).
+	"""
+	file_doc = frappe.get_doc("File", {"file_url": file_url})
+	file_path = file_doc.get_full_path()
+
+	with open(file_path, "rb") as f:
+		head = f.read(8)
+	mime_type = _detect_mime_by_magic_numbers(head)
+
+	file_size_bytes = os.path.getsize(file_path)
+
+	validate_ficha_medica(
+		file_url=file_url,
+		mime_type=mime_type,
+		file_size_bytes=file_size_bytes,
+	)
 
 
 def enforce_mandatory_depends_on(doc: "Document") -> None:

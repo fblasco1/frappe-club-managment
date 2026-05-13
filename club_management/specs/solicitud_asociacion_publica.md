@@ -3,9 +3,7 @@
 Given/When/Then para el **DocType `Solicitud de Asociación`** y su **Web Form público**.
 Es la puerta de entrada del flujo prioritario:
 
-`No Socio → Formulario público → Cola en dashboard Secretaría → Validación de
-documentos → (OK) creación de User + Socio + email con botón de pago / (Rechazo)
-email con motivos detallados`.
+`No Socio → Formulario público → Cola en dashboard Secretaría → Validación de documentos → (OK) creación de User + Socio + email con botón de pago / (Rechazo) email con motivos detallados`.
 
 **Ruta en Bench (relativa a `frappe-bench/`):** `apps/club_management/club_management/specs/`
 **Ruta en este workspace:** `club_manager_infra/development/frappe-bench/apps/club_management/club_management/specs/`
@@ -18,15 +16,14 @@ email con motivos detallados`.
 
 ## Decisión sobre el `name` técnico del DocType
 
-El `name` técnico del DocType es **`Solicitud Asociacion`** (ASCII puro,
+El `name` técnico del DocType es `**Solicitud Asociacion`** (ASCII puro,
 sin tilde y sin "de"). Esto es por dos motivos:
 
 1. Frappe deriva el path del módulo Python con `frappe.scrub(name)`, que no
-   normaliza tildes ni mayúsculas. `scrub("Solicitud de Asociación") =
-   "solicitud_de_asociación"`, lo que forzaría un folder con tilde en el
+  normaliza tildes ni mayúsculas. `scrub("Solicitud de Asociación") =  "solicitud_de_asociación"`, lo que forzaría un folder con tilde en el
    filesystem (frágil entre Windows / Linux / Git).
 2. El name interno se mantiene ASCII puro para evitar problemas de encoding
-   entre sistemas, BD, URLs y serializaciones.
+  entre sistemas, BD, URLs y serializaciones.
 
 El **concepto de negocio** sigue siendo "Solicitud de Asociación". El
 **label visible** en Desk se va a traducir a "Solicitud de Asociación" vía
@@ -34,6 +31,7 @@ El **concepto de negocio** sigue siendo "Solicitud de Asociación". El
 tanto, Desk muestra el `name` técnico.
 
 Esta decisión se refleja en:
+
 - Folder físico: `members/doctype/solicitud_asociacion/`
 - Clase Python: `SolicitudAsociacion`
 - Slug del módulo: `solicitud_asociacion`
@@ -53,10 +51,116 @@ nombre conceptual (más legible), pero técnicamente refiere al DocType
   - `User` de portal (rol `Socio`),
   - `Socio` enlazado a ese `User` (estado `Pendiente de Pago`),
   - email con **stub local** de botón de pago (Sprint 1 no integra Supervielle real; se
-    sustituye en Sprint 4).
+  sustituye en Sprint 4).
 
 Esto evita pedirle al solicitante crear una cuenta antes de saber si será aceptado,
 y simplifica el anti-abuso al concentrar la creación de `User` en una acción autenticada.
+
+---
+
+## Decisión sobre el endpoint público del Web Form
+
+El alta pública desde el Web Form se canaliza **siempre** por un
+endpoint custom whitelisted, **no** por el built-in
+`frappe.www.web_form.accept`:
+
+```
+POST /api/method/club_management.members.api.solicitud_publica.submit_solicitud
+```
+
+Con `@frappe.whitelist(allow_guest=True)` y
+`@frappe.rate_limiter.rate_limit(limit=5, seconds=600)` (Frappe v15
+expone el decorator como `frappe.rate_limiter.rate_limit`, no como
+`frappe.rate_limit`; usa `ip_based=True` por defecto, que identifica
+al cliente por `frappe.local.request_ip`).
+
+Consecuencias para los permisos del DocType:
+
+- El rol `Guest` **NO** se declara en `DocPerm` de `Solicitud Asociacion`.
+- Guest no puede crear documentos vía `/api/resource/Solicitud Asociacion`.
+- El endpoint custom hace `frappe.get_doc(payload).insert(ignore_permissions=True)`
+después de aplicar rate-limit, validación de archivos, y filtrado de
+campos del sistema.
+
+Esto evita el bypass donde un atacante crearía solicitudes saltándose
+el rate-limit y la persistencia server-side de `enviado_desde_ip`.
+
+### Separación `submit_solicitud` (wrapper HTTP) vs `_submit_solicitud_impl`
+
+El decorator `@rate_limit` de Frappe v15 requiere
+`frappe.local.request_ip` poblado y un store Redis activo: no funciona
+correctamente cuando se invoca la función directamente desde Python
+(unit tests), porque tira `ValidationError: "Either key or IP flag is required."` al no poder derivar la identidad del cliente. Para que la
+lógica de negocio sea testeable unitariamente sin acoplarse al ciclo
+HTTP, el módulo `solicitud_publica.py` separa dos funciones:
+
+- `_submit_solicitud_impl(data)`: contiene **toda** la lógica
+(parseo, filtrado de campos sistema, validación de ficha médica,
+resolución de IP, `insert(ignore_permissions=True)`). **Sin
+decoradores.** Es la función que llaman los unit tests.
+- `submit_solicitud(data)`: wrapper público con
+`@frappe.whitelist(allow_guest=True)` y `@rate_limit(...)`, delega
+a `_submit_solicitud_impl`. Es el handler real del endpoint
+`/api/method/...submit_solicitud`.
+
+Los escenarios E2E del rate-limit (la 6ª request en 600 s recibe
+`429`) y del comportamiento Guest+whitelist se cubren como
+**integration tests** en un sprint posterior (Sprint 1 C2.5 o C5,
+depende del plan).
+
+### Lista blanca de campos editables por Guest
+
+El endpoint rechaza (silenciosamente, ignorando) los siguientes campos
+del payload de cliente:
+
+```
+name, owner, creation, modified, modified_by, docstatus,
+workflow_state, token_seguimiento, enviado_desde_ip,
+socio_generado, user_generado, grupo_familiar_generado,
+validado_por, validado_en, rechazado_por, rechazado_en,
+correccion_solicitada_por, correccion_solicitada_en
+```
+
+El cliente solo puede setear los campos del solicitante, del tutor (si
+Menor), los adjuntos (como `file_url`s) y la sección de familia y
+preferencias declarativas.
+
+### Resolución de IP cliente
+
+Helper `_resolve_client_ip()` (interno al módulo):
+
+```
+si X-Forwarded-For está en headers:
+    devolver el primer IP del listado (cliente real)
+sino:
+    devolver request.remote_addr
+```
+
+La IP resuelta se persiste en `enviado_desde_ip` server-side (el cliente
+no puede pisarlo: está en la lista de campos rechazados).
+
+---
+
+## Decisión sobre la subida de archivos por Guest
+
+Flujo multi-step:
+
+1. Frontend (HTML del Web Form nativo de Frappe) sube cada attachment
+  con `POST /api/method/upload_file` (whitelisted, `allow_guest=True`).
+   Esto requiere habilitar `**File Settings.allow_guest_to_upload_files**`
+   en el site (documentado en `infra-docker` para la configuración por
+   environment).
+2. La respuesta del `upload_file` devuelve un `file_url` `/files/...`.
+3. El frontend ensambla el payload final con todos los `file_url`s y lo
+  envía al endpoint `submit_solicitud`.
+4. El endpoint resuelve el `File` de Frappe a partir del `file_url`, lee
+  el archivo del disco local, detecta el MIME por **magic numbers**
+   (no por extensión, anti-spoofing) y valida tamaño.
+
+El helper canónico de validación es
+`members/validations.py::validate_ficha_medica_from_url(file_url)`,
+construido sobre `validate_ficha_medica()` de Sprint 0 (mismo criterio
+PDF/JPEG/PNG ≤ 5 MB en Desk y portal).
 
 ---
 
@@ -65,14 +169,13 @@ y simplifica el anti-abuso al concentrar la creación de `User` en una acción a
 Política unificada al validar un menor:
 
 1. Si `solicitud.email == solicitud.email_tutor` (mismo email para menor y tutor),
-   **no** se crea `User` para el menor. El menor se gestiona vía el `User` del
+  **no** se crea `User` para el menor. El menor se gestiona vía el `User` del
    tutor. `Socio.user` queda vacío.
 2. Si `solicitud.email != solicitud.email_tutor` y `solicitud.email` **no** está
-   tomado por otro `User`, se crea un `User` propio para el menor con `name =
-   solicitud.email`, `username = solicitud.dni`, rol `Socio`. `Socio.user` queda
+  tomado por otro `User`, se crea un `User` propio para el menor con `name =  solicitud.email`, `username = solicitud.dni`, rol `Socio`. `Socio.user` queda
    poblado.
 3. Si `solicitud.email != solicitud.email_tutor` pero `solicitud.email` **ya
-   está tomado** por otro `User`, la transición `Validar` falla con
+  está tomado** por otro `User`, la transición `Validar` falla con
    `frappe.ValidationError` y el solicitante debe usar otro email para el menor
    (o compartir el del tutor).
 
@@ -99,21 +202,23 @@ Esto evita duplicación y mantener dos puntos sincronizados.
 
 ### Datos del solicitante
 
-| Campo | Tipo | Reqd | Comentario |
-|---|---|---|---|
-| `nombre` | Data | sí | |
-| `apellido` | Data | sí | |
-| `dni` | Data | sí | Validación de formato (solo dígitos); será el `username` del futuro `User` |
-| `nacionalidad` | Link → `Country` | **sí** | Default `"Argentina"` |
-| `fecha_nacimiento` | Date | sí | El sistema deriva `es_menor` comparando con la fecha actual |
-| `genero` | Select | **sí** | `Masculino` / `Femenino` / `Otro` / `Prefiero no decir` |
-| `categoria_solicitada` | Select | sí | `Activo` / `Menor` / `Adherente` / `Jubilado` |
-| `email` | Data (Email) | sí | **No único**: puede coincidir con el del tutor o de otro familiar socio |
-| `telefono` | Data | sí | |
-| `domicilio` | Small Text | sí | |
-| `localidad` | Data | sí | |
-| `provincia` | Data | sí | |
-| `codigo_postal` | Data | sí | |
+
+| Campo                  | Tipo             | Reqd   | Comentario                                                                 |
+| ---------------------- | ---------------- | ------ | -------------------------------------------------------------------------- |
+| `nombre`               | Data             | sí     |                                                                            |
+| `apellido`             | Data             | sí     |                                                                            |
+| `dni`                  | Data             | sí     | Validación de formato (solo dígitos); será el `username` del futuro `User` |
+| `nacionalidad`         | Link → `Country` | **sí** | Default `"Argentina"`                                                      |
+| `fecha_nacimiento`     | Date             | sí     | El sistema deriva `es_menor` comparando con la fecha actual                |
+| `genero`               | Select           | **sí** | `Masculino` / `Femenino` / `Otro` / `Prefiero no decir`                    |
+| `categoria_solicitada` | Select           | sí     | `Activo` / `Menor` / `Adherente` / `Jubilado`                              |
+| `email`                | Data (Email)     | sí     | **No único**: puede coincidir con el del tutor o de otro familiar socio    |
+| `telefono`             | Data             | sí     |                                                                            |
+| `domicilio`            | Small Text       | sí     |                                                                            |
+| `localidad`            | Data             | sí     |                                                                            |
+| `provincia`            | Data             | sí     |                                                                            |
+| `codigo_postal`        | Data             | sí     |                                                                            |
+
 
 ### Datos del tutor (solo si `categoria_solicitada = "Menor"`)
 
@@ -122,21 +227,23 @@ que asocia a sus hijos al club pero él/ella mismo/a no realiza actividad. Los
 campos del tutor son los necesarios para crear o resolver un `Tutor No Socio` /
 `Socio` al validar.
 
-| Campo                 | Tipo             | Reqd               | Comentario                                                                                                                                                                                                                                                                                          |
-| --------------------- | ---------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dni_tutor`           | Data             | sí (cuando menor)  | Si existe un `Socio` con este DNI, se reutiliza como tutor. Si no, se crea un `Tutor No Socio` con los datos siguientes                                                                                                                                                                              |
-| `nombre_tutor`        | Data             | sí (cuando menor)  |                                                                                                                                                                                                                                                                                                     |
-| `apellido_tutor`      | Data             | sí (cuando menor)  |                                                                                                                                                                                                                                                                                                     |
-| `fecha_nacimiento_tutor` | Date          | sí (cuando menor)  | Debe corresponder a mayor de 18 años                                                                                                                                                                                                                                                               |
-| `nacionalidad_tutor`  | Link → `Country` | sí (cuando menor)  | Default `"Argentina"`                                                                                                                                                                                                                                                                              |
-| `genero_tutor`        | Select           | sí (cuando menor)  | `Masculino` / `Femenino` / `Otro` / `Prefiero no decir`                                                                                                                                                                                                                                            |
-| `email_tutor`         | Data (Email)     | sí (cuando menor)  | Email de contacto del tutor; puede coincidir con `email` del menor                                                                                                                                                                                                                                  |
-| `telefono_tutor`      | Data             | sí (cuando menor)  |                                                                                                                                                                                                                                                                                                     |
-| `domicilio_tutor`     | Small Text       | sí (cuando menor)  |                                                                                                                                                                                                                                                                                                     |
-| `localidad_tutor`     | Data             | sí (cuando menor)  |                                                                                                                                                                                                                                                                                                     |
-| `provincia_tutor`     | Data             | sí (cuando menor)  |                                                                                                                                                                                                                                                                                                     |
-| `codigo_postal_tutor` | Data             | sí (cuando menor)  |                                                                                                                                                                                                                                                                                                     |
-| `rol_tutor`           | Select           | sí (cuando menor)  | `Padre` / `Madre` / `Tutor Legal` — se guarda como `rol` en `Miembro de Grupo Familiar` al validar al menor                                                                                                                                                                                        |
+
+| Campo                    | Tipo             | Reqd              | Comentario                                                                                                              |
+| ------------------------ | ---------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `dni_tutor`              | Data             | sí (cuando menor) | Si existe un `Socio` con este DNI, se reutiliza como tutor. Si no, se crea un `Tutor No Socio` con los datos siguientes |
+| `nombre_tutor`           | Data             | sí (cuando menor) |                                                                                                                         |
+| `apellido_tutor`         | Data             | sí (cuando menor) |                                                                                                                         |
+| `fecha_nacimiento_tutor` | Date             | sí (cuando menor) | Debe corresponder a mayor de 18 años                                                                                    |
+| `nacionalidad_tutor`     | Link → `Country` | sí (cuando menor) | Default `"Argentina"`                                                                                                   |
+| `genero_tutor`           | Select           | sí (cuando menor) | `Masculino` / `Femenino` / `Otro` / `Prefiero no decir`                                                                 |
+| `email_tutor`            | Data (Email)     | sí (cuando menor) | Email de contacto del tutor; puede coincidir con `email` del menor                                                      |
+| `telefono_tutor`         | Data             | sí (cuando menor) |                                                                                                                         |
+| `domicilio_tutor`        | Small Text       | sí (cuando menor) |                                                                                                                         |
+| `localidad_tutor`        | Data             | sí (cuando menor) |                                                                                                                         |
+| `provincia_tutor`        | Data             | sí (cuando menor) |                                                                                                                         |
+| `codigo_postal_tutor`    | Data             | sí (cuando menor) |                                                                                                                         |
+| `rol_tutor`              | Select           | sí (cuando menor) | `Padre` / `Madre` / `Tutor Legal` — se guarda como `rol` en `Miembro de Grupo Familiar` al validar al menor             |
+
 
 > Si el `dni_tutor` declarado ya corresponde a un `Socio` existente (con
 > `categoria` ≠ `"Menor"` y mayor de 18 años), Secretaría valida la solicitud y el
@@ -145,45 +252,53 @@ campos del tutor son los necesarios para crear o resolver un `Tutor No Socio` /
 
 ### Documentación adjunta
 
-| Campo | Tipo | Reqd | Comentario |
-|---|---|---|---|
-| `dni_frente` | Attach | sí | imagen / PDF |
-| `dni_dorso` | Attach | sí | imagen / PDF |
-| `foto_perfil` | Attach Image | sí | |
-| `ficha_medica` | Attach | **sí** | PDF / JPEG / PNG, ≤ 5MB; firmado por profesional médico |
-| `comprobante_domicilio` | Attach | no | servicio, AFIP, etc. |
+
+| Campo                   | Tipo         | Reqd   | Comentario                                              |
+| ----------------------- | ------------ | ------ | ------------------------------------------------------- |
+| `dni_frente`            | Attach       | sí     | imagen / PDF                                            |
+| `dni_dorso`             | Attach       | sí     | imagen / PDF                                            |
+| `foto_perfil`           | Attach Image | sí     |                                                         |
+| `ficha_medica`          | Attach       | **sí** | PDF / JPEG / PNG, ≤ 5MB; firmado por profesional médico |
+| `comprobante_domicilio` | Attach       | no     | servicio, AFIP, etc.                                    |
+
 
 ### Familia y preferencias (declarativas; no vinculantes)
 
-| Campo | Tipo | Reqd | Comentario |
-|---|---|---|---|
-| `tiene_familiares_socios` | Check | no | Si sí, abre los siguientes |
-| `familiares_existentes_dnis` | Small Text | no | DNIs separados por coma. Secretaría valida luego. |
-| `actividad_interes` | Data | no | Texto libre o link a `Item`; declarativo |
+
+| Campo                        | Tipo       | Reqd | Comentario                                        |
+| ---------------------------- | ---------- | ---- | ------------------------------------------------- |
+| `tiene_familiares_socios`    | Check      | no   | Si sí, abre los siguientes                        |
+| `familiares_existentes_dnis` | Small Text | no   | DNIs separados por coma. Secretaría valida luego. |
+| `actividad_interes`          | Data       | no   | Texto libre o link a `Item`; declarativo          |
+
 
 ### Workflow y trazabilidad
 
-| Campo | Tipo | Reqd | Read-only | Comentario |
-|---|---|---|---|---|
-| `workflow_state` | Link → `Workflow State` | sí | sí | Inicial: `Pendiente` |
-| `motivos_rechazo` | Text | depende | no | Requerido en transición a `Rechazada` |
-| `observaciones_secretaria` | Text | no | no | Notas internas |
-| `socio_generado` | Link → `Socio` | no | sí | Se setea al validar |
-| `user_generado` | Link → `User` | no | sí | Vacío si el menor queda sin User propio (gestión vía tutor) |
-| `grupo_familiar_generado` | Link → `Grupo Familiar` | no | sí | Grupo al que se incorporó el Socio al validar (nuevo o existente del tutor) |
-| `token_seguimiento` | Data | no | sí | Token público para que el solicitante consulte estado |
-| `enviado_desde_ip` | Data | no | sí | Para auditoría y rate-limit |
+
+| Campo                      | Tipo                    | Reqd    | Read-only | Comentario                                                                  |
+| -------------------------- | ----------------------- | ------- | --------- | --------------------------------------------------------------------------- |
+| `workflow_state`           | Link → `Workflow State` | sí      | sí        | Inicial: `Pendiente`                                                        |
+| `motivos_rechazo`          | Text                    | depende | no        | Requerido en transición a `Rechazada`                                       |
+| `observaciones_secretaria` | Text                    | no      | no        | Notas internas                                                              |
+| `socio_generado`           | Link → `Socio`          | no      | sí        | Se setea al validar                                                         |
+| `user_generado`            | Link → `User`           | no      | sí        | Vacío si el menor queda sin User propio (gestión vía tutor)                 |
+| `grupo_familiar_generado`  | Link → `Grupo Familiar` | no      | sí        | Grupo al que se incorporó el Socio al validar (nuevo o existente del tutor) |
+| `token_seguimiento`        | Data                    | no      | sí        | Token público para que el solicitante consulte estado                       |
+| `enviado_desde_ip`         | Data                    | no      | sí        | Para auditoría y rate-limit                                                 |
+
 
 ### Auditoría del flujo (todos `read-only`; setean server-side)
 
-| Campo                          | Tipo          | Comentario                                              |
-| ------------------------------ | ------------- | ------------------------------------------------------- |
-| `validado_por`                 | Link → `User` | Quién ejecutó la transición `Validar`                   |
-| `validado_en`                  | Datetime      | Timestamp                                               |
-| `rechazado_por`                | Link → `User` | Quién ejecutó la transición `Rechazar`                  |
-| `rechazado_en`                 | Datetime      | Timestamp                                               |
-| `correccion_solicitada_por`    | Link → `User` | Última vez que se transicionó a `Requiere Corrección`   |
-| `correccion_solicitada_en`     | Datetime      | Timestamp                                               |
+
+| Campo                       | Tipo          | Comentario                                            |
+| --------------------------- | ------------- | ----------------------------------------------------- |
+| `validado_por`              | Link → `User` | Quién ejecutó la transición `Validar`                 |
+| `validado_en`               | Datetime      | Timestamp                                             |
+| `rechazado_por`             | Link → `User` | Quién ejecutó la transición `Rechazar`                |
+| `rechazado_en`              | Datetime      | Timestamp                                             |
+| `correccion_solicitada_por` | Link → `User` | Última vez que se transicionó a `Requiere Corrección` |
+| `correccion_solicitada_en`  | Datetime      | Timestamp                                             |
+
 
 > `owner` / `creation` ya capturan quién envió la Solicitud y cuándo (creación
 > por Guest queda con `owner = "Guest"`). Los campos de arriba auditan
@@ -209,12 +324,14 @@ Rechazada            → estado terminal
 
 ## Permisos
 
-| Rol | create | read | write | submit | cancel | delete |
-|---|---|---|---|---|---|---|
-| `Guest` | sí (solo vía Web Form) | no | no | no | no | no |
-| `Secretaria` | sí | sí (todas) | sí | n/a | n/a | no |
-| `System Manager` | sí | sí | sí | n/a | n/a | sí |
-| `Socio` | no | no | no | no | no | no |
+
+| Rol              | create                 | read       | write | submit | cancel | delete |
+| ---------------- | ---------------------- | ---------- | ----- | ------ | ------ | ------ |
+| `Guest`          | sí (solo vía Web Form) | no         | no    | no     | no     | no     |
+| `Secretaria`     | sí                     | sí (todas) | sí    | n/a    | n/a    | no     |
+| `System Manager` | sí                     | sí         | sí    | n/a    | n/a    | sí     |
+| `Socio`          | no                     | no         | no    | no     | no     | no     |
+
 
 `Guest` no debe poder leer ninguna `Solicitud de Asociación` por `/api/resource/`.
 Solo crea vía endpoint del Web Form.
@@ -329,24 +446,25 @@ And no existe un `User` con `username` = `<dni del solicitante>`
 And no existe un `Socio` con ese DNI
 When `Secretaria` ejecuta la acción `Validar` (transición de workflow)
 Then en una sola transacción:
-  - se crea un `User` con `name = <email>`, `username = <dni>`,
-    `enabled = 1`, `user_type = "Website User"`, rol `Socio`,
-  - se crea un `Socio` con `estado = "Pendiente de Pago"`, `dni`, `email`,
-    `nacionalidad`, `categoria = <categoria_solicitada>`,
-    `user = <name del User>`, `solicitud_origen = <name de la solicitud>`,
-    (la auditoría de la validación queda en la propia Solicitud,
-    cf. sección "Decisión sobre auditoría de validación"),
-  - se crea un `Grupo Familiar` nuevo con `titulares` = una sola fila
-    `{tipo_titular: "Socio", titular: <Socio>, es_principal: 1, rol: "Titular"}`,
-  - el `Socio` queda automáticamente en `miembros` con `rol = "Titular"` (por la
-    sincronización del controlador de `Grupo Familiar`),
-  - el `Socio` queda con `grupo_familiar = <nuevo grupo>`,
-  - los adjuntos `dni_frente`, `dni_dorso`, `foto_perfil`, `ficha_medica` se
-    referencian (o copian) en el `Socio`,
-  - la solicitud queda con `workflow_state = "Validada"`, `socio_generado`,
-    `user_generado`, `grupo_familiar_generado` poblados, `validado_por` y
-    `validado_en` registrados,
-  - se encola un email al solicitante con el **link stub** de pago de primera cuota.
+
+- se crea un `User` con `name = <email>`, `username = <dni>`,
+`enabled = 1`, `user_type = "Website User"`, rol `Socio`,
+- se crea un `Socio` con `estado = "Pendiente de Pago"`, `dni`, `email`,
+`nacionalidad`, `categoria = <categoria_solicitada>`,
+`user = <name del User>`, `solicitud_origen = <name de la solicitud>`,
+(la auditoría de la validación queda en la propia Solicitud,
+cf. sección "Decisión sobre auditoría de validación"),
+- se crea un `Grupo Familiar` nuevo con `titulares` = una sola fila
+`{tipo_titular: "Socio", titular: <Socio>, es_principal: 1, rol: "Titular"}`,
+- el `Socio` queda automáticamente en `miembros` con `rol = "Titular"` (por la
+sincronización del controlador de `Grupo Familiar`),
+- el `Socio` queda con `grupo_familiar = <nuevo grupo>`,
+- los adjuntos `dni_frente`, `dni_dorso`, `foto_perfil`, `ficha_medica` se
+referencian (o copian) en el `Socio`,
+- la solicitud queda con `workflow_state = "Validada"`, `socio_generado`,
+`user_generado`, `grupo_familiar_generado` poblados, `validado_por` y
+`validado_en` registrados,
+- se encola un email al solicitante con el **link stub** de pago de primera cuota.
 And si **cualquier paso** falla, la transacción se aborta (no queda `User` huérfano
 sin `Socio`, ni grupo huérfano sin titulares, ni viceversa).
 
@@ -377,8 +495,8 @@ para registrar la decisión de unión manual posterior.
 ## Scenario: validar adulto con email ya tomado bloquea
 
 Given una `Solicitud de Asociación` con `categoria_solicitada` ≠ `"Menor"`,
-`email` = "familia@example.com"
-And ya existe un `User` con `name` = "familia@example.com"
+`email` = "[familia@example.com](mailto:familia@example.com)"
+And ya existe un `User` con `name` = "[familia@example.com](mailto:familia@example.com)"
 When `Secretaria` ejecuta la acción `Validar`
 Then la transición falla con `frappe.ValidationError`
 (mensaje: "El email ya tiene cuenta en el portal; pedí al solicitante un email distinto")
@@ -401,19 +519,20 @@ titular activo (`es_principal = 1`) de `Grupo Familiar` `G` (vía una fila
 And ya existe un `User` con `name = "familia@example.com"` (del tutor)
 When `Secretaria` ejecuta la acción `Validar`
 Then en una sola transacción:
-  - **no** se crea `User` para el menor (regla 1 de "Decisión sobre `User`
-    para menores": `solicitud.email == solicitud.email_tutor`),
-  - se crea un `Socio` con `dni = "55222222"`, `categoria = "Menor"`,
-    `email = "familia@example.com"`, `user = ""` (vacío),
-    `tipo_tutor = "Socio"`, `tutor = <S_tutor.name>`,
-    `grupo_familiar = G`,
-    `estado = "Pendiente de Pago"`, `solicitud_origen = <name>`,
-  - se agrega una nueva fila a `G.miembros` con `socio = <Socio menor>`,
-    `rol = "Hijo"` (derivado de `rol_tutor = "Padre"`), `desde = hoy`,
-  - la solicitud queda `Validada`, `socio_generado` poblado, `user_generado` vacío,
-    `grupo_familiar_generado = G`,
-  - el email del stub de pago se envía a `"familia@example.com"` (el tutor recibe
-    el link para pagar la primera cuota del menor).
+
+- **no** se crea `User` para el menor (regla 1 de "Decisión sobre `User`
+para menores": `solicitud.email == solicitud.email_tutor`),
+- se crea un `Socio` con `dni = "55222222"`, `categoria = "Menor"`,
+`email = "familia@example.com"`, `user = ""` (vacío),
+`tipo_tutor = "Socio"`, `tutor = <S_tutor.name>`,
+`grupo_familiar = G`,
+`estado = "Pendiente de Pago"`, `solicitud_origen = <name>`,
+- se agrega una nueva fila a `G.miembros` con `socio = <Socio menor>`,
+`rol = "Hijo"` (derivado de `rol_tutor = "Padre"`), `desde = hoy`,
+- la solicitud queda `Validada`, `socio_generado` poblado, `user_generado` vacío,
+`grupo_familiar_generado = G`,
+- el email del stub de pago se envía a `"familia@example.com"` (el tutor recibe
+el link para pagar la primera cuota del menor).
 
 ---
 
@@ -428,21 +547,22 @@ titular activo de `Grupo Familiar` `G`
 And **no** existe ningún `User` con `name = "ana@example.com"` ni `username = "55222222"`
 When `Secretaria` ejecuta la acción `Validar`
 Then en una sola transacción:
-  - **se crea** un `User` para el menor con `name = "ana@example.com"`,
-    `username = "55222222"`, `enabled = 1`, `user_type = "Website User"`, rol
-    `Socio` (regla 2 de "Decisión sobre `User` para menores"),
-  - se crea un `Socio` con `dni = "55222222"`, `categoria = "Menor"`,
-    `email = "ana@example.com"`, `user = "ana@example.com"`,
-    `tipo_tutor = "Socio"`, `tutor = <S_tutor.name>`,
-    `grupo_familiar = G`, `estado = "Pendiente de Pago"`,
-    `solicitud_origen = <name>`,
-  - se agrega una nueva fila a `G.miembros` con `socio = <Socio menor>`,
-    `rol = "Hijo"`, `desde = hoy`,
-  - la solicitud queda `Validada`, `socio_generado` y `user_generado` poblados,
-    `grupo_familiar_generado = G`,
-  - el email del stub de pago se envía a `"papa@example.com"` (el **tutor**
-    recibe el link aun cuando el menor tenga `User` propio: el tutor sigue
-    siendo el responsable financiero).
+
+- **se crea** un `User` para el menor con `name = "ana@example.com"`,
+`username = "55222222"`, `enabled = 1`, `user_type = "Website User"`, rol
+`Socio` (regla 2 de "Decisión sobre `User` para menores"),
+- se crea un `Socio` con `dni = "55222222"`, `categoria = "Menor"`,
+`email = "ana@example.com"`, `user = "ana@example.com"`,
+`tipo_tutor = "Socio"`, `tutor = <S_tutor.name>`,
+`grupo_familiar = G`, `estado = "Pendiente de Pago"`,
+`solicitud_origen = <name>`,
+- se agrega una nueva fila a `G.miembros` con `socio = <Socio menor>`,
+`rol = "Hijo"`, `desde = hoy`,
+- la solicitud queda `Validada`, `socio_generado` y `user_generado` poblados,
+`grupo_familiar_generado = G`,
+- el email del stub de pago se envía a `"papa@example.com"` (el **tutor**
+recibe el link aun cuando el menor tenga `User` propio: el tutor sigue
+siendo el responsable financiero).
 
 ---
 
@@ -475,22 +595,23 @@ And **no** existe ningún `Tutor No Socio` con `dni = "20111111"`
 And no existe `User` con `name = "familia@example.com"` ni `username = "20111111"`
 When `Secretaria` ejecuta la acción `Validar`
 Then en una sola transacción:
-  - se crea un `Tutor No Socio` `T_padre` con todos los datos declarados del tutor,
-  - se provisiona un `User` para `T_padre` con `name = "familia@example.com"`,
-    `username = "20111111"` (el tutor podrá pagar y gestionar desde el portal),
-  - se crea un `Grupo Familiar` `G` con `titulares` = una sola fila
-    `{tipo_titular: "Tutor No Socio", titular: T_padre, es_principal: 1, rol: <rol_tutor>}`,
-  - **no** se crea `User` para el menor (regla 1: email compartido con tutor),
-  - se crea un `Socio` `S_menor` con `dni = "55222222"`, `categoria = "Menor"`,
-    `email = "familia@example.com"`, `user = ""` (vacío),
-    `tipo_tutor = "Tutor No Socio"`, `tutor = T_padre`,
-    `grupo_familiar = G`, `estado = "Pendiente de Pago"`,
-    `solicitud_origen = <name>`,
-  - se agrega una fila a `G.miembros` con `socio = S_menor`, `rol = "Hijo"`,
-    `desde = hoy`,
-  - la solicitud queda `Validada`, `socio_generado = S_menor`,
-    `user_generado = ""`, `grupo_familiar_generado = G`,
-  - el email del stub de pago se envía a `familia@example.com`.
+
+- se crea un `Tutor No Socio` `T_padre` con todos los datos declarados del tutor,
+- se provisiona un `User` para `T_padre` con `name = "familia@example.com"`,
+`username = "20111111"` (el tutor podrá pagar y gestionar desde el portal),
+- se crea un `Grupo Familiar` `G` con `titulares` = una sola fila
+`{tipo_titular: "Tutor No Socio", titular: T_padre, es_principal: 1, rol: <rol_tutor>}`,
+- **no** se crea `User` para el menor (regla 1: email compartido con tutor),
+- se crea un `Socio` `S_menor` con `dni = "55222222"`, `categoria = "Menor"`,
+`email = "familia@example.com"`, `user = ""` (vacío),
+`tipo_tutor = "Tutor No Socio"`, `tutor = T_padre`,
+`grupo_familiar = G`, `estado = "Pendiente de Pago"`,
+`solicitud_origen = <name>`,
+- se agrega una fila a `G.miembros` con `socio = S_menor`, `rol = "Hijo"`,
+`desde = hoy`,
+- la solicitud queda `Validada`, `socio_generado = S_menor`,
+`user_generado = ""`, `grupo_familiar_generado = G`,
+- el email del stub de pago se envía a `familia@example.com`.
 And si **cualquier paso** falla, la transacción se aborta (no queda
 `Tutor No Socio` huérfano sin grupo, ni grupo sin titulares, etc.).
 
@@ -507,14 +628,15 @@ And no existen `User` con `name` en `{"papa@example.com", "ana@example.com"}`
 ni con `username` en `{"20111111", "55222222"}`
 When `Secretaria` ejecuta `Validar`
 Then en una sola transacción:
-  - se crea `T_padre` (`Tutor No Socio`) + su `User` (`name = "papa@example.com"`,
-    `username = "20111111"`),
-  - se crea `G` (`Grupo Familiar`) con `T_padre` como único titular activo,
-  - **se crea** un `User` para el menor con `name = "ana@example.com"`,
-    `username = "55222222"`, rol `Socio` (regla 2: email único y no tomado),
-  - se crea `S_menor` con `user = "ana@example.com"`, demás datos como en el
-    escenario anterior,
-  - el email del stub de pago se envía a `papa@example.com` (al tutor, no al menor).
+
+- se crea `T_padre` (`Tutor No Socio`) + su `User` (`name = "papa@example.com"`,
+`username = "20111111"`),
+- se crea `G` (`Grupo Familiar`) con `T_padre` como único titular activo,
+- **se crea** un `User` para el menor con `name = "ana@example.com"`,
+`username = "55222222"`, rol `Socio` (regla 2: email único y no tomado),
+- se crea `S_menor` con `user = "ana@example.com"`, demás datos como en el
+escenario anterior,
+- el email del stub de pago se envía a `papa@example.com` (al tutor, no al menor).
 
 > **Nota sobre cotitulares (padre + madre):** la Solicitud carga **un** tutor.
 > Si ambos padres son adultos responsables del grupo, Secretaría agrega al
@@ -533,12 +655,13 @@ And una nueva `Solicitud de Asociación` con `categoria_solicitada = "Menor"`,
 `dni_tutor = T_padre.dni` (el mismo padre), datos consistentes
 When `Secretaria` ejecuta la acción `Validar`
 Then en una sola transacción:
-  - **no** se crea un nuevo `Tutor No Socio` (se reutiliza `T_padre`),
-  - **no** se crea un nuevo `Grupo Familiar` (se reutiliza `G`),
-  - se crea un `Socio` `S_hijo2` con `tipo_tutor = "Tutor No Socio"`,
-    `tutor = T_padre`, `grupo_familiar = G`,
-  - se agrega `S_hijo2` a `G.miembros`,
-  - la solicitud queda `Validada` con `grupo_familiar_generado = G`.
+
+- **no** se crea un nuevo `Tutor No Socio` (se reutiliza `T_padre`),
+- **no** se crea un nuevo `Grupo Familiar` (se reutiliza `G`),
+- se crea un `Socio` `S_hijo2` con `tipo_tutor = "Tutor No Socio"`,
+`tutor = T_padre`, `grupo_familiar = G`,
+- se agrega `S_hijo2` a `G.miembros`,
+- la solicitud queda `Validada` con `grupo_familiar_generado = G`.
 
 > En esta iteración no se aplica todavía el descuento por hermanos
 > (out of scope Sprint 0/1; cubierto por `socios_categoria_validacion.md`).
@@ -682,9 +805,7 @@ And el resto de los campos editables sí se aplican (degradación segura: el
 ataque no rompe el flujo legítimo).
 
 (La lista blanca de campos editables vive en el código del endpoint y se
-documenta como constante: `CAMPOS_EDITABLES_POR_GUEST = {"telefono",
-"domicilio", "localidad", "provincia", "codigo_postal", "dni_frente",
-"dni_dorso", "foto_perfil", "ficha_medica", "comprobante_domicilio", ...}`.)
+documenta como constante: `CAMPOS_EDITABLES_POR_GUEST = {"telefono", "domicilio", "localidad", "provincia", "codigo_postal", "dni_frente", "dni_dorso", "foto_perfil", "ficha_medica", "comprobante_domicilio", ...}`.)
 
 ---
 
@@ -747,7 +868,7 @@ Given una `Solicitud de Asociación` rechazada con
 `motivos_rechazo = '<script>alert(1)</script> Falta DNI dorso'`
 When se renderiza el template del email de rechazo
 Then el contenido renderizado contiene el texto literal escapado
-(`&lt;script&gt;alert(1)&lt;/script&gt; Falta DNI dorso`)
+(`<script>alert(1)</script> Falta DNI dorso`)
 And el cliente de correo no ejecuta script alguno
 And esto se cubre con un test sobre la función de render del email.
 
@@ -755,14 +876,55 @@ And esto se cubre con un test sobre la función de render del email.
 
 ## Plan de commits (Sprint 1)
 
-| # | Tema | Tests rojos primero |
-|---|---|---|
-| 1 | DocType `Solicitud de Asociación` (JSON + autoname + permisos) + tests unitarios | sí — `test_solicitud_asociacion.py::test_doctype_*` |
-| 2 | Web Form público + validaciones server-side (incluye rate-limit, token, IP detrás de proxy, IP en `enviado_desde_ip`) | sí — `test_solicitud_asociacion.py::test_web_form_*` |
-| 3 | Workflow fixture (`Pendiente / Requiere Corrección / Validada / Rechazada`) + `before_save` de auditoría (`validado_por/en`, etc.) | sí — `test_workflow_solicitud_asociacion.py` |
-| 4 | Service `ensure_grupo_for_socio` + `validar_solicitud` (adulto, menor-con-Socio, menor-con-TNS, los 3 sub-flujos de email del menor) + bloqueos (G2 DNI ya TNS, G3 email ya tomado, etc.) | sí — `test_workflow_solicitud_asociacion.py::test_validar_*` |
-| 5 | Email templates + stub de pago (`pago_stub`) + tests de escape XSS en `motivos_rechazo` + endpoint público `solicitar_correccion` por token | sí — `test_solicitud_asociacion_emails.py`, `test_correccion_publica.py` |
-| 6 | Migrar `Socio.solicitud_origen` de `Data` → `Link "Solicitud de Asociación"` + test que verifica la integridad referencial | sí — `test_socio_referencia_solicitud.py` (nuevo) |
+
+| #   | Tema                                                                                                                                                                                                                                          | Tests rojos primero                                                      |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1   | DocType `Solicitud Asociacion` (JSON + autoname + permisos + controller) + tests unitarios                                                                                                                                                    | sí — `test_solicitud_asociacion.py` (26 tests)                           |
+| 2   | **Endpoint público** `submit_solicitud` (whitelisted Guest, rate-limit por IP, X-Forwarded-For, validación de `ficha_medica` por magic numbers, filtrado de campos del sistema). NO incluye UI.                                               | sí — `test_solicitud_publica_api.py`                                     |
+| 2.5 | **Frontend del Web Form** (UI). Se decide entre (a) Web Form nativo con DocPerm Guest `create:1` + endurecimiento del controller o (b) página Jinja custom en `www/solicitud-asociacion.html`. Decisión tras prototipar con docker corriendo. | sí — `test_web_form_*` (a definir según el camino elegido)               |
+| 3   | Workflow fixture (`Pendiente / Requiere Corrección / Validada / Rechazada`) + `before_save` de auditoría (`validado_por/en`, etc.)                                                                                                            | sí — `test_workflow_solicitud_asociacion.py`                             |
+| 4   | Service `ensure_grupo_for_socio` + `validar_solicitud` (adulto, menor-con-Socio, menor-con-TNS, los 3 sub-flujos de email del menor) + bloqueos (G2 DNI ya TNS, G3 email ya tomado, etc.)                                                     | sí — `test_workflow_solicitud_asociacion.py::test_validar_*`             |
+| 5   | Email templates + stub de pago (`pago_stub`) + tests de escape XSS en `motivos_rechazo` + endpoints públicos `consultar_solicitud` y `actualizar_solicitud` por token                                                                         | sí — `test_solicitud_asociacion_emails.py`, `test_correccion_publica.py` |
+| 6   | Migrar `Socio.solicitud_origen` de `Data` → `Link "Solicitud Asociacion"` + test que verifica la integridad referencial                                                                                                                       | sí — `test_socio_referencia_solicitud.py` (nuevo)                        |
+
+
+### Por qué C2.5 se separó de C2
+
+Durante la implementación de C2 se detectó un conflicto técnico entre dos
+decisiones tomadas en la review del spec:
+
+- **q1**: el rol `Guest` **NO** se declara en DocPerm de `Solicitud Asociacion`; la creación va exclusivamente por el endpoint custom
+`submit_solicitud` con `ignore_permissions=True`.
+- **q4**: el frontend es **Web Form nativo de Frappe**.
+
+El submit nativo del Web Form (`frappe.www.web_form.accept`) **requiere**
+DocPerm Guest con `create:1`; sin él, devuelve 403. Frappe v15 no expone
+un hook documentado para reemplazar completamente la función `save()`
+interna del Web Form (`frappe.web_form.validate` solo permite `return false` para abortar). Pisar `frappe.web_form.save()` desde el
+`client_script` depende de internals no documentados y es frágil.
+
+Caminos válidos para C2.5, a decidir al prototipar:
+
+- **(A) Web Form nativo + Guest en DocPerm `create:1`**: hace funcionar
+la UI built-in al costo de exponer `/api/resource/Solicitud Asociacion`
+a Guest. Mitigación obligatoria en `Solicitud Asociacion.before_insert()`:
+  - Forzar `workflow_state = "Pendiente"`, `token_seguimiento = uuid()`,
+  `enviado_desde_ip = _resolve_client_ip()`, y blanquear campos de
+  auditoría (`validado_por/en`, `rechazado_por/en`, etc.) **siempre**,
+  incluso si el payload los trae.
+  - Rate-limit propio dentro del controller, no solo en el endpoint
+  custom, consultando el conteo de solicitudes recientes desde la
+  misma IP.
+  - Llamar a `validate_ficha_medica_from_url` también desde el
+  controller.
+  - El endpoint custom queda como camino alternativo (clientes que
+  prefieran no usar el Web Form nativo, p. ej. integraciones) y
+  duplica las validaciones.
+- **(B) Página Jinja custom en `www/solicitud-asociacion.html`**:
+Guest sigue fuera del DocPerm; el HTML/CSS/JS los escribimos
+nosotros. El submit JS llama directo a `submit_solicitud`. UX
+controlada totalmente por la app, sin depender del Web Form
+framework.
 
 Cada commit con sus tests en verde antes de pasar al siguiente. La rama
 `develop` debe quedar siempre estable.
@@ -774,67 +936,65 @@ Cada commit con sus tests en verde antes de pasar al siguiente. La rama
 - DocType: `members/doctype/solicitud_asociacion/solicitud_asociacion.{json,py,js}`.
 - Web Form: `members/web_form/solicitud_asociacion/solicitud_asociacion.{json,html?}`.
 - API del flujo de validación: `members/api.py` con `validar_solicitud(name)`,
-  `rechazar_solicitud(name)`, `solicitar_correccion(name)`, `consultar_solicitud(token)`,
-  `pago_stub(token)`. Toda mutación de workflow corre dentro de `frappe.db.savepoint`
-  o transacción explícita para garantizar atomicidad de `User` + `Socio` +
-  `Grupo Familiar` + adjuntos + email.
+`rechazar_solicitud(name)`, `solicitar_correccion(name)`, `consultar_solicitud(token)`,
+`pago_stub(token)`. Toda mutación de workflow corre dentro de `frappe.db.savepoint`
+o transacción explícita para garantizar atomicidad de `User` + `Socio` +
+`Grupo Familiar` + adjuntos + email.
 - Workflow JSON: `members/workflow/solicitud_asociacion/solicitud_asociacion.json`.
 - Email Templates: `members/email_template/` con `solicitud_validada.html`,
-  `solicitud_rechazada.html`, `solicitud_requiere_correccion.html`. El enlace al
-  stub de pago se inserta vía Jinja con `token` firmado/expirado.
+`solicitud_rechazada.html`, `solicitud_requiere_correccion.html`. El enlace al
+stub de pago se inserta vía Jinja con `token` firmado/expirado.
 - `validar_solicitud` reutiliza:
   - `members/services/user_provisioning.py::provision_user_for_socio(socio_doc)` —
-    crea `User` si y solo si el email no está tomado y no comparte el del tutor;
-    **nunca** genera email técnico; devuelve `None` si el menor queda sin User.
-    Es el servicio que ejecuta la "Decisión sobre `User` para menores" (3 reglas).
+  crea `User` si y solo si el email no está tomado y no comparte el del tutor;
+  **nunca** genera email técnico; devuelve `None` si el menor queda sin User.
+  Es el servicio que ejecuta la "Decisión sobre `User` para menores" (3 reglas).
   - `members/services/grupo_familiar.py::ensure_grupo_for_socio(socio_doc, tutor_doc=None)` —
-    crea `Grupo Familiar` nuevo si el solicitante es adulto, o agrega al menor al
-    `Grupo Familiar` del tutor existente. **Este servicio no existe todavía; se
-    crea en el commit 4 del Sprint 1.**
-
-- **Migración de `Socio.solicitud_origen` (commit 6 del sprint):** hoy es `Data
-  (string)` porque el DocType `Solicitud de Asociación` no existía en Sprint 0.
-  En Sprint 1 commit 6 se migra a `Link → "Solicitud de Asociación"`. La
-  migración requiere:
+  crea `Grupo Familiar` nuevo si el solicitante es adulto, o agrega al menor al
+  `Grupo Familiar` del tutor existente. **Este servicio no existe todavía; se
+  crea en el commit 4 del Sprint 1.**
+- **Migración de `Socio.solicitud_origen` (commit 6 del sprint):** hoy es `Data (string)` porque el DocType `Solicitud de Asociación` no existía en Sprint 0.
+En Sprint 1 commit 6 se migra a `Link → "Solicitud de Asociación"`. La
+migración requiere:
   - actualizar `socio.json` con el nuevo `fieldtype` y `options`,
   - un patch en `patches.txt` que mapee strings huérfanos a `name`s del nuevo
-    DocType (o los limpie si no se encuentran),
+  DocType (o los limpie si no se encuentran),
   - test que verifica que un `Socio` con `solicitud_origen` apuntando a una
-    `Solicitud de Asociación` válida puede leerse y la referencia es navegable.
+  `Solicitud de Asociación` válida puede leerse y la referencia es navegable.
 - Auditoría:
   - `before_save` del DocType setea `validado_por/en`, `rechazado_por/en`,
-    `correccion_solicitada_por/en` según la transición de `workflow_state`.
+  `correccion_solicitada_por/en` según la transición de `workflow_state`.
   - Si `workflow_state` no cambia, los campos de auditoría se mantienen
-    (no se sobreescriben en saves "intrascendentes").
+  (no se sobreescriben en saves "intrascendentes").
 - Tests:
   - `members/doctype/solicitud_asociacion/test_solicitud_asociacion.py`
-    → alta Guest, validaciones de campos, rate-limit, validación MIME de ficha
-    médica, IP detrás de proxy (`X-Forwarded-For`), `token_seguimiento` no
-    enumerable, autoname.
+  → alta Guest, validaciones de campos, rate-limit, validación MIME de ficha
+  médica, IP detrás de proxy (`X-Forwarded-For`), `token_seguimiento` no
+  enumerable, autoname.
   - `members/doctype/solicitud_asociacion/test_workflow_solicitud_asociacion.py`
-    → transiciones (validar adulto / validar menor con tutor Socio / validar
-    menor con tutor No Socio / validar segundo menor / rechazar / corrección),
-    los 3 sub-flujos de email del menor (compartido, único+libre, único+tomado),
-    bloqueo por DNI ya Socio, bloqueo por DNI ya Tutor No Socio,
-    idempotencia, auditoría de timestamps, `familiares_existentes_dnis`
-    declarativo.
+  → transiciones (validar adulto / validar menor con tutor Socio / validar
+  menor con tutor No Socio / validar segundo menor / rechazar / corrección),
+  los 3 sub-flujos de email del menor (compartido, único+libre, único+tomado),
+  bloqueo por DNI ya Socio, bloqueo por DNI ya Tutor No Socio,
+  idempotencia, auditoría de timestamps, `familiares_existentes_dnis`
+  declarativo.
   - `members/tests/test_solicitud_asociacion_isolation.py`
-    → Guest no lee, Socio no lee, Secretaría sí.
+  → Guest no lee, Socio no lee, Secretaría sí.
   - `members/tests/test_solicitud_asociacion_emails.py`
-    → escape XSS en `motivos_rechazo`, contenido del email validada, link de
-    pago stub no adivinable por enumeración.
+  → escape XSS en `motivos_rechazo`, contenido del email validada, link de
+  pago stub no adivinable por enumeración.
   - `members/tests/test_correccion_publica.py` (Sprint 1 mantiene endpoint
-    público de corrección)
-    → token válido + estado `Requiere Corrección` permite actualizar adjuntos;
-    token inválido o vencido → 404; scope limitado a la misma solicitud
-    (no se puede modificar otra); campos no editables por Guest están
-    protegidos (`workflow_state`, auditoría, etc.).
+  público de corrección)
+  → token válido + estado `Requiere Corrección` permite actualizar adjuntos;
+  token inválido o vencido → 404; scope limitado a la misma solicitud
+  (no se puede modificar otra); campos no editables por Guest están
+  protegidos (`workflow_state`, auditoría, etc.).
   - `members/tests/test_socio_referencia_solicitud.py` (commit 6)
-    → migración `Socio.solicitud_origen` de Data → Link funciona; integridad
-    referencial; lectura del Socio sigue accesible vía las reglas de aislamiento
-    de Sprint 0.
-
+  → migración `Socio.solicitud_origen` de Data → Link funciona; integridad
+  referencial; lectura del Socio sigue accesible vía las reglas de aislamiento
+  de Sprint 0.
 - En `hooks.py` (al implementar):
   - `has_website_permission` / `permission_query_conditions` para
-    `Solicitud de Asociación` si se permite portal de seguimiento.
+  `Solicitud de Asociación` si se permite portal de seguimiento.
   - No exponer la solicitud por `/api/resource/` a Guest.
+
