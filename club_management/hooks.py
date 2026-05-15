@@ -238,7 +238,9 @@ has_permission = {
 # Authentication and authorization
 # --------------------------------
 
-auth_hooks = [
+# Login dual (SOC-/TNS- → email). Debe ir en `before_login`, no en
+# `auth_hooks`: Frappe v16 llama `auth_hooks` sin argumentos en cada request.
+before_login = [
 	"club_management.members.auth.dual_login.resolve_login_user",
 ]
 

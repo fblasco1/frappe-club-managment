@@ -19,6 +19,8 @@ import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
 
+from club_management.members.services.actividades_portal import list_actividades_asociacion
+from club_management.members.services.google_places import get_places_config_for_portal
 from club_management.members.validations import validate_ficha_medica_from_url
 
 # Campos que el cliente Guest NO puede setear desde el payload del Web Form.
@@ -131,6 +133,7 @@ def _submit_solicitud_impl(data: Any) -> dict[str, Any]:
     payload: dict[str, Any] = {
         k: v for k, v in data.items() if k not in _CAMPOS_BLOQUEADOS_DESDE_PAYLOAD
     }
+    _normalize_legacy_address_fields(payload)
     payload["doctype"] = "Solicitud Asociacion"
 
     ficha_url = payload.get("ficha_medica")
@@ -146,6 +149,30 @@ def _submit_solicitud_impl(data: Any) -> dict[str, Any]:
         "status": "ok",
         "token_seguimiento": doc.token_seguimiento,
     }
+
+
+def _normalize_legacy_address_fields(payload: dict[str, Any]) -> None:
+	"""Acepta `domicilio` / `domicilio_tutor` legacy del cliente anterior."""
+	if payload.get("domicilio") and not payload.get("calle"):
+		payload["calle"] = payload.pop("domicilio")
+	elif "domicilio" in payload:
+		payload.pop("domicilio", None)
+	if payload.get("domicilio_tutor") and not payload.get("calle_tutor"):
+		payload["calle_tutor"] = payload.pop("domicilio_tutor")
+	elif "domicilio_tutor" in payload:
+		payload.pop("domicilio_tutor", None)
+
+
+@frappe.whitelist(allow_guest=True)
+def get_places_config() -> dict[str, str | bool]:
+	"""Devuelve si Google Places está habilitado y la API key (referrer-restricted)."""
+	return get_places_config_for_portal()
+
+
+@frappe.whitelist(allow_guest=True)
+def get_actividades_asociacion() -> list[dict[str, str]]:
+	"""Lista actividades para el desplegable del formulario público."""
+	return list_actividades_asociacion()
 
 
 @frappe.whitelist(allow_guest=True)

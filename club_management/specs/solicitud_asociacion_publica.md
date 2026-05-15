@@ -145,11 +145,12 @@ no puede pisarlo: está en la lista de campos rechazados).
 
 Flujo multi-step:
 
-1. Frontend (HTML del Web Form nativo de Frappe) sube cada attachment
-  con `POST /api/method/upload_file` (whitelisted, `allow_guest=True`).
-   Esto requiere habilitar `**File Settings.allow_guest_to_upload_files**`
-   en el site (documentado en `infra-docker` para la configuración por
-   environment).
+1. Frontend (página `www` o Web Form nativo) sube cada attachment con
+  `POST /api/method/frappe.handler.upload_file` (whitelisted,
+  `allow_guest=True`). Esto requiere habilitar en **System Settings**
+  la opción **`allow_guests_to_upload_files`** (Frappe v15+; nombre
+  canónico en código) en el site (documentar en `infra-docker` por
+  environment).
 2. La respuesta del `upload_file` devuelve un `file_url` `/files/...`.
 3. El frontend ensambla el payload final con todos los `file_url`s y lo
   envía al endpoint `submit_solicitud`.
@@ -214,10 +215,48 @@ Esto evita duplicación y mantener dos puntos sincronizados.
 | `categoria_solicitada` | Select           | sí     | `Activo` / `Menor` / `Adherente` / `Jubilado`                              |
 | `email`                | Data (Email)     | sí     | **No único**: puede coincidir con el del tutor o de otro familiar socio    |
 | `telefono`             | Data             | sí     |                                                                            |
-| `domicilio`            | Small Text       | sí     |                                                                            |
+| `calle`                | Data             | sí     | Calle y número (portal: autocompletado Google Places si está configurado) |
 | `localidad`            | Data             | sí     |                                                                            |
 | `provincia`            | Data             | sí     |                                                                            |
 | `codigo_postal`        | Data             | sí     |                                                                            |
+
+
+#### Autocompletado de dirección (Google Places)
+
+**Given** el sitio tiene `google_maps_api_key` en `site_config.json` (restringida por HTTP referrer en Google Cloud),
+**When** el solicitante escribe en el campo `calle` (o `calle_tutor`) del formulario público,
+**Then** puede elegir una sugerencia de Google Places que completa `calle`, `localidad`, `provincia` y `codigo_postal` (Argentina: `componentRestrictions.country = ar`).
+
+**Given** no hay clave configurada,
+**When** se abre `/solicitud-asociacion`,
+**Then** los campos de dirección siguen siendo editables manualmente (sin script de Maps).
+
+#### Configuración actual (C2.5)
+
+- Clave en `sites/<site>/site_config.json`: `"google_maps_api_key": "…"`.
+- Contexto Jinja: `www/solicitud-asociacion.py` expone `google_places_enabled` y la clave al template.
+- API opcional: `get_places_config` (`allow_guest=True`) en `solicitud_publica.py` (mismo contrato que el servicio `google_places`).
+- Cliente: **Maps JavaScript API** + biblioteca **Places** (`Autocomplete` clásico), restricción `country: ar`, parseo de `address_components` hacia `calle` / `localidad` / `provincia` / `codigo_postal`.
+- En Google Cloud habilitar al menos: **Maps JavaScript API** y **Places API**; restringir la key por **HTTP referrer** del dominio del portal.
+
+#### Mejora a futuro (Google Maps Platform)
+
+> **Fuera de scope C2.5.** Documentado para un sprint posterior de UX/infra.
+
+| Tema | Estado C2.5 | Mejora propuesta |
+| ---- | ------------- | ---------------- |
+| API de autocompletado | `google.maps.places.Autocomplete` (widget legacy en JS) | Migrar a **Places API (New)** — `Autocomplete (New)` / **Place Autocomplete Element** con **session tokens** (mejor billing y soporte a largo plazo). |
+| Exposición de la API key | Key en el HTML vía `site_config` + referrer restriction | Valorar **proxy server-side** (solo `get_places_config` devuelve token de sesión efímero) o **Maps Platform per-site** en Single DocType de configuración del club. |
+| Validación de dirección | Solo parseo de componentes en el cliente | Opcional: **Address Validation API** o **Geocoding API** server-side antes de `submit_solicitud` (normalizar CP/localidad). |
+| Desk / Socio | N/A | Reutilizar el mismo componente en formulario `Socio` / corrección por token (C5). |
+| Observabilidad | N/A | Alertas de cuota/costo en GCP; fallback explícito si Places falla (mensaje + entrada manual). |
+
+**Criterio de aceptación futuro (borrador):**
+
+**Given** el sitio tiene Places API (New) configurada,
+**When** el usuario elige una dirección en `calle`,
+**Then** los cuatro campos se completan sin exponer la master key en el cliente más allá de lo estrictamente necesario,
+**And** las solicitudes de autocomplete usan session token por búsqueda.
 
 
 ### Datos del tutor (solo si `categoria_solicitada = "Menor"`)
@@ -238,7 +277,7 @@ campos del tutor son los necesarios para crear o resolver un `Tutor No Socio` /
 | `genero_tutor`           | Select           | sí (cuando menor) | `Masculino` / `Femenino` / `Otro` / `Prefiero no decir`                                                                 |
 | `email_tutor`            | Data (Email)     | sí (cuando menor) | Email de contacto del tutor; puede coincidir con `email` del menor                                                      |
 | `telefono_tutor`         | Data             | sí (cuando menor) |                                                                                                                         |
-| `domicilio_tutor`        | Small Text       | sí (cuando menor) |                                                                                                                         |
+| `calle_tutor`            | Data             | sí (cuando menor) |                                                                                                                         |
 | `localidad_tutor`        | Data             | sí (cuando menor) |                                                                                                                         |
 | `provincia_tutor`        | Data             | sí (cuando menor) |                                                                                                                         |
 | `codigo_postal_tutor`    | Data             | sí (cuando menor) |                                                                                                                         |
@@ -805,7 +844,7 @@ And el resto de los campos editables sí se aplican (degradación segura: el
 ataque no rompe el flujo legítimo).
 
 (La lista blanca de campos editables vive en el código del endpoint y se
-documenta como constante: `CAMPOS_EDITABLES_POR_GUEST = {"telefono", "domicilio", "localidad", "provincia", "codigo_postal", "dni_frente", "dni_dorso", "foto_perfil", "ficha_medica", "comprobante_domicilio", ...}`.)
+documenta como constante: `CAMPOS_EDITABLES_POR_GUEST = {"telefono", "calle", "localidad", "provincia", "codigo_postal", "dni_frente", "dni_dorso", "foto_perfil", "ficha_medica", "comprobante_domicilio", ...}`.)
 
 ---
 
@@ -881,7 +920,7 @@ And esto se cubre con un test sobre la función de render del email.
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | 1   | DocType `Solicitud Asociacion` (JSON + autoname + permisos + controller) + tests unitarios                                                                                                                                                    | sí — `test_solicitud_asociacion.py` (26 tests)                           |
 | 2   | **Endpoint público** `submit_solicitud` (whitelisted Guest, rate-limit por IP, X-Forwarded-For, validación de `ficha_medica` por magic numbers, filtrado de campos del sistema). NO incluye UI.                                               | sí — `test_solicitud_publica_api.py`                                     |
-| 2.5 | **Frontend del Web Form** (UI). Se decide entre (a) Web Form nativo con DocPerm Guest `create:1` + endurecimiento del controller o (b) página Jinja custom en `www/solicitud-asociacion.html`. Decisión tras prototipar con docker corriendo. | sí — `test_web_form_*` (a definir según el camino elegido)               |
+| 2.5 | **Frontend público** (UI): página Jinja **`www/solicitud-asociacion.html`** (camino **B**), sin Web Form nativo, que sube adjuntos vía `frappe.handler.upload_file` y envía el JSON a `submit_solicitud`. Incluye: bloque **responsable** (Menor), **calle** + localidad/provincia/CP, multiselect actividades, Google Places opcional (`google_maps_api_key`). Patch `domicilio` → `calle`. Ver «Mejora a futuro (Google Maps Platform)». | sí — `test_solicitud_asociacion_web_page.py`                               |
 | 3   | Workflow fixture (`Pendiente / Requiere Corrección / Validada / Rechazada`) + `before_save` de auditoría (`validado_por/en`, etc.)                                                                                                            | sí — `test_workflow_solicitud_asociacion.py`                             |
 | 4   | Service `ensure_grupo_for_socio` + `validar_solicitud` (adulto, menor-con-Socio, menor-con-TNS, los 3 sub-flujos de email del menor) + bloqueos (G2 DNI ya TNS, G3 email ya tomado, etc.)                                                     | sí — `test_workflow_solicitud_asociacion.py::test_validar_*`             |
 | 5   | Email templates + stub de pago (`pago_stub`) + tests de escape XSS en `motivos_rechazo` + endpoints públicos `consultar_solicitud` y `actualizar_solicitud` por token                                                                         | sí — `test_solicitud_asociacion_emails.py`, `test_correccion_publica.py` |
@@ -895,7 +934,9 @@ decisiones tomadas en la review del spec:
 
 - **q1**: el rol `Guest` **NO** se declara en DocPerm de `Solicitud Asociacion`; la creación va exclusivamente por el endpoint custom
 `submit_solicitud` con `ignore_permissions=True`.
-- **q4**: el frontend es **Web Form nativo de Frappe**.
+- **q4**: en la review inicial se contemplaba **Web Form nativo de Frappe**;
+  para **C2.5** el prototipo público es la página **`www/solicitud-asociacion.html`**
+  (camino B), sin Web Form engine.
 
 El submit nativo del Web Form (`frappe.www.web_form.accept`) **requiere**
 DocPerm Guest con `create:1`; sin él, devuelve 403. Frappe v15 no expone
@@ -903,7 +944,8 @@ un hook documentado para reemplazar completamente la función `save()`
 interna del Web Form (`frappe.web_form.validate` solo permite `return false` para abortar). Pisar `frappe.web_form.save()` desde el
 `client_script` depende de internals no documentados y es frágil.
 
-Caminos válidos para C2.5, a decidir al prototipar:
+Caminos válidos para C2.5 (la decisión de implementación quedó registrada
+en la sección **Decisión C2.5 — Frontend público (camino B)** más abajo):
 
 - **(A) Web Form nativo + Guest en DocPerm `create:1`**: hace funcionar
 la UI built-in al costo de exponer `/api/resource/Solicitud Asociacion`
@@ -928,6 +970,38 @@ framework.
 
 Cada commit con sus tests en verde antes de pasar al siguiente. La rama
 `develop` debe quedar siempre estable.
+
+---
+
+## Decisión C2.5 — Frontend público (camino B)
+
+Tras la review técnica del conflicto q1 vs q4 (Guest sin DocPerm vs Web Form
+nativo), el Sprint 1 adopta el **camino B** para el prototipo de UI:
+
+- **Ruta web:** `/solicitud-asociacion` (archivo `club_management/www/solicitud-asociacion.html`).
+- **Submit:** el JavaScript llama a
+  `club_management.members.api.solicitud_publica.submit_solicitud` vía
+  `frappe.call` (mismo contrato que el Commit 2).
+- **Adjuntos:** subida previa con `frappe.handler.upload_file` usando
+  `FormData` + header `X-Frappe-CSRF-Token`; requiere
+  `allow_guests_to_upload_files` en **System Settings** (ver sección
+  «Decisión sobre la subida de archivos por Guest»).
+- **UX:** formulario accesible en español, bloque **responsable** visible solo si
+  `categoria_solicitada == Menor` (vínculo Padre/Madre/Tutor), mensaje de éxito mostrando solo el
+  `token_seguimiento` (sin `name` del documento) usando `textContent` para
+  evitar XSS.
+- **Dirección:** campos `calle`, `localidad`, `provincia`, `codigo_postal` (y homónimos `_tutor`);
+  autocompletado opcional vía Google Places si `google_maps_api_key` está en `site_config.json`.
+- **Actividades:** multiselect combobox (no `<select multiple>`); valor enviado como CSV en `actividad_interes`.
+- **Migración C2.5:** patches `rename_domicilio_to_calle_solicitud` + `consolidate_domicilio_to_calle_solicitud` (copia datos y elimina columnas `domicilio*` si coexistían con `calle*`).
+
+### Scenario: la plantilla pública referencia los contratos de API
+
+Given el paquete `club_management` incluye `www/solicitud-asociacion.html`
+When un desarrollador o un test lee el archivo fuente de la plantilla
+Then aparece el método whitelisted `club_management.members.api.solicitud_publica.submit_solicitud`
+And aparece `frappe.handler.upload_file` como destino de subida de archivos
+And los controles del formulario usan los `fieldname` del DocType (`nombre`, `dni`, `categoria_solicitada`, `dni_tutor`, `ficha_medica`, …)
 
 ---
 

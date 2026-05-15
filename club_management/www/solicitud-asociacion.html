@@ -1,0 +1,861 @@
+{% extends "templates/web.html" %}
+
+{% set title = _("Solicitud de asociación") %}
+
+{% block header %}
+<h1>{{ _("Solicitud de asociación") }}</h1>
+<p class="lead text-muted">
+	{{ _("Complete el formulario. Los archivos se suben de forma segura antes del envío.") }}
+</p>
+{% endblock %}
+
+{% block page_content %}
+<style>
+	.club-sol-form { max-width: 52rem; padding-bottom: 2rem; }
+	.club-sol-form .form-section-title {
+		font-size: 1.1rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.75rem;
+		border-bottom: 1px solid #e9ecef; padding-bottom: 0.25rem;
+	}
+	.club-sol-form .help-block { font-size: 0.85rem; color: #6c757d; margin-top: 0.25rem; }
+	#club-sol-banner { display: none; }
+	#club-sol-success { display: none; }
+	.club-file-field { margin-bottom: 1rem; }
+	.club-file-control {
+		display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem;
+	}
+	.club-file-btn {
+		white-space: nowrap; min-width: 9.5rem; flex-shrink: 0;
+	}
+	.club-file-name {
+		font-size: 0.875rem; color: #495057; word-break: break-all; flex: 1 1 8rem;
+	}
+	.club-file-input {
+		position: absolute; width: 0.1px; height: 0.1px; opacity: 0; overflow: hidden;
+	}
+	.club-ms-combobox {
+		position: relative; border: 1px solid #ced4da; border-radius: 4px;
+		padding: 0.35rem 0.5rem; background: #fff;
+	}
+	.club-ms-pills { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.35rem; min-height: 1.5rem; }
+	.club-ms-pill {
+		display: inline-flex; align-items: center; gap: 0.25rem;
+		padding: 0.2rem 0.55rem; background: #e9ecef; border-radius: 1rem; font-size: 0.85rem;
+	}
+	.club-ms-pill-remove {
+		border: none; background: transparent; cursor: pointer; padding: 0 0.15rem;
+		line-height: 1; font-size: 1rem; color: #6c757d;
+	}
+	.club-ms-input-wrap { position: relative; }
+	.club-ms-search {
+		border: none; box-shadow: none !important; padding: 0.25rem 0;
+		width: 100%;
+	}
+	.club-ms-dropdown {
+		position: absolute; left: 0; right: 0; top: 100%; z-index: 200;
+		max-height: 11rem; overflow-y: auto; background: #fff;
+		border: 1px solid #ced4da; border-radius: 4px; margin-top: 2px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+	}
+	.club-ms-option {
+		padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.9rem;
+	}
+	.club-ms-option:hover, .club-ms-option.is-active { background: #f1f3f5; }
+	.club-ms-empty { padding: 0.5rem 0.75rem; color: #6c757d; font-size: 0.85rem; }
+	.club-sol-actions {
+		margin: 2.5rem 0 5rem; padding-top: 1.5rem;
+		border-top: 1px solid #e9ecef;
+	}
+	.club-sol-actions .btn-primary { min-width: 11rem; }
+	.pac-container { z-index: 3000; }
+</style>
+
+<div class="club-sol-form">
+	<div id="club-sol-banner" class="alert alert-danger" role="alert"></div>
+	<div id="club-sol-success" class="alert alert-success" role="alert">
+		<strong>{{ _("Solicitud recibida") }}</strong>
+		<p class="mb-1">{{ _("Guarde este código para consultar el estado (no es su número de socio):") }}</p>
+		<code id="club-sol-token"></code>
+	</div>
+
+	<form id="club-sol-form" class="standard-form">
+		<div class="form-section-title">{{ _("Datos del solicitante") }}</div>
+		<div class="row">
+			<div class="col-sm-6">
+				<div class="form-group">
+					<label for="nombre">{{ _("Nombre") }} *</label>
+					<input class="form-control" id="nombre" name="nombre" type="text" required maxlength="140">
+				</div>
+			</div>
+			<div class="col-sm-6">
+				<div class="form-group">
+					<label for="apellido">{{ _("Apellido") }} *</label>
+					<input class="form-control" id="apellido" name="apellido" type="text" required maxlength="140">
+				</div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-sm-6">
+				<div class="form-group">
+					<label for="dni">{{ _("DNI") }} *</label>
+					<input class="form-control" id="dni" name="dni" type="text" required maxlength="32">
+				</div>
+			</div>
+			<div class="col-sm-6">
+				<div class="form-group">
+					<label for="nacionalidad">{{ _("Nacionalidad") }} *</label>
+					<input class="form-control" id="nacionalidad" name="nacionalidad" type="text" required value="Argentina" maxlength="140">
+				</div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-sm-6">
+				<div class="form-group">
+					<label for="fecha_nacimiento">{{ _("Fecha de nacimiento") }} *</label>
+					<input class="form-control" id="fecha_nacimiento" name="fecha_nacimiento" type="date" required>
+				</div>
+			</div>
+			<div class="col-sm-6">
+				<div class="form-group">
+					<label for="genero">{{ _("Género") }} *</label>
+					<select class="form-control" id="genero" name="genero" required>
+						<option value="">{{ _("Seleccione…") }}</option>
+						<option value="Masculino">{{ _("Masculino") }}</option>
+						<option value="Femenino">{{ _("Femenino") }}</option>
+						<option value="Otro">{{ _("Otro") }}</option>
+						<option value="Prefiero no decir">{{ _("Prefiero no decir") }}</option>
+					</select>
+				</div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-sm-6">
+				<div class="form-group">
+					<label for="email">{{ _("Email") }} *</label>
+					<input class="form-control" id="email" name="email" type="email" required maxlength="140">
+				</div>
+			</div>
+			<div class="col-sm-6">
+				<div class="form-group">
+					<label for="telefono">{{ _("Teléfono") }} *</label>
+					<input class="form-control" id="telefono" name="telefono" type="text" required maxlength="40">
+				</div>
+			</div>
+		</div>
+		<div class="form-section-title">{{ _("Dirección") }}</div>
+		<div class="form-group">
+			<label for="calle">{{ _("Calle") }} *</label>
+			<input class="form-control club-address-autocomplete" id="calle" name="calle" type="text"
+				required maxlength="240" autocomplete="off"
+				placeholder="{{ _('Calle y número') }}">
+			{% if google_places_enabled %}
+			<div class="help-block">{{ _("Busque su dirección para completar calle, localidad, provincia y código postal.") }}</div>
+			{% endif %}
+		</div>
+		<div class="row">
+			<div class="col-sm-4">
+				<div class="form-group">
+					<label for="localidad">{{ _("Localidad") }} *</label>
+					<input class="form-control" id="localidad" name="localidad" type="text" required maxlength="120">
+				</div>
+			</div>
+			<div class="col-sm-4">
+				<div class="form-group">
+					<label for="provincia">{{ _("Provincia") }} *</label>
+					<input class="form-control" id="provincia" name="provincia" type="text" required maxlength="120">
+				</div>
+			</div>
+			<div class="col-sm-4">
+				<div class="form-group">
+					<label for="codigo_postal">{{ _("Código postal") }} *</label>
+					<input class="form-control" id="codigo_postal" name="codigo_postal" type="text" required maxlength="16">
+				</div>
+			</div>
+		</div>
+		<div class="form-group">
+			<label for="categoria_solicitada">{{ _("Categoría solicitada") }} *</label>
+			<select class="form-control" id="categoria_solicitada" name="categoria_solicitada" required>
+				<option value="">{{ _("Seleccione la fecha de nacimiento primero") }}</option>
+			</select>
+			<div class="help-block" id="categoria-help"></div>
+		</div>
+
+		<div id="club-sol-responsable-block" style="display: none;">
+			<div class="form-section-title">{{ _("Datos del responsable (solo Menor)") }}</div>
+			<div class="row">
+				<div class="col-sm-6">
+					<div class="form-group">
+						<label for="dni_tutor">{{ _("DNI del responsable") }} *</label>
+						<input class="form-control" id="dni_tutor" name="dni_tutor" type="text" maxlength="32">
+					</div>
+				</div>
+				<div class="col-sm-6">
+					<div class="form-group">
+						<label for="rol_tutor">{{ _("Vínculo con el menor") }} *</label>
+						<select class="form-control" id="rol_tutor" name="rol_tutor">
+							<option value="">{{ _("Seleccione…") }}</option>
+							<option value="Padre">Padre</option>
+							<option value="Madre">Madre</option>
+							<option value="Tutor">Tutor</option>
+						</select>
+					</div>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-sm-6">
+					<div class="form-group">
+						<label for="nombre_tutor">{{ _("Nombre del responsable") }} *</label>
+						<input class="form-control" id="nombre_tutor" name="nombre_tutor" type="text" maxlength="140">
+					</div>
+				</div>
+				<div class="col-sm-6">
+					<div class="form-group">
+						<label for="apellido_tutor">{{ _("Apellido del responsable") }} *</label>
+						<input class="form-control" id="apellido_tutor" name="apellido_tutor" type="text" maxlength="140">
+					</div>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-sm-6">
+					<div class="form-group">
+						<label for="fecha_nacimiento_tutor">{{ _("Fecha de nacimiento del responsable") }} *</label>
+						<input class="form-control" id="fecha_nacimiento_tutor" name="fecha_nacimiento_tutor" type="date">
+					</div>
+				</div>
+				<div class="col-sm-6">
+					<div class="form-group">
+						<label for="nacionalidad_tutor">{{ _("Nacionalidad del responsable") }} *</label>
+						<input class="form-control" id="nacionalidad_tutor" name="nacionalidad_tutor" type="text" value="Argentina" maxlength="140">
+					</div>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-sm-6">
+					<div class="form-group">
+						<label for="genero_tutor">{{ _("Género del responsable") }} *</label>
+						<select class="form-control" id="genero_tutor" name="genero_tutor">
+							<option value="">{{ _("Seleccione…") }}</option>
+							<option value="Masculino">Masculino</option>
+							<option value="Femenino">Femenino</option>
+							<option value="Otro">Otro</option>
+							<option value="Prefiero no decir">Prefiero no decir</option>
+						</select>
+					</div>
+				</div>
+				<div class="col-sm-6">
+					<div class="form-group">
+						<label for="email_tutor">{{ _("Email del responsable") }} *</label>
+						<input class="form-control" id="email_tutor" name="email_tutor" type="email" maxlength="140">
+					</div>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-sm-6">
+					<div class="form-group">
+						<label for="telefono_tutor">{{ _("Teléfono del responsable") }} *</label>
+						<input class="form-control" id="telefono_tutor" name="telefono_tutor" type="text" maxlength="40">
+					</div>
+				</div>
+			</div>
+			<div class="form-section-title">{{ _("Dirección del responsable") }}</div>
+			<div class="form-group">
+				<label for="calle_tutor">{{ _("Calle del responsable") }} *</label>
+				<input class="form-control club-address-autocomplete" id="calle_tutor" name="calle_tutor" type="text"
+					maxlength="240" autocomplete="off"
+					placeholder="{{ _('Calle y número') }}">
+			</div>
+			<div class="row">
+				<div class="col-sm-4">
+					<div class="form-group">
+						<label for="localidad_tutor">{{ _("Localidad del responsable") }} *</label>
+						<input class="form-control" id="localidad_tutor" name="localidad_tutor" type="text" maxlength="120">
+					</div>
+				</div>
+				<div class="col-sm-4">
+					<div class="form-group">
+						<label for="provincia_tutor">{{ _("Provincia del responsable") }} *</label>
+						<input class="form-control" id="provincia_tutor" name="provincia_tutor" type="text" maxlength="120">
+					</div>
+				</div>
+				<div class="col-sm-4">
+					<div class="form-group">
+						<label for="codigo_postal_tutor">{{ _("Código postal del responsable") }} *</label>
+						<input class="form-control" id="codigo_postal_tutor" name="codigo_postal_tutor" type="text" maxlength="16">
+					</div>
+				</div>
+			</div>
+
+			<div class="form-section-title">{{ _("Documentación del responsable") }}</div>
+			<div class="row">
+				<div class="col-sm-6">
+					<div class="club-file-field" data-file-id="dni_frente_tutor" data-required-responsable="1">
+						<label>{{ _("DNI responsable - frente") }} *</label>
+						<div class="club-file-control">
+							<input class="club-file-input" id="dni_frente_tutor" type="file" accept="image/*,.pdf">
+							<button type="button" class="btn btn-default club-file-btn">{{ _("Cargar Archivo") }}</button>
+							<span class="club-file-name" aria-live="polite"></span>
+						</div>
+					</div>
+				</div>
+				<div class="col-sm-6">
+					<div class="club-file-field" data-file-id="dni_dorso_tutor" data-required-responsable="1">
+						<label>{{ _("DNI responsable - dorso") }} *</label>
+						<div class="club-file-control">
+							<input class="club-file-input" id="dni_dorso_tutor" type="file" accept="image/*,.pdf">
+							<button type="button" class="btn btn-default club-file-btn">{{ _("Cargar Archivo") }}</button>
+							<span class="club-file-name" aria-live="polite"></span>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-sm-6">
+					<div class="club-file-field" data-file-id="foto_perfil_tutor" data-required-responsable="1">
+						<label>{{ _("Foto del responsable") }} *</label>
+						<div class="club-file-control">
+							<input class="club-file-input" id="foto_perfil_tutor" type="file" accept="image/*">
+							<button type="button" class="btn btn-default club-file-btn">{{ _("Cargar Archivo") }}</button>
+							<span class="club-file-name" aria-live="polite"></span>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="form-section-title">{{ _("Documentación del solicitante") }}</div>
+		<div class="row">
+			<div class="col-sm-6">
+				<div class="club-file-field" data-file-id="dni_frente" data-required="1">
+					<label>{{ _("DNI frente") }} *</label>
+					<div class="club-file-control">
+						<input class="club-file-input" id="dni_frente" type="file" accept="image/*,.pdf">
+						<button type="button" class="btn btn-default club-file-btn">{{ _("Cargar Archivo") }}</button>
+						<span class="club-file-name" aria-live="polite"></span>
+					</div>
+				</div>
+			</div>
+			<div class="col-sm-6">
+				<div class="club-file-field" data-file-id="dni_dorso" data-required="1">
+					<label>{{ _("DNI dorso") }} *</label>
+					<div class="club-file-control">
+						<input class="club-file-input" id="dni_dorso" type="file" accept="image/*,.pdf">
+						<button type="button" class="btn btn-default club-file-btn">{{ _("Cargar Archivo") }}</button>
+						<span class="club-file-name" aria-live="polite"></span>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-sm-6">
+				<div class="club-file-field" data-file-id="foto_perfil" data-required="1">
+					<label>{{ _("Foto de perfil") }} *</label>
+					<div class="club-file-control">
+						<input class="club-file-input" id="foto_perfil" type="file" accept="image/*">
+						<button type="button" class="btn btn-default club-file-btn">{{ _("Cargar Archivo") }}</button>
+						<span class="club-file-name" aria-live="polite"></span>
+					</div>
+				</div>
+			</div>
+			<div class="col-sm-6">
+				<div class="club-file-field" data-file-id="ficha_medica" data-required="1">
+					<label>{{ _("Ficha médica") }} *</label>
+					<div class="club-file-control">
+						<input class="club-file-input" id="ficha_medica" type="file" accept="image/*,.pdf">
+						<button type="button" class="btn btn-default club-file-btn">{{ _("Cargar Archivo") }}</button>
+						<span class="club-file-name" aria-live="polite"></span>
+					</div>
+					<div class="help-block">{{ _("PDF, JPEG o PNG, máximo 5 MB (validado en servidor).") }}</div>
+				</div>
+			</div>
+		</div>
+		<div class="club-file-field" data-file-id="comprobante_domicilio">
+			<label>{{ _("Comprobante de domicilio (opcional)") }}</label>
+			<div class="club-file-control">
+				<input class="club-file-input" id="comprobante_domicilio" type="file" accept="image/*,.pdf">
+				<button type="button" class="btn btn-default club-file-btn">{{ _("Cargar Archivo") }}</button>
+				<span class="club-file-name" aria-live="polite"></span>
+			</div>
+		</div>
+
+		<div class="form-section-title">{{ _("Familia y preferencias") }}</div>
+		<div class="checkbox">
+			<label>
+				<input type="checkbox" id="tiene_familiares_socios" name="tiene_familiares_socios" value="1">
+				{{ _("Tiene familiares socios") }}
+			</label>
+		</div>
+		<div class="form-group">
+			<label for="familiares_existentes_dnis">{{ _("DNIs de familiares (separados por coma)") }}</label>
+			<input class="form-control" id="familiares_existentes_dnis" name="familiares_existentes_dnis" type="text" maxlength="240">
+		</div>
+		<div class="form-group">
+			<label for="club-actividades-search">{{ _("Actividades de interés") }}</label>
+			<div class="club-ms-combobox" id="club-actividades-combobox">
+				<div class="club-ms-pills" id="club-actividades-pills"></div>
+				<div class="club-ms-input-wrap">
+					<input type="text" class="form-control club-ms-search" id="club-actividades-search"
+						placeholder="{{ _('Buscar y seleccionar actividades…') }}" autocomplete="off"
+						role="combobox" aria-expanded="false" aria-controls="club-actividades-dropdown">
+					<div class="club-ms-dropdown" id="club-actividades-dropdown" style="display: none;"></div>
+				</div>
+			</div>
+			<div class="help-block">{{ _("Escriba para filtrar y haga clic para agregar una o más actividades.") }}</div>
+		</div>
+
+		<div class="club-sol-actions">
+			<button type="submit" class="btn btn-primary btn-lg" id="club-sol-submit">{{ _("Enviar solicitud") }}</button>
+		</div>
+	</form>
+</div>
+
+<script>
+frappe.ready(function () {
+	var GOOGLE_MAPS_API_KEY = {{ (google_maps_api_key or "") | tojson }};
+	var form = document.getElementById("club-sol-form");
+	var cat = document.getElementById("categoria_solicitada");
+	var fechaNac = document.getElementById("fecha_nacimiento");
+	var categoriaHelp = document.getElementById("categoria-help");
+	var tutorBlock = document.getElementById("club-sol-responsable-block");
+	var banner = document.getElementById("club-sol-banner");
+	var successBox = document.getElementById("club-sol-success");
+	var tokenEl = document.getElementById("club-sol-token");
+	var actividadesCatalog = [];
+	var actividadesSelected = {};
+	var msPills = document.getElementById("club-actividades-pills");
+	var msSearch = document.getElementById("club-actividades-search");
+	var msDropdown = document.getElementById("club-actividades-dropdown");
+	var msCombobox = document.getElementById("club-actividades-combobox");
+
+	var CATEGORIAS_MENOR = [
+		{ value: "", label: "{{ _('Seleccione…') }}" },
+		{ value: "Menor", label: "Menor" },
+		{ value: "Adherente", label: "Adherente" }
+	];
+	var CATEGORIAS_MAYOR = [
+		{ value: "", label: "{{ _('Seleccione…') }}" },
+		{ value: "Activo", label: "Activo" },
+		{ value: "Adherente", label: "Adherente" },
+		{ value: "Jubilado", label: "Jubilado" }
+	];
+
+	function csrf() {
+		return frappe.csrf_token || (frappe.boot && frappe.boot.csrf_token) || "";
+	}
+
+	function showError(msg) {
+		banner.style.display = "block";
+		banner.textContent = msg;
+		successBox.style.display = "none";
+	}
+
+	function clearError() {
+		banner.style.display = "none";
+		banner.textContent = "";
+	}
+
+	function calcEdad(fecha) {
+		if (!fecha) return null;
+		var parts = fecha.split("-");
+		if (parts.length !== 3) return null;
+		var born = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+		var today = new Date();
+		var edad = today.getFullYear() - born.getFullYear();
+		var m = today.getMonth() - born.getMonth();
+		if (m < 0 || (m === 0 && today.getDate() < born.getDate())) {
+			edad -= 1;
+		}
+		return edad;
+	}
+
+	function setCategoriaOptions(lista) {
+		var prev = cat.value;
+		cat.innerHTML = "";
+		lista.forEach(function (opt) {
+			var o = document.createElement("option");
+			o.value = opt.value;
+			o.textContent = opt.label;
+			cat.appendChild(o);
+		});
+		var valid = lista.some(function (o) { return o.value === prev; });
+		cat.value = valid ? prev : "";
+	}
+
+	function syncCategoriaPorEdad() {
+		var edad = calcEdad(fechaNac.value);
+		if (edad === null) {
+			setCategoriaOptions([{ value: "", label: "{{ _('Seleccione la fecha de nacimiento') }}" }]);
+			categoriaHelp.textContent = "";
+			return;
+		}
+		if (edad < 18) {
+			setCategoriaOptions(CATEGORIAS_MENOR);
+			categoriaHelp.textContent = "{{ _('Menor de 18 años: solo Menor o Adherente.') }}";
+		} else {
+			setCategoriaOptions(CATEGORIAS_MAYOR);
+			categoriaHelp.textContent = "{{ _('Mayor de edad: Activo, Adherente o Jubilado.') }}";
+		}
+		syncTutorVisibility();
+	}
+
+	function syncTutorVisibility() {
+		var minor = cat.value === "Menor";
+		tutorBlock.style.display = minor ? "block" : "none";
+		var tutorInputs = tutorBlock.querySelectorAll("input:not(.club-file-input), select, textarea");
+		for (var i = 0; i < tutorInputs.length; i++) {
+			tutorInputs[i].disabled = !minor;
+		}
+		tutorBlock.querySelectorAll(".club-file-field[data-required-responsable]").forEach(function (wrap) {
+			var input = wrap.querySelector(".club-file-input");
+			if (input) {
+				input.disabled = !minor;
+				wrap.querySelector(".club-file-btn").disabled = !minor;
+			}
+		});
+	}
+
+	fechaNac.addEventListener("change", syncCategoriaPorEdad);
+	fechaNac.addEventListener("input", syncCategoriaPorEdad);
+	cat.addEventListener("change", syncTutorVisibility);
+	syncCategoriaPorEdad();
+
+	document.querySelectorAll(".club-file-field").forEach(function (wrap) {
+		var input = wrap.querySelector(".club-file-input");
+		var btn = wrap.querySelector(".club-file-btn");
+		var nameEl = wrap.querySelector(".club-file-name");
+		btn.addEventListener("click", function () {
+			input.click();
+		});
+		input.addEventListener("change", function () {
+			var f = input.files[0];
+			nameEl.textContent = f ? f.name : "";
+		});
+	});
+
+	function renderActividadPills() {
+		msPills.innerHTML = "";
+		Object.keys(actividadesSelected).forEach(function (value) {
+			var pill = document.createElement("span");
+			pill.className = "club-ms-pill";
+			pill.textContent = actividadesSelected[value];
+			var removeBtn = document.createElement("button");
+			removeBtn.type = "button";
+			removeBtn.className = "club-ms-pill-remove";
+			removeBtn.setAttribute("aria-label", "{{ _('Quitar') }}");
+			removeBtn.textContent = "\u00d7";
+			removeBtn.addEventListener("click", function () {
+				delete actividadesSelected[value];
+				renderActividadPills();
+				renderActividadDropdown();
+			});
+			pill.appendChild(removeBtn);
+			msPills.appendChild(pill);
+		});
+	}
+
+	function renderActividadDropdown() {
+		var q = (msSearch.value || "").trim().toLowerCase();
+		var items = actividadesCatalog.filter(function (row) {
+			if (actividadesSelected[row.value]) return false;
+			if (!q) return true;
+			var label = (row.label || "").toLowerCase();
+			return label.indexOf(q) >= 0 || String(row.value).toLowerCase().indexOf(q) >= 0;
+		});
+		msDropdown.innerHTML = "";
+		if (!items.length) {
+			var empty = document.createElement("div");
+			empty.className = "club-ms-empty";
+			empty.textContent = q
+				? "{{ _('Sin coincidencias') }}"
+				: "{{ _('No hay más actividades disponibles') }}";
+			msDropdown.appendChild(empty);
+			return;
+		}
+		items.forEach(function (row) {
+			var opt = document.createElement("div");
+			opt.className = "club-ms-option";
+			opt.setAttribute("role", "option");
+			opt.textContent = row.label;
+			opt.addEventListener("mousedown", function (e) {
+				e.preventDefault();
+				actividadesSelected[row.value] = row.label;
+				msSearch.value = "";
+				renderActividadPills();
+				renderActividadDropdown();
+				closeActividadDropdown();
+				msSearch.focus();
+			});
+			msDropdown.appendChild(opt);
+		});
+	}
+
+	function openActividadDropdown() {
+		msDropdown.style.display = "block";
+		msSearch.setAttribute("aria-expanded", "true");
+		renderActividadDropdown();
+	}
+
+	function closeActividadDropdown() {
+		msDropdown.style.display = "none";
+		msSearch.setAttribute("aria-expanded", "false");
+	}
+
+	function loadActividades() {
+		frappe.call({
+			method: "club_management.members.api.solicitud_publica.get_actividades_asociacion",
+			callback: function (r) {
+				if (r.exc || !r.message) return;
+				actividadesCatalog = r.message;
+				renderActividadDropdown();
+			},
+		});
+	}
+
+	msSearch.addEventListener("focus", openActividadDropdown);
+	msSearch.addEventListener("input", openActividadDropdown);
+	document.addEventListener("click", function (e) {
+		if (msCombobox && !msCombobox.contains(e.target)) {
+			closeActividadDropdown();
+		}
+	});
+	loadActividades();
+
+	function parseGoogleAddressComponents(components) {
+		var out = { calle: "", localidad: "", provincia: "", codigo_postal: "" };
+		var route = "";
+		var streetNumber = "";
+		(components || []).forEach(function (c) {
+			var types = c.types || [];
+			if (types.indexOf("route") >= 0) route = c.long_name;
+			if (types.indexOf("street_number") >= 0) streetNumber = c.long_name;
+			if (types.indexOf("locality") >= 0) out.localidad = c.long_name;
+			else if (types.indexOf("administrative_area_level_2") >= 0 && !out.localidad) {
+				out.localidad = c.long_name;
+			}
+			if (types.indexOf("administrative_area_level_1") >= 0) {
+				out.provincia = c.long_name;
+			}
+			if (types.indexOf("postal_code") >= 0) out.codigo_postal = c.long_name;
+		});
+		out.calle = [route, streetNumber].filter(Boolean).join(" ").trim();
+		if (!out.calle && route) out.calle = route;
+		return out;
+	}
+
+	function applyParsedAddress(isTutor, parsed) {
+		var calleEl = document.getElementById(isTutor ? "calle_tutor" : "calle");
+		var locEl = document.getElementById(isTutor ? "localidad_tutor" : "localidad");
+		var provEl = document.getElementById(isTutor ? "provincia_tutor" : "provincia");
+		var cpEl = document.getElementById(isTutor ? "codigo_postal_tutor" : "codigo_postal");
+		if (parsed.calle && calleEl) calleEl.value = parsed.calle;
+		if (parsed.localidad && locEl) locEl.value = parsed.localidad;
+		if (parsed.provincia && provEl) provEl.value = parsed.provincia;
+		if (parsed.codigo_postal && cpEl) cpEl.value = parsed.codigo_postal;
+	}
+
+	function initPlacesAutocomplete(inputId, isTutor) {
+		var input = document.getElementById(inputId);
+		if (!input || !window.google || !google.maps || !google.maps.places) return;
+		var autocomplete = new google.maps.places.Autocomplete(input, {
+			componentRestrictions: { country: "ar" },
+			fields: ["address_components"],
+			types: ["address"],
+		});
+		autocomplete.addListener("place_changed", function () {
+			var place = autocomplete.getPlace();
+			if (!place || !place.address_components) return;
+			applyParsedAddress(isTutor, parseGoogleAddressComponents(place.address_components));
+		});
+	}
+
+	function loadGoogleMapsPlaces(callback) {
+		if (!GOOGLE_MAPS_API_KEY) return;
+		if (window.google && window.google.maps && window.google.maps.places) {
+			callback();
+			return;
+		}
+		window.__clubGoogleMapsReady = callback;
+		var script = document.createElement("script");
+		script.async = true;
+		script.defer = true;
+		script.src = "https://maps.googleapis.com/maps/api/js?key="
+			+ encodeURIComponent(GOOGLE_MAPS_API_KEY)
+			+ "&libraries=places&callback=__clubGoogleMapsReady";
+		document.head.appendChild(script);
+	}
+
+	if (GOOGLE_MAPS_API_KEY) {
+		loadGoogleMapsPlaces(function () {
+			initPlacesAutocomplete("calle", false);
+			initPlacesAutocomplete("calle_tutor", true);
+		});
+	}
+
+	function val(id) {
+		var el = document.getElementById(id);
+		if (!el || el.disabled) return "";
+		if (el.type === "checkbox") return el.checked ? 1 : 0;
+		return (el.value || "").trim();
+	}
+
+	function selectedActividades() {
+		return Object.keys(actividadesSelected).join(", ");
+	}
+
+	function uploadFile(file) {
+		if (!file) {
+			return Promise.reject(new Error("{{ _('Falta un archivo obligatorio.') }}"));
+		}
+		var fd = new FormData();
+		fd.append("file", file, file.name);
+		fd.append("is_private", "1");
+		return fetch("/api/method/frappe.handler.upload_file", {
+			method: "POST",
+			headers: { "X-Frappe-CSRF-Token": csrf() },
+			body: fd,
+		}).then(function (resp) {
+			return resp.json();
+		}).then(function (data) {
+			if (data.exc) {
+				throw new Error("{{ _('Error al subir archivo. ¿Está habilitada la subida para invitados?') }}");
+			}
+			var msg = data.message;
+			if (msg && msg.file_url) return msg.file_url;
+			throw new Error("{{ _('Respuesta de subida inesperada.') }}");
+		});
+	}
+
+	function fileFromId(id) {
+		var el = document.getElementById(id);
+		return el && el.files && el.files[0] ? el.files[0] : null;
+	}
+
+	function uploadIfPresent(fieldId) {
+		var f = fileFromId(fieldId);
+		if (!f) return Promise.resolve(null);
+		return uploadFile(f);
+	}
+
+	form.addEventListener("submit", function (e) {
+		e.preventDefault();
+		clearError();
+
+		if (cat.value === "Menor") {
+			var need = [
+				"dni_tutor", "nombre_tutor", "apellido_tutor", "fecha_nacimiento_tutor",
+				"nacionalidad_tutor", "genero_tutor", "rol_tutor", "email_tutor",
+				"telefono_tutor", "calle_tutor", "localidad_tutor", "provincia_tutor",
+				"codigo_postal_tutor"
+			];
+			for (var j = 0; j < need.length; j++) {
+				if (!val(need[j])) {
+					showError("{{ _('Complete todos los datos del responsable para categoría Menor.') }}");
+					return;
+				}
+			}
+			var responsableFiles = ["dni_frente_tutor", "dni_dorso_tutor", "foto_perfil_tutor"];
+			for (var k = 0; k < responsableFiles.length; k++) {
+				if (!fileFromId(responsableFiles[k])) {
+					showError("{{ _('Cargue la documentación obligatoria del responsable.') }}");
+					return;
+				}
+			}
+		}
+
+		var requiredSolicitante = ["dni_frente", "dni_dorso", "foto_perfil", "ficha_medica"];
+		for (var r = 0; r < requiredSolicitante.length; r++) {
+			if (!fileFromId(requiredSolicitante[r])) {
+				showError("{{ _('Cargue toda la documentación obligatoria del solicitante.') }}");
+				return;
+			}
+		}
+
+		var uploadIds = ["dni_frente", "dni_dorso", "foto_perfil", "ficha_medica", "comprobante_domicilio"];
+		if (cat.value === "Menor") {
+			uploadIds = uploadIds.concat([
+				"dni_frente_tutor", "dni_dorso_tutor", "foto_perfil_tutor"
+			]);
+		}
+
+		var chain = Promise.resolve({});
+		uploadIds.forEach(function (fieldId) {
+			chain = chain.then(function (payload) {
+				return uploadIfPresent(fieldId).then(function (url) {
+					if (url) payload[fieldId] = url;
+					return payload;
+				});
+			});
+		});
+
+		chain
+			.then(function (attach) {
+				var data = {
+					nombre: val("nombre"),
+					apellido: val("apellido"),
+					dni: val("dni"),
+					nacionalidad: val("nacionalidad"),
+					fecha_nacimiento: val("fecha_nacimiento"),
+					genero: val("genero"),
+					email: val("email"),
+					telefono: val("telefono"),
+					calle: val("calle"),
+					localidad: val("localidad"),
+					provincia: val("provincia"),
+					codigo_postal: val("codigo_postal"),
+					categoria_solicitada: val("categoria_solicitada"),
+					dni_frente: attach.dni_frente,
+					dni_dorso: attach.dni_dorso,
+					foto_perfil: attach.foto_perfil,
+					ficha_medica: attach.ficha_medica,
+					tiene_familiares_socios: val("tiene_familiares_socios") ? 1 : 0,
+					familiares_existentes_dnis: val("familiares_existentes_dnis"),
+					actividad_interes: selectedActividades(),
+				};
+				if (attach.comprobante_domicilio) {
+					data.comprobante_domicilio = attach.comprobante_domicilio;
+				}
+				if (cat.value === "Menor") {
+					data.dni_tutor = val("dni_tutor");
+					data.nombre_tutor = val("nombre_tutor");
+					data.apellido_tutor = val("apellido_tutor");
+					data.fecha_nacimiento_tutor = val("fecha_nacimiento_tutor");
+					data.nacionalidad_tutor = val("nacionalidad_tutor");
+					data.genero_tutor = val("genero_tutor");
+					data.rol_tutor = val("rol_tutor");
+					data.email_tutor = val("email_tutor");
+					data.telefono_tutor = val("telefono_tutor");
+					data.calle_tutor = val("calle_tutor");
+					data.localidad_tutor = val("localidad_tutor");
+					data.provincia_tutor = val("provincia_tutor");
+					data.codigo_postal_tutor = val("codigo_postal_tutor");
+					data.dni_frente_tutor = attach.dni_frente_tutor;
+					data.dni_dorso_tutor = attach.dni_dorso_tutor;
+					data.foto_perfil_tutor = attach.foto_perfil_tutor;
+				}
+				return data;
+			})
+			.then(function (payload) {
+				frappe.call({
+					method: "club_management.members.api.solicitud_publica.submit_solicitud",
+					args: { data: payload },
+					freeze: true,
+					freeze_message: "{{ _('Enviando…') }}",
+					callback: function (r) {
+						if (r.exc) {
+							showError("{{ _('No se pudo registrar la solicitud. Revise los datos e intente nuevamente.') }}");
+							return;
+						}
+						form.style.display = "none";
+						successBox.style.display = "block";
+						tokenEl.textContent = r.message.token_seguimiento || "";
+					},
+					error: function () {
+						showError("{{ _('Error de red o del servidor al enviar la solicitud.') }}");
+					},
+				});
+			})
+			.catch(function (err) {
+				showError(err.message || "{{ _('Error inesperado.') }}");
+			});
+	});
+});
+</script>
+{% endblock %}

@@ -548,6 +548,56 @@ class TestGuestNoTienePermisoSobreSolicitud(
 # ---------------------------------------------------------------------------
 
 
+class TestSubmitSolicitudLegacyAddressFields(
+    _PayloadConFichaRealMixin, MembersTestCase
+):
+    """Payload legacy `domicilio` se normaliza a `calle` antes del insert."""
+
+    def test_submit_acepta_domicilio_legacy_como_calle(self) -> None:
+        from club_management.members.api.solicitud_publica import (
+            _submit_solicitud_impl as submit_solicitud,
+        )
+
+        payload = self._adulto_payload()
+        payload.pop("calle", None)
+        payload["domicilio"] = "Av. Siempre Viva 742"
+
+        with _patched_request(_mock_request()):
+            result = submit_solicitud(data=payload)
+
+        sol = frappe.get_doc(
+            "Solicitud Asociacion",
+            {"token_seguimiento": result["token_seguimiento"]},
+        )
+        self.assertEqual(sol.calle, "Av. Siempre Viva 742")
+
+
+class TestGetPlacesConfig(MembersTestCase):
+    def test_sin_clave_devuelve_disabled(self) -> None:
+        from club_management.members.api.solicitud_publica import get_places_config
+
+        old = frappe.conf.get("google_maps_api_key")
+        frappe.conf.google_maps_api_key = ""
+        try:
+            cfg = get_places_config()
+        finally:
+            frappe.conf.google_maps_api_key = old
+        self.assertFalse(cfg["enabled"])
+        self.assertEqual(cfg["api_key"], "")
+
+    def test_con_clave_devuelve_enabled(self) -> None:
+        from club_management.members.api.solicitud_publica import get_places_config
+
+        old = frappe.conf.get("google_maps_api_key")
+        frappe.conf.google_maps_api_key = "test-key-123"
+        try:
+            cfg = get_places_config()
+        finally:
+            frappe.conf.google_maps_api_key = old
+        self.assertTrue(cfg["enabled"])
+        self.assertEqual(cfg["api_key"], "test-key-123")
+
+
 class TestSubmitSolicitudRateLimitDecorator(MembersTestCase):
     """Verifica que `submit_solicitud` está decorado con `@frappe.rate_limit`.
 

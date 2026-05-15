@@ -55,6 +55,9 @@ DUMMY_FOTO_PERFIL = "/files/test_foto_perfil.jpg"
 DUMMY_DNI_FRENTE = "/files/test_dni_frente.jpg"
 DUMMY_DNI_DORSO = "/files/test_dni_dorso.jpg"
 DUMMY_FICHA_MEDICA = "/files/test_ficha_medica.pdf"
+DUMMY_DNI_FRENTE_TUTOR = "/files/test_dni_frente_tutor.jpg"
+DUMMY_DNI_DORSO_TUTOR = "/files/test_dni_dorso_tutor.jpg"
+DUMMY_FOTO_PERFIL_TUTOR = "/files/test_foto_perfil_tutor.jpg"
 
 
 # PDF mínimo estructuralmente válido (~180 bytes). pypdf 6.x lo parsea sin
@@ -248,7 +251,7 @@ def make_solicitud_asociacion_payload(**overrides: Any) -> dict[str, Any]:
         "categoria_solicitada": "Activo",
         "email": "ana@example.com",
         "telefono": "+541112345678",
-        "domicilio": "Calle Falsa 123",
+        "calle": "Calle Falsa 123",
         "localidad": "CABA",
         "provincia": "CABA",
         "codigo_postal": "1414",
@@ -282,11 +285,14 @@ def make_solicitud_menor_payload(**overrides: Any) -> dict[str, Any]:
             "genero_tutor": "Masculino",
             "email_tutor": "papa@example.com",
             "telefono_tutor": "+541198765432",
-            "domicilio_tutor": "Calle Falsa 123",
+            "calle_tutor": "Calle Falsa 123",
             "localidad_tutor": "CABA",
             "provincia_tutor": "CABA",
             "codigo_postal_tutor": "1414",
             "rol_tutor": "Padre",
+            "dni_frente_tutor": DUMMY_DNI_FRENTE_TUTOR,
+            "dni_dorso_tutor": DUMMY_DNI_DORSO_TUTOR,
+            "foto_perfil_tutor": DUMMY_FOTO_PERFIL_TUTOR,
         }
     )
     payload.update(overrides)

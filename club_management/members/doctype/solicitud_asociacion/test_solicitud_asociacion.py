@@ -37,6 +37,24 @@ DOCTYPE = "Solicitud Asociacion"
 class TestSolicitudAsociacionMetadata(MembersTestCase):
     """Smoke + metadata del DocType."""
 
+    def test_campos_calle_en_meta(self) -> None:
+        meta = frappe.get_meta(DOCTYPE)
+        self.assertIsNotNone(meta.get_field("calle"))
+        self.assertIsNotNone(meta.get_field("calle_tutor"))
+        self.assertIsNone(meta.get_field("domicilio"))
+
+    def test_campos_documentacion_tutor_en_meta(self) -> None:
+        meta = frappe.get_meta(DOCTYPE)
+        for fname in (
+            "dni_frente_tutor",
+            "dni_dorso_tutor",
+            "foto_perfil_tutor",
+        ):
+            self.assertIsNotNone(
+                meta.get_field(fname),
+                f"Falta campo {fname} en Solicitud Asociacion",
+            )
+
     def test_doctype_existe(self) -> None:
         self.assertTrue(frappe.db.exists("DocType", DOCTYPE))
 
@@ -124,6 +142,11 @@ class TestSolicitudAsociacionMenor(MembersTestCase):
         self.assertEqual(sol.categoria_solicitada, "Menor")
         self.assertEqual(sol.dni_tutor, "20111111")
         self.assertEqual(sol.email_tutor, "papa@example.com")
+
+    def test_menor_sin_documentacion_tutor_falla(self) -> None:
+        payload = make_solicitud_menor_payload(dni_frente_tutor=None)
+        with self.assertRaises(frappe.exceptions.MandatoryError):
+            frappe.get_doc(payload).insert(ignore_permissions=True)
 
     def test_menor_sin_dni_tutor_falla(self) -> None:
         payload = make_solicitud_menor_payload(dni_tutor=None)
