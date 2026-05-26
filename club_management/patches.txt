@@ -7,3 +7,4 @@
 club_management.patches.v1_0.drop_alta_validada_from_socio
 club_management.patches.v1_0.rename_domicilio_to_calle_solicitud
 club_management.patches.v1_0.consolidate_domicilio_to_calle_solicitud
+club_management.patches.v1_0.install_solicitud_asociacion_workflow

@@ -122,7 +122,7 @@
   { "fieldname": "actividad_interes", "fieldtype": "Small Text", "label": "Actividades de inter\u00e9s", "description": "Nombres de actividades separados por coma (portal multi-select)." },
 
   { "fieldname": "workflow_section", "fieldtype": "Section Break", "label": "Estado y trazabilidad" },
-  { "fieldname": "workflow_state", "fieldtype": "Select", "label": "Estado de la solicitud", "options": "Pendiente\nRequiere Correcci\u00f3n\nValidada\nRechazada", "reqd": 1, "default": "Pendiente", "read_only": 1, "in_list_view": 1, "in_standard_filter": 1, "description": "Sprint 1 commit 3 reemplaza este Select con un Workflow fixture." },
+  { "fieldname": "workflow_state", "fieldtype": "Select", "label": "Estado de la solicitud", "options": "Pendiente\nRequiere Correcci\u00f3n\nValidada\nRechazada", "reqd": 1, "default": "Pendiente", "read_only": 1, "in_list_view": 1, "in_standard_filter": 1, "description": "Gestionado por el Workflow Desk (Sprint 1 commit 3)." },
   { "fieldname": "motivos_rechazo", "fieldtype": "Text", "label": "Motivos de rechazo", "description": "Requerido al transicionar a `Rechazada` (validado en commit 3)." },
   { "fieldname": "observaciones_secretaria", "fieldtype": "Text", "label": "Observaciones internas de Secretar\u00eda" },
   { "fieldname": "column_break_workflow", "fieldtype": "Column Break" },

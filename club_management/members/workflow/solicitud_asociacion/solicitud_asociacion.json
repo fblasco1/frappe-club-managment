@@ -1,0 +1,64 @@
+{
+  "doctype": "Workflow",
+  "workflow_name": "Solicitud Asociacion",
+  "document_type": "Solicitud Asociacion",
+  "workflow_state_field": "workflow_state",
+  "is_active": 1,
+  "send_email_alert": 0,
+  "states": [
+    { "state": "Pendiente", "doc_status": "0", "allow_edit": "Secretaria" },
+    {
+      "state": "Requiere Corrección",
+      "doc_status": "0",
+      "allow_edit": "Secretaria"
+    },
+    { "state": "Validada", "doc_status": "0", "allow_edit": "Secretaria" },
+    { "state": "Rechazada", "doc_status": "0", "allow_edit": "Secretaria" }
+  ],
+  "transitions": [
+    {
+      "state": "Pendiente",
+      "action": "Solicitar Corrección",
+      "next_state": "Requiere Corrección",
+      "allowed": "Secretaria",
+      "allow_self_approval": 1
+    },
+    {
+      "state": "Requiere Corrección",
+      "action": "Reenviar",
+      "next_state": "Pendiente",
+      "allowed": "Secretaria",
+      "allow_self_approval": 1
+    },
+    {
+      "state": "Pendiente",
+      "action": "Validar",
+      "next_state": "Validada",
+      "allowed": "Secretaria",
+      "allow_self_approval": 1
+    },
+    {
+      "state": "Requiere Corrección",
+      "action": "Validar",
+      "next_state": "Validada",
+      "allowed": "Secretaria",
+      "allow_self_approval": 1
+    },
+    {
+      "state": "Pendiente",
+      "action": "Rechazar",
+      "next_state": "Rechazada",
+      "allowed": "Secretaria",
+      "allow_self_approval": 1,
+      "condition": "doc.motivos_rechazo and doc.motivos_rechazo.strip()"
+    },
+    {
+      "state": "Requiere Corrección",
+      "action": "Rechazar",
+      "next_state": "Rechazada",
+      "allowed": "Secretaria",
+      "allow_self_approval": 1,
+      "condition": "doc.motivos_rechazo and doc.motivos_rechazo.strip()"
+    }
+  ]
+}

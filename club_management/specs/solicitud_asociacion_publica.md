@@ -913,6 +913,54 @@ And esto se cubre con un test sobre la función de render del email.
 
 ---
 
+## Commit 3 — Workflow Desk y auditoría (escenarios)
+
+Alcance **exclusivo** del commit 3: fixture `Workflow`, transiciones Desk vía
+`apply_workflow`, `before_save` de campos de auditoría y validación de
+`motivos_rechazo` al rechazar. **No** incluye `validar_solicitud`, creación de
+`Socio`/`User`, emails ni endpoints públicos de corrección (commits 4–5).
+
+### Scenario: el Workflow activo existe tras migrate
+
+Given la app `club_management` migrada en el sitio
+When se consulta `Workflow` para `document_type = "Solicitud Asociacion"`
+Then existe un workflow activo con estados
+`Pendiente`, `Requiere Corrección`, `Validada`, `Rechazada`
+And acciones `Solicitar Corrección`, `Reenviar`, `Validar`, `Rechazar`
+And el campo de estado es `workflow_state`.
+
+### Scenario: Solicitar Corrección audita usuario y timestamp
+
+Given una `Solicitud de Asociación` con `workflow_state = "Pendiente"`
+And un usuario con rol `Secretaria`
+When `Secretaria` ejecuta la acción `Solicitar Corrección`
+Then `workflow_state` pasa a `Requiere Corrección`
+And `correccion_solicitada_por` = usuario actual
+And `correccion_solicitada_en` queda poblado.
+
+### Scenario: Reenviar vuelve a Pendiente (Secretaría)
+
+Given una solicitud en `Requiere Corrección`
+When `Secretaria` ejecuta `Reenviar`
+Then `workflow_state` pasa a `Pendiente`
+And los campos de auditoría de corrección previos **no se borran**.
+
+### Scenario: Validar audita sin crear Socio (commit 3)
+
+Given una solicitud en `Pendiente`
+When `Secretaria` ejecuta `Validar`
+Then `workflow_state` pasa a `Validada`
+And `validado_por` / `validado_en` quedan poblados
+And `socio_generado` permanece vacío (la creación de Socio es commit 4).
+
+### Scenario: save sin cambio de estado no sobrescribe auditoría
+
+Given una solicitud ya en `Validada` con `validado_por` y `validado_en` seteados
+When `Secretaria` guarda cambios en `observaciones_secretaria` sin cambiar `workflow_state`
+Then `validado_por` y `validado_en` mantienen los valores anteriores.
+
+---
+
 ## Plan de commits (Sprint 1)
 
 

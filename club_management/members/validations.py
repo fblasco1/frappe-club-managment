@@ -74,6 +74,25 @@ def _detect_mime_by_magic_numbers(head: bytes) -> str:
 	return "application/octet-stream"
 
 
+def _resolve_uploaded_file_path(file_url: str) -> str:
+	"""Path en disco para un `file_url` de Frappe, sin depender de `get_url()` HTTP.
+
+	Evita fallos en tests que mockean `frappe.local.request` (p. ej. `get_full_path`
+	devuelve `TypeError` si `site_url` no es `str`).
+	"""
+	from frappe.utils import get_files_path
+
+	if file_url.startswith("/private/files/"):
+		relative = file_url.removeprefix("/private/files/")
+		return get_files_path(*relative.split("/"), is_private=1)
+	if file_url.startswith("/files/"):
+		relative = file_url.removeprefix("/files/")
+		return get_files_path(*relative.split("/"), is_private=0)
+
+	file_doc = frappe.get_doc("File", {"file_url": file_url})
+	return file_doc.get_full_path()
+
+
 def validate_ficha_medica_from_url(file_url: str) -> None:
 	"""Valida MIME + tamaño de la ficha médica a partir de su `file_url`.
 
@@ -87,8 +106,7 @@ def validate_ficha_medica_from_url(file_url: str) -> None:
 	4. Lee el tamaño con `os.path.getsize`.
 	5. Delega a `validate_ficha_medica` (política única para Desk y portal).
 	"""
-	file_doc = frappe.get_doc("File", {"file_url": file_url})
-	file_path = file_doc.get_full_path()
+	file_path = _resolve_uploaded_file_path(file_url)
 
 	with open(file_path, "rb") as f:
 		head = f.read(8)

@@ -353,3 +353,47 @@ def ensure_role_socio_exists() -> None:
 
     if frappe.db.get_value("Role", "Socio", "desk_access"):
         frappe.db.set_value("Role", "Socio", "desk_access", 0, update_modified=False)
+
+
+def ensure_role_secretaria_exists() -> None:
+    """Asegura que el rol Frappe `Secretaria` exista con acceso a Desk."""
+    if frappe.db.exists("Role", "Secretaria"):
+        return
+    frappe.get_doc(
+        {"doctype": "Role", "role_name": "Secretaria", "desk_access": 1}
+    ).insert(ignore_permissions=True)
+
+
+def make_secretaria_user(email: str = "secretaria.test@example.com") -> str:
+    """Crea (o reutiliza) un usuario de prueba con rol `Secretaria`."""
+    ensure_role_secretaria_exists()
+    if frappe.db.exists("User", email):
+        return email
+
+    frappe.get_doc(
+        {
+            "doctype": "User",
+            "email": email,
+            "first_name": "Secretaria",
+            "send_welcome_email": 0,
+            "roles": [{"role": "Secretaria"}],
+        }
+    ).insert(ignore_permissions=True)
+    return email
+
+
+def apply_workflow_rechazar(doc: "frappe.model.document.Document", motivos: str) -> None:
+    """Ejecuta la transición «Rechazar» con motivos persistidos.
+
+    `frappe.model.workflow.apply_workflow` llama `load_from_db()` y descarta
+    cambios en memoria; los motivos deben guardarse antes (mismo flujo que Desk).
+    """
+    from frappe.model.workflow import apply_workflow
+
+    from club_management.members.workflow.solicitud_asociacion_workflow import (
+        ACTION_RECHAZAR,
+    )
+
+    doc.motivos_rechazo = motivos
+    doc.save()
+    apply_workflow(doc, ACTION_RECHAZAR)

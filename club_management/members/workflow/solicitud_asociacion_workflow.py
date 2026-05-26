@@ -1,0 +1,182 @@
+"""Workflow Desk de `Solicitud Asociacion` (Sprint 1 Commit 3).
+
+Instala de forma idempotente el Workflow con estados y transiciones definidos
+en `specs/solicitud_asociacion_publica.md`.
+
+Spec: `club_management/specs/solicitud_asociacion_publica.md` (Commit 3).
+"""
+
+from __future__ import annotations
+
+import frappe
+from frappe import _
+
+WORKFLOW_NAME = "Solicitud Asociacion"
+DOCUMENT_TYPE = "Solicitud Asociacion"
+WORKFLOW_STATE_FIELD = "workflow_state"
+
+STATE_PENDIENTE = "Pendiente"
+STATE_REQUIERE_CORRECCION = "Requiere Corrección"
+STATE_VALIDADA = "Validada"
+STATE_RECHAZADA = "Rechazada"
+
+WORKFLOW_STATES = (
+	STATE_PENDIENTE,
+	STATE_REQUIERE_CORRECCION,
+	STATE_VALIDADA,
+	STATE_RECHAZADA,
+)
+
+ACTION_SOLICITAR_CORRECCION = "Solicitar Corrección"
+ACTION_REENVIAR = "Reenviar"
+ACTION_VALIDAR = "Validar"
+ACTION_RECHAZAR = "Rechazar"
+
+WORKFLOW_ACTIONS = (
+	ACTION_SOLICITAR_CORRECCION,
+	ACTION_REENVIAR,
+	ACTION_VALIDAR,
+	ACTION_RECHAZAR,
+)
+
+ROLE_SECRETARIA = "Secretaria"
+
+# Condición en transiciones «Rechazar»: exige motivos persistidos en DB (Desk: guardar antes).
+RECHAZAR_TRANSITION_CONDITION = "doc.motivos_rechazo and doc.motivos_rechazo.strip()"
+
+
+def ensure_solicitud_asociacion_workflow() -> None:
+	"""Crea o reactiva el Workflow de Solicitud Asociacion."""
+	_ensure_document_type_exists()
+	_ensure_role_secretaria()
+	_ensure_workflow_states()
+	_ensure_workflow_actions()
+
+	if frappe.db.exists("Workflow", WORKFLOW_NAME):
+		workflow = frappe.get_doc("Workflow", WORKFLOW_NAME)
+		changed = _sync_rechazar_transition_conditions(workflow)
+		if not workflow.is_active:
+			workflow.is_active = 1
+			changed = True
+		if changed:
+			workflow.save(ignore_permissions=True)
+		frappe.clear_cache(doctype=DOCUMENT_TYPE)
+		return
+
+	workflow = frappe.get_doc(
+		{
+			"doctype": "Workflow",
+			"workflow_name": WORKFLOW_NAME,
+			"document_type": DOCUMENT_TYPE,
+			"workflow_state_field": WORKFLOW_STATE_FIELD,
+			"is_active": 1,
+			"send_email_alert": 0,
+		}
+	)
+	for state in WORKFLOW_STATES:
+		workflow.append(
+			"states",
+			{
+				"state": state,
+				"doc_status": "0",
+				"allow_edit": ROLE_SECRETARIA,
+			},
+		)
+
+	transitions = (
+		(STATE_PENDIENTE, ACTION_SOLICITAR_CORRECCION, STATE_REQUIERE_CORRECCION),
+		(STATE_REQUIERE_CORRECCION, ACTION_REENVIAR, STATE_PENDIENTE),
+		(STATE_PENDIENTE, ACTION_VALIDAR, STATE_VALIDADA),
+		(STATE_REQUIERE_CORRECCION, ACTION_VALIDAR, STATE_VALIDADA),
+		(STATE_PENDIENTE, ACTION_RECHAZAR, STATE_RECHAZADA),
+		(STATE_REQUIERE_CORRECCION, ACTION_RECHAZAR, STATE_RECHAZADA),
+	)
+	for state, action, next_state in transitions:
+		workflow.append(
+			"transitions",
+			_workflow_transition_row(state, action, next_state),
+		)
+
+	workflow.insert(ignore_permissions=True)
+	frappe.clear_cache(doctype=DOCUMENT_TYPE)
+
+
+def _workflow_transition_row(state: str, action: str, next_state: str) -> dict[str, object]:
+	row: dict[str, object] = {
+		"state": state,
+		"action": action,
+		"next_state": next_state,
+		"allowed": ROLE_SECRETARIA,
+		"allow_self_approval": 1,
+	}
+	if action == ACTION_RECHAZAR:
+		row["condition"] = RECHAZAR_TRANSITION_CONDITION
+	return row
+
+
+def _sync_rechazar_transition_conditions(workflow) -> bool:
+	"""Añade condición de motivos en transiciones Rechazar si faltaba (migrate idempotente)."""
+	changed = False
+	for row in workflow.transitions:
+		if row.action != ACTION_RECHAZAR:
+			continue
+		if (row.condition or "").strip() != RECHAZAR_TRANSITION_CONDITION:
+			row.condition = RECHAZAR_TRANSITION_CONDITION
+			changed = True
+	return changed
+
+
+def _ensure_document_type_exists() -> None:
+	"""Garantiza que `Solicitud Asociacion` esté en `tabDocType` antes del Workflow."""
+	if frappe.db.exists("DocType", DOCUMENT_TYPE):
+		return
+
+	installed = frappe.get_installed_apps()
+	if "club_management" not in installed:
+		frappe.throw(
+			_(
+				"La app `club_management` no está instalada en el sitio {0}. "
+				"Ejecutá: bench --site {0} install-app club_management && bench migrate"
+			).format(frappe.local.site),
+			frappe.ValidationError,
+		)
+
+	from frappe.model.sync import sync_for
+
+	sync_for("club_management", force=0)
+	frappe.clear_cache(doctype="DocType")
+
+	if not frappe.db.exists("DocType", DOCUMENT_TYPE):
+		frappe.throw(
+			_(
+				"DocType `{0}` no encontrado tras sincronizar `club_management`. "
+				"Ejecutá bench migrate en el sitio {1}."
+			).format(DOCUMENT_TYPE, frappe.local.site),
+			frappe.ValidationError,
+		)
+
+
+def _ensure_role_secretaria() -> None:
+	if frappe.db.exists("Role", ROLE_SECRETARIA):
+		return
+	frappe.get_doc(
+		{"doctype": "Role", "role_name": ROLE_SECRETARIA, "desk_access": 1}
+	).insert(ignore_permissions=True)
+
+
+def _ensure_workflow_states() -> None:
+	for state in WORKFLOW_STATES:
+		if frappe.db.exists("Workflow State", state):
+			continue
+		frappe.get_doc(
+			{"doctype": "Workflow State", "workflow_state_name": state}
+		).insert(ignore_permissions=True)
+
+
+def _ensure_workflow_actions() -> None:
+	for action in WORKFLOW_ACTIONS:
+		if frappe.db.exists("Workflow Action Master", action):
+			continue
+		frappe.get_doc(
+			{"doctype": "Workflow Action Master", "workflow_action_name": action}
+		).insert(ignore_permissions=True)
