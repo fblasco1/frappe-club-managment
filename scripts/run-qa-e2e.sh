@@ -40,5 +40,6 @@ if [[ ! -x "$PW" ]]; then
 fi
 
 echo "PLAYWRIGHT_BASE_URL=$PLAYWRIGHT_BASE_URL"
+echo "PW_CHANNEL=${PW_CHANNEL:-chromium (bundle)}"
 echo "cwd=$ROOT"
-exec "$PW" test "$@"
+exec "$PW" test --config="${ROOT}/playwright.config.cjs" "$@"

@@ -17,7 +17,7 @@ _write_channel() {
 	echo "Navegador: PW_CHANNEL=${ch} (sistema, sin bundle de Playwright)"
 }
 
-if "$PW" install chromium 2>/dev/null; then
+if "$PW" install chromium >/dev/null 2>&1; then
 	rm -f "$ENV_FILE"
 	echo "Chromium de Playwright instalado correctamente."
 	exit 0
