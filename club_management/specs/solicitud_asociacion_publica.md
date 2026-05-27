@@ -913,6 +913,47 @@ And esto se cubre con un test sobre la función de render del email.
 
 ---
 
+## Commit 4 — `validar_solicitud` y `ensure_grupo_for_socio` (escenarios)
+
+Alcance **exclusivo** del commit 4: al transicionar a `Validada` (acción workflow
+`Validar`), crear de forma atómica `User` / `Socio` / `Grupo Familiar` / `Tutor No Socio`
+según la spec; bloqueos previos; idempotencia si `socio_generado` ya está poblado.
+
+**No** incluye plantillas de email ni stub de pago navegable (Commit 5): solo
+`enqueue_validacion_pago_email` como stub registrable en tests.
+
+**Punto de enganche:** `SolicitudAsociacion.validate()` detecta
+`workflow_state` → `Validada` sin `socio_generado` y llama
+`members.services.validar_solicitud.ejecutar_validacion_desde_solicitud`.
+
+**Servicios:**
+
+- `members/services/validar_solicitud.py`
+- `members/services/grupo_familiar.py` → `ensure_grupo_for_socio(socio, solicitud=...)`
+
+**Mensajes de bloqueo (texto exacto en `ValidationError`):**
+
+| Caso | Mensaje |
+|------|---------|
+| Email adulto tomado | `El email ya tiene cuenta en el portal; pedí al solicitante un email distinto` |
+| Email menor tomado (distinto del tutor) | `El email del menor ya tiene cuenta en el portal; usá el mismo email del tutor o pedí al solicitante uno distinto` |
+| DNI ya Socio | `DNI ya registrado como Socio` |
+| DNI ya Tutor No Socio (solicitud adulta) | `DNI ya está registrado como Tutor No Socio; Secretaría debe migrar manualmente el registro a Socio antes de validar` |
+| Tutor menor de edad | `Tutor debe ser mayor de 18 años` |
+| Datos tutor incompletos | `Datos del tutor incompletos: \`{campo}\` es obligatorio` |
+
+### Scenario: Commit 4 — validar adulto (resumen ejecutable)
+
+Given solicitud `Pendiente`, categoría adulta, sin colisiones de DNI/email
+When `Validar` (workflow)
+Then `User` + `Socio` (`Pendiente de Pago`) + `Grupo Familiar` nuevo; solicitud con
+`socio_generado`, `user_generado`, `grupo_familiar_generado`; stub de email encolado.
+
+(Los escenarios detallados de menores, segundo hijo, bloqueos e idempotencia están
+en las secciones «validar …» más arriba en este mismo documento.)
+
+---
+
 ## Commit 3 — Workflow Desk y auditoría (escenarios)
 
 Alcance **exclusivo** del commit 3: fixture `Workflow`, transiciones Desk vía

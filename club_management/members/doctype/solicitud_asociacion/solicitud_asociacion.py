@@ -16,6 +16,11 @@ Commit 3 añade:
   cambia `workflow_state`.
 - `validate`: exige `motivos_rechazo` al transicionar a `Rechazada`.
 
+Commit 4 añade:
+
+- `validate`: al quedar en `Validada` sin `socio_generado`, ejecuta
+  `validar_solicitud.ejecutar_validacion_desde_solicitud`.
+
 El resto de la lógica (validación de transiciones del workflow, escape XSS
 en `motivos_rechazo`, validación MIME de `ficha_medica`, sincronización con
 `Socio`, etc.) se agrega en commits posteriores del Sprint 1.
@@ -39,6 +44,9 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
+from club_management.members.services.validar_solicitud import (
+    ejecutar_validacion_desde_solicitud,
+)
 from club_management.members.validations import enforce_mandatory_depends_on
 from club_management.members.workflow.solicitud_asociacion_workflow import (
     STATE_RECHAZADA,
@@ -89,3 +97,6 @@ class SolicitudAsociacion(Document):
             and not (self.motivos_rechazo or "").strip()
         ):
             frappe.throw(_("motivos_rechazo es obligatorio"), frappe.ValidationError)
+
+        if self.workflow_state == STATE_VALIDADA and not self.socio_generado:
+            ejecutar_validacion_desde_solicitud(self)
