@@ -46,7 +46,7 @@ def ensure_solicitud_asociacion_workflow() -> None:
 
 	if frappe.db.exists("Workflow", WORKFLOW_NAME):
 		workflow = frappe.get_doc("Workflow", WORKFLOW_NAME)
-		changed = False
+		changed = _sync_workflow_definition(workflow)
 		if not workflow.is_active:
 			workflow.is_active = 1
 			changed = True
@@ -89,6 +89,46 @@ def ensure_solicitud_asociacion_workflow() -> None:
 
 	workflow.insert(ignore_permissions=True)
 	frappe.clear_cache(doctype=DOCUMENT_TYPE)
+
+
+def _sync_workflow_definition(workflow) -> bool:
+	"""Mantiene estados/transiciones alineados al flujo actual.
+
+	En Sprint 1 cierre se eliminó el estado terminal `Rechazada` y la acción
+	`Rechazar`. En sitios ya migrados puede quedar en el Doc de Workflow: este
+	sync lo remueve para que Desk no lo ofrezca.
+	"""
+	changed = False
+
+	expected_states = set(WORKFLOW_STATES)
+	expected_actions = set(WORKFLOW_ACTIONS)
+
+	# Filtrar estados extra (p. ej. "Rechazada")
+	kept_states = [row for row in workflow.states if row.state in expected_states]
+	if len(kept_states) != len(workflow.states):
+		workflow.set("states", kept_states)
+		changed = True
+
+	# Filtrar transiciones extra (p. ej. acción "Rechazar")
+	kept_transitions = [row for row in workflow.transitions if row.action in expected_actions]
+	if len(kept_transitions) != len(workflow.transitions):
+		workflow.set("transitions", kept_transitions)
+		changed = True
+
+	# Asegurar que existan las transiciones esperadas (idempotente)
+	existing = {(t.state, t.action, t.next_state) for t in workflow.transitions}
+	expected = {
+		(STATE_PENDIENTE, ACTION_SOLICITAR_CORRECCION, STATE_REQUIERE_CORRECCION),
+		(STATE_REQUIERE_CORRECCION, ACTION_REENVIAR, STATE_PENDIENTE),
+		(STATE_PENDIENTE, ACTION_VALIDAR, STATE_VALIDADA),
+		(STATE_REQUIERE_CORRECCION, ACTION_VALIDAR, STATE_VALIDADA),
+	}
+	missing = expected - existing
+	for state, action, next_state in sorted(missing):
+		workflow.append("transitions", _workflow_transition_row(state, action, next_state))
+		changed = True
+
+	return changed
 
 
 def _workflow_transition_row(state: str, action: str, next_state: str) -> dict[str, object]:
