@@ -130,8 +130,12 @@
 	}
 
 	function csrf() {
-		const meta = document.querySelector("meta[name='csrf-token']");
-		return meta ? meta.getAttribute("content") : "";
+		// En website, el token vive en cookie `csrf_token` y también en `frappe.csrf_token`.
+		function getCookie(name) {
+			const m = document.cookie.match(new RegExp("(^|;\\s*)" + name + "=([^;]*)"));
+			return m ? decodeURIComponent(m[2]) : "";
+		}
+		return (window.frappe && frappe.csrf_token) || getCookie("csrf_token") || "";
 	}
 
 	function fileFromId(id) {
