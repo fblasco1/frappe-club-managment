@@ -274,6 +274,12 @@ def _consultar_solicitud_impl(token: str) -> dict[str, Any]:
 	}
 	if doc.workflow_state == "Rechazada" and doc.motivos_rechazo:
 		result["motivos_rechazo"] = doc.motivos_rechazo
+	if doc.workflow_state == STATE_REQUIERE_CORRECCION:
+		# Para corrección pública, devolvemos observaciones y un snapshot
+		# acotado a campos editables (incluye adjuntos como URLs).
+		result["observaciones"] = doc.observaciones_secretaria or ""
+		fields = sorted(_CAMPOS_EDITABLES_CORRECCION)
+		result["editable"] = {f: doc.get(f) for f in fields if doc.get(f)}
 	return result
 
 

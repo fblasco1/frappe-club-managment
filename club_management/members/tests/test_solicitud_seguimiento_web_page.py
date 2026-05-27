@@ -37,6 +37,7 @@ class TestSolicitudSeguimientoWebPage(FrappeTestCase):
 		self.assertIn(ACTUALIZAR_METHOD, body)
 		self.assertIn("URLSearchParams", body)
 		self.assertIn(".get(\"token\")", body)
+		self.assertIn("frappe.handler.upload_file", body)
 
 	def test_plantilla_no_usa_innerhtml_para_motivos(self) -> None:
 		with open(_seguimiento_web_page_path(), encoding="utf-8") as f:

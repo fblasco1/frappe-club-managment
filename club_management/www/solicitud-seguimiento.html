@@ -38,6 +38,29 @@
 				Completá los campos que te pidieron corregir y reenviá la solicitud.
 			</p>
 
+			<div class="row g-2 mb-3">
+				<div class="col-12 col-md-6">
+					<label class="form-label" for="dni_frente">DNI frente (reemplazar)</label>
+					<input class="form-control" id="dni_frente" type="file" accept="image/*,.pdf" />
+				</div>
+				<div class="col-12 col-md-6">
+					<label class="form-label" for="dni_dorso">DNI dorso (reemplazar)</label>
+					<input class="form-control" id="dni_dorso" type="file" accept="image/*,.pdf" />
+				</div>
+				<div class="col-12 col-md-6">
+					<label class="form-label" for="foto_perfil">Foto de perfil (reemplazar)</label>
+					<input class="form-control" id="foto_perfil" type="file" accept="image/*" />
+				</div>
+				<div class="col-12 col-md-6">
+					<label class="form-label" for="ficha_medica">Ficha médica (reemplazar)</label>
+					<input class="form-control" id="ficha_medica" type="file" accept="image/*,.pdf" />
+				</div>
+				<div class="col-12">
+					<label class="form-label" for="comprobante_domicilio">Comprobante domicilio (opcional)</label>
+					<input class="form-control" id="comprobante_domicilio" type="file" accept="image/*,.pdf" />
+				</div>
+			</div>
+
 			<div class="row g-2">
 				<div class="col-12 col-md-6">
 					<label class="form-label" for="telefono">Teléfono</label>
@@ -78,6 +101,7 @@
 <script>
 	const CONSULTAR = "club_management.members.api.solicitud_publica.consultar_solicitud";
 	const ACTUALIZAR = "club_management.members.api.solicitud_publica.actualizar_solicitud";
+	const UPLOAD = "frappe.handler.upload_file";
 
 	(function prefillTokenFromQuery() {
 		try {
@@ -109,6 +133,35 @@
 		return (document.getElementById("token").value || "").trim();
 	}
 
+	function csrf() {
+		const meta = document.querySelector("meta[name='csrf-token']");
+		return meta ? meta.getAttribute("content") : "";
+	}
+
+	function fileFromId(id) {
+		const el = document.getElementById(id);
+		return el && el.files && el.files[0] ? el.files[0] : null;
+	}
+
+	function uploadFile(file) {
+		if (!file) return Promise.resolve(null);
+		const fd = new FormData();
+		fd.append("file", file, file.name);
+		fd.append("is_private", "1");
+		return fetch("/api/method/" + UPLOAD, {
+			method: "POST",
+			headers: { "X-Frappe-CSRF-Token": csrf() },
+			body: fd,
+		})
+			.then((resp) => resp.json())
+			.then((data) => {
+				if (data.exc) throw new Error("Error al subir archivo.");
+				const msg = data.message;
+				if (msg && msg.file_url) return msg.file_url;
+				throw new Error("Respuesta de subida inesperada.");
+			});
+	}
+
 	function renderEstado(data) {
 		setVisible("resultado", true);
 		document.getElementById("estado").textContent = data.workflow_state || "";
@@ -121,6 +174,16 @@
 		} else {
 			setVisible("motivos-wrap", false);
 			document.getElementById("motivos").textContent = "";
+		}
+
+		if (data.editable) {
+			const fields = ["telefono", "email", "calle", "localidad", "provincia", "codigo_postal"];
+			fields.forEach((f) => {
+				if (typeof data.editable[f] !== "undefined" && data.editable[f] !== null) {
+					const el = document.getElementById(f);
+					if (el) el.value = String(data.editable[f] || "");
+				}
+			});
 		}
 
 		const requiere = (data.workflow_state || "").toLowerCase().includes("requiere");
@@ -152,6 +215,17 @@
 			provincia: (document.getElementById("provincia").value || "").trim(),
 			codigo_postal: (document.getElementById("codigo_postal").value || "").trim(),
 		};
+
+		const uploadIds = ["dni_frente", "dni_dorso", "foto_perfil", "ficha_medica", "comprobante_domicilio"];
+		const attach = {};
+		for (const id of uploadIds) {
+			const f = fileFromId(id);
+			if (!f) continue;
+			attach[id] = await uploadFile(f);
+		}
+		for (const k in attach) {
+			if (attach[k]) data[k] = attach[k];
+		}
 
 		document.getElementById("reenviar-resultado").textContent = "";
 		return frappe.call({

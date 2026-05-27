@@ -45,6 +45,7 @@ class TestCorreccionPublica(MembersTestCase):
 		self.assertIn("creation", result)
 		self.assertNotIn("dni", result)
 		self.assertNotIn("dni_frente", result)
+		self.assertNotIn("editable", result)
 
 	def test_consultar_solicitud_token_invalido_404(self) -> None:
 		with self.assertRaises(DoesNotExistError):
@@ -57,6 +58,11 @@ class TestCorreccionPublica(MembersTestCase):
 		apply_workflow(doc, ACTION_SOLICITAR_CORRECCION)
 		doc.reload()
 		self.assertEqual(doc.workflow_state, STATE_REQUIERE_CORRECCION)
+
+		consulta = _consultar_solicitud_impl(sol.token_seguimiento)
+		self.assertEqual(consulta["workflow_state"], STATE_REQUIERE_CORRECCION)
+		self.assertIn("observaciones", consulta)
+		self.assertIn("editable", consulta)
 
 		result = _actualizar_solicitud_impl(
 			sol.token_seguimiento,
