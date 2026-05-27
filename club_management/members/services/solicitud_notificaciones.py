@@ -67,6 +67,7 @@ def _send_rechazo_email(solicitud_name: str) -> None:
 	html = render_solicitud_rechazada_email(
 		nombre=solicitud.nombre,
 		motivos_rechazo=solicitud.motivos_rechazo or "",
+		token_seguimiento=solicitud.token_seguimiento or "",
 	)
 	frappe.sendmail(
 		recipients=[solicitud.email],

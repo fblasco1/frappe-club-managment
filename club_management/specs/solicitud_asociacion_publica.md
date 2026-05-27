@@ -462,6 +462,27 @@ And un `token` inválido o vencido responde `404` sin distinguir entre "no exist
 
 ---
 
+## Scenario: portal público de seguimiento muestra estado y motivos
+
+Given existe una página pública `/solicitud-seguimiento` accesible sin login
+And el solicitante tiene `token_seguimiento`
+When abre `/solicitud-seguimiento?token=<token>`
+Then el portal consulta `consultar_solicitud(token)` y muestra `workflow_state`
+And si `workflow_state == "Rechazada"`, muestra `motivos_rechazo` (escapado)
+And el portal no usa `innerHTML` para renderizar texto proveniente del server.
+
+---
+
+## Scenario: portal público permite reenviar corrección por token
+
+Given una solicitud con `workflow_state = "Requiere Corrección"`
+When el solicitante abre `/solicitud-seguimiento` y envía cambios
+Then el portal llama `actualizar_solicitud(token, data)`
+And la solicitud pasa a `Pendiente`
+And un token inválido o estado incorrecto responde `404` sin oracle.
+
+---
+
 ## Scenario: Secretaría ve la cola de pendientes
 
 Given existen `Solicitud de Asociación` con `workflow_state` en `{Pendiente, Requiere Corrección, Validada, Rechazada}`

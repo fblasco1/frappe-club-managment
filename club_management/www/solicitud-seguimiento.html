@@ -1,0 +1,164 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div class="container py-5">
+	<h1>Seguimiento de solicitud</h1>
+	<p class="text-muted">
+		Ingresá tu <strong>token de seguimiento</strong> para ver el estado. Si Secretaría pidió corrección,
+		podés actualizar los datos y reenviar.
+	</p>
+
+	<div class="row g-2 align-items-end">
+		<div class="col-12 col-md-8">
+			<label class="form-label" for="token">Token de seguimiento</label>
+			<input class="form-control" id="token" name="token" type="text" value="{{ token | e }}" maxlength="64" />
+		</div>
+		<div class="col-12 col-md-4">
+			<button class="btn btn-primary w-100" id="btn-consultar">Consultar</button>
+		</div>
+	</div>
+
+	<hr class="my-4" />
+
+	<div id="resultado" class="d-none">
+		<h2 class="h5">Estado</h2>
+		<p>
+			<strong id="estado"></strong>
+			<span class="text-muted" id="creacion"></span>
+		</p>
+
+		<div id="motivos-wrap" class="d-none">
+			<h3 class="h6">Motivos / observaciones</h3>
+			<p id="motivos" class="mb-0"></p>
+		</div>
+
+		<div id="correccion-wrap" class="d-none mt-4">
+			<h3 class="h6">Corrección</h3>
+			<p class="text-muted">
+				Completá los campos que te pidieron corregir y reenviá la solicitud.
+			</p>
+
+			<div class="row g-2">
+				<div class="col-12 col-md-6">
+					<label class="form-label" for="telefono">Teléfono</label>
+					<input class="form-control" id="telefono" name="telefono" type="text" maxlength="40" />
+				</div>
+				<div class="col-12 col-md-6">
+					<label class="form-label" for="email">Email</label>
+					<input class="form-control" id="email" name="email" type="email" maxlength="140" />
+				</div>
+				<div class="col-12">
+					<label class="form-label" for="calle">Calle</label>
+					<input class="form-control" id="calle" name="calle" type="text" maxlength="240" />
+				</div>
+				<div class="col-12 col-md-4">
+					<label class="form-label" for="localidad">Localidad</label>
+					<input class="form-control" id="localidad" name="localidad" type="text" maxlength="120" />
+				</div>
+				<div class="col-12 col-md-4">
+					<label class="form-label" for="provincia">Provincia</label>
+					<input class="form-control" id="provincia" name="provincia" type="text" maxlength="120" />
+				</div>
+				<div class="col-12 col-md-4">
+					<label class="form-label" for="codigo_postal">Código postal</label>
+					<input class="form-control" id="codigo_postal" name="codigo_postal" type="text" maxlength="16" />
+				</div>
+			</div>
+
+			<div class="mt-3">
+				<button class="btn btn-success" id="btn-reenviar">Reenviar corrección</button>
+				<p class="text-muted mt-2 mb-0" id="reenviar-resultado"></p>
+			</div>
+		</div>
+	</div>
+
+	<div id="error" class="alert alert-danger d-none mt-3"></div>
+</div>
+
+<script>
+	const CONSULTAR = "club_management.members.api.solicitud_publica.consultar_solicitud";
+	const ACTUALIZAR = "club_management.members.api.solicitud_publica.actualizar_solicitud";
+
+	function showError(msg) {
+		const el = document.getElementById("error");
+		el.textContent = msg || "Error";
+		el.classList.remove("d-none");
+	}
+
+	function clearError() {
+		document.getElementById("error").classList.add("d-none");
+		document.getElementById("error").textContent = "";
+	}
+
+	function setVisible(id, visible) {
+		const el = document.getElementById(id);
+		if (visible) el.classList.remove("d-none");
+		else el.classList.add("d-none");
+	}
+
+	function tokenValue() {
+		return (document.getElementById("token").value || "").trim();
+	}
+
+	function renderEstado(data) {
+		setVisible("resultado", true);
+		document.getElementById("estado").textContent = data.workflow_state || "";
+		document.getElementById("creacion").textContent = data.creation ? ` · ${data.creation}` : "";
+
+		const motivos = data.motivos_rechazo || data.observaciones || "";
+		if (motivos) {
+			setVisible("motivos-wrap", true);
+			document.getElementById("motivos").textContent = motivos;
+		} else {
+			setVisible("motivos-wrap", false);
+			document.getElementById("motivos").textContent = "";
+		}
+
+		const requiere = (data.workflow_state || "").toLowerCase().includes("requiere");
+		setVisible("correccion-wrap", requiere);
+	}
+
+	async function consultar() {
+		clearError();
+		const token = tokenValue();
+		if (!token) return showError("Ingresá un token de seguimiento.");
+		return frappe.call({
+			method: CONSULTAR,
+			args: { token },
+			callback: (r) => renderEstado(r.message || {}),
+			error: () => showError("No se encontró la solicitud (token inválido o vencido)."),
+		});
+	}
+
+	async function reenviar() {
+		clearError();
+		const token = tokenValue();
+		if (!token) return showError("Ingresá un token de seguimiento.");
+
+		const data = {
+			telefono: (document.getElementById("telefono").value || "").trim(),
+			email: (document.getElementById("email").value || "").trim(),
+			calle: (document.getElementById("calle").value || "").trim(),
+			localidad: (document.getElementById("localidad").value || "").trim(),
+			provincia: (document.getElementById("provincia").value || "").trim(),
+			codigo_postal: (document.getElementById("codigo_postal").value || "").trim(),
+		};
+
+		document.getElementById("reenviar-resultado").textContent = "";
+		return frappe.call({
+			method: ACTUALIZAR,
+			args: { token, data: JSON.stringify(data) },
+			callback: (r) => {
+				document.getElementById("reenviar-resultado").textContent =
+					(r.message && r.message.message) || "Solicitud reenviada.";
+				consultar();
+			},
+			error: () => showError("No se pudo reenviar (estado incorrecto o token inválido)."),
+		});
+	}
+
+	document.getElementById("btn-consultar").addEventListener("click", consultar);
+	document.getElementById("btn-reenviar").addEventListener("click", reenviar);
+</script>
+{% endblock %}
+

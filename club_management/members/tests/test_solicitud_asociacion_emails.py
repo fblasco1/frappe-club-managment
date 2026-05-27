@@ -25,9 +25,14 @@ class TestSolicitudAsociacionEmails(MembersTestCase):
 
 	def test_email_rechazo_escapa_html_en_motivos(self) -> None:
 		motivos = '<script>alert(1)</script> Falta DNI dorso'
-		html = render_solicitud_rechazada_email(nombre="Ana", motivos_rechazo=motivos)
+		html = render_solicitud_rechazada_email(
+			nombre="Ana",
+			motivos_rechazo=motivos,
+			token_seguimiento="tk-test",
+		)
 		self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt; Falta DNI dorso", html)
 		self.assertNotIn("<script>", html)
+		self.assertIn("/solicitud-seguimiento?token=tk-test", html)
 
 	def test_email_validada_solo_nombre_y_link_sin_dni(self) -> None:
 		html = render_solicitud_validada_email(
