@@ -1,0 +1,2 @@
+# Scripts shell siempre LF (evita env: bash\r en WSL)
+*.sh text eol=lf
