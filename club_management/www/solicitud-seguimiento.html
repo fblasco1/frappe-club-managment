@@ -11,7 +11,7 @@
 	<div class="row g-2 align-items-end">
 		<div class="col-12 col-md-8">
 			<label class="form-label" for="token">Token de seguimiento</label>
-			<input class="form-control" id="token" name="token" type="text" value="{{ token | e }}" maxlength="64" />
+			<input class="form-control" id="token" name="token" type="text" value="" maxlength="64" />
 		</div>
 		<div class="col-12 col-md-4">
 			<button class="btn btn-primary w-100" id="btn-consultar">Consultar</button>
@@ -78,6 +78,15 @@
 <script>
 	const CONSULTAR = "club_management.members.api.solicitud_publica.consultar_solicitud";
 	const ACTUALIZAR = "club_management.members.api.solicitud_publica.actualizar_solicitud";
+
+	(function prefillTokenFromQuery() {
+		try {
+			const t = new URLSearchParams(window.location.search).get("token");
+			if (t) document.getElementById("token").value = t;
+		} catch (e) {
+			// ignore
+		}
+	})();
 
 	function showError(msg) {
 		const el = document.getElementById("error");
