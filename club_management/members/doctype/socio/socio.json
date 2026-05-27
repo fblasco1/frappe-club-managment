@@ -68,7 +68,7 @@
   { "fieldname": "column_break_tutor", "fieldtype": "Column Break" },
   { "fieldname": "tipo_tutor", "fieldtype": "Select", "label": "Tipo de tutor", "options": "\nSocio\nTutor No Socio", "mandatory_depends_on": "eval:doc.categoria==\"Menor\"" },
   { "fieldname": "tutor", "fieldtype": "Dynamic Link", "label": "Tutor", "options": "tipo_tutor", "mandatory_depends_on": "eval:doc.categoria==\"Menor\"" },
-  { "fieldname": "solicitud_origen", "fieldtype": "Data", "label": "Solicitud de origen", "read_only": 1, "description": "Trazabilidad opcional al Solicitud de Asociaci\u00f3n (DocType pendiente)." },
+  { "fieldname": "solicitud_origen", "fieldtype": "Link", "label": "Solicitud de origen", "options": "Solicitud Asociacion", "read_only": 1, "description": "Trazabilidad del origen en `Solicitud Asociacion`." },
   { "fieldname": "documentos_section", "fieldtype": "Section Break", "label": "Documentos adjuntos" },
   { "fieldname": "foto_perfil", "fieldtype": "Attach Image", "label": "Foto de perfil", "reqd": 1 },
   { "fieldname": "dni_frente", "fieldtype": "Attach", "label": "DNI - frente", "reqd": 1 },
