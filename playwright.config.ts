@@ -5,6 +5,14 @@ import { defineConfig, devices } from "@playwright/test";
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:8000";
 
+/** En distros nuevas (ej. Ubuntu 26.04) sin build de Chromium: `PW_CHANNEL=chrome`. */
+const browserChannel = process.env.PW_CHANNEL as
+	| "chrome"
+	| "chrome-beta"
+	| "msedge"
+	| "msedge-beta"
+	| undefined;
+
 export default defineConfig({
   testDir: path.join(rootDir, "e2e"),
   outputDir: path.join(rootDir, "test-results"),
@@ -24,8 +32,11 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      name: browserChannel ?? "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        ...(browserChannel ? { channel: browserChannel } : {}),
+      },
     },
   ],
 });

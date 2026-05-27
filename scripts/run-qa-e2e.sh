@@ -19,7 +19,16 @@ fi
 if [[ ! -d node_modules/@playwright/test ]]; then
 	echo "Instalando dependencias npm…"
 	npm install
-	"${ROOT}/node_modules/.bin/playwright" install chromium
+fi
+
+if [[ ! -f "${ROOT}/.pw-browser-ready" ]]; then
+	"${ROOT}/scripts/install-playwright-browser.sh"
+	touch "${ROOT}/.pw-browser-ready"
+fi
+
+if [[ -f "${ROOT}/.pw-channel.env" ]]; then
+	# shellcheck source=/dev/null
+	source "${ROOT}/.pw-channel.env"
 fi
 
 export PLAYWRIGHT_BASE_URL="${PLAYWRIGHT_BASE_URL:-http://localhost:8000}"

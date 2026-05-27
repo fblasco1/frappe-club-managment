@@ -55,11 +55,27 @@ Verificación rápida:
 cd ~/ERSport/club_manager_infra/development/frappe-bench/apps/club_management
 rm -rf node_modules   # si antes instalaste con npm de Windows
 npm install
-./node_modules/.bin/playwright install chromium
+./scripts/install-playwright-browser.sh
 ```
 
-No uses `npx` hasta tener `which node` correcto; preferí
-`./node_modules/.bin/playwright` después de `npm install`.
+### Ubuntu 26.04 (u otra distro sin build de Chromium)
+
+Si ves `Playwright does not support chromium on ubuntu26.04`:
+
+```bash
+sudo apt update
+sudo apt install -y wget
+cd /tmp
+wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+sudo apt install -y ./google-chrome-stable_current_amd64.deb
+
+cd ~/ERSport/club_manager_infra/development/frappe-bench/apps/club_management
+rm -f .pw-browser-ready
+./scripts/install-playwright-browser.sh
+# crea .pw-channel.env con PW_CHANNEL=chrome
+```
+
+Los tests usan Chrome del sistema; no hace falta `playwright install chromium`.
 
 ## Variables
 

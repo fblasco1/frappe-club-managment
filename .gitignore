@@ -40,6 +40,8 @@ jspm_packages/
 playwright-report/
 test-results/
 blob-report/
+.pw-channel.env
+.pw-browser-ready
 
 # IDEs and editors
 .vscode/
