@@ -1,0 +1,30 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div class="container py-5">
+	{% if pago_valido %}
+	<h1>Pago simulado — primera cuota</h1>
+	<p>Hola {{ nombre_solicitante | e }}, esta pantalla es un <strong>stub temporal</strong> (Sprint 1).</p>
+	<p>Al confirmar, tu membresía pasará a estado <em>Activo</em> sin integración bancaria real.</p>
+	<button class="btn btn-primary" id="confirmar-pago">Marcar como pagado</button>
+	<p class="text-muted mt-3" id="pago-resultado"></p>
+	<script>
+		document.getElementById("confirmar-pago").addEventListener("click", function () {
+			frappe.call({
+				method: "club_management.members.api.solicitud_publica.confirmar_pago_stub",
+				args: { token: {{ pago_token | tojson }} },
+				callback: function (r) {
+					document.getElementById("pago-resultado").textContent =
+						r.message && r.message.status === "ok"
+							? "Pago registrado. Podés cerrar esta ventana."
+							: "No se pudo registrar el pago.";
+				},
+			});
+		});
+	</script>
+	{% else %}
+	<h1>Enlace no válido</h1>
+	<p>El enlace de pago no existe o ya no está disponible.</p>
+	{% endif %}
+</div>
+{% endblock %}

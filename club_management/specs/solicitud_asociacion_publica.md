@@ -954,6 +954,38 @@ en las secciones «validar …» más arriba en este mismo documento.)
 
 ---
 
+## Commit 5 — emails, stub de pago y endpoints públicos por token
+
+Alcance **exclusivo** del commit 5:
+
+- Plantillas de email (`solicitud_validada`, `solicitud_rechazada`,
+  `solicitud_requiere_correccion`) con escape XSS en `motivos_rechazo`.
+- Stub de pago navegable (`pago_stub` / `/pago-stub`) con token firmado no
+  enumerable; al confirmar, `Socio.estado` → `Activo` vía `cambiar_estado`.
+- Endpoints Guest: `consultar_solicitud(token)` y `actualizar_solicitud(token, payload)`.
+- Enganche de emails en transiciones workflow (Rechazar, Solicitar Corrección;
+  validación usa `enqueue_validacion_pago_email` con plantilla real).
+
+**No** incluye migración `Socio.solicitud_origen` → Link (Commit 6).
+
+**API (módulo `members/api/solicitud_publica.py`):**
+
+| Método | Gate | Respuesta OK |
+|--------|------|--------------|
+| `consultar_solicitud(token)` | token válido | `{status, workflow_state, creation, motivos_rechazo?}` sin adjuntos ni PII extra |
+| `actualizar_solicitud(token, data)` | token + estado `Requiere Corrección` | `{status: ok}`; pasa a `Pendiente` |
+| `pago_stub(token)` | token firmado válido + solicitud `Validada` | contexto página stub |
+| `confirmar_pago_stub(token)` | idem | `{status: ok}`; socio → `Activo` |
+
+Token inválido / estado incorrecto → `404` (`DoesNotExistError`), sin oracle.
+
+**Lista blanca corrección:** mismos campos editables que el alta (`CAMPOS_EDITABLES_CORRECCION`);
+campos sistema/auditoría se ignoran silenciosamente.
+
+**Rate-limit:** `actualizar_solicitud` usa `5/600s` por IP (igual que `submit_solicitud`).
+
+---
+
 ## Commit 3 — Workflow Desk y auditoría (escenarios)
 
 Alcance **exclusivo** del commit 3: fixture `Workflow`, transiciones Desk vía

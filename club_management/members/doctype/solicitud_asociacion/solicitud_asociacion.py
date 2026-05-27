@@ -21,6 +21,11 @@ Commit 4 añade:
 - `validate`: al quedar en `Validada` sin `socio_generado`, ejecuta
   `validar_solicitud.ejecutar_validacion_desde_solicitud`.
 
+Commit 5 añade:
+
+- `before_save`: encola emails al transicionar a `Rechazada` o
+  `Requiere Corrección`.
+
 El resto de la lógica (validación de transiciones del workflow, escape XSS
 en `motivos_rechazo`, validación MIME de `ficha_medica`, sincronización con
 `Socio`, etc.) se agrega en commits posteriores del Sprint 1.
@@ -44,6 +49,10 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
+from club_management.members.services.solicitud_notificaciones import (
+    enqueue_correccion_email,
+    enqueue_rechazo_email,
+)
 from club_management.members.services.validar_solicitud import (
     ejecutar_validacion_desde_solicitud,
 )
@@ -81,9 +90,11 @@ class SolicitudAsociacion(Document):
         elif new_state == STATE_RECHAZADA:
             self.rechazado_por = user
             self.rechazado_en = now
+            enqueue_rechazo_email(self.name)
         elif new_state == STATE_REQUIERE_CORRECCION:
             self.correccion_solicitada_por = user
             self.correccion_solicitada_en = now
+            enqueue_correccion_email(self.name)
 
     def validate(self) -> None:
         enforce_mandatory_depends_on(self)

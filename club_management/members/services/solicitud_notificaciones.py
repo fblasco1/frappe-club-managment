@@ -1,22 +1,24 @@
-"""Notificaciones del flujo Solicitud de Asociación (stubs Sprint 1).
-
-Commit 5 implementará plantillas y enlaces de pago; Commit 4 solo expone
-`enqueue_validacion_pago_email` para encolar (o registrar en tests).
-"""
+"""Notificaciones del flujo Solicitud de Asociación."""
 
 from __future__ import annotations
 
 import frappe
+from frappe import _
+from frappe.utils import get_url
+
+from club_management.members.email_templates.solicitud_emails import (
+	render_solicitud_rechazada_email,
+	render_solicitud_requiere_correccion_email,
+	render_solicitud_validada_email,
+)
+from club_management.members.services.solicitud_tokens import sign_pago_token
 
 
 def enqueue_validacion_pago_email(solicitud_name: str, to_email: str) -> None:
-	"""Encola (o registra) el email de primera cuota tras validar una solicitud."""
 	if not to_email:
 		return
-
-	# Commit 5: frappe.sendmail con plantilla `solicitud_validada`.
 	frappe.enqueue(
-		"club_management.members.services.solicitud_notificaciones._send_validacion_pago_stub",
+		"club_management.members.services.solicitud_notificaciones._send_validacion_pago_email",
 		queue="short",
 		solicitud_name=solicitud_name,
 		to_email=to_email,
@@ -24,7 +26,68 @@ def enqueue_validacion_pago_email(solicitud_name: str, to_email: str) -> None:
 	)
 
 
-def _send_validacion_pago_stub(solicitud_name: str, to_email: str) -> None:
-	frappe.logger("solicitud_notificaciones").info(
-		"validacion_pago_email_stub solicitud=%s to=%s", solicitud_name, to_email
+def enqueue_rechazo_email(solicitud_name: str) -> None:
+	frappe.enqueue(
+		"club_management.members.services.solicitud_notificaciones._send_rechazo_email",
+		queue="short",
+		solicitud_name=solicitud_name,
+		enqueue_after_commit=True,
+	)
+
+
+def enqueue_correccion_email(solicitud_name: str) -> None:
+	frappe.enqueue(
+		"club_management.members.services.solicitud_notificaciones._send_correccion_email",
+		queue="short",
+		solicitud_name=solicitud_name,
+		enqueue_after_commit=True,
+	)
+
+
+def _send_validacion_pago_email(solicitud_name: str, to_email: str) -> None:
+	solicitud = frappe.get_doc("Solicitud Asociacion", solicitud_name)
+	pago_token = sign_pago_token(solicitud_name)
+	pago_url = get_url(f"/pago-stub?token={pago_token}")
+	html = render_solicitud_validada_email(
+		nombre=solicitud.nombre,
+		pago_url=pago_url,
+	)
+	frappe.sendmail(
+		recipients=[to_email],
+		subject=_("Solicitud validada — primera cuota"),
+		message=html,
+		delayed=False,
+	)
+
+
+def _send_rechazo_email(solicitud_name: str) -> None:
+	solicitud = frappe.get_doc("Solicitud Asociacion", solicitud_name)
+	if not solicitud.email:
+		return
+	html = render_solicitud_rechazada_email(
+		nombre=solicitud.nombre,
+		motivos_rechazo=solicitud.motivos_rechazo or "",
+	)
+	frappe.sendmail(
+		recipients=[solicitud.email],
+		subject=_("Solicitud de asociación rechazada"),
+		message=html,
+		delayed=False,
+	)
+
+
+def _send_correccion_email(solicitud_name: str) -> None:
+	solicitud = frappe.get_doc("Solicitud Asociacion", solicitud_name)
+	if not solicitud.email:
+		return
+	html = render_solicitud_requiere_correccion_email(
+		nombre=solicitud.nombre,
+		token_seguimiento=solicitud.token_seguimiento or "",
+		observaciones=solicitud.observaciones_secretaria or "",
+	)
+	frappe.sendmail(
+		recipients=[solicitud.email],
+		subject=_("Solicitud de asociación — corrección requerida"),
+		message=html,
+		delayed=False,
 	)

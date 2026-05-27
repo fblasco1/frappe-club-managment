@@ -21,7 +21,17 @@ from frappe.rate_limiter import rate_limit
 
 from club_management.members.services.actividades_portal import list_actividades_asociacion
 from club_management.members.services.google_places import get_places_config_for_portal
+from club_management.members.services.socio_transitions import cambiar_estado
+from club_management.members.services.solicitud_tokens import (
+    get_solicitud_by_seguimiento_token,
+    verify_pago_token,
+)
 from club_management.members.validations import validate_ficha_medica_from_url
+from club_management.members.workflow.solicitud_asociacion_workflow import (
+    STATE_PENDIENTE,
+    STATE_REQUIERE_CORRECCION,
+    STATE_VALIDADA,
+)
 
 # Campos que el cliente Guest NO puede setear desde el payload del Web Form.
 # El servidor los gestiona internamente (workflow, token, IP, auditoría,
@@ -48,8 +58,52 @@ _CAMPOS_BLOQUEADOS_DESDE_PAYLOAD: frozenset[str] = frozenset(
         "rechazado_en",
         "correccion_solicitada_por",
         "correccion_solicitada_en",
+        "motivos_rechazo",
         "motivo_rechazo",
         "motivo_correccion",
+    }
+)
+
+# Campos que Guest puede actualizar vía `actualizar_solicitud` (corrección).
+_CAMPOS_EDITABLES_CORRECCION: frozenset[str] = frozenset(
+    {
+        "nombre",
+        "apellido",
+        "dni",
+        "nacionalidad",
+        "fecha_nacimiento",
+        "genero",
+        "categoria_solicitada",
+        "email",
+        "telefono",
+        "calle",
+        "localidad",
+        "provincia",
+        "codigo_postal",
+        "dni_frente",
+        "dni_dorso",
+        "foto_perfil",
+        "ficha_medica",
+        "comprobante_domicilio",
+        "actividad_interes",
+        "tiene_familiares_socios",
+        "familiares_existentes_dnis",
+        "dni_tutor",
+        "nombre_tutor",
+        "apellido_tutor",
+        "fecha_nacimiento_tutor",
+        "nacionalidad_tutor",
+        "genero_tutor",
+        "email_tutor",
+        "telefono_tutor",
+        "calle_tutor",
+        "localidad_tutor",
+        "provincia_tutor",
+        "codigo_postal_tutor",
+        "rol_tutor",
+        "dni_frente_tutor",
+        "dni_dorso_tutor",
+        "foto_perfil_tutor",
     }
 )
 
@@ -205,3 +259,83 @@ def submit_solicitud(data: Any) -> dict[str, Any]:
         `{"status": "ok", "token_seguimiento": "<hex>"}`.
     """
     return _submit_solicitud_impl(data)
+
+
+def _consultar_solicitud_impl(token: str) -> dict[str, Any]:
+	"""Consulta estado por `token_seguimiento` sin filtrar PII extra."""
+	doc = get_solicitud_by_seguimiento_token(token)
+	if not doc:
+		frappe.throw(_("Not Found"), frappe.DoesNotExistError)
+
+	result: dict[str, Any] = {
+		"status": "ok",
+		"workflow_state": doc.workflow_state,
+		"creation": str(doc.creation),
+	}
+	if doc.workflow_state == "Rechazada" and doc.motivos_rechazo:
+		result["motivos_rechazo"] = doc.motivos_rechazo
+	return result
+
+
+def _actualizar_solicitud_impl(token: str, data: Any) -> dict[str, Any]:
+	"""Actualiza campos permitidos y reenvía a cola (`Pendiente`)."""
+	doc = get_solicitud_by_seguimiento_token(token)
+	if not doc or doc.workflow_state != STATE_REQUIERE_CORRECCION:
+		frappe.throw(_("Not Found"), frappe.DoesNotExistError)
+
+	if isinstance(data, str):
+		try:
+			data = json.loads(data)
+		except json.JSONDecodeError as exc:
+			frappe.throw(_("Payload inválido (JSON malformado)."), exc=frappe.ValidationError)
+
+	if not isinstance(data, dict):
+		frappe.throw(_("Payload inválido: se esperaba un objeto."), frappe.ValidationError)
+
+	for key, value in data.items():
+		if key in _CAMPOS_EDITABLES_CORRECCION:
+			doc.set(key, value)
+
+	if data.get("ficha_medica"):
+		validate_ficha_medica_from_url(doc.get("ficha_medica"))
+
+	doc.workflow_state = STATE_PENDIENTE
+	doc.save(ignore_permissions=True)
+	return {"status": "ok", "message": _("Solicitud actualizada y reenviada.")}
+
+
+def _confirmar_pago_stub_impl(pago_token: str) -> dict[str, str]:
+	"""Stub Sprint 1: marca el socio como `Activo` tras pago simulado."""
+	solicitud_name = verify_pago_token(pago_token)
+	if not solicitud_name:
+		frappe.throw(_("Not Found"), frappe.DoesNotExistError)
+
+	solicitud = frappe.get_doc("Solicitud Asociacion", solicitud_name)
+	if solicitud.workflow_state != STATE_VALIDADA or not solicitud.socio_generado:
+		frappe.throw(_("Not Found"), frappe.DoesNotExistError)
+
+	cambiar_estado(
+		solicitud.socio_generado,
+		"Activo",
+		motivo="Pago stub Sprint 1",
+	)
+	return {"status": "ok"}
+
+
+@frappe.whitelist(allow_guest=True)
+def consultar_solicitud(token: str) -> dict[str, Any]:
+	"""Endpoint público de consulta de estado por token."""
+	return _consultar_solicitud_impl(token)
+
+
+@frappe.whitelist(allow_guest=True)
+@rate_limit(limit=5, seconds=600)
+def actualizar_solicitud(token: str, data: Any) -> dict[str, Any]:
+	"""Endpoint público de corrección/reenvío por token."""
+	return _actualizar_solicitud_impl(token, data)
+
+
+@frappe.whitelist(allow_guest=True)
+def confirmar_pago_stub(token: str) -> dict[str, str]:
+	"""Confirma pago simulado desde la página `/pago-stub`."""
+	return _confirmar_pago_stub_impl(token)
