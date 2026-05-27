@@ -21,7 +21,7 @@ jobs:
       - name: Install Playwright
         working-directory: ${{ github.workspace }}
         run: |
-          npm ci
+          npm install
           npx playwright install --with-deps chromium
 
       - name: Run E2E (API + UI smoke)

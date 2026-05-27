@@ -2,19 +2,34 @@
 
 Pruebas de UI **opcionales** (no corren en el job `tests` de GitHub por defecto).
 
+## Dónde ejecutar (importante)
+
+| Entorno | ¿Playwright? | Alternativa |
+|---------|----------------|-------------|
+| **Host (WSL / Windows)** con Docker exponiendo `:8000` | **Sí** (recomendado) | — |
+| Contenedor `frappe` (`docker exec … bash`) | **No** | `bench execute …run_supervised` o tests bench |
+
+Dentro del contenedor suele fallar con `playwright: not found` (falta `npm install`) o
+`libatk-bridge-2.0.so.0` / `ECONNREFUSED 127.0.0.1:8000` (el HTTP no escucha ahí).
+
 ## Requisitos
 
-- Sitio Frappe arriba (ej. `http://dev.localhost:8000`).
+- Stack Docker levantado y sitio accesible desde el **host**: `http://localhost:8000` o `http://dev.localhost:8000`.
 - Usuario Secretaría en el sitio.
-- Node 20+.
+- Node 20+ en el **host** (no hace falta dentro del contenedor).
 
-## Instalación
+## Instalación (una vez, en el host)
+
+Desde la carpeta de la app en tu máquina (no dentro de `docker exec`):
 
 ```bash
-cd apps/club_management   # raíz de la app en el bench
-npm ci
+cd development/frappe-bench/apps/club_management   # ruta en el repo infra
+npm install
 npx playwright install chromium
 ```
+
+Si ves `playwright: not found`, usá los scripts npm (ya llaman `npx playwright`) o ejecutá
+`npm install` antes.
 
 ## Variables
 
@@ -26,21 +41,25 @@ npx playwright install chromium
 | `QA_SUPERVISED` | — | Si `1`, el test `@supervised` usa `page.pause()` |
 | `PW_VIDEO` | — | Si set, graba video |
 
-## Comandos
+## Comandos (desde el host)
 
 ```bash
-# Headless (rápido)
-PLAYWRIGHT_BASE_URL=http://dev.localhost:8000 npm run qa:e2e
+export PLAYWRIGHT_BASE_URL=http://localhost:8000
+export QA_SECRETARIA_EMAIL=secretaria@dev.local
+export QA_SECRETARIA_PASSWORD=Secretaria123!
 
-# Supervisado (ventana visible)
-PLAYWRIGHT_BASE_URL=http://dev.localhost:8000 npm run qa:e2e:headed
+# Headless (rápido)
+npm run qa:e2e
+
+# Supervisado (ventana visible — requiere display en el host)
+QA_SUPERVISED=1 npm run qa:e2e:headed
 
 # UI mode (paso a paso)
-PLAYWRIGHT_BASE_URL=http://dev.localhost:8000 npm run qa:e2e:ui
-
-# Pausas manuales en test supervisado
-QA_SUPERVISED=1 npm run qa:e2e:headed
+npm run qa:e2e:ui
 ```
+
+En WSL, si `dev.localhost` está en `/etc/hosts`, podés usar
+`PLAYWRIGHT_BASE_URL=http://dev.localhost:8000` en lugar de `localhost`.
 
 ## CI API (nivel 1)
 
@@ -51,9 +70,11 @@ bench --site test_site run-tests \
   --module club_management.members.tests.test_flujo_solicitud_completo
 ```
 
-## Q&A terminal (nivel 2)
+## Q&A terminal (nivel 2) — dentro del contenedor
 
 ```bash
+docker exec -it devcontainer-example-frappe-1 bash
+cd /workspace/development/frappe-bench
 bench --site dev.localhost execute club_management.members.qa.run_supervised.run
 ```
 

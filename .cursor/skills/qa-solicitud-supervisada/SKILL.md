@@ -92,16 +92,19 @@ Cada paso imprime JSON de evidencia; el operador pulsa Enter o `n` para abortar.
 
 ### Playwright local (alternativa al MCP)
 
-Desde `apps/club_management`:
+**Ejecutar en el host (WSL), no dentro del contenedor `frappe`.**
 
 ```bash
-export PLAYWRIGHT_BASE_URL=http://dev.localhost:8000
+cd development/frappe-bench/apps/club_management
+npm install
+npx playwright install chromium
+export PLAYWRIGHT_BASE_URL=http://localhost:8000
 export QA_SECRETARIA_EMAIL=secretaria@dev.local
 export QA_SECRETARIA_PASSWORD=Secretaria123!
-npm ci
-npx playwright install chromium
-npm run qa:e2e:headed
+QA_SUPERVISED=1 npm run qa:e2e:headed
 ```
+
+Si aparece `playwright: not found` → falta `npm install` (los scripts usan `npx playwright`).
 
 ## Evidencia a reportar al usuario
 
