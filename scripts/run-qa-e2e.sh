@@ -39,6 +39,14 @@ if [[ ! -x "$PW" ]]; then
 	exit 1
 fi
 
+if [[ "$*" == *"--headed"* ]] || [[ "$*" == *"--ui"* ]]; then
+	if [[ -z "${DISPLAY:-}" ]] && [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+		echo "AVISO: WSL sin DISPLAY — --headed/--ui no mostrarán ventana." >&2
+		echo "  UI supervisada: usá Cursor Browser MCP (skill qa-solicitud-supervisada)." >&2
+		echo "  Automatización sin UI: npm run qa:e2e  o  bench execute …run_supervised" >&2
+	fi
+fi
+
 echo "PLAYWRIGHT_BASE_URL=$PLAYWRIGHT_BASE_URL"
 echo "PW_CHANNEL=${PW_CHANNEL:-chromium (bundle)}"
 echo "cwd=$ROOT"

@@ -2,6 +2,18 @@
 
 Pruebas de UI **opcionales** (no corren en el job `tests` de GitHub por defecto).
 
+## WSL sin ventana gráfica
+
+En **WSL**, `npm run qa:e2e:headed` **no** abre un navegador visible (no hay DISPLAY).
+
+| Qué querés | Qué usar |
+|------------|----------|
+| Ver el flujo clic a clic (supervisado) | **Cursor → Browser MCP** + skill `.cursor/skills/qa-solicitud-supervisada/SKILL.md` |
+| Automatizar sin UI | `bench run-tests` / `bench execute …run_supervised` |
+| Smoke UI sin ventana | `npm run qa:e2e` (Playwright **headless**) |
+
+Cursor Browser usa `http://localhost:8000` (puerto de Docker en Windows/WSL).
+
 ## Dónde ejecutar (importante)
 
 | Entorno | ¿Playwright? | Alternativa |
@@ -87,20 +99,23 @@ Los tests usan Chrome del sistema; no hace falta `playwright install chromium`.
 | `QA_SUPERVISED` | — | Si `1`, el test `@supervised` usa `page.pause()` |
 | `PW_VIDEO` | — | Si set, graba video |
 
-## Comandos (desde el host)
+## Comandos (desde WSL — solo headless recomendado)
 
 ```bash
 export PLAYWRIGHT_BASE_URL=http://localhost:8000
 export QA_SECRETARIA_EMAIL=secretaria@dev.local
 export QA_SECRETARIA_PASSWORD=Secretaria123!
 
-# Headless (rápido)
+# Headless (rápido, sin ventana — OK en WSL)
 npm run qa:e2e
+```
 
-# Supervisado (ventana visible — requiere display en el host)
+**Supervisado con ventana:** usar **Cursor Browser** (ver skill `qa-solicitud-supervisada`), no `qa:e2e:headed`.
+
+Solo si tenés WSLg (`echo $DISPLAY`):
+
+```bash
 QA_SUPERVISED=1 npm run qa:e2e:headed
-
-# UI mode (paso a paso)
 npm run qa:e2e:ui
 ```
 
