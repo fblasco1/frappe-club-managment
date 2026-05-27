@@ -61,6 +61,26 @@ npm run qa:e2e:ui
 En WSL, si `dev.localhost` está en `/etc/hosts`, podés usar
 `PLAYWRIGHT_BASE_URL=http://dev.localhost:8000` en lugar de `localhost`.
 
+### Error `CMD.EXE` / UNC / `EPERM … C:\Windows\test-results`
+
+Suele pasar si corrés `npm` desde **PowerShell/CMD** apuntando a una ruta
+`\\wsl.localhost\Ubuntu\...` (Node de Windows, cwd = `C:\Windows`).
+
+**Solución:** terminal **Ubuntu (WSL)**, ruta Linux:
+
+```bash
+cd ~/ERSport/club_manager_infra/development/frappe-bench/apps/club_management
+chmod +x scripts/run-qa-e2e.sh
+npm install
+npx playwright install chromium
+export PLAYWRIGHT_BASE_URL=http://localhost:8000
+QA_SUPERVISED=1 ./scripts/run-qa-e2e.sh --headed
+# o: QA_SUPERVISED=1 npm run qa:e2e:headed
+```
+
+Comprobá que usás Node de Linux: `which node` → `/usr/...` o `~/.nvm/...`, **no**
+`/mnt/c/Program Files/nodejs/...`.
+
 ## CI API (nivel 1)
 
 El flujo completo de negocio corre en:

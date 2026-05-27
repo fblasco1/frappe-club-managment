@@ -1,14 +1,21 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://dev.localhost:8000";
+const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:8000";
 
 export default defineConfig({
-  testDir: "./e2e",
+  testDir: path.join(rootDir, "e2e"),
+  outputDir: path.join(rootDir, "test-results"),
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
-  reporter: [["list"], ["html", { open: "never" }]],
+  reporter: [
+    ["list"],
+    ["html", { open: "never", outputFolder: path.join(rootDir, "playwright-report") }],
+  ],
   use: {
     baseURL,
     trace: "on-first-retry",
