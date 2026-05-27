@@ -986,6 +986,68 @@ campos sistema/auditoría se ignoran silenciosamente.
 
 ---
 
+## Flujo E2E — CI (API) y Q&A supervisado (UI)
+
+Automatiza el recorrido manual: alta pública → consulta → validación Secretaría →
+pago stub → `Socio` `Activo`. Implementación compartida en
+`club_management/members/qa/flujo_solicitud.py`.
+
+### Nivel 1 — CI (`bench run-tests`)
+
+**Módulo de test:** `club_management/members/tests/test_flujo_solicitud_completo.py`
+
+### Scenario: flujo feliz adulto de punta a punta (CI)
+
+Given un sitio con workflow activo y rol `Secretaria`
+When se ejecuta el runner `FlujoSolicitudRunner.run_happy_path_adulto()`
+Then:
+
+1. `_submit_solicitud_impl` crea solicitud `Pendiente` y devuelve `token_seguimiento`.
+2. `consultar_solicitud` responde `workflow_state = Pendiente`.
+3. `Secretaria` ejecuta `Validar` → `Validada`, `socio_generado`, `User`, `Grupo Familiar`.
+4. El `Socio` queda `estado = Pendiente de Pago`.
+5. `confirmar_pago_stub` con token firmado → `Socio.estado = Activo`.
+
+### Scenario: flujo con corrección antes de validar (CI)
+
+Given solicitud en `Requiere Corrección`
+When `actualizar_solicitud` actualiza `telefono` y reenvía
+And `Secretaria` valida
+Then el flujo termina con `Socio` `Activo` igual que el escenario feliz.
+
+**CI GitHub:** el job `tests` de `.github/workflows/ci.yml` ejecuta
+`bench run-tests --app club_management`, que incluye estos tests.
+
+### Nivel 2 — Q&A supervisado (terminal / Agent)
+
+**Comando (dentro del bench / contenedor):**
+
+```bash
+bench --site <sitio> execute club_management.members.qa.run_supervised.run
+bench --site <sitio> execute club_management.members.qa.run_supervised.run --kwargs '{"auto": True}'
+```
+
+- Sin `auto`: imprime cada paso, evidencia JSON y espera Enter (supervisado).
+- Con `auto: true`: corre todo sin pausas (smoke local).
+
+**Skill Cursor:** `.cursor/skills/qa-solicitud-supervisada/SKILL.md` — guion Q&A
+con browser MCP para Desk y `/pago-stub` cuando haga falta validación visual.
+
+### Nivel 3 — Playwright (UI, local / opcional CI)
+
+Carpeta `e2e/` en la raíz de la app. No corre en el job `tests` por defecto.
+
+```bash
+cd apps/club_management
+npm ci
+PLAYWRIGHT_BASE_URL=http://dev.localhost:8000 npm run qa:e2e
+PLAYWRIGHT_BASE_URL=http://dev.localhost:8000 npm run qa:e2e:headed  # supervisado
+```
+
+Variables: `PLAYWRIGHT_BASE_URL`, `QA_SECRETARIA_EMAIL`, `QA_SECRETARIA_PASSWORD`.
+
+---
+
 ## Commit 3 — Workflow Desk y auditoría (escenarios)
 
 Alcance **exclusivo** del commit 3: fixture `Workflow`, transiciones Desk vía

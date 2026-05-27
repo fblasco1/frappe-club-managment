@@ -36,6 +36,11 @@ venv.bak/
 node_modules/
 jspm_packages/
 
+# Playwright E2E
+playwright-report/
+test-results/
+blob-report/
+
 # IDEs and editors
 .vscode/
 .vs/

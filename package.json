@@ -1,0 +1,13 @@
+{
+  "name": "club_management-qa",
+  "private": true,
+  "description": "Playwright E2E opcional para club_management (no corre en CI por defecto)",
+  "scripts": {
+    "qa:e2e": "playwright test",
+    "qa:e2e:headed": "playwright test --headed",
+    "qa:e2e:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
+  }
+}
