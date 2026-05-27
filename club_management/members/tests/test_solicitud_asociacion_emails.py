@@ -10,7 +10,6 @@ from unittest.mock import patch
 import frappe
 
 from club_management.members.email_templates.solicitud_emails import (
-	render_solicitud_rechazada_email,
 	render_solicitud_validada_email,
 )
 from club_management.members.services.solicitud_tokens import sign_pago_token, verify_pago_token
@@ -22,17 +21,6 @@ from club_management.members.test_helpers import (
 
 class TestSolicitudAsociacionEmails(MembersTestCase):
 	"""Plantillas y tokens de pago."""
-
-	def test_email_rechazo_escapa_html_en_motivos(self) -> None:
-		motivos = '<script>alert(1)</script> Falta DNI dorso'
-		html = render_solicitud_rechazada_email(
-			nombre="Ana",
-			motivos_rechazo=motivos,
-			token_seguimiento="tk-test",
-		)
-		self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt; Falta DNI dorso", html)
-		self.assertNotIn("<script>", html)
-		self.assertIn("/solicitud-seguimiento?token=tk-test", html)
 
 	def test_email_validada_solo_nombre_y_link_sin_dni(self) -> None:
 		html = render_solicitud_validada_email(

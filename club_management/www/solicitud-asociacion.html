@@ -367,15 +367,6 @@
 				</div>
 			</div>
 		</div>
-		<div class="club-file-field" data-file-id="comprobante_domicilio">
-			<label>{{ _("Comprobante de domicilio (opcional)") }}</label>
-			<div class="club-file-control">
-				<input class="club-file-input" id="comprobante_domicilio" type="file" accept="image/*,.pdf">
-				<button type="button" class="btn btn-default club-file-btn">{{ _("Cargar Archivo") }}</button>
-				<span class="club-file-name" aria-live="polite"></span>
-			</div>
-		</div>
-
 		<div class="form-section-title">{{ _("Familia y preferencias") }}</div>
 		<div class="checkbox">
 			<label>
@@ -768,7 +759,7 @@ frappe.ready(function () {
 			}
 		}
 
-		var uploadIds = ["dni_frente", "dni_dorso", "foto_perfil", "ficha_medica", "comprobante_domicilio"];
+		var uploadIds = ["dni_frente", "dni_dorso", "foto_perfil", "ficha_medica"];
 		if (cat.value === "Menor") {
 			uploadIds = uploadIds.concat([
 				"dni_frente_tutor", "dni_dorso_tutor", "foto_perfil_tutor"
@@ -809,9 +800,6 @@ frappe.ready(function () {
 					familiares_existentes_dnis: val("familiares_existentes_dnis"),
 					actividad_interes: selectedActividades(),
 				};
-				if (attach.comprobante_domicilio) {
-					data.comprobante_domicilio = attach.comprobante_domicilio;
-				}
 				if (cat.value === "Menor") {
 					data.dni_tutor = val("dni_tutor");
 					data.nombre_tutor = val("nombre_tutor");

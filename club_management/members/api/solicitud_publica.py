@@ -84,7 +84,6 @@ _CAMPOS_EDITABLES_CORRECCION: frozenset[str] = frozenset(
         "dni_dorso",
         "foto_perfil",
         "ficha_medica",
-        "comprobante_domicilio",
         "actividad_interes",
         "tiene_familiares_socios",
         "familiares_existentes_dnis",
@@ -272,8 +271,6 @@ def _consultar_solicitud_impl(token: str) -> dict[str, Any]:
 		"workflow_state": doc.workflow_state,
 		"creation": str(doc.creation),
 	}
-	if doc.workflow_state == "Rechazada" and doc.motivos_rechazo:
-		result["motivos_rechazo"] = doc.motivos_rechazo
 	if doc.workflow_state == STATE_REQUIERE_CORRECCION:
 		# Para corrección pública, devolvemos observaciones y un snapshot
 		# acotado a campos editables (incluye adjuntos como URLs).

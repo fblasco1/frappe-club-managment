@@ -18,32 +18,24 @@ WORKFLOW_STATE_FIELD = "workflow_state"
 STATE_PENDIENTE = "Pendiente"
 STATE_REQUIERE_CORRECCION = "Requiere Corrección"
 STATE_VALIDADA = "Validada"
-STATE_RECHAZADA = "Rechazada"
 
 WORKFLOW_STATES = (
 	STATE_PENDIENTE,
 	STATE_REQUIERE_CORRECCION,
 	STATE_VALIDADA,
-	STATE_RECHAZADA,
 )
 
 ACTION_SOLICITAR_CORRECCION = "Solicitar Corrección"
 ACTION_REENVIAR = "Reenviar"
 ACTION_VALIDAR = "Validar"
-ACTION_RECHAZAR = "Rechazar"
 
 WORKFLOW_ACTIONS = (
 	ACTION_SOLICITAR_CORRECCION,
 	ACTION_REENVIAR,
 	ACTION_VALIDAR,
-	ACTION_RECHAZAR,
 )
 
 ROLE_SECRETARIA = "Secretaria"
-
-# Condición en transiciones «Rechazar»: exige motivos persistidos en DB (Desk: guardar antes).
-RECHAZAR_TRANSITION_CONDITION = "doc.motivos_rechazo and doc.motivos_rechazo.strip()"
-
 
 def ensure_solicitud_asociacion_workflow() -> None:
 	"""Crea o reactiva el Workflow de Solicitud Asociacion."""
@@ -54,7 +46,7 @@ def ensure_solicitud_asociacion_workflow() -> None:
 
 	if frappe.db.exists("Workflow", WORKFLOW_NAME):
 		workflow = frappe.get_doc("Workflow", WORKFLOW_NAME)
-		changed = _sync_rechazar_transition_conditions(workflow)
+		changed = False
 		if not workflow.is_active:
 			workflow.is_active = 1
 			changed = True
@@ -88,8 +80,6 @@ def ensure_solicitud_asociacion_workflow() -> None:
 		(STATE_REQUIERE_CORRECCION, ACTION_REENVIAR, STATE_PENDIENTE),
 		(STATE_PENDIENTE, ACTION_VALIDAR, STATE_VALIDADA),
 		(STATE_REQUIERE_CORRECCION, ACTION_VALIDAR, STATE_VALIDADA),
-		(STATE_PENDIENTE, ACTION_RECHAZAR, STATE_RECHAZADA),
-		(STATE_REQUIERE_CORRECCION, ACTION_RECHAZAR, STATE_RECHAZADA),
 	)
 	for state, action, next_state in transitions:
 		workflow.append(
@@ -109,21 +99,7 @@ def _workflow_transition_row(state: str, action: str, next_state: str) -> dict[s
 		"allowed": ROLE_SECRETARIA,
 		"allow_self_approval": 1,
 	}
-	if action == ACTION_RECHAZAR:
-		row["condition"] = RECHAZAR_TRANSITION_CONDITION
 	return row
-
-
-def _sync_rechazar_transition_conditions(workflow) -> bool:
-	"""Añade condición de motivos en transiciones Rechazar si faltaba (migrate idempotente)."""
-	changed = False
-	for row in workflow.transitions:
-		if row.action != ACTION_RECHAZAR:
-			continue
-		if (row.condition or "").strip() != RECHAZAR_TRANSITION_CONDITION:
-			row.condition = RECHAZAR_TRANSITION_CONDITION
-			changed = True
-	return changed
 
 
 def _ensure_document_type_exists() -> None:

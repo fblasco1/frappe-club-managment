@@ -314,7 +314,7 @@ class TestSubmitSolicitudFiltradoDeCampos(
         payload["socio_generado"] = "SOC-FALSO"
         payload["user_generado"] = "atacante@example.com"
         payload["validado_por"] = "Administrator"
-        payload["rechazado_por"] = "Administrator"
+        payload["correccion_solicitada_por"] = "Administrator"
 
         with _patched_request(_mock_request()):
             result = submit_solicitud(data=payload)
@@ -326,7 +326,7 @@ class TestSubmitSolicitudFiltradoDeCampos(
         self.assertFalse(sol.socio_generado)
         self.assertFalse(sol.user_generado)
         self.assertFalse(sol.validado_por)
-        self.assertFalse(sol.rechazado_por)
+        self.assertFalse(sol.correccion_solicitada_por)
 
 
 # ---------------------------------------------------------------------------

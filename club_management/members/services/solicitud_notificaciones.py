@@ -7,7 +7,6 @@ from frappe import _
 from frappe.utils import get_url
 
 from club_management.members.email_templates.solicitud_emails import (
-	render_solicitud_rechazada_email,
 	render_solicitud_requiere_correccion_email,
 	render_solicitud_validada_email,
 )
@@ -22,15 +21,6 @@ def enqueue_validacion_pago_email(solicitud_name: str, to_email: str) -> None:
 		queue="short",
 		solicitud_name=solicitud_name,
 		to_email=to_email,
-		enqueue_after_commit=True,
-	)
-
-
-def enqueue_rechazo_email(solicitud_name: str) -> None:
-	frappe.enqueue(
-		"club_management.members.services.solicitud_notificaciones._send_rechazo_email",
-		queue="short",
-		solicitud_name=solicitud_name,
 		enqueue_after_commit=True,
 	)
 
@@ -55,23 +45,6 @@ def _send_validacion_pago_email(solicitud_name: str, to_email: str) -> None:
 	frappe.sendmail(
 		recipients=[to_email],
 		subject=_("Solicitud validada — primera cuota"),
-		message=html,
-		delayed=False,
-	)
-
-
-def _send_rechazo_email(solicitud_name: str) -> None:
-	solicitud = frappe.get_doc("Solicitud Asociacion", solicitud_name)
-	if not solicitud.email:
-		return
-	html = render_solicitud_rechazada_email(
-		nombre=solicitud.nombre,
-		motivos_rechazo=solicitud.motivos_rechazo or "",
-		token_seguimiento=solicitud.token_seguimiento or "",
-	)
-	frappe.sendmail(
-		recipients=[solicitud.email],
-		subject=_("Solicitud de asociación rechazada"),
 		message=html,
 		delayed=False,
 	)

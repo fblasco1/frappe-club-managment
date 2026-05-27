@@ -382,18 +382,16 @@ def make_secretaria_user(email: str = "secretaria.test@example.com") -> str:
     return email
 
 
-def apply_workflow_rechazar(doc: "frappe.model.document.Document", motivos: str) -> None:
-    """Ejecuta la transición «Rechazar» con motivos persistidos.
-
-    `frappe.model.workflow.apply_workflow` llama `load_from_db()` y descarta
-    cambios en memoria; los motivos deben guardarse antes (mismo flujo que Desk).
-    """
+def apply_workflow_solicitar_correccion(
+    doc: "frappe.model.document.Document", observaciones: str
+) -> None:
+    """Ejecuta la transición «Solicitar Corrección» con observaciones persistidas."""
     from frappe.model.workflow import apply_workflow
 
     from club_management.members.workflow.solicitud_asociacion_workflow import (
-        ACTION_RECHAZAR,
+        ACTION_SOLICITAR_CORRECCION,
     )
 
-    doc.motivos_rechazo = motivos
+    doc.observaciones_secretaria = observaciones
     doc.save()
-    apply_workflow(doc, ACTION_RECHAZAR)
+    apply_workflow(doc, ACTION_SOLICITAR_CORRECCION)

@@ -55,10 +55,6 @@
 					<label class="form-label" for="ficha_medica">Ficha médica (reemplazar)</label>
 					<input class="form-control" id="ficha_medica" type="file" accept="image/*,.pdf" />
 				</div>
-				<div class="col-12">
-					<label class="form-label" for="comprobante_domicilio">Comprobante domicilio (opcional)</label>
-					<input class="form-control" id="comprobante_domicilio" type="file" accept="image/*,.pdf" />
-				</div>
 			</div>
 
 			<div class="row g-2">
@@ -167,7 +163,7 @@
 		document.getElementById("estado").textContent = data.workflow_state || "";
 		document.getElementById("creacion").textContent = data.creation ? ` · ${data.creation}` : "";
 
-		const motivos = data.motivos_rechazo || data.observaciones || "";
+		const motivos = data.observaciones || "";
 		if (motivos) {
 			setVisible("motivos-wrap", true);
 			document.getElementById("motivos").textContent = motivos;
@@ -216,7 +212,7 @@
 			codigo_postal: (document.getElementById("codigo_postal").value || "").trim(),
 		};
 
-		const uploadIds = ["dni_frente", "dni_dorso", "foto_perfil", "ficha_medica", "comprobante_domicilio"];
+		const uploadIds = ["dni_frente", "dni_dorso", "foto_perfil", "ficha_medica"];
 		const attach = {};
 		for (const id of uploadIds) {
 			const f = fileFromId(id);

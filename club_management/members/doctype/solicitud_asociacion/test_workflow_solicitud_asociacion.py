@@ -8,13 +8,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import frappe
-from frappe import ValidationError
-from frappe.model.workflow import (
-	WorkflowTransitionError,
-	apply_workflow,
-	get_transitions,
-	get_workflow,
-)
+from frappe.model.workflow import apply_workflow
 
 from club_management.members.services.validar_solicitud import (
 	MSG_DNI_YA_SOCIO,
@@ -26,7 +20,7 @@ from club_management.members.services.validar_solicitud import (
 from club_management.members.test_helpers import (
 	MembersTestCase,
 	adult_birthdate,
-	apply_workflow_rechazar,
+	apply_workflow_solicitar_correccion,
 	ensure_role_socio_exists,
 	insert_grupo_familiar_solo_socio,
 	insert_grupo_familiar_solo_tutor,
@@ -37,13 +31,11 @@ from club_management.members.test_helpers import (
 	make_solicitud_menor_payload,
 )
 from club_management.members.workflow.solicitud_asociacion_workflow import (
-	ACTION_RECHAZAR,
 	ACTION_REENVIAR,
 	ACTION_SOLICITAR_CORRECCION,
 	ACTION_VALIDAR,
 	DOCUMENT_TYPE,
 	STATE_PENDIENTE,
-	STATE_RECHAZADA,
 	STATE_REQUIERE_CORRECCION,
 	STATE_VALIDADA,
 	WORKFLOW_ACTIONS,
@@ -122,24 +114,12 @@ class TestSolicitudAsociacionWorkflowTransiciones(MembersTestCase):
 		self.assertEqual(doc.workflow_state, STATE_VALIDADA)
 		self.assertTrue(doc.socio_generado)
 
-	def test_rechazar_con_motivos_pasa_a_rechazada(self) -> None:
+	def test_solicitar_correccion_con_observaciones_pasa_a_requiere_correccion(self) -> None:
 		sol = insert_solicitud_asociacion()
 		doc = frappe.get_doc(DOCTYPE, sol.name)
-		apply_workflow_rechazar(doc, "Documentación incompleta")
+		apply_workflow_solicitar_correccion(doc, "DNI borroso")
 		doc.reload()
-		self.assertEqual(doc.workflow_state, STATE_RECHAZADA)
-
-	def test_rechazar_sin_motivos_falla_y_mantiene_pendiente(self) -> None:
-		sol = insert_solicitud_asociacion()
-		doc = frappe.get_doc(DOCTYPE, sol.name)
-		workflow = get_workflow(DOCTYPE)
-		allowed_actions = {t.action for t in get_transitions(doc, workflow)}
-		self.assertNotIn(ACTION_RECHAZAR, allowed_actions)
-
-		with self.assertRaises(WorkflowTransitionError):
-			apply_workflow(doc, ACTION_RECHAZAR)
-		doc.reload()
-		self.assertEqual(doc.workflow_state, STATE_PENDIENTE)
+		self.assertEqual(doc.workflow_state, STATE_REQUIERE_CORRECCION)
 
 
 class TestSolicitudAsociacionWorkflowAuditoria(MembersTestCase):
@@ -177,14 +157,6 @@ class TestSolicitudAsociacionWorkflowAuditoria(MembersTestCase):
 		doc.reload()
 		self.assertEqual(doc.validado_por, self.secretaria)
 		self.assertIsNotNone(doc.validado_en)
-
-	def test_rechazar_audita_usuario_y_timestamp(self) -> None:
-		sol = insert_solicitud_asociacion()
-		doc = frappe.get_doc(DOCTYPE, sol.name)
-		apply_workflow_rechazar(doc, "Falta DNI dorso")
-		doc.reload()
-		self.assertEqual(doc.rechazado_por, self.secretaria)
-		self.assertIsNotNone(doc.rechazado_en)
 
 	def test_reenviar_no_borra_auditoria_de_correccion(self) -> None:
 		sol = insert_solicitud_asociacion()

@@ -298,7 +298,7 @@ campos del tutor son los necesarios para crear o resolver un `Tutor No Socio` /
 | `dni_dorso`             | Attach       | sí     | imagen / PDF                                            |
 | `foto_perfil`           | Attach Image | sí     |                                                         |
 | `ficha_medica`          | Attach       | **sí** | PDF / JPEG / PNG, ≤ 5MB; firmado por profesional médico |
-| `comprobante_domicilio` | Attach       | no     | servicio, AFIP, etc.                                    |
+| *(eliminado)* `comprobante_domicilio` | — | — | Fuera del modelo (Sprint 1 cierre). |
 
 
 ### Familia y preferencias (declarativas; no vinculantes)
@@ -317,8 +317,7 @@ campos del tutor son los necesarios para crear o resolver un `Tutor No Socio` /
 | Campo                      | Tipo                    | Reqd    | Read-only | Comentario                                                                  |
 | -------------------------- | ----------------------- | ------- | --------- | --------------------------------------------------------------------------- |
 | `workflow_state`           | Link → `Workflow State` | sí      | sí        | Inicial: `Pendiente`                                                        |
-| `motivos_rechazo`          | Text                    | depende | no        | Requerido en transición a `Rechazada`                                       |
-| `observaciones_secretaria` | Text                    | no      | no        | Notas internas                                                              |
+| `observaciones_secretaria` | Text                    | no      | no        | Observaciones de administración para corrección                              |
 | `socio_generado`           | Link → `Socio`          | no      | sí        | Se setea al validar                                                         |
 | `user_generado`            | Link → `User`           | no      | sí        | Vacío si el menor queda sin User propio (gestión vía tutor)                 |
 | `grupo_familiar_generado`  | Link → `Grupo Familiar` | no      | sí        | Grupo al que se incorporó el Socio al validar (nuevo o existente del tutor) |
@@ -356,7 +355,7 @@ Pendiente
    ↓ acción "Validar"  (Secretaria)
 Validada
    ↓ acción "Rechazar" (Secretaria)  desde Pendiente o Requiere Corrección
-Rechazada            → estado terminal
+Requiere Corrección  → administración deja observaciones y el solicitante corrige/reenvía
 ```
 
 ---
@@ -456,7 +455,7 @@ And se registra el intento en `frappe.log_error` (sin volcar PII en el log).
 Given una `Solicitud de Asociación` con `token_seguimiento = "tk-…"` y `workflow_state = "Pendiente"`
 And un endpoint público `consultar_solicitud(token)` whitelist `allow_guest=True`
 When el solicitante consulta con su `token`
-Then recibe un payload con `workflow_state`, fecha de creación, y (si aplica) `motivos_rechazo`
+Then recibe un payload con `workflow_state`, fecha de creación, y (si aplica) `observaciones` (para corrección)
 And **no** recibe documentos adjuntos ni datos de otros solicitantes
 And un `token` inválido o vencido responde `404` sin distinguir entre "no existe" y "no autorizado".
 
@@ -468,7 +467,7 @@ Given existe una página pública `/solicitud-seguimiento` accesible sin login
 And el solicitante tiene `token_seguimiento`
 When abre `/solicitud-seguimiento?token=<token>`
 Then el portal consulta `consultar_solicitud(token)` y muestra `workflow_state`
-And si `workflow_state == "Rechazada"`, muestra `motivos_rechazo` (escapado)
+And si `workflow_state == "Requiere Corrección"`, muestra `observaciones` (escapado)
 And el portal no usa `innerHTML` para renderizar texto proveniente del server.
 
 ---
@@ -802,21 +801,13 @@ And la solicitud permanece en `Pendiente`.
 
 ---
 
-## Scenario: rechazar requiere `motivos_rechazo`
+## Scenario: unificar estado de observaciones (sin Rechazada)
 
 Given una `Solicitud de Asociación` con `workflow_state = "Pendiente"`
-And `motivos_rechazo` vacío
-When `Secretaria` intenta la transición `Rechazar`
-Then la transición falla con `frappe.ValidationError` ("motivos_rechazo es obligatorio")
-And el `workflow_state` permanece en `Pendiente`.
-
-Given la misma solicitud
-And ahora `motivos_rechazo` contiene texto
-When `Secretaria` ejecuta `Rechazar`
-Then `workflow_state` pasa a `Rechazada`
-And se encola un email al solicitante con el contenido de `motivos_rechazo`,
-**escapado** según las reglas de XSS de `.cursor/rules/security.mdc`
-(`frappe.utils.escape_html` o `| e` en Jinja).
+When `Secretaria` ejecuta la transición `Solicitar Corrección` con observaciones
+Then `workflow_state` pasa a `Requiere Corrección`
+And se encola un email al solicitante con el contenido de `observaciones_secretaria`,
+**escapado** según las reglas de XSS
 
 ---
 
@@ -865,7 +856,7 @@ And el resto de los campos editables sí se aplican (degradación segura: el
 ataque no rompe el flujo legítimo).
 
 (La lista blanca de campos editables vive en el código del endpoint y se
-documenta como constante: `CAMPOS_EDITABLES_POR_GUEST = {"telefono", "calle", "localidad", "provincia", "codigo_postal", "dni_frente", "dni_dorso", "foto_perfil", "ficha_medica", "comprobante_domicilio", ...}`.)
+documenta como constante: `CAMPOS_EDITABLES_POR_GUEST = {"telefono", "calle", "localidad", "provincia", "codigo_postal", "dni_frente", "dni_dorso", "foto_perfil", "ficha_medica", ...}`.)
 
 ---
 
@@ -922,13 +913,13 @@ And el link de pago lleva un token único que **no es** adivinable por enumeraci
 
 ---
 
-## Scenario: email de rechazo escapa HTML en `motivos_rechazo`
+## Scenario: email de corrección escapa HTML en observaciones
 
-Given una `Solicitud de Asociación` rechazada con
-`motivos_rechazo = '<script>alert(1)</script> Falta DNI dorso'`
-When se renderiza el template del email de rechazo
+Given una `Solicitud de Asociación` en `Requiere Corrección` con
+`observaciones_secretaria = '<script>alert(1)</script> DNI borroso'`
+When se renderiza el template del email de corrección
 Then el contenido renderizado contiene el texto literal escapado
-(`<script>alert(1)</script> Falta DNI dorso`)
+(`<script>alert(1)</script> DNI borroso`)
 And el cliente de correo no ejecuta script alguno
 And esto se cubre con un test sobre la función de render del email.
 
@@ -979,8 +970,7 @@ en las secciones «validar …» más arriba en este mismo documento.)
 
 Alcance **exclusivo** del commit 5:
 
-- Plantillas de email (`solicitud_validada`, `solicitud_rechazada`,
-  `solicitud_requiere_correccion`) con escape XSS en `motivos_rechazo`.
+- Plantillas de email (`solicitud_validada`, `solicitud_requiere_correccion`) con escape XSS.
 - Stub de pago navegable (`pago_stub` / `/pago-stub`) con token firmado no
   enumerable; al confirmar, `Socio.estado` → `Activo` vía `cambiar_estado`.
 - Endpoints Guest: `consultar_solicitud(token)` y `actualizar_solicitud(token, payload)`.
@@ -993,7 +983,7 @@ Alcance **exclusivo** del commit 5:
 
 | Método | Gate | Respuesta OK |
 |--------|------|--------------|
-| `consultar_solicitud(token)` | token válido | `{status, workflow_state, creation, motivos_rechazo?}` sin adjuntos ni PII extra |
+| `consultar_solicitud(token)` | token válido | `{status, workflow_state, creation, observaciones?}` sin adjuntos ni PII extra |
 | `actualizar_solicitud(token, data)` | token + estado `Requiere Corrección` | `{status: ok}`; pasa a `Pendiente` |
 | `pago_stub(token)` | token firmado válido + solicitud `Validada` | contexto página stub |
 | `confirmar_pago_stub(token)` | idem | `{status: ok}`; socio → `Activo` |
@@ -1072,8 +1062,7 @@ Variables: `PLAYWRIGHT_BASE_URL`, `QA_SECRETARIA_EMAIL`, `QA_SECRETARIA_PASSWORD
 ## Commit 3 — Workflow Desk y auditoría (escenarios)
 
 Alcance **exclusivo** del commit 3: fixture `Workflow`, transiciones Desk vía
-`apply_workflow`, `before_save` de campos de auditoría y validación de
-`motivos_rechazo` al rechazar. **No** incluye `validar_solicitud`, creación de
+`apply_workflow`, `before_save` de campos de auditoría. **No** incluye `validar_solicitud`, creación de
 `Socio`/`User`, emails ni endpoints públicos de corrección (commits 4–5).
 
 ### Scenario: el Workflow activo existe tras migrate
@@ -1125,9 +1114,9 @@ Then `validado_por` y `validado_en` mantienen los valores anteriores.
 | 1   | DocType `Solicitud Asociacion` (JSON + autoname + permisos + controller) + tests unitarios                                                                                                                                                    | sí — `test_solicitud_asociacion.py` (26 tests)                           |
 | 2   | **Endpoint público** `submit_solicitud` (whitelisted Guest, rate-limit por IP, X-Forwarded-For, validación de `ficha_medica` por magic numbers, filtrado de campos del sistema). NO incluye UI.                                               | sí — `test_solicitud_publica_api.py`                                     |
 | 2.5 | **Frontend público** (UI): página Jinja **`www/solicitud-asociacion.html`** (camino **B**), sin Web Form nativo, que sube adjuntos vía `frappe.handler.upload_file` y envía el JSON a `submit_solicitud`. Incluye: bloque **responsable** (Menor), **calle** + localidad/provincia/CP, multiselect actividades, Google Places opcional (`google_maps_api_key`). Patch `domicilio` → `calle`. Ver «Mejora a futuro (Google Maps Platform)». | sí — `test_solicitud_asociacion_web_page.py`                               |
-| 3   | Workflow fixture (`Pendiente / Requiere Corrección / Validada / Rechazada`) + `before_save` de auditoría (`validado_por/en`, etc.)                                                                                                            | sí — `test_workflow_solicitud_asociacion.py`                             |
+| 3   | Workflow fixture (`Pendiente / Requiere Corrección / Validada`) + `before_save` de auditoría (`validado_por/en`, etc.)                                                                                                            | sí — `test_workflow_solicitud_asociacion.py`                             |
 | 4   | Service `ensure_grupo_for_socio` + `validar_solicitud` (adulto, menor-con-Socio, menor-con-TNS, los 3 sub-flujos de email del menor) + bloqueos (G2 DNI ya TNS, G3 email ya tomado, etc.)                                                     | sí — `test_workflow_solicitud_asociacion.py::test_validar_*`             |
-| 5   | Email templates + stub de pago (`pago_stub`) + tests de escape XSS en `motivos_rechazo` + endpoints públicos `consultar_solicitud` y `actualizar_solicitud` por token                                                                         | sí — `test_solicitud_asociacion_emails.py`, `test_correccion_publica.py` |
+| 5   | Email templates + stub de pago (`pago_stub`) + endpoints públicos `consultar_solicitud` y `actualizar_solicitud` por token                                                                         | sí — `test_solicitud_asociacion_emails.py`, `test_correccion_publica.py` |
 | 6   | Migrar `Socio.solicitud_origen` de `Data` → `Link "Solicitud Asociacion"` + test que verifica la integridad referencial                                                                                                                       | sí — `test_socio_referencia_solicitud.py` (nuevo)                        |
 
 
@@ -1259,7 +1248,7 @@ migración requiere:
   - `members/tests/test_solicitud_asociacion_isolation.py`
   → Guest no lee, Socio no lee, Secretaría sí.
   - `members/tests/test_solicitud_asociacion_emails.py`
-  → escape XSS en `motivos_rechazo`, contenido del email validada, link de
+  → contenido del email validada, link de
   pago stub no adivinable por enumeración.
   - `members/tests/test_correccion_publica.py` (Sprint 1 mantiene endpoint
   público de corrección)

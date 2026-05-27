@@ -21,21 +21,6 @@ def render_solicitud_validada_email(*, nombre: str, pago_url: str) -> str:
 <p>Equipo del club</p>"""
 
 
-def render_solicitud_rechazada_email(
-	*, nombre: str, motivos_rechazo: str, token_seguimiento: str
-) -> str:
-	"""Email de rechazo con `motivos_rechazo` escapado (anti-XSS)."""
-	nombre_seguro = escape_html(nombre or "Solicitante")
-	motivos_seguros = escape_html(motivos_rechazo or "")
-	seguimiento_url = escape_html(_seguimiento_portal_url(token_seguimiento))
-	return f"""<p>Hola {nombre_seguro},</p>
-<p>Tu solicitud de asociación fue <strong>rechazada</strong>.</p>
-<p>Motivos:</p>
-<p>{motivos_seguros}</p>
-<p>Podés consultar el estado en: <a href="{seguimiento_url}">seguimiento</a></p>
-<p>Equipo del club</p>"""
-
-
 def render_solicitud_requiere_correccion_email(
 	*, nombre: str, token_seguimiento: str, observaciones: str
 ) -> str:
