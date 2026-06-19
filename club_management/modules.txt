@@ -1,2 +1,3 @@
 Club Management
 Members
+Activities

@@ -11,22 +11,23 @@ app_license = "mit"
 # required_apps = []
 
 # Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "club_management",
-# 		"logo": "/assets/club_management/logo.png",
-# 		"title": "Club Management",
-# 		"route": "/club_management",
-# 		"has_permission": "club_management.api.permission.has_app_permission"
-# 	}
-# ]
+add_to_apps_screen = [
+	{
+		"name": "club_management",
+		"logo": "/assets/frappe/images/frappe-framework-logo.svg",
+		"title": "Club Management",
+		"route": "/desk",
+		"has_permission": "club_management.members.permissions_app.has_app_permission",
+	}
+]
 
 # Includes in <head>
 # ------------------
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/club_management/css/club_management.css"
-# app_include_js = "/assets/club_management/js/club_management.js"
+app_include_css = "club_management.bundle.css"
+app_include_js = "club_management.bundle.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/club_management/css/club_management.css"
@@ -86,7 +87,7 @@ app_license = "mit"
 # ------------
 
 # before_install = "club_management.install.before_install"
-# after_install = "club_management.install.after_install"
+after_install = "club_management.install.after_install"
 
 # Uninstallation
 # ------------
@@ -124,12 +125,14 @@ permission_query_conditions = {
 	"Socio": "club_management.members.permissions.socio_query_conditions",
 	"Tutor No Socio": "club_management.members.permissions.tutor_no_socio_query_conditions",
 	"Grupo Familiar": "club_management.members.permissions.grupo_familiar_query_conditions",
+	"Cargo Socio": "club_management.members.permissions.cargo_socio_query_conditions",
 }
 
 has_permission = {
 	"Socio": "club_management.members.permissions.socio_has_permission",
 	"Tutor No Socio": "club_management.members.permissions.tutor_no_socio_has_permission",
 	"Grupo Familiar": "club_management.members.permissions.grupo_familiar_has_permission",
+	"Cargo Socio": "club_management.members.permissions.cargo_socio_has_permission",
 }
 
 # Document Events
@@ -146,6 +149,14 @@ has_permission = {
 
 # Scheduled Tasks
 # ---------------
+
+scheduler_events = {
+	"daily": [
+		"club_management.members.jobs.cobranza_periodica.run_generar_deuda_si_corresponde",
+		"club_management.members.jobs.cobranza_periodica.run_recargos_si_corresponde",
+		"club_management.members.jobs.moroso_automatico.run_evaluar_morosos_si_corresponde",
+	],
+}
 
 # scheduler_events = {
 # 	"all": [
@@ -243,6 +254,8 @@ has_permission = {
 before_login = [
 	"club_management.members.auth.dual_login.resolve_login_user",
 ]
+
+extend_bootinfo = "club_management.boot.extend_bootinfo"
 
 # Automatically update python controller files with type annotations for this app.
 export_python_type_annotations = True
