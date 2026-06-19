@@ -19,7 +19,7 @@ class TestImportSociosPadronContactoDomicilio(MembersTestCase):
             "categoria_socio": "ACTIVO",
             "matrícula": "",
             "cobrador": "",
-            "teléfono": "01144445555",
+            "teléfono": "456-7890",
             "tel_movil": "+541155566677",
             "email": "",
             "cuenta": "",
@@ -35,8 +35,8 @@ class TestImportSociosPadronContactoDomicilio(MembersTestCase):
             "codigo_postal": "1900",
         }
         payload = build_socio_payload(row)
-        self.assertEqual(payload["telefono_fijo"], "01144445555")
-        self.assertEqual(payload["telefono_movil"], "+541155566677")
+        self.assertEqual(payload["telefono_fijo"], "4567890")
+        self.assertEqual(payload["telefono_movil"], "541155566677")
         self.assertEqual(payload["email"], "")
         self.assertEqual(payload["calle"], "San Martín")
         self.assertEqual(payload["numero"], "100")

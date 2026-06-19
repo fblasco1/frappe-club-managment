@@ -20,7 +20,7 @@ Notas:
 - Campos legacy sin columna nativa en `Socio` (`nro_socio`, `matrícula`, `cobrador`,
   `cuenta`, `notas`) se persisten si existen Custom Fields configurados en
   `LEGACY_FIELD_MAP`; si no, quedan en un comentario JSON trazable en el documento.
-- Contacto: `telefono_fijo` (opcional), `telefono_movil`, `email` vacío si el CSV no trae valor.
+- Contacto: `telefono_fijo` / `telefono_movil` vía heurística `parsear_telefono` (≥10 dígitos → móvil; &lt;10 → fijo); `email` vacío si el CSV no trae valor.
 - Domicilio: `calle`, `numero`, `piso`, `departamento`, `provincia`, `ciudad`, `localidad_barrio`.
 - Para menores sin tutor en el CSV, la migración usa `flags.ignore_validate` de forma
   explícita (solo en este script) para no bloquear el padrón; Secretaría debe completar
@@ -40,6 +40,8 @@ from typing import Any
 import frappe
 from frappe.exceptions import DuplicateEntryError, MandatoryError, ValidationError
 from frappe.utils import getdate
+
+from club_management.members.services.telefono import mapear_telefonos_desde_fila
 
 # ---------------------------------------------------------------------------
 # Configuración del DocType destino
@@ -85,6 +87,8 @@ CATEGORIA_PADRON_MAP: dict[str, str] = {
 	"SOCIOS BEC. 7A.": "Activo",
 }
 
+TELEFONOS_INVALIDOS_ETIQUETA = "Teléfonos Inválidos"
+
 CSV_COLUMNS: tuple[str, ...] = (
 	"nro_socio",
 	"socio",
@@ -121,6 +125,10 @@ class MigrationStats:
 	def registrar_fallo(self, etiqueta_error: str, identificador: str) -> None:
 		self.total_fallidos += 1
 		self.choques[etiqueta_error].append(identificador)
+
+	def registrar_advertencia(self, etiqueta: str, detalle: str) -> None:
+		"""Registra un choque informativo sin contar como fallo de inserción."""
+		self.choques[etiqueta].append(detalle)
 
 	def registrar_exito(self) -> None:
 		self.total_exitosos += 1
@@ -173,11 +181,17 @@ def migrate_padron_csv(
 	for row in rows:
 		identificador = _row_identifier(row)
 		try:
-			payload = build_socio_payload(
+			payload, telefonos_invalidos = build_socio_payload(
 				row,
 				meta_fieldnames=meta_fieldnames,
 				default_estado=default_estado,
+				return_telefonos_invalidos=True,
 			)
+			for numero in telefonos_invalidos:
+				stats.registrar_advertencia(
+					TELEFONOS_INVALIDOS_ETIQUETA,
+					f"{identificador} — {numero}",
+				)
 			if dry_run:
 				stats.registrar_exito()
 				continue
@@ -210,7 +224,8 @@ def build_socio_payload(
 	*,
 	meta_fieldnames: set[str] | None = None,
 	default_estado: str = "Activo",
-) -> dict[str, Any]:
+	return_telefonos_invalidos: bool = False,
+) -> dict[str, Any] | tuple[dict[str, Any], list[str]]:
 	"""Transforma una fila del CSV en el dict para `frappe.get_doc`."""
 	meta_fieldnames = meta_fieldnames or {
 		df.fieldname for df in frappe.get_meta(DOCTYPE).fields
@@ -225,8 +240,7 @@ def build_socio_payload(
 		context=basket_context,
 	)
 
-	telefono_fijo = (row.get("teléfono") or "").strip()
-	telefono_movil = (row.get("tel_movil") or "").strip()
+	telefono_fijo, telefono_movil, telefonos_invalidos = mapear_telefonos_desde_fila(row)
 	email = _normalize_email(row.get("email", ""))
 	provincia = (row.get("provincia") or "").strip()
 	ciudad = (row.get("ciudad") or "").strip()
@@ -272,6 +286,8 @@ def build_socio_payload(
 		payload["matricula_padron"] = matricula
 
 	_validate_required_mapping(payload, row)
+	if return_telefonos_invalidos:
+		return payload, telefonos_invalidos
 	return payload
 
 

@@ -59,8 +59,32 @@ And las columnas legacy se eliminan.
 
 Given una fila CSV con `teléfono`, `tel_movil`, `email`, `calle`, `numero`, `piso`, `departamento`, `provincia`, `ciudad`, `localidad_barrio`
 When `build_socio_payload` procesa la fila
-Then `telefono_fijo` ← `teléfono`, `telefono_movil` ← `tel_movil`, `email` vacío si CSV vacío
+Then cada valor de `teléfono` y `tel_movil` pasa por `parsear_telefono`
+And el número limpio con longitud ≥ 10 se asigna a `telefono_movil`
+And el número limpio con longitud &lt; 10 se asigna a `telefono_fijo`
+And `email` queda vacío si el CSV no trae valor
 And los campos de domicilio se copian 1:1 sin concatenar en un único `domicilio`.
+
+---
+
+## Scenario: heurística `parsear_telefono` en migración de padrón
+
+Given un valor crudo de teléfono del CSV (con guiones, espacios, paréntesis o prefijo `+`)
+When se ejecuta `parsear_telefono(numero_crudo)`
+Then el valor se reduce a dígitos únicamente
+And si queda vacío retorna `None`
+And si la longitud del número limpio es ≥ 10 retorna tipo `"Celular"`
+And si la longitud es &lt; 10 retorna tipo `"Fijo"`.
+
+---
+
+## Scenario: teléfonos inválidos en reporte de choques
+
+Given una fila del padrón cuyo `teléfono` o `tel_movil` tiene menos de 6 dígitos tras limpiar
+When `migrate_padron_csv` procesa la fila
+Then el socio se inserta omitiendo ese número
+And el identificador de la fila figura en el reporte de choques bajo **Teléfonos Inválidos**
+And el contador de fallidos no incrementa por este motivo.
 
 ---
 
