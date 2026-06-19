@@ -5,19 +5,28 @@
 	{% if pago_valido %}
 	<h1>Pago simulado — primera cuota</h1>
 	<p>Hola {{ nombre_solicitante | e }}, esta pantalla es un <strong>stub temporal</strong> (Sprint 1).</p>
-	<p>Al confirmar, tu membresía pasará a estado <em>Activo</em> sin integración bancaria real.</p>
+	<p>Al confirmar el pago simulado, podrás <strong>elegir las actividades</strong> que vas a realizar (sin integración bancaria real).</p>
 	<button class="btn btn-primary" id="confirmar-pago">Marcar como pagado</button>
 	<p class="text-muted mt-3" id="pago-resultado"></p>
 	<script>
 		document.getElementById("confirmar-pago").addEventListener("click", function () {
+			var btn = document.getElementById("confirmar-pago");
+			btn.disabled = true;
 			frappe.call({
 				method: "club_management.members.api.solicitud_publica.confirmar_pago_stub",
 				args: { token: {{ pago_token | tojson }} },
 				callback: function (r) {
+					if (r.message && r.message.status === "ok" && r.message.inscripcion_url) {
+						document.getElementById("pago-resultado").textContent =
+							"Redirigiendo para elegir actividades…";
+						window.location.href = r.message.inscripcion_url;
+						return;
+					}
 					document.getElementById("pago-resultado").textContent =
 						r.message && r.message.status === "ok"
-							? "Pago registrado. Podés cerrar esta ventana."
+							? "Pago registrado."
 							: "No se pudo registrar el pago.";
+					btn.disabled = false;
 				},
 			});
 		});

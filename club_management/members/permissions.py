@@ -217,3 +217,61 @@ def grupo_familiar_has_permission(doc: Any, ptype: str | None = None, user: str 
 			return True
 
 	return False
+
+
+# -----------------------------------------------------------------------------
+# Cargo Socio
+# -----------------------------------------------------------------------------
+
+
+def cargo_socio_query_conditions(user: str | None = None) -> str:
+	user = user or frappe.session.user
+	if _es_full_access(user):
+		return ""
+	socio_names = frappe.get_all("Socio", filters={"user": user}, pluck="name")
+	if not socio_names:
+		return "1=0"
+	escaped = ", ".join(frappe.db.escape(name) for name in socio_names)
+	return f"`tabCargo Socio`.socio IN ({escaped})"
+
+
+def cargo_socio_has_permission(
+	doc: Any, ptype: str | None = None, user: str | None = None, **kwargs: Any
+) -> bool:
+	user = user or frappe.session.user
+	if _es_full_access(user):
+		return True
+	socio_name = _doc_field(doc, "Cargo Socio", "socio")
+	if not socio_name:
+		return False
+	socio_user = frappe.db.get_value("Socio", socio_name, "user")
+	return bool(socio_user) and socio_user == user
+
+
+# -----------------------------------------------------------------------------
+# Cargo Socio
+# -----------------------------------------------------------------------------
+
+
+def cargo_socio_query_conditions(user: str | None = None) -> str:
+	user = user or frappe.session.user
+	if _es_full_access(user):
+		return ""
+	socio_names = frappe.get_all("Socio", filters={"user": user}, pluck="name")
+	if not socio_names:
+		return "1=0"
+	escaped = ", ".join(frappe.db.escape(name) for name in socio_names)
+	return f"`tabCargo Socio`.socio IN ({escaped})"
+
+
+def cargo_socio_has_permission(
+	doc: Any, ptype: str | None = None, user: str | None = None, **kwargs: Any
+) -> bool:
+	user = user or frappe.session.user
+	if _es_full_access(user):
+		return True
+	socio_name = _doc_field(doc, "Cargo Socio", "socio")
+	if not socio_name:
+		return False
+	socio_user = frappe.db.get_value("Socio", socio_name, "user")
+	return bool(socio_user) and socio_user == user

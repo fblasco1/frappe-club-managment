@@ -95,11 +95,37 @@ And the Report references DocType Socio with appropriate filter metadata
 
 ---
 
+## Scenario: Workspace Secretaría with solicitud queue shortcuts
+
+Given Workspace "Secretaría" is installed (fixture `members/workspace/secretaria/secretaria.json`)
+When Secretaria opens that workspace in Desk
+Then a shortcut "Solicitudes pendientes" opens `Solicitud Asociacion` filtered to `workflow_state = Pendiente`
+And shortcuts exist for `Requiere Corrección`, `Validada` y socios `Pendiente de Pago`
+And links open DocTypes `Socio`, `Grupo Familiar` y `Tutor No Socio`
+
+---
+
+## Scenario: panel Secretaría muestra cuatro number cards operativas
+
+Given Number Cards estándar del módulo Members están sincronizadas
+When Secretaria abre el workspace "Secretaría"
+Then ve cuatro tarjetas con contadores:
+  1. Solicitudes pendientes de revisión (`Solicitud Asociacion`, `workflow_state = Pendiente`)
+  2. Aprobados pendientes de 1er pago (`Socio`, `estado = Pendiente de Pago`)
+  3. Socios morosos (`Socio`, `estado = Moroso`)
+  4. Total socios activos (`Socio`, `estado = Activo`, con variación mensual si hay histórico)
+And al hacer clic en cada tarjeta se abre la lista del DocType con el filtro correspondiente
+And al iniciar sesión, si `default_workspace` es "Secretaría", la ruta inicial es `/desk/secretaría` (no la pantalla genérica de apps).
+
+Detalle de listas preview: `specs/secretaria_workspace_listas.md`.
+
+---
+
 ## Scenario: Workspace Secretaría with Report shortcut and no "Todos los Módulos"
 
 Given Workspace "Secretaría" is installed
 When Secretaria opens that workspace in Desk
-Then a shortcut or primary link opens the Report "Socios pendientes de validación"
+Then a shortcut or primary link opens the Report "Socios pendientes de validación" *(Sprint 2 — reporte pendiente de implementar)*
 And the workspace layout does not include a "Todos los Módulos" block matching Club Management's module cards
 
 ---

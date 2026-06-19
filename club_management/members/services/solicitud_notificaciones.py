@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
-from frappe.utils import get_url
-
 from club_management.members.email_templates.solicitud_emails import (
 	render_solicitud_requiere_correccion_email,
 	render_solicitud_validada_email,
 )
-from club_management.members.services.solicitud_tokens import sign_pago_token
+from club_management.members.services.solicitud_tokens import (
+	build_pago_stub_url,
+	sign_pago_token,
+)
 
 
 def enqueue_validacion_pago_email(solicitud_name: str, to_email: str) -> None:
@@ -37,7 +38,7 @@ def enqueue_correccion_email(solicitud_name: str) -> None:
 def _send_validacion_pago_email(solicitud_name: str, to_email: str) -> None:
 	solicitud = frappe.get_doc("Solicitud Asociacion", solicitud_name)
 	pago_token = sign_pago_token(solicitud_name)
-	pago_url = get_url(f"/pago-stub?token={pago_token}")
+	pago_url = build_pago_stub_url(pago_token)
 	html = render_solicitud_validada_email(
 		nombre=solicitud.nombre,
 		pago_url=pago_url,

@@ -19,12 +19,19 @@ import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
 
+from club_management.activities.services.actividades_catalog import (
+    ESTADO_SOCIO_PENDIENTE_INSCRIPCION,
+)
 from club_management.members.services.actividades_portal import list_actividades_asociacion
 from club_management.members.services.google_places import get_places_config_for_portal
 from club_management.members.services.socio_transitions import cambiar_estado
 from club_management.members.services.solicitud_tokens import (
+    build_inscripcion_actividades_url,
     get_solicitud_by_seguimiento_token,
     verify_pago_token,
+)
+from club_management.members.services.contacto_domicilio import (
+	normalize_legacy_solicitud_payload,
 )
 from club_management.members.validations import validate_ficha_medica_from_url
 from club_management.members.workflow.solicitud_asociacion_workflow import (
@@ -75,10 +82,15 @@ _CAMPOS_EDITABLES_CORRECCION: frozenset[str] = frozenset(
         "genero",
         "categoria_solicitada",
         "email",
-        "telefono",
+        "telefono_fijo",
+        "telefono_movil",
         "calle",
-        "localidad",
+        "numero",
+        "piso",
+        "departamento",
         "provincia",
+        "ciudad",
+        "localidad_barrio",
         "codigo_postal",
         "dni_frente",
         "dni_dorso",
@@ -94,10 +106,15 @@ _CAMPOS_EDITABLES_CORRECCION: frozenset[str] = frozenset(
         "nacionalidad_tutor",
         "genero_tutor",
         "email_tutor",
-        "telefono_tutor",
+        "telefono_fijo_tutor",
+        "telefono_movil_tutor",
         "calle_tutor",
-        "localidad_tutor",
+        "numero_tutor",
+        "piso_tutor",
+        "departamento_tutor",
         "provincia_tutor",
+        "ciudad_tutor",
+        "localidad_barrio_tutor",
         "codigo_postal_tutor",
         "rol_tutor",
         "dni_frente_tutor",
@@ -186,7 +203,7 @@ def _submit_solicitud_impl(data: Any) -> dict[str, Any]:
     payload: dict[str, Any] = {
         k: v for k, v in data.items() if k not in _CAMPOS_BLOQUEADOS_DESDE_PAYLOAD
     }
-    _normalize_legacy_address_fields(payload)
+    normalize_legacy_solicitud_payload(payload)
     payload["doctype"] = "Solicitud Asociacion"
 
     ficha_url = payload.get("ficha_medica")
@@ -205,15 +222,8 @@ def _submit_solicitud_impl(data: Any) -> dict[str, Any]:
 
 
 def _normalize_legacy_address_fields(payload: dict[str, Any]) -> None:
-	"""Acepta `domicilio` / `domicilio_tutor` legacy del cliente anterior."""
-	if payload.get("domicilio") and not payload.get("calle"):
-		payload["calle"] = payload.pop("domicilio")
-	elif "domicilio" in payload:
-		payload.pop("domicilio", None)
-	if payload.get("domicilio_tutor") and not payload.get("calle_tutor"):
-		payload["calle_tutor"] = payload.pop("domicilio_tutor")
-	elif "domicilio_tutor" in payload:
-		payload.pop("domicilio_tutor", None)
+	"""Compat: delega en `normalize_legacy_solicitud_payload`."""
+	normalize_legacy_solicitud_payload(payload)
 
 
 @frappe.whitelist(allow_guest=True)
@@ -295,6 +305,8 @@ def _actualizar_solicitud_impl(token: str, data: Any) -> dict[str, Any]:
 	if not isinstance(data, dict):
 		frappe.throw(_("Payload inválido: se esperaba un objeto."), frappe.ValidationError)
 
+	normalize_legacy_solicitud_payload(data)
+
 	for key, value in data.items():
 		if key in _CAMPOS_EDITABLES_CORRECCION:
 			doc.set(key, value)
@@ -308,7 +320,7 @@ def _actualizar_solicitud_impl(token: str, data: Any) -> dict[str, Any]:
 
 
 def _confirmar_pago_stub_impl(pago_token: str) -> dict[str, str]:
-	"""Stub Sprint 1: marca el socio como `Activo` tras pago simulado."""
+	"""Stub Sprint 1: pago registrado; el socio elige actividades antes de `Activo`."""
 	solicitud_name = verify_pago_token(pago_token)
 	if not solicitud_name:
 		frappe.throw(_("Not Found"), frappe.DoesNotExistError)
@@ -317,12 +329,27 @@ def _confirmar_pago_stub_impl(pago_token: str) -> dict[str, str]:
 	if solicitud.workflow_state != STATE_VALIDADA or not solicitud.socio_generado:
 		frappe.throw(_("Not Found"), frappe.DoesNotExistError)
 
+	socio = frappe.get_doc("Socio", solicitud.socio_generado)
+	if socio.estado == ESTADO_SOCIO_PENDIENTE_INSCRIPCION:
+		return {
+			"status": "ok",
+			"inscripcion_url": build_inscripcion_actividades_url(pago_token),
+		}
+	if socio.estado == "Activo":
+		return {
+			"status": "ok",
+			"inscripcion_url": build_inscripcion_actividades_url(pago_token),
+		}
+
 	cambiar_estado(
 		solicitud.socio_generado,
-		"Activo",
+		ESTADO_SOCIO_PENDIENTE_INSCRIPCION,
 		motivo="Pago stub Sprint 1",
 	)
-	return {"status": "ok"}
+	return {
+		"status": "ok",
+		"inscripcion_url": build_inscripcion_actividades_url(pago_token),
+	}
 
 
 @frappe.whitelist(allow_guest=True)

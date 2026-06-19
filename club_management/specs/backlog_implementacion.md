@@ -1,0 +1,703 @@
+# Backlog de implementación — Gestión de Socios y Actividades
+
+
+
+Índice de specs para implementar en chats separados (orden **SDD → test fallando → código**).
+
+
+
+**Ruta:** `club_management/specs/`  
+
+**Estado:** `[ ]` pendiente · `[~]` parcial (ver spec «ya implementado») · `[x]` hecho
+
+
+
+**Última revisión MVP producción:** 2026-06-16  
+
+**Destino producción:** Hetzner Cloud **CX23** (servidor aparte del devcontainer local)
+
+
+
+---
+
+
+
+## Producción — Hetzner CX23
+
+
+
+| Recurso | Valor ([Cost-Optimized CX23](https://www.hetzner.com/cloud/cost-optimized)) |
+
+|---------|-------------------------------------------------------------------------------|
+
+| vCPU | 2 (Intel®/AMD) |
+
+| RAM | **4 GB** |
+
+| Disco local | **40 GB** SSD |
+
+| Uso previsto | 1 sitio Frappe + ERPNext + `club_management`, Secretaría interna ICDPE |
+
+
+
+**Adecuado para MVP** con decenas/cientos de socios si se configura bien. **No** es margen holgado: monitorear RAM y disco desde el día 1.
+
+
+
+### Recomendaciones antes de crear la VM
+
+
+
+- **SO:** Ubuntu 24.04 LTS.
+
+- **Región:** `eu-central` (Nuremberg / Falkenstein) u otra EU; DNS del dominio → IP pública.
+
+- **Swap 2 GB** en el host (4 GB RAM es justo con Postgres + Redis + workers + scheduler).
+
+- **Firewall Hetzner:** entrante `22` (SSH restringido), `80`, `443`.
+
+- **Backups:** Backups de Hetzner en la VM + cron `bench backup --with-files`; Volume extra si crecen adjuntos.
+
+- **Imagen:** build **custom** con `club_management` (ver `docs/02-setup/02-build-setup.md` en club-manager-infra).
+
+
+
+### Stack Compose sugerido (un solo bench)
+
+
+
+```bash
+
+cd ~/club_manager_infra
+
+docker compose \
+
+  -f compose.yaml \
+
+  -f overrides/compose.postgres.yaml \
+
+  -f overrides/compose.redis.yaml \
+
+  -f overrides/compose.https.yaml \
+
+  up -d
+
+```
+
+
+
+Variables mínimas en `.env` (desde `example.env`): `ERPNEXT_VERSION`, `DB_PASSWORD`, `LETSENCRYPT_EMAIL`, `SITES_RULE`, `FRAPPE_SITE_NAME_HEADER`.
+
+
+
+Servicios críticos cobranza: **scheduler**, **queue-long**, **queue-short**, **backend**, **db**.
+
+
+
+### Orden primer arranque en CX23
+
+
+
+1. Crear CX23, SSH, Docker + Compose v2, swap.
+
+2. Clonar club-manager-infra + imagen con `club_management`.
+
+3. `.env` producción (nunca en git).
+
+4. `docker compose … up -d` (esperar DB healthy).
+
+5. `bench new-site --db-type postgres … <sitio-prod>`
+
+6. `install-app erpnext club_management` + `migrate` + `build`
+
+7. Club Settings, Secretaría, ciclo cobranza (runbook bloque C).
+
+
+
+**Dev local** = ensayo (bloque A). **Prod** = SSH al CX23 (bloques B–D).
+
+
+
+---
+
+
+
+## Leyenda de dependencias
+
+
+
+| Símbolo | Significa |
+
+|---------|-----------|
+
+| → | Implementar después de |
+
+| ‖ | Puede ir en paralelo |
+
+
+
+---
+
+
+
+## Alcance MVP producción (Secretaría interna ICDPE)
+
+
+
+**Incluye (listo para operar en Desk):**
+
+
+
+| Área | Specs / notas |
+
+|------|----------------|
+
+| Socios | Alta guiada, edición, estados, tutor menor, cobranza manual puntual |
+
+| Inscripciones | Diálogo en Socio (Link cascada), form `Inscripcion Actividad`, baja/listado |
+
+| Actividades | Jerarquía Actividad → Grupo → Equipo, panel gestión, aranceles inline |
+
+| Equipo Actividad | Layout grupo+título en fila, roster de socios inscriptos (`equipo_actividad_form_roster.md`) |
+
+| Cobranza | Club Settings, facturación día 1, recargo 2.º vencimiento, moroso automático, cargos extra |
+
+| Informes | Deuda por equipo, pagos por equipo, liquidación manual en rango |
+
+| Workspace Secretaría | Panel KPI (socios, recaudación, morosos), sidebar, navegación Desk acotada |
+
+
+
+**Fuera de alcance en este go-live (Fase 3+):**
+
+
+
+| Tema | Spec | Motivo |
+
+|------|------|--------|
+
+| Solicitud pública de asociación | `solicitud_asociacion_publica.md` | Operación interna MVP (`secretaria_operacion_interna_mvp.md`) |
+
+| Grupo familiar | `grupo_familiar_minimo.md` | Segunda implementación |
+
+| Pagos online Supervielle | `supervielle_cobros_plus_*.md` | Sin gateway en producción inicial |
+
+| Portal socio / inscripciones web | `activities_modulo.md`, `login_dual.md` | Posterior |
+
+| Job categoría Vitalicio | `socios_categoria_validacion.md` | Futuro |
+
+
+
+---
+
+
+
+## Fase 0 — Ya implementado (referencia)
+
+
+
+| Spec | Estado | Notas |
+
+|------|--------|-------|
+
+| `socio_minimo.md` | [~] | DocType Socio; falta job Vitalicio |
+
+| `solicitud_asociacion_publica.md` | [x] | Código listo; **no** se expone en MVP interno |
+
+| `mvp_operacion_secretaria_sin_pagos.md` | [x] | Estados, inscripción Desk, cobranza manual puntual |
+
+| `secretaria_operacion_interna_mvp.md` | [x] | Desk sin solicitudes/grupo familiar; tutor menor obligatorio |
+
+| `secretaria_workspace_listas.md` | [x] | Panel listas + cuotas inline (montos) |
+
+| `secretaria_workspace_panel_kpis.md` | [x] | Cards KPI Secretaría (socios, recaudación mes, morosos + deuda) |
+
+| `gestion_actividades_panel.md` | [x] | Catálogo, alta, aranceles inline |
+
+| `gestion_actividades_edicion_panel.md` | [x] | Editar / deshabilitar nodos en panel actividades |
+
+| `socio_alta_edicion_secretaria.md` | [x] | Alta manual + edición Desk |
+
+| `inscripcion_gestion_desk.md` | [x] | Baja/listado inscripciones; cascada actividad→grupo→equipo en diálogos |
+
+| `equipo_actividad_form_roster.md` | [x] | Roster socios en formulario Equipo Actividad |
+
+| `cuotas_sync_erpnext.md` | [x] | Guardar cuotas → Item Price + Subscription Plan |
+
+| `activities_jerarquia.md` | [x] | DocTypes Actividad / Grupo / Equipo / Inscripción |
+
+| `cuotas_sociales_suscripcion.md` | [x] | Suscripción ERPNext solo cuota social |
+
+| `cobranza_config_club_settings.md` | [x] | Calendario de deuda y recargo en Club Settings |
+
+| `cobranza_periodica_mensual.md` | [x] | Job día 1: facturar cuota + aranceles activos |
+
+| `cargo_extra_socio.md` | [x] | DocType Cargo Socio + UI Secretaría |
+
+| `cobranza_recargo_segundo_vencimiento.md` | [x] | Recargo fin de mes + segunda exigibilidad |
+
+| `moroso_automatico.md` | [x] | Job moroso post-2.º vencimiento |
+
+| `liquidacion_equipo_deuda_rango.md` | [x] | Reporte deuda por equipo + liquidación manual en rango |
+
+| `socios_categoria_validacion.md` | [ ] | Validación categoría, job Vitalicio — futuro |
+
+
+
+---
+
+
+
+## Fase 1 — Completar operación Desk (bajo riesgo)
+
+
+
+| # | Spec | Depende de | Entregable principal |
+
+|---|------|------------|----------------------|
+
+| 1.1 | `socio_alta_edicion_secretaria.md` | socio_minimo | Alta manual + edición guiada desde Desk — **hecho** |
+
+| 1.2 | `inscripcion_gestion_desk.md` | mvp_operacion | Baja/listado inscripciones desde formulario Socio — **hecho** |
+
+| 1.3 | `cuotas_sync_erpnext.md` | cuotas_sociales_suscripcion | Guardar cuotas → Item Price + Subscription Plan — **hecho** |
+
+| 1.4 | `gestion_actividades_edicion_panel.md` | gestion_actividades_panel | Editar / deshabilitar nodos en panel actividades — **hecho** |
+
+| 1.5 | `equipo_actividad_form_roster.md` | activities_jerarquia, inscripcion_gestion_desk | Roster socios en Equipo Actividad — **hecho** |
+
+
+
+**Paralelo posible:** 1.1 ‖ 1.2 ‖ 1.3 ‖ 1.4 ‖ 1.5
+
+
+
+---
+
+
+
+## Fase 1b — Liquidación por equipo (operación interna)
+
+
+
+| # | Spec | Depende de | Entregable principal |
+
+|---|------|------------|----------------------|
+
+| 1.6 | `liquidacion_equipo_deuda_rango.md` | mvp_operacion, activities_jerarquia, cobranza_periodica | Script Report + API liquidación manual en rango — **hecho** |
+
+
+
+---
+
+
+
+## Fase 2 — Cobranza periódica (crítico para operación mensual)
+
+
+
+| # | Spec | Depende de | Entregable principal |
+
+|---|------|------------|----------------------|
+
+| 2.1 | `cobranza_config_club_settings.md` | — | Campos calendario y recargo en Club Settings — **hecho** |
+
+| 2.2 | `cobranza_periodica_mensual.md` | 2.1, cuotas_sync | Job día 1: facturar cuota + aranceles activos — **hecho** |
+
+| 2.3 | `cargo_extra_socio.md` | 2.1 | DocType Cargo Socio + UI Secretaría — **hecho** |
+
+| 2.4 | `cobranza_periodica_mensual.md` (ext.) | 2.3 | Incluir cargos extra en facturación mensual — **hecho** |
+
+| 2.5 | `cobranza_recargo_segundo_vencimiento.md` | 2.2 | Recargo fin de mes + segunda exigibilidad — **hecho** |
+
+| 2.6 | `moroso_automatico.md` | 2.5 | Job moroso post-2.º vencimiento — **hecho** |
+
+
+
+**Orden estricto:** 2.1 → 2.2 → 2.3 → 2.4 → 2.5 → 2.6 — **completo**
+
+
+
+---
+
+
+
+## Fase 3 — Integración pagos y portal (posterior al go-live)
+
+
+
+| Spec | Notas |
+
+|------|-------|
+
+| `supervielle_cobros_plus_webhook.md` | Ya existe; alinear con cobranza periódica |
+
+| `supervielle_cobros_plus_api.md` | Botón pago real |
+
+| `activities_modulo.md` | Portal socio inscripciones autenticado |
+
+| `login_dual.md` | Acceso portal + Desk |
+
+| `grupo_familiar_minimo.md` | Segunda ola funcional |
+
+| Reactivar flujo `Solicitud Asociacion` en workspace | Cuando se retome alta pública |
+
+
+
+---
+
+
+
+## Mapa requisito de negocio → spec
+
+
+
+| Requisito Secretaría | Spec |
+
+|----------------------|------|
+
+| CREAR / EDITAR socio | `socio_alta_edicion_secretaria.md` |
+
+| Actualizar pago manual | `mvp_operacion_secretaria_sin_pagos.md` |
+
+| Inscribir a actividades | `mvp_operacion_secretaria_sin_pagos.md` + `inscripcion_gestion_desk.md` |
+
+| Ver socios de un equipo / tira | `equipo_actividad_form_roster.md` |
+
+| Cargos extra (federativa, multa, viaje…) | `cargo_extra_socio.md` |
+
+| Actualizar CUOTA SOCIAL y ARANCEL | `secretaria_workspace_listas.md` + `cuotas_sync_erpnext.md` + `gestion_actividades_edicion_panel.md` |
+
+| Panel KPI Secretaría | `secretaria_workspace_panel_kpis.md` |
+
+| Deuda día 1, vence 10, recargo fin mes | `cobranza_config_club_settings.md` + `cobranza_periodica_mensual.md` + `cobranza_recargo_segundo_vencimiento.md` |
+
+| Moroso automático | `moroso_automatico.md` |
+
+| CREAR / EDITAR actividad, subgrupo, equipo | `gestion_actividades_panel.md` + `gestion_actividades_edicion_panel.md` |
+
+| Liquidación / deuda por equipo y rango de fechas | `liquidacion_equipo_deuda_rango.md` |
+
+
+
+---
+
+
+
+## Checklist salida a producción (antes del cutover)
+
+**Sesión 2026-06-16 (sin CX23 aún):** ver estado al pie de cada ítem.
+
+
+
+### Código y calidad
+
+
+
+- [~] Tag o commit acordado en **frappe-club-management** (app) y **club-manager-infra** (compose/imagen).  
+  **Hoy:** `infra` `92322f8` (main, ahead 1, muchos cambios sin commit). App `b435147` (`develop`, **gran volumen sin commit**). **Pendiente:** commit + tag `mvp-secretaria-2026-06-16` antes del deploy.
+
+- [~] Tests verdes en contenedor dev.  
+  **Hoy:** suite completa 342 tests → **1 fail + 5 errors** (flujo solicitud pública / ICDPE catalog; fuera del MVP interno).  
+  **Módulos MVP críticos (71 tests): OK** — inscripción Desk, cobranza manual/periódica, moroso, KPI panel, equipo roster, alta Secretaría, liquidación, operaciones Secretaría.
+
+```bash
+docker compose -p devcontainer-example -f .devcontainer/docker-compose.yml up -d
+docker exec devcontainer-example-frappe-1 bash -c 'cd /workspace/development/frappe-bench && \
+  bench --site dev.localhost run-tests --app club_management --skip-before-tests'
+```
+
+- [x] `bench build --app club_management` en dev (**2026-06-16**, OK).
+
+- [x] Revisión checklist **security-auditor** (MVP Desk) — ver informe abajo.
+
+- [~] `.env` producción desde plantilla; **no** commitear credenciales.  
+  **Hoy:** plantilla `docs/club/example.prod.env`; `.env` en `.gitignore`.
+
+
+
+### Informe seguridad MVP Desk (2026-06-16)
+
+| Área | Estado |
+|------|--------|
+| Whitelist Desk (`socio_operaciones_desk`, `cobranza_desk`, `liquidacion_equipo_desk`, `equipo_actividad_desk`, `secretaria_workspace`) | OK — `ensure_secretaria_operacion_access()` o rol + `has_permission` en Club Settings |
+| Aislamiento socio | OK en tests `test_socio_isolation`; APIs Desk restringidas a Secretaría |
+| Guest (`solicitud_publica`, inscripción pública) | Fuera de go-live MVP; tokens/spec existentes |
+| SIRO / Supervielle | No en uso prod MVP |
+| XSS panels Desk | Datos de usuario con `frappe.utils.escape_html` en tablas dinámicas |
+
+**Recomendación pre-go-live:** no exponer rutas públicas de solicitud en DNS prod hasta Fase 3.
+
+
+
+### Club Settings dev (replicar en prod)
+
+| Campo | Valor dev |
+|-------|-----------|
+| `dia_generacion_deuda` | 1 |
+| `dia_primer_vencimiento` | 10 |
+| `dia_segundo_vencimiento` | Último día del mes |
+| `recargo_segundo_vencimiento_pct` | 10 |
+| `incluir_aranceles_en_deuda_mensual` | sí |
+| `incluir_cargos_extra_en_deuda_mensual` | sí |
+| `cuotas_categoria` | 6 filas |
+| `company` | verificar en Desk antes del cutover |
+
+
+
+### Infraestructura (bloqueado hasta CX23)
+
+
+
+- [ ] VM **Hetzner CX23** (Ubuntu 24.04, swap 2 GB, firewall 22/80/443).
+
+- [ ] DNS dominio prod → IP pública CX23.
+
+- [ ] Imagen Docker Frappe v16 + ERPNext + `club_management` (custom).
+
+- [ ] PostgreSQL en compose (`overrides/compose.postgres.yaml`).
+
+- [ ] TLS Let's Encrypt (`compose.https.yaml`).
+
+- [ ] Servicios **scheduler** y colas en compose (cobranza + moroso).
+
+- [ ] Backup Hetzner y/o cron `bench backup --with-files`.
+
+- [ ] `bench --site <sitio-prod> migrate` en ventana de mantenimiento.
+
+- [ ] `bench --site <sitio-prod> clear-cache` tras migrate/build.
+
+
+
+### Datos maestros (post-migrate)
+
+
+
+- [ ] **Club Settings:** empresa ICDPE, días generación deuda / 1.er y 2.º vencimiento, recargo, cuotas por categoría.
+
+- [ ] Verificar patches de seed: actividades ICDPE, estructura básquet, workspaces Secretaría / Gestión Actividades.
+
+- [ ] Ítems y aranceles revisados con contabilidad (ver `docs/docs/Accounting - ICDPE - Revision Contable.md`).
+
+- [ ] Usuarios **Secretaria** creados (sin compartir contraseña por chat; usar correo institucional).
+
+- [ ] Rol **Socio** sin permisos de escritura indebidos en Desk.
+
+
+
+### Smoke test en producción (Secretaría)
+
+
+
+- [ ] Login → workspace **Secretaría** → panel KPI carga y «Ver más» abre listas filtradas.
+
+- [ ] Alta guiada de socio menor con tutor.
+
+- [ ] Inscribir en actividades (diálogo Socio) con grupo/tira y equipo.
+
+- [ ] Abrir **Equipo Actividad** → roster de socios visible.
+
+- [ ] Registrar cobro manual sobre factura pendiente.
+
+- [ ] Informes **Deuda por equipo** y **Pagos por equipo** con filtros.
+
+- [ ] (Opcional staging) Simular `generar_deuda_mensual` en un socio de prueba antes del día 1 real.
+
+
+
+### Rollback
+
+
+
+- [ ] Backup completo (`bench --site all backup --with-files`) **inmediatamente antes** del migrate en prod.
+
+- [ ] Procedimiento documentado: restaurar backup + imagen anterior si falla smoke test.
+
+
+
+---
+
+
+
+## Pasos para mañana (2026-06-16) — runbook acordado
+
+**Sesión conjunta:** despliegue MVP + **primer ciclo de cobranza** (generación de deuda junio + carga de pagos manual en Desk).
+
+Participantes: equipo técnico + al menos una persona de Secretaría para probar cobro real.
+
+**Entorno:** dev local (ensayo) → **prod en Hetzner CX23** (SSH). Ajustar `<sitio-prod>` y dominio real.
+
+---
+
+### ⚠ Calendario automático vs. mañana (día 16)
+
+El job diario `run_generar_deuda_si_corresponde` **solo factura** cuando **hoy == `dia_generacion_deuda`** en Club Settings (default **día 1**).
+
+| Situación | Qué pasa el 16/06 |
+|-----------|-------------------|
+| `dia_generacion_deuda = 1` (default) | El scheduler **no** genera facturas solo por ser día 16. |
+| Queremos facturar junio mañana | **Opción A (recomendada go-live):** ejecución **manual** tras el deploy (comandos abajo). |
+| | **Opción B:** poner `dia_generacion_deuda = 16` solo para el primer mes; el scheduler dispara a la madrugada; **volver a 1** antes de julio. |
+
+Para el **primer mes en producción**, usar **Opción A** da control total (revisar facturas antes de avisar a socios).
+
+**Pagos:** no hay gateway online en MVP. Secretaría registra cobros con **Registrar cobro** en el formulario Socio (`cobranza_desk.registrar_cobro` → `Payment Entry`).
+
+---
+
+### Bloque A — Mañana temprano (dev / ensayo, sin prod)
+
+1. Congelar versión (SHA o tag `mvp-secretaria-2026-06-16`).
+2. Tests finales:
+
+```bash
+docker compose exec backend bash -c 'cd /workspace/development/frappe-bench && \
+  bench --site dev.localhost run-tests --app club_management --skip-before-tests'
+```
+
+3. **Ensayo cobranza en dev** (2 socios activos con cuota e inscripción):
+
+```bash
+docker compose exec backend bash -c 'cd /workspace/development/frappe-bench && bench --site dev.localhost console'
+```
+
+```python
+from club_management.members.services.cobranza_periodica import (
+    generar_deuda_mensual_socio,
+    generar_deuda_mensual_socios,
+)
+from frappe.utils import today
+
+# Un socio piloto
+generar_deuda_mensual_socio("SOC-XXXX-XXXX", reference_date=today())
+
+# O lote completo elegible
+generar_deuda_mensual_socios(reference_date=today())
+```
+
+4. En Desk (dev): abrir ese Socio → **Registrar cobro** → elegir factura pendiente → confirmar.
+5. Verificar: `Payment Entry` submitted, `Socio.saldo_deuda` baja, panel KPI recaudación del mes refleja el cobro.
+6. Anotar valores de **Club Settings** a replicar en prod.
+
+---
+
+### Bloque B — Mediodía (despliegue en Hetzner CX23)
+
+7. SSH al CX23; verificar `docker compose ps` (todos healthy).
+8. Backup prod (obligatorio):
+
+```bash
+cd ~/club_manager_infra   # o ruta del clone en el servidor
+docker compose exec backend bench --site <sitio-prod> backup --with-files
+```
+
+9. Actualizar imagen / `git pull` en el servidor + `bench --site <sitio-prod> migrate`
+10. `docker compose exec backend bench build --app club_management`
+11. `docker compose exec backend bench --site <sitio-prod> clear-cache`
+12. `docker compose restart backend queue-short queue-long scheduler`
+
+---
+
+### Bloque C — Tarde (config + primer ciclo cobranza real)
+
+11. **Club Settings (prod):** Company ICDPE, cuotas por categoría, `dia_generacion_deuda` (dejar **1** si usamos manual mañana), `dia_primer_vencimiento` (ej. 10), `dia_segundo_vencimiento`, recargo %.
+12. Usuarios Secretaría creados y login probado.
+13. Smoke Desk: KPI, alta, inscripción, roster equipo (sin facturar aún).
+
+#### C.1 Generación de deuda junio (manual controlado)
+
+14. Confirmar socios **Activo** / **Moroso** elegibles y que tengan (o auto-crean) **Customer**.
+15. Ejecutar en prod (ventana acordada con Secretaría):
+
+```bash
+ssh root@<ip-cx23>
+cd ~/club_manager_infra
+docker compose exec backend bash -c 'cd /home/frappe/frappe-bench && bench --site <sitio-prod> console'
+```
+
+```python
+from club_management.members.services.cobranza_periodica import generar_deuda_mensual_socios
+from frappe.utils import today
+
+result = generar_deuda_mensual_socios(reference_date=today())
+print(result)  # facturas_creadas, errores, invoice_names
+```
+
+16. Revisar muestra de **Sales Invoice** (cuota + aranceles + cargos extra si aplican), `due_date`, período `06/2026`.
+17. Si hay errores en `result["detalle_errores"]` → Error Log / corregir antes de seguir.
+
+#### C.2 Carga de pagos (Secretaría)
+
+18. Por cada cobro recibido en efectivo/transferencia (piloto: 2–3 socios):
+    - Formulario **Socio** → botón **Registrar cobro** (grupo Cobranza manual).
+    - Elegir factura del período → confirmar.
+19. Verificar `Payment Entry`, saldo deuda del socio, estado **Moroso → Activo** si correspondía.
+20. Panel KPI: card recaudación mes y morosos coherentes.
+
+#### C.3 Scheduler a futuro
+
+21. Confirmar servicio **scheduler** activo (jobs `daily`: deuda, recargo 2.º vencimiento, moroso).
+22. A partir de **julio**, con `dia_generacion_deuda = 1`, el día 1/07 el job corre solo (no hace falta consola).
+
+---
+
+### Bloque D — Cierre del día
+
+23. Go/no-go documentado (versión, hora, facturas emitidas, cobros piloto OK).
+24. Capacitación Secretaría (30 min): generación ya hecha + cómo registrar cobros el resto del mes.
+25. Pendientes → issues; nuevas features → Fase 3 del backlog.
+
+---
+
+### Checklist rápido cobranza mañana
+
+- [ ] Ensayo dev: 1 factura + 1 cobro manual OK
+- [ ] Backup prod antes de migrate
+- [ ] Migrate + build + restart scheduler
+- [ ] Club Settings prod verificado
+- [ ] `generar_deuda_mensual_socios` ejecutado (manual) — revisar resumen
+- [ ] Al menos 2 cobros registrados en Desk por Secretaría
+- [ ] KPI / saldo deuda / informes de equipo coherentes
+- [ ] Equipo informado: próximo ciclo automático día 1 del mes siguiente
+
+---
+
+
+
+## Convenciones para cada chat de implementación
+
+
+
+1. Leer la spec indicada y `AGENTS.md` / reglas SDD+TDD.
+
+2. Escribir o ajustar test **antes** del código de producción.
+
+3. `bench migrate` si hay cambios JSON de DocType.
+
+4. No modificar `apps/frappe` ni `apps/erpnext`.
+
+5. PostgreSQL v14 si hay SQL crudo.
+
+
+
+---
+
+
+
+## Pendientes menores post-MVP (no bloquean go-live)
+
+
+
+| Tema | Prioridad | Notas |
+
+|------|-----------|-------|
+
+| Roster en **Grupo Actividad** (solo grupo, sin equipo) | Baja | Hoy está en Equipo Actividad; grupo se ve al abrir equipos o vía informes |
+
+| Job categoría **Vitalicio** automático | Media | `socios_categoria_validacion.md` |
+
+| Labels Select diálogo inscripción (título vs name interno) | Baja | UX |
+
+| Tests E2E supervisados flujo completo Secretaría | Media | Skill `qa-solicitud-supervisada` adaptable |
+
+

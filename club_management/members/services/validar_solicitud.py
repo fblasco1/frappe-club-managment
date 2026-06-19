@@ -13,6 +13,11 @@ from club_management.members.services import grupo_familiar as gf
 from club_management.members.services.solicitud_notificaciones import (
 	enqueue_validacion_pago_email,
 )
+from club_management.members.services.contacto_domicilio import (
+	map_socio_contacto_domicilio_desde_solicitud,
+	map_tutor_contacto_domicilio_desde_solicitud,
+)
+from club_management.members.services.suscripciones_socio import sync_suscripcion_cuota_al_validar_socio
 from club_management.members.services.user_provisioning import (
 	provision_user_for_socio,
 	provision_user_for_tutor_no_socio,
@@ -43,7 +48,7 @@ CAMPOS_TUTOR_OBLIGATORIOS = (
 	"apellido_tutor",
 	"fecha_nacimiento_tutor",
 	"email_tutor",
-	"telefono_tutor",
+	"telefono_movil_tutor",
 	"rol_tutor",
 )
 
@@ -245,6 +250,7 @@ def _finalize_solicitud(
 	solicitud.socio_generado = socio_name
 	solicitud.user_generado = user_name or ""
 	solicitud.grupo_familiar_generado = grupo_name
+	sync_suscripcion_cuota_al_validar_socio(socio_name)
 	enqueue_validacion_pago_email(solicitud.name, email_destino)
 
 
@@ -264,12 +270,7 @@ def _insert_socio_desde_solicitud(
 		"nacionalidad": solicitud.nacionalidad,
 		"fecha_nacimiento": solicitud.fecha_nacimiento,
 		"genero": solicitud.genero,
-		"email": solicitud.email,
-		"telefono": solicitud.telefono,
-		"domicilio": solicitud.calle or "",
-		"localidad": solicitud.localidad,
-		"provincia": solicitud.provincia,
-		"codigo_postal": solicitud.codigo_postal,
+		**map_socio_contacto_domicilio_desde_solicitud(solicitud),
 		"categoria": categoria,
 		"estado": ESTADO_SOCIO_TRAS_VALIDAR,
 		"solicitud_origen": solicitud.name,
@@ -296,12 +297,7 @@ def _insert_tutor_desde_solicitud(solicitud: Document) -> Document:
 			"nacionalidad": solicitud.nacionalidad_tutor or solicitud.nacionalidad,
 			"fecha_nacimiento": solicitud.fecha_nacimiento_tutor,
 			"genero": solicitud.genero_tutor,
-			"email": solicitud.email_tutor,
-			"telefono": solicitud.telefono_tutor,
-			"domicilio": solicitud.calle_tutor or solicitud.calle or "",
-			"localidad": solicitud.localidad_tutor or solicitud.localidad,
-			"provincia": solicitud.provincia_tutor or solicitud.provincia,
-			"codigo_postal": solicitud.codigo_postal_tutor or solicitud.codigo_postal,
+			**map_tutor_contacto_domicilio_desde_solicitud(solicitud),
 		}
 	)
 	tutor.insert(ignore_permissions=True)

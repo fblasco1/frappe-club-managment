@@ -8,9 +8,8 @@ Implementa las invariantes mínimas del Sprint 0 documentadas en
   configura el flag `flags.estado_change_authorized` antes de guardar.
 - `fecha_alta` se setea la primera vez que `estado` pasa a `"Activo"` y no
   vuelve a modificarse.
-- Cuando `categoria = "Menor"`, exige `tipo_tutor`, `tutor` y `grupo_familiar`
-  consistentes: el tutor debe ser mayor de 18 y figurar como titular activo en
-  el grupo declarado.
+- Cuando `categoria = "Menor"`, exige `tipo_tutor` y `tutor` (adulto responsable).
+  Si además tiene `grupo_familiar`, valida que el tutor sea titular activo del grupo.
 """
 
 from __future__ import annotations
@@ -26,12 +25,25 @@ from frappe.utils import getdate, today
 ESTADOS_BLOQUEADOS_MANUALMENTE = {"Vitalicio"}
 
 
+def format_socio_nombre_completo(apellido: str | None, nombre: str | None) -> str:
+	"""Etiqueta Desk: «Apellido, Nombre/s»."""
+	ap = (apellido or "").strip()
+	nom = (nombre or "").strip()
+	if ap and nom:
+		return f"{ap}, {nom}"
+	return ap or nom or ""
+
+
 class Socio(Document):
 	def validate(self) -> None:
+		self._sync_nombre_completo()
 		self._validate_estado_solo_via_servicio()
 		self._set_fecha_alta_si_corresponde()
 		if self.categoria == "Menor":
 			self._validate_menor()
+
+	def _sync_nombre_completo(self) -> None:
+		self.nombre_completo = format_socio_nombre_completo(self.apellido, self.nombre)
 
 	def _validate_estado_solo_via_servicio(self) -> None:
 		if self.flags.get("estado_change_authorized"):
@@ -61,13 +73,11 @@ class Socio(Document):
 
 	def _validate_menor(self) -> None:
 		faltantes = [
-			campo
-			for campo in ("tipo_tutor", "tutor", "grupo_familiar")
-			if not self.get(campo)
+			campo for campo in ("tipo_tutor", "tutor") if not self.get(campo)
 		]
 		if faltantes:
 			frappe.throw(
-				_("Socio menor requiere `tipo_tutor`, `tutor` y `grupo_familiar` (faltan: {0})").format(
+				_("Socio menor requiere tutor responsable (faltan: {0})").format(
 					", ".join(faltantes)
 				)
 			)
@@ -81,6 +91,9 @@ class Socio(Document):
 		edad = hoy.year - tutor_birth.year - ((hoy.month, hoy.day) < (tutor_birth.month, tutor_birth.day))
 		if edad < 18:
 			frappe.throw(_("Tutor debe ser mayor de 18 años"))
+
+		if not self.grupo_familiar:
+			return
 
 		grupo = frappe.get_doc("Grupo Familiar", self.grupo_familiar)
 		es_titular_activo = any(

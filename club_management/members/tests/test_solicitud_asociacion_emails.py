@@ -5,7 +5,9 @@ Spec: `club_management/specs/solicitud_asociacion_publica.md` (Commit 5).
 
 from __future__ import annotations
 
+import re
 from unittest.mock import patch
+from urllib.parse import unquote
 
 import frappe
 
@@ -52,4 +54,8 @@ class TestSolicitudAsociacionEmails(MembersTestCase):
 		mock_sendmail.assert_called_once()
 		html = mock_sendmail.call_args.kwargs.get("message") or mock_sendmail.call_args[1].get("message")
 		self.assertIn("/pago-stub?token=", html)
+		match = re.search(r"/pago-stub\?token=([^\"]+)", html)
+		self.assertIsNotNone(match)
+		token_param = unquote(match.group(1))
+		self.assertEqual(verify_pago_token(token_param), sol.name)
 		self.assertIn("Ana", html)

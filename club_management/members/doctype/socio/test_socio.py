@@ -50,6 +50,14 @@ class TestSocioCamposObligatorios(MembersTestCase):
         self.assertEqual(socio.estado, "Pendiente de Validación")
         self.assertFalse(socio.get("fecha_alta"))
 
+    def test_nombre_completo_apellido_nombre(self) -> None:
+        socio = insert_socio(apellido="García", nombre="Ana")
+        self.assertEqual(socio.nombre_completo, "García, Ana")
+        self.assertEqual(
+            frappe.db.get_value("Socio", socio.name, "nombre_completo"),
+            "García, Ana",
+        )
+
     def test_dni_obligatorio(self) -> None:
         payload = make_socio_payload(dni="")
         with self.assertRaises(frappe.MandatoryError):
@@ -145,7 +153,7 @@ class TestSocioAuditoria(MembersTestCase):
         self.assertEqual(socio.motivo_ultimo_cambio_estado, "Validada SOL-0001")
 
 
-class TestSocioMenorRequiereTutorYGrupo(MembersTestCase):
+class TestSocioMenorRequiereTutor(MembersTestCase):
     """Invariantes del menor."""
 
     def test_menor_sin_tutor_falla(self) -> None:
@@ -157,6 +165,22 @@ class TestSocioMenorRequiereTutorYGrupo(MembersTestCase):
         )
         with self.assertRaises(frappe.ValidationError):
             frappe.get_doc(payload).insert(ignore_permissions=True)
+
+    def test_menor_con_tutor_socio_sin_grupo_es_valido(self) -> None:
+        tutor = insert_socio(dni="30111112", email="papa.sin.grupo@example.com")
+
+        payload = make_socio_payload(
+            dni="55222223",
+            email="hijo.sin.grupo@example.com",
+            fecha_nacimiento=minor_birthdate(12),
+            categoria="Menor",
+            tipo_tutor="Socio",
+            tutor=tutor.name,
+        )
+        socio_menor = frappe.get_doc(payload)
+        socio_menor.insert(ignore_permissions=True)
+        self.assertEqual(socio_menor.tutor, tutor.name)
+        self.assertFalse(socio_menor.grupo_familiar)
 
     def test_menor_con_tutor_socio_y_grupo_es_valido(self) -> None:
         tutor = insert_socio(dni="30111111", email="papa@example.com")
@@ -198,22 +222,19 @@ class TestSocioMenorRequiereTutorYGrupo(MembersTestCase):
         self.assertEqual(socio_menor.tipo_tutor, "Tutor No Socio")
 
     def test_menor_con_tutor_menor_de_edad_falla(self) -> None:
-        adulto_titular = insert_socio(dni="30000000", email="titular@example.com")
-        grupo = insert_grupo_familiar_solo_socio(adulto_titular.name)
-
         tutor_joven = insert_socio(
-            dni="30111111",
-            email="t@example.com",
+            dni="30111113",
+            email="t.joven@example.com",
             fecha_nacimiento=adult_birthdate(17),
         )
 
         payload = make_socio_payload(
-            dni="55222222",
+            dni="55222224",
+            email="hijo.joven@example.com",
             fecha_nacimiento=minor_birthdate(10),
             categoria="Menor",
             tipo_tutor="Socio",
             tutor=tutor_joven.name,
-            grupo_familiar=grupo.name,
         )
         with self.assertRaises(frappe.ValidationError):
             frappe.get_doc(payload).insert(ignore_permissions=True)
@@ -222,6 +243,66 @@ class TestSocioMenorRequiereTutorYGrupo(MembersTestCase):
         adulto = insert_socio(categoria="Adherente")
         self.assertFalse(adulto.get("tutor"))
         self.assertFalse(adulto.get("grupo_familiar"))
+
+
+class TestSocioContactoDomicilio(MembersTestCase):
+    """Contacto y domicilio estructurado (`socio_contacto_domicilio.md`)."""
+
+    def test_meta_tiene_telefonos_separados_y_domicilio_desglosado(self) -> None:
+        meta = frappe.get_meta("Socio")
+        self.assertIsNotNone(meta.get_field("telefono_fijo"))
+        self.assertIsNotNone(meta.get_field("telefono_movil"))
+        self.assertIsNotNone(meta.get_field("calle"))
+        self.assertIsNotNone(meta.get_field("numero"))
+        self.assertIsNotNone(meta.get_field("piso"))
+        self.assertIsNotNone(meta.get_field("departamento"))
+        self.assertIsNotNone(meta.get_field("ciudad"))
+        self.assertIsNotNone(meta.get_field("localidad_barrio"))
+        self.assertIsNone(meta.get_field("telefono"))
+        self.assertIsNone(meta.get_field("domicilio"))
+        self.assertIsNone(meta.get_field("localidad"))
+
+    def test_alta_sin_email_falla_en_flujo_normal(self) -> None:
+        payload = make_socio_payload(dni="30999888", email="")
+        with self.assertRaises(frappe.MandatoryError):
+            frappe.get_doc(payload).insert(ignore_permissions=True)
+
+    def test_alta_sin_telefono_movil_falla_en_flujo_normal(self) -> None:
+        payload = make_socio_payload(dni="30999887", telefono_movil="")
+        with self.assertRaises(frappe.MandatoryError):
+            frappe.get_doc(payload).insert(ignore_permissions=True)
+
+    def test_migracion_padron_permite_email_y_movil_vacios(self) -> None:
+        payload = make_socio_payload(dni="30999886", email="", telefono_movil="")
+        doc = frappe.get_doc(payload)
+        doc.flags.ignore_validate = True
+        doc.insert(ignore_permissions=True, ignore_mandatory=True)
+        self.assertEqual(doc.email or "", "")
+        self.assertEqual(doc.telefono_movil or "", "")
+
+    def test_alta_con_domicilio_estructurado(self) -> None:
+        socio = insert_socio(
+            dni="30999777",
+            email="con.domicilio@example.com",
+            calle="Av. Corrientes",
+            numero="1234",
+            piso="5",
+            departamento="B",
+            provincia="CABA",
+            ciudad="CABA",
+            localidad_barrio="San Telmo",
+            telefono_fijo="0114567890",
+            telefono_movil="+541112345678",
+        )
+        self.assertEqual(socio.calle, "Av. Corrientes")
+        self.assertEqual(socio.numero, "1234")
+        self.assertEqual(socio.piso, "5")
+        self.assertEqual(socio.departamento, "B")
+        self.assertEqual(socio.provincia, "CABA")
+        self.assertEqual(socio.ciudad, "CABA")
+        self.assertEqual(socio.localidad_barrio, "San Telmo")
+        self.assertEqual(socio.telefono_fijo, "0114567890")
+        self.assertEqual(socio.telefono_movil, "+541112345678")
 
 
 class TestSocioFichaMedica(MembersTestCase):

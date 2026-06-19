@@ -134,40 +134,76 @@
 					<input class="form-control" id="email" name="email" type="email" required maxlength="140">
 				</div>
 			</div>
-			<div class="col-sm-6">
+			<div class="col-sm-3">
 				<div class="form-group">
-					<label for="telefono">{{ _("Teléfono") }} *</label>
-					<input class="form-control" id="telefono" name="telefono" type="text" required maxlength="40">
+					<label for="telefono_fijo">{{ _("Teléfono fijo") }}</label>
+					<input class="form-control" id="telefono_fijo" name="telefono_fijo" type="text" maxlength="40">
+				</div>
+			</div>
+			<div class="col-sm-3">
+				<div class="form-group">
+					<label for="telefono_movil">{{ _("Teléfono móvil") }} *</label>
+					<input class="form-control" id="telefono_movil" name="telefono_movil" type="text" required maxlength="40">
 				</div>
 			</div>
 		</div>
 		<div class="form-section-title">{{ _("Dirección") }}</div>
-		<div class="form-group">
-			<label for="calle">{{ _("Calle") }} *</label>
-			<input class="form-control club-address-autocomplete" id="calle" name="calle" type="text"
-				required maxlength="240" autocomplete="off"
-				placeholder="{{ _('Calle y número') }}">
-			{% if google_places_enabled %}
-			<div class="help-block">{{ _("Busque su dirección para completar calle, localidad, provincia y código postal.") }}</div>
-			{% endif %}
-		</div>
 		<div class="row">
-			<div class="col-sm-4">
+			<div class="col-sm-8">
 				<div class="form-group">
-					<label for="localidad">{{ _("Localidad") }} *</label>
-					<input class="form-control" id="localidad" name="localidad" type="text" required maxlength="120">
+					<label for="calle">{{ _("Calle") }} *</label>
+					<input class="form-control club-address-autocomplete" id="calle" name="calle" type="text"
+						required maxlength="240" autocomplete="off"
+						placeholder="{{ _('Calle') }}">
 				</div>
 			</div>
 			<div class="col-sm-4">
+				<div class="form-group">
+					<label for="numero">{{ _("Número") }}</label>
+					<input class="form-control" id="numero" name="numero" type="text" maxlength="32">
+				</div>
+			</div>
+		</div>
+		{% if google_places_enabled %}
+		<div class="help-block">{{ _("Busque su dirección para completar calle, ciudad, localidad/barrio, provincia y código postal.") }}</div>
+		{% endif %}
+		<div class="row">
+			<div class="col-sm-3">
+				<div class="form-group">
+					<label for="piso">{{ _("Piso") }}</label>
+					<input class="form-control" id="piso" name="piso" type="text" maxlength="16">
+				</div>
+			</div>
+			<div class="col-sm-3">
+				<div class="form-group">
+					<label for="departamento">{{ _("Departamento") }}</label>
+					<input class="form-control" id="departamento" name="departamento" type="text" maxlength="16">
+				</div>
+			</div>
+			<div class="col-sm-3">
 				<div class="form-group">
 					<label for="provincia">{{ _("Provincia") }} *</label>
 					<input class="form-control" id="provincia" name="provincia" type="text" required maxlength="120">
 				</div>
 			</div>
-			<div class="col-sm-4">
+			<div class="col-sm-3">
 				<div class="form-group">
 					<label for="codigo_postal">{{ _("Código postal") }} *</label>
 					<input class="form-control" id="codigo_postal" name="codigo_postal" type="text" required maxlength="16">
+				</div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-sm-6">
+				<div class="form-group">
+					<label for="ciudad">{{ _("Ciudad") }}</label>
+					<input class="form-control" id="ciudad" name="ciudad" type="text" maxlength="120">
+				</div>
+			</div>
+			<div class="col-sm-6">
+				<div class="form-group">
+					<label for="localidad_barrio">{{ _("Localidad / Barrio") }} *</label>
+					<input class="form-control" id="localidad_barrio" name="localidad_barrio" type="text" required maxlength="120">
 				</div>
 			</div>
 		</div>
@@ -249,37 +285,73 @@
 				</div>
 			</div>
 			<div class="row">
-				<div class="col-sm-6">
+				<div class="col-sm-4">
 					<div class="form-group">
-						<label for="telefono_tutor">{{ _("Teléfono del responsable") }} *</label>
-						<input class="form-control" id="telefono_tutor" name="telefono_tutor" type="text" maxlength="40">
+						<label for="telefono_fijo_tutor">{{ _("Teléfono fijo del responsable") }}</label>
+						<input class="form-control" id="telefono_fijo_tutor" name="telefono_fijo_tutor" type="text" maxlength="40">
+					</div>
+				</div>
+				<div class="col-sm-4">
+					<div class="form-group">
+						<label for="telefono_movil_tutor">{{ _("Teléfono móvil del responsable") }} *</label>
+						<input class="form-control" id="telefono_movil_tutor" name="telefono_movil_tutor" type="text" maxlength="40">
 					</div>
 				</div>
 			</div>
 			<div class="form-section-title">{{ _("Dirección del responsable") }}</div>
-			<div class="form-group">
-				<label for="calle_tutor">{{ _("Calle del responsable") }} *</label>
-				<input class="form-control club-address-autocomplete" id="calle_tutor" name="calle_tutor" type="text"
-					maxlength="240" autocomplete="off"
-					placeholder="{{ _('Calle y número') }}">
-			</div>
 			<div class="row">
-				<div class="col-sm-4">
+				<div class="col-sm-8">
 					<div class="form-group">
-						<label for="localidad_tutor">{{ _("Localidad del responsable") }} *</label>
-						<input class="form-control" id="localidad_tutor" name="localidad_tutor" type="text" maxlength="120">
+						<label for="calle_tutor">{{ _("Calle del responsable") }} *</label>
+						<input class="form-control club-address-autocomplete" id="calle_tutor" name="calle_tutor" type="text"
+							maxlength="240" autocomplete="off"
+							placeholder="{{ _('Calle') }}">
 					</div>
 				</div>
 				<div class="col-sm-4">
+					<div class="form-group">
+						<label for="numero_tutor">{{ _("Número del responsable") }}</label>
+						<input class="form-control" id="numero_tutor" name="numero_tutor" type="text" maxlength="32">
+					</div>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-sm-3">
+					<div class="form-group">
+						<label for="piso_tutor">{{ _("Piso del responsable") }}</label>
+						<input class="form-control" id="piso_tutor" name="piso_tutor" type="text" maxlength="16">
+					</div>
+				</div>
+				<div class="col-sm-3">
+					<div class="form-group">
+						<label for="departamento_tutor">{{ _("Departamento del responsable") }}</label>
+						<input class="form-control" id="departamento_tutor" name="departamento_tutor" type="text" maxlength="16">
+					</div>
+				</div>
+				<div class="col-sm-3">
 					<div class="form-group">
 						<label for="provincia_tutor">{{ _("Provincia del responsable") }} *</label>
 						<input class="form-control" id="provincia_tutor" name="provincia_tutor" type="text" maxlength="120">
 					</div>
 				</div>
-				<div class="col-sm-4">
+				<div class="col-sm-3">
 					<div class="form-group">
 						<label for="codigo_postal_tutor">{{ _("Código postal del responsable") }} *</label>
 						<input class="form-control" id="codigo_postal_tutor" name="codigo_postal_tutor" type="text" maxlength="16">
+					</div>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-sm-6">
+					<div class="form-group">
+						<label for="ciudad_tutor">{{ _("Ciudad del responsable") }}</label>
+						<input class="form-control" id="ciudad_tutor" name="ciudad_tutor" type="text" maxlength="120">
+					</div>
+				</div>
+				<div class="col-sm-6">
+					<div class="form-group">
+						<label for="localidad_barrio_tutor">{{ _("Localidad / Barrio del responsable") }} *</label>
+						<input class="form-control" id="localidad_barrio_tutor" name="localidad_barrio_tutor" type="text" maxlength="120">
 					</div>
 				</div>
 			</div>
@@ -610,36 +682,32 @@ frappe.ready(function () {
 	loadActividades();
 
 	function parseGoogleAddressComponents(components) {
-		var out = { calle: "", localidad: "", provincia: "", codigo_postal: "" };
+		var out = { calle: "", numero: "", ciudad: "", localidad_barrio: "", provincia: "", codigo_postal: "" };
 		var route = "";
 		var streetNumber = "";
 		(components || []).forEach(function (c) {
 			var types = c.types || [];
 			if (types.indexOf("route") >= 0) route = c.long_name;
 			if (types.indexOf("street_number") >= 0) streetNumber = c.long_name;
-			if (types.indexOf("locality") >= 0) out.localidad = c.long_name;
-			else if (types.indexOf("administrative_area_level_2") >= 0 && !out.localidad) {
-				out.localidad = c.long_name;
-			}
+			if (types.indexOf("locality") >= 0) out.localidad_barrio = c.long_name;
+			if (types.indexOf("administrative_area_level_2") >= 0) out.ciudad = c.long_name;
 			if (types.indexOf("administrative_area_level_1") >= 0) {
 				out.provincia = c.long_name;
 			}
 			if (types.indexOf("postal_code") >= 0) out.codigo_postal = c.long_name;
 		});
-		out.calle = [route, streetNumber].filter(Boolean).join(" ").trim();
-		if (!out.calle && route) out.calle = route;
+		out.calle = route || "";
+		out.numero = streetNumber || "";
 		return out;
 	}
 
 	function applyParsedAddress(isTutor, parsed) {
-		var calleEl = document.getElementById(isTutor ? "calle_tutor" : "calle");
-		var locEl = document.getElementById(isTutor ? "localidad_tutor" : "localidad");
-		var provEl = document.getElementById(isTutor ? "provincia_tutor" : "provincia");
-		var cpEl = document.getElementById(isTutor ? "codigo_postal_tutor" : "codigo_postal");
-		if (parsed.calle && calleEl) calleEl.value = parsed.calle;
-		if (parsed.localidad && locEl) locEl.value = parsed.localidad;
-		if (parsed.provincia && provEl) provEl.value = parsed.provincia;
-		if (parsed.codigo_postal && cpEl) cpEl.value = parsed.codigo_postal;
+		var fields = ["calle", "numero", "ciudad", "localidad_barrio", "provincia", "codigo_postal"];
+		fields.forEach(function (field) {
+			var id = isTutor ? field + "_tutor" : field;
+			var el = document.getElementById(id);
+			if (parsed[field] && el) el.value = parsed[field];
+		});
 	}
 
 	function initPlacesAutocomplete(inputId, isTutor) {
@@ -733,7 +801,7 @@ frappe.ready(function () {
 			var need = [
 				"dni_tutor", "nombre_tutor", "apellido_tutor", "fecha_nacimiento_tutor",
 				"nacionalidad_tutor", "genero_tutor", "rol_tutor", "email_tutor",
-				"telefono_tutor", "calle_tutor", "localidad_tutor", "provincia_tutor",
+				"telefono_movil_tutor", "calle_tutor", "localidad_barrio_tutor", "provincia_tutor",
 				"codigo_postal_tutor"
 			];
 			for (var j = 0; j < need.length; j++) {
@@ -786,10 +854,15 @@ frappe.ready(function () {
 					fecha_nacimiento: val("fecha_nacimiento"),
 					genero: val("genero"),
 					email: val("email"),
-					telefono: val("telefono"),
+					telefono_fijo: val("telefono_fijo"),
+					telefono_movil: val("telefono_movil"),
 					calle: val("calle"),
-					localidad: val("localidad"),
+					numero: val("numero"),
+					piso: val("piso"),
+					departamento: val("departamento"),
 					provincia: val("provincia"),
+					ciudad: val("ciudad"),
+					localidad_barrio: val("localidad_barrio"),
 					codigo_postal: val("codigo_postal"),
 					categoria_solicitada: val("categoria_solicitada"),
 					dni_frente: attach.dni_frente,
@@ -809,10 +882,15 @@ frappe.ready(function () {
 					data.genero_tutor = val("genero_tutor");
 					data.rol_tutor = val("rol_tutor");
 					data.email_tutor = val("email_tutor");
-					data.telefono_tutor = val("telefono_tutor");
+					data.telefono_fijo_tutor = val("telefono_fijo_tutor");
+					data.telefono_movil_tutor = val("telefono_movil_tutor");
 					data.calle_tutor = val("calle_tutor");
-					data.localidad_tutor = val("localidad_tutor");
+					data.numero_tutor = val("numero_tutor");
+					data.piso_tutor = val("piso_tutor");
+					data.departamento_tutor = val("departamento_tutor");
 					data.provincia_tutor = val("provincia_tutor");
+					data.ciudad_tutor = val("ciudad_tutor");
+					data.localidad_barrio_tutor = val("localidad_barrio_tutor");
 					data.codigo_postal_tutor = val("codigo_postal_tutor");
 					data.dni_frente_tutor = attach.dni_frente_tutor;
 					data.dni_dorso_tutor = attach.dni_dorso_tutor;

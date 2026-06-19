@@ -29,3 +29,9 @@ def cambiar_estado(
 	socio.ultimo_cambio_estado_en = now()
 	socio.motivo_ultimo_cambio_estado = motivo
 	socio.save(ignore_permissions=True)
+	if nuevo_estado == "Baja":
+		from club_management.members.services.suscripciones_socio import (
+			sync_suscripciones_al_dar_baja_socio,
+		)
+
+		sync_suscripciones_al_dar_baja_socio(socio_name)

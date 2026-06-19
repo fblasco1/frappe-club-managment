@@ -93,9 +93,11 @@ class TestSolicitudAsociacionWebPage(FrappeTestCase):
         with open(_solicitud_web_page_path(), encoding="utf-8") as f:
             body = f.read()
         self.assertIn('name="calle"', body)
-        self.assertIn('name="localidad"', body)
+        self.assertIn('name="telefono_movil"', body)
+        self.assertIn('name="localidad_barrio"', body)
         self.assertIn('name="provincia"', body)
         self.assertIn('name="calle_tutor"', body)
+        self.assertIn('name="telefono_movil_tutor"', body)
         self.assertNotIn('name="domicilio"', body)
         self.assertIn("club-address-autocomplete", body)
         self.assertIn("parseGoogleAddressComponents", body)
