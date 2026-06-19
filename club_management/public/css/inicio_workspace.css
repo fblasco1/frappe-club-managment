@@ -1,0 +1,19 @@
+/* Landing Inicio — accesos principales tipo botón */
+.club-inicio-workspace .widget.shortcut-widget-box {
+	min-height: 9rem;
+}
+
+.club-inicio-workspace .widget.shortcut-widget-box .widget-head {
+	padding-top: 1.25rem;
+}
+
+.club-inicio-workspace .widget.shortcut-widget-box .widget-label .widget-title {
+	font-size: 1.05rem;
+	font-weight: 600;
+}
+
+.club-inicio-workspace .widget.shortcut-widget-box .shortcut-widget-icon {
+	width: 2.75rem;
+	height: 2.75rem;
+	font-size: 1.35rem;
+}

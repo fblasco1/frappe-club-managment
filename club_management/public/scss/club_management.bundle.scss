@@ -1,0 +1,496 @@
+/* Panel Secretaría — KPI cards + cuotas colapsables */
+.club-secretaria-workspace .codex-editor,
+.club-secretaria-workspace .codex-editor__redactor {
+	min-height: unset !important;
+}
+
+.club-secretaria-workspace .editor-holder,
+.club-secretaria-workspace #editorjs {
+	display: none;
+}
+
+.club-secretaria-lists {
+	width: 100%;
+	margin-top: 0.25rem;
+	margin-bottom: 0.5rem;
+}
+
+.club-secretaria-panel-actions {
+	margin-bottom: 1rem;
+}
+
+.club-secretaria-kpi-grid {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 1rem;
+	margin-bottom: 1.25rem;
+}
+
+@media (max-width: 1200px) {
+	.club-secretaria-kpi-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 576px) {
+	.club-secretaria-kpi-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.club-secretaria-kpi-card {
+	background: var(--card-bg, #fff);
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-radius: var(--border-radius-lg, 10px);
+	padding: 1.1rem 1.25rem;
+	min-height: 9rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.club-secretaria-kpi-title {
+	font-size: var(--text-sm, 0.8125rem);
+	color: var(--text-muted, #6b7280);
+	margin: 0;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+
+.club-secretaria-kpi-value {
+	font-size: 2.25rem;
+	font-weight: 700;
+	line-height: 1.1;
+	color: var(--text-color, #111827);
+}
+
+.club-secretaria-kpi-value--pct {
+	font-size: 1.85rem;
+}
+
+.club-secretaria-kpi-delta {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	font-size: var(--text-sm, 0.8125rem);
+	font-weight: 600;
+}
+
+.club-secretaria-kpi-delta.is-up {
+	color: #059669;
+}
+
+.club-secretaria-kpi-delta.is-down {
+	color: #dc2626;
+}
+
+.club-secretaria-kpi-delta.is-flat {
+	color: var(--text-muted, #6b7280);
+}
+
+.club-secretaria-kpi-footer {
+	margin-top: auto;
+	padding-top: 0.35rem;
+}
+
+.club-secretaria-kpi-card--morosos {
+	border-color: #fecaca;
+	background: linear-gradient(180deg, #fff 0%, #fef2f2 100%);
+}
+
+.club-secretaria-kpi-card--morosos .club-secretaria-kpi-value {
+	color: #dc2626;
+}
+
+.club-secretaria-kpi-deuda {
+	margin: 0;
+	font-size: 1.05rem;
+	font-weight: 600;
+	color: #b91c1c;
+}
+
+.club-secretaria-aranceles-detail {
+	margin-top: 0.35rem;
+}
+
+.club-secretaria-aranceles-detail summary {
+	cursor: pointer;
+	font-size: var(--text-sm, 0.8125rem);
+	color: var(--text-muted, #6b7280);
+	user-select: none;
+}
+
+.club-secretaria-aranceles-detail ul {
+	margin: 0.5rem 0 0;
+	padding-left: 1.1rem;
+	font-size: var(--text-sm, 0.8125rem);
+}
+
+.club-secretaria-aranceles-detail li {
+	margin-bottom: 0.25rem;
+}
+
+.club-secretaria-cuotas-collapse {
+	margin-top: 0.5rem;
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-radius: var(--border-radius-lg, 10px);
+	background: var(--card-bg, #fff);
+	padding: 0 1.25rem 1rem;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.club-secretaria-cuotas-collapse summary {
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-weight: 600;
+	padding: 0.85rem 0;
+	user-select: none;
+	list-style: none;
+}
+
+.club-secretaria-cuotas-collapse summary::-webkit-details-marker {
+	display: none;
+}
+
+.club-secretaria-cuotas-collapse[open] summary {
+	margin-bottom: 0.5rem;
+	border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.club-cuotas-table input.club-cuota-monto {
+	max-width: 140px;
+}
+
+.club-secretaria-ver-mas {
+	padding-left: 0;
+}
+
+.club-secretaria-list-icon {
+	font-size: 1.25rem;
+	line-height: 1;
+}
+/* Barra de navegación entre workspaces del club */
+.club-desk-with-nav {
+	padding-top: 0.25rem;
+}
+
+.club-desk-nav {
+	margin: 0 0 1.25rem;
+}
+
+.club-desk-nav-inner {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.club-desk-nav-tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	padding: 0.55rem 1rem;
+	border: 1px solid var(--border-color, #d1d5db);
+	border-radius: var(--border-radius-lg, 8px);
+	background: var(--card-bg, #fff);
+	color: var(--text-color, #1f2937);
+	font-size: var(--text-md, 0.875rem);
+	font-weight: 500;
+	cursor: pointer;
+	transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.club-desk-nav-tab span {
+	color: inherit;
+}
+
+.club-desk-nav-tab:hover {
+	background: var(--fg-hover-color, #f3f4f6);
+	border-color: var(--gray-400, #9ca3af);
+}
+
+.club-desk-nav-tab.is-active[data-workspace="Secretaría"],
+.club-desk-nav-tab.is-active.club-desk-nav-tab--socios {
+	background: #2563eb;
+	border-color: #2563eb;
+	color: #fff;
+}
+
+.club-desk-nav-tab.is-active[data-workspace="Gestión de Actividades"],
+.club-desk-nav-tab.is-active.club-desk-nav-tab--actividades {
+	background: #059669;
+	border-color: #059669;
+	color: #fff;
+}
+
+.club-desk-nav-tab.is-active .club-desk-nav-icon,
+.club-desk-nav-tab.is-active[data-workspace="Secretaría"] .club-desk-nav-icon,
+.club-desk-nav-tab.is-active[data-workspace="Gestión de Actividades"] .club-desk-nav-icon {
+	--icon-stroke: #fff;
+}
+
+.club-desk-nav-icon {
+	flex-shrink: 0;
+}
+
+/* Retiro defensivo: ocultar pestaña Inicio si quedó en caché antigua */
+.club-desk-nav-tab[data-workspace="Inicio"],
+.club-desk-nav-tab[data-workspace="Inicio Club"] {
+	display: none !important;
+}
+.club-actividades-workspace #editorjs {
+	display: none;
+}
+
+.club-actividades-workspace .codex-editor,
+.club-actividades-workspace .codex-editor__redactor {
+	min-height: unset !important;
+}
+
+.club-actividades-toolbar {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-bottom: 1rem;
+}
+
+.club-actividades-toolbar-title {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	min-width: 0;
+	flex: 1;
+}
+
+.club-actividades-filter {
+	max-width: 320px;
+}
+
+.club-actividades-admin {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.75rem;
+	margin-bottom: 0.75rem;
+	padding: 0.55rem 0.75rem;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-sm);
+	background: var(--control-bg);
+}
+
+.club-actividades-admin-label {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+
+.club-actividades-admin-nav {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.club-actividades-admin-sep {
+	color: var(--text-muted);
+	font-size: 0.85rem;
+}
+
+.club-actividades-catalog {
+	width: 100%;
+	margin-top: 0.75rem;
+}
+
+.club-actividades-accordion {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	max-height: calc(100vh - 260px);
+	overflow: auto;
+}
+
+.club-actividad-card,
+.club-grupo-card {
+	flex-shrink: 0;
+	background: var(--card-bg);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+	overflow: hidden;
+}
+
+.club-actividad-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	width: 100%;
+	padding: 0.85rem 1rem;
+	border: 0;
+	background: transparent;
+	text-align: left;
+	cursor: pointer;
+}
+
+.club-actividad-toggle:hover {
+	background: var(--fg-hover-color);
+}
+
+.club-actividad-chevron {
+	width: 1rem;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.club-actividad-toggle-text {
+	display: flex;
+	flex-direction: column;
+	gap: 0.1rem;
+	min-width: 0;
+}
+
+.club-actividad-body {
+	padding: 0 1rem 1rem;
+	border-top: 1px solid var(--border-color);
+}
+
+.club-actividad-body.is-collapsed {
+	display: none;
+}
+
+.club-actividad-card-header,
+.club-grupo-header {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.75rem;
+	margin: 0.75rem 0;
+}
+
+.club-grupos-wrap {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	margin-top: 0.5rem;
+}
+
+.club-grupo-card {
+	padding: 0;
+	overflow: hidden;
+}
+
+.club-grupo-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	width: 100%;
+	padding: 0.75rem 1rem;
+	border: 0;
+	background: transparent;
+	text-align: left;
+	cursor: pointer;
+}
+
+.club-grupo-toggle:hover {
+	background: var(--fg-hover-color);
+}
+
+.club-grupo-chevron {
+	width: 1rem;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.club-grupo-toggle-text {
+	display: flex;
+	flex-direction: column;
+	gap: 0.1rem;
+	min-width: 0;
+}
+
+.club-grupo-body {
+	padding: 0 1rem 1rem;
+	border-top: 1px solid var(--border-color);
+}
+
+.club-grupo-body.is-collapsed {
+	display: none;
+}
+
+.club-equipos-wrap {
+	margin-top: 0.5rem;
+}
+
+.club-equipos-table {
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-sm);
+	overflow: hidden;
+}
+
+.club-equipos-table-head,
+.club-equipo-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 0.5rem;
+	align-items: center;
+	padding: 0.4rem 0.65rem;
+}
+
+.club-equipos-table-head {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--text-muted);
+	background: var(--control-bg);
+	border-bottom: 1px solid var(--border-color);
+}
+
+.club-equipo-row + .club-equipo-row {
+	border-top: 1px solid var(--border-color);
+}
+
+.club-equipo-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.club-node-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	justify-content: flex-end;
+}
+
+.club-node-actions--compact .btn {
+	min-width: 1.75rem;
+	padding-left: 0.35rem;
+	padding-right: 0.35rem;
+}
+
+.club-arancel-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 120px;
+	gap: 0.35rem 0.75rem;
+	align-items: center;
+	max-width: 480px;
+	margin-bottom: 0.75rem;
+}
+
+.club-arancel-row label {
+	grid-column: 1 / -1;
+	margin-bottom: 0;
+}
+
+.club-arancel-item {
+	cursor: pointer;
+}
+
+@media (max-width: 992px) {
+	.club-actividades-accordion {
+		max-height: none;
+	}
+}
