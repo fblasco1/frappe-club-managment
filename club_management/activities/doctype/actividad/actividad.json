@@ -1,0 +1,120 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:titulo",
+ "creation": "2026-05-27 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "titulo",
+  "item",
+  "usa_grupos",
+  "habilitada",
+  "orden",
+  "descripcion"
+ ],
+ "fields": [
+  {
+   "fieldname": "titulo",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "T\u00edtulo",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "\u00cdtem (arancel mensual)",
+   "options": "Item",
+   "description": "Arancel por defecto si la actividad no usa grupos/tiras."
+  },
+  {
+   "default": "0",
+   "fieldname": "usa_grupos",
+   "fieldtype": "Check",
+   "label": "Usa grupos / tiras",
+   "description": "Si est\u00e1 marcado, la inscripci\u00f3n exige elegir un Grupo Actividad (cada uno con su arancel)."
+  },
+  {
+   "default": "1",
+   "fieldname": "habilitada",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Habilitada"
+  },
+  {
+   "default": "0",
+   "fieldname": "orden",
+   "fieldtype": "Int",
+   "label": "Orden"
+  },
+  {
+   "fieldname": "descripcion",
+   "fieldtype": "Small Text",
+   "label": "Descripci\u00f3n"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "group": "Grupos / tiras",
+   "link_doctype": "Grupo Actividad",
+   "link_fieldname": "actividad"
+  },
+  {
+   "group": "Inscripciones",
+   "link_doctype": "Inscripcion Actividad",
+   "link_fieldname": "actividad"
+  }
+ ],
+ "modified": "2026-05-27 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Activities",
+ "name": "Actividad",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Secretaria",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 0,
+   "role": "All",
+   "share": 0,
+   "write": 0
+  }
+ ],
+ "sort_field": "orden",
+ "sort_order": "ASC",
+ "states": [],
+ "track_changes": 1
+}

@@ -1,0 +1,100 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "prompt",
+ "creation": "2026-06-04 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "grupo_actividad",
+  "column_break_grupo_equipo",
+  "titulo",
+  "habilitada",
+  "orden",
+  "descripcion"
+ ],
+ "fields": [
+  {
+   "fieldname": "grupo_actividad",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Grupo / tira",
+   "options": "Grupo Actividad",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_grupo_equipo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "titulo",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Equipo / categor\u00eda",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "habilitada",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Habilitada"
+  },
+  {
+   "default": "0",
+   "fieldname": "orden",
+   "fieldtype": "Int",
+   "label": "Orden"
+  },
+  {
+   "fieldname": "descripcion",
+   "fieldtype": "Small Text",
+   "label": "Descripci\u00f3n"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-04 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Activities",
+ "name": "Equipo Actividad",
+ "naming_rule": "Set by user",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Secretaria",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "read": 1,
+   "role": "All",
+   "write": 0
+  }
+ ],
+ "sort_field": "orden",
+ "sort_order": "ASC",
+ "track_changes": 1
+}
