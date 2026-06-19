@@ -1,0 +1,161 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:CAR-{YYYY}-{#####}",
+ "creation": "2026-06-10 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "socio",
+  "titulo",
+  "tipo_cargo",
+  "modo_cobro",
+  "column_break_cargo",
+  "item",
+  "monto",
+  "fecha_desde",
+  "fecha_hasta",
+  "estado",
+  "sales_invoice",
+  "observaciones"
+ ],
+ "fields": [
+  {
+   "fieldname": "socio",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Socio",
+   "options": "Socio",
+   "reqd": 1
+  },
+  {
+   "fieldname": "titulo",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Título",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tipo_cargo",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Tipo de cargo",
+   "options": "Cuota Federativa\nMulta\nViaje\nOtro",
+   "reqd": 1
+  },
+  {
+   "fieldname": "modo_cobro",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Modo de cobro",
+   "options": "Unico\nRecurrente",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_cargo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "Ítem ERPNext",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "monto",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Monto",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "fecha_desde",
+   "fieldtype": "Date",
+   "label": "Vigente desde",
+   "reqd": 1
+  },
+  {
+   "fieldname": "fecha_hasta",
+   "fieldtype": "Date",
+   "label": "Vigente hasta",
+   "description": "Obligatorio si el modo de cobro es Recurrente."
+  },
+  {
+   "default": "Pendiente",
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Estado",
+   "options": "Pendiente\nFacturado\nCancelado",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Factura de venta",
+   "options": "Sales Invoice",
+   "read_only": 1
+  },
+  {
+   "fieldname": "observaciones",
+   "fieldtype": "Small Text",
+   "label": "Observaciones"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-10 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Members",
+ "name": "Cargo Socio",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Secretaria",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 0,
+   "role": "Socio",
+   "share": 0,
+   "write": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

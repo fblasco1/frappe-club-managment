@@ -1,0 +1,140 @@
+{
+ "actions": [],
+ "creation": "2026-06-05 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "item_cuota_social",
+  "cuotas_categoria_section",
+  "cuotas_categoria",
+  "cobranza_periodica_section",
+  "dia_generacion_deuda",
+  "dia_primer_vencimiento",
+  "dia_segundo_vencimiento",
+  "recargo_segundo_vencimiento_pct",
+  "item_recargo_mora",
+  "column_break_cobranza",
+  "incluir_aranceles_en_deuda_mensual",
+  "incluir_cargos_extra_en_deuda_mensual"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Empresa",
+   "options": "Company",
+   "description": "Empresa ERPNext para facturas y cobros manuales."
+  },
+  {
+   "fieldname": "item_cuota_social",
+   "fieldtype": "Link",
+   "label": "\u00cdtem cuota social (default)",
+   "options": "Item",
+   "description": "\u00cdtem de servicio para la cuota de categor\u00eda cuando la fila no define uno propio."
+  },
+  {
+   "fieldname": "cuotas_categoria_section",
+   "fieldtype": "Section Break",
+   "label": "Cuotas sociales por categor\u00eda"
+  },
+  {
+   "fieldname": "cuotas_categoria",
+   "fieldtype": "Table",
+   "label": "Cuotas",
+   "options": "Cuota Categoria Club"
+  },
+  {
+   "fieldname": "cobranza_periodica_section",
+   "fieldtype": "Section Break",
+   "label": "Cobranza periódica"
+  },
+  {
+   "default": "1",
+   "fieldname": "dia_generacion_deuda",
+   "fieldtype": "Int",
+   "label": "Día generación de deuda",
+   "description": "Día del mes (1–28) en que se emite la deuda mensual."
+  },
+  {
+   "default": "10",
+   "fieldname": "dia_primer_vencimiento",
+   "fieldtype": "Int",
+   "label": "Día primer vencimiento",
+   "description": "Día del mes (1–28) del primer vencimiento."
+  },
+  {
+   "default": "Ultimo dia del mes",
+   "fieldname": "dia_segundo_vencimiento",
+   "fieldtype": "Select",
+   "label": "Segundo vencimiento",
+   "options": "Ultimo dia del mes\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28"
+  },
+  {
+   "default": "10",
+   "fieldname": "recargo_segundo_vencimiento_pct",
+   "fieldtype": "Percent",
+   "label": "Recargo 2.º vencimiento (%)"
+  },
+  {
+   "fieldname": "item_recargo_mora",
+   "fieldtype": "Link",
+   "label": "Ítem recargo mora",
+   "options": "Item",
+   "description": "Servicio ERPNext para la línea de recargo por mora."
+  },
+  {
+   "fieldname": "column_break_cobranza",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "incluir_aranceles_en_deuda_mensual",
+   "fieldtype": "Check",
+   "label": "Incluir aranceles de actividades"
+  },
+  {
+   "default": "1",
+   "fieldname": "incluir_cargos_extra_en_deuda_mensual",
+   "fieldtype": "Check",
+   "label": "Incluir cargos extra recurrentes"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-05 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Members",
+ "name": "Club Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Secretaria",
+   "share": 0,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

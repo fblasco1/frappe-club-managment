@@ -1,0 +1,72 @@
+"""API Desk — cobranza manual (Secretaría)."""
+
+from __future__ import annotations
+
+import frappe
+
+from club_management.members.services.cargo_socio import (
+	cancelar_cargo_socio as _cancelar_cargo_socio,
+	facturar_cargo_socio as _facturar_cargo_socio,
+)
+from club_management.members.services.cobranza_manual import (
+	ensure_customer_for_socio,
+	generar_cargo_socio,
+	list_facturas_pendientes_socio,
+	registrar_cobro_manual,
+	sync_saldo_deuda_socio,
+)
+from club_management.members.services.socio_operaciones_secretaria import (
+	ensure_secretaria_operacion_access,
+)
+
+
+@frappe.whitelist()
+def crear_cliente_socio(socio: str) -> dict[str, str]:
+	ensure_secretaria_operacion_access()
+	customer = ensure_customer_for_socio(socio)
+	return {"status": "ok", "customer": customer}
+
+
+@frappe.whitelist()
+def generar_cargo(socio: str, incluir_actividades: int = 1) -> dict[str, str]:
+	ensure_secretaria_operacion_access()
+	invoice = generar_cargo_socio(socio, incluir_actividades=bool(incluir_actividades))
+	saldo = sync_saldo_deuda_socio(socio)
+	return {"status": "ok", "sales_invoice": invoice, "saldo_deuda": saldo}
+
+
+@frappe.whitelist()
+def list_facturas_pendientes(socio: str) -> list[dict]:
+	ensure_secretaria_operacion_access()
+	return list_facturas_pendientes_socio(socio)
+
+
+@frappe.whitelist()
+def registrar_cobro(socio: str, sales_invoice: str) -> dict[str, str]:
+	ensure_secretaria_operacion_access()
+	payment_entry = registrar_cobro_manual(socio, sales_invoice)
+	saldo = sync_saldo_deuda_socio(socio)
+	estado = frappe.db.get_value("Socio", socio, "estado")
+	return {
+		"status": "ok",
+		"payment_entry": payment_entry,
+		"saldo_deuda": saldo,
+		"estado": estado,
+	}
+
+
+@frappe.whitelist()
+def actualizar_saldo_deuda(socio: str) -> dict[str, float]:
+	ensure_secretaria_operacion_access()
+	saldo = sync_saldo_deuda_socio(socio)
+	return {"status": "ok", "saldo_deuda": saldo}
+
+
+@frappe.whitelist()
+def facturar_cargo_socio(cargo: str) -> dict[str, str | float]:
+	return _facturar_cargo_socio(cargo)
+
+
+@frappe.whitelist()
+def cancelar_cargo_socio(cargo: str) -> dict[str, str]:
+	return _cancelar_cargo_socio(cargo)
