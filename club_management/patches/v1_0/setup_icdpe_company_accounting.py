@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import frappe
-
+from club_management.setup.icdpe_company import resolve_icdpe_company
 from club_management.setup.icdpe_company_accounts import setup_icdpe_company_accounting
 
 
 def execute() -> None:
-	if not frappe.db.exists("Company", "Institución Cultural y Deportiva Pedro Echagüe"):
+	if not resolve_icdpe_company():
 		return
 	setup_icdpe_company_accounting(create_items=True)

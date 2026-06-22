@@ -9,6 +9,7 @@
   "grupo_actividad",
   "column_break_grupo_equipo",
   "titulo",
+  "item",
   "habilitada",
   "orden",
   "descripcion"
@@ -33,6 +34,12 @@
    "in_list_view": 1,
    "label": "Equipo / categor\u00eda",
    "reqd": 1
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "\u00cdtem arancel",
+   "options": "Item"
   },
   {
    "default": "1",

@@ -15,10 +15,13 @@ from club_management.members.test_helpers import MembersTestCase
 
 
 class TestActividadesIcdpeCatalog(MembersTestCase):
-	def test_catalogo_oficial_tiene_trece_actividades(self) -> None:
-		self.assertEqual(len(ACTIVIDADES_CATALOGO_ICDPE), 13)
+	def test_catalogo_oficial_tiene_dieciocho_actividades(self) -> None:
+		self.assertEqual(len(ACTIVIDADES_CATALOGO_ICDPE), 18)
 		titulos = [e.titulo for e in ACTIVIDADES_CATALOGO_ICDPE]
 		self.assertIn("Basquet Masculino", titulos)
+		self.assertIn("Boxeo", titulos)
+		self.assertIn("Yoga", titulos)
+		self.assertIn("Taekwondo", titulos)
 		self.assertIn("Zumba", titulos)
 		self.assertIn("Ritmos Latinos", titulos)
 		self.assertIn("Gimnasio Fitness", titulos)
@@ -31,7 +34,7 @@ class TestActividadesIcdpeCatalog(MembersTestCase):
 			pluck="titulo",
 			order_by="orden asc",
 		)
-		self.assertEqual(len(habilitadas), 13)
+		self.assertEqual(len(habilitadas), 18)
 		self.assertEqual(set(habilitadas), {e.titulo for e in ACTIVIDADES_CATALOGO_ICDPE})
 		if frappe.db.exists("Actividad", "Natación"):
 			self.assertFalse(frappe.db.get_value("Actividad", "Natación", "habilitada"))

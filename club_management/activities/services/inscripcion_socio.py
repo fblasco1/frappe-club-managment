@@ -57,15 +57,19 @@ def sync_socio_actividad_resumen(socio_name: str) -> None:
 
 
 def resolve_item_arancel_inscripcion(inscripcion_name: str) -> str | None:
-	"""Ítem de cobro: grupo → actividad."""
+	"""Ítem de cobro: equipo → grupo → actividad."""
 	row = frappe.db.get_value(
 		INSCRIPCION_DOCTYPE,
 		inscripcion_name,
-		["grupo_actividad", "actividad"],
+		["equipo_actividad", "grupo_actividad", "actividad"],
 		as_dict=True,
 	)
 	if not row:
 		return None
+	if row.equipo_actividad:
+		item = frappe.db.get_value("Equipo Actividad", row.equipo_actividad, "item")
+		if item:
+			return item
 	if row.grupo_actividad:
 		item = frappe.db.get_value("Grupo Actividad", row.grupo_actividad, "item")
 		if item:

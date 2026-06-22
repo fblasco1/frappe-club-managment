@@ -31,8 +31,7 @@ import unicodedata
 
 import frappe
 
-
-COMPANY = "Institución Cultural y Deportiva Pedro Echagüe"
+from club_management.setup.icdpe_company import resolve_icdpe_company
 
 # Raíz estándar ERPNext para Item Group (si no existe, se crea bajo "All Item Groups")
 DEFAULT_ITEM_GROUP_ROOT = "All Item Groups"
@@ -135,8 +134,9 @@ def _upsert_item_default(item_name: str, company: str, income_account: str, sell
 
 def upsert_service_item(spec: ServiceItemSpec) -> str:
     _ensure_item_group(spec.item_group)
-    _resolve_cost_center(COMPANY, spec.cost_center_name)
-    income_account = _resolve_income_account(COMPANY, spec.income_account_number)
+    company = resolve_icdpe_company()
+    _resolve_cost_center(company, spec.cost_center_name)
+    income_account = _resolve_income_account(company, spec.income_account_number)
 
     if frappe.db.exists("Item", spec.item_code):
         item = frappe.get_doc("Item", spec.item_code)
@@ -161,7 +161,7 @@ def upsert_service_item(spec: ServiceItemSpec) -> str:
         if changed:
             item.save(ignore_permissions=True)
 
-        _upsert_item_default(spec.item_code, COMPANY, income_account, spec.cost_center_name)
+        _upsert_item_default(spec.item_code, company, income_account, spec.cost_center_name)
         return "updated"
 
     item = frappe.get_doc(
@@ -176,7 +176,7 @@ def upsert_service_item(spec: ServiceItemSpec) -> str:
             "include_item_in_manufacturing": 0,
             "item_defaults": [
                 {
-                    "company": COMPANY,
+                    "company": company,
                     "income_account": income_account,
                     "selling_cost_center": spec.cost_center_name,
                 }
@@ -184,7 +184,7 @@ def upsert_service_item(spec: ServiceItemSpec) -> str:
         }
     )
     item.insert(ignore_permissions=True)
-    _upsert_item_default(spec.item_code, COMPANY, income_account, spec.cost_center_name)
+    _upsert_item_default(spec.item_code, company, income_account, spec.cost_center_name)
     return "created"
 
 
@@ -207,10 +207,11 @@ def _specs() -> list[ServiceItemSpec]:
         ),
     ]
 
-    # --- Deportes (aranceles / packs / federativo) ---
+    # --- Deportes (aranceles mensuales + federativo; sin packs) ---
     sports_cc = [
         "Deportes - Futbol - ICDPE",
         "Deportes - Basquet Masculino - ICDPE",
+        "Deportes - Basquet Escuelita - ICDPE",
         "Deportes - Basquet Femenino - ICDPE",
         "Deportes - Voley - ICDPE",
         "Deportes - Patin - ICDPE",
@@ -233,13 +234,6 @@ def _specs() -> list[ServiceItemSpec]:
                 cost_center_name=cc,
             ),
             ServiceItemSpec(
-                item_code=f"ICDPE-PACKS-CLASES-{slug}",
-                item_name=f"Packs CLASES — {label}",
-                item_group="ICDPE / Packs deportes",
-                income_account_number="412002",
-                cost_center_name=cc,
-            ),
-            ServiceItemSpec(
                 item_code=f"ICDPE-CUOTA-FEDERATIVA-{slug}",
                 item_name=f"Cuota federativa — {label}",
                 item_group="ICDPE / Federaciones deportes",
@@ -248,7 +242,7 @@ def _specs() -> list[ServiceItemSpec]:
             ),
         ]
 
-    # --- Actividades (aranceles / packs; federativo normalmente no aplica) ---
+    # --- Actividades (aranceles mensuales) ---
     act_cc = [
         "Actividades - Iniciacion Deportiva - ICDPE",
         "Actividades - Danza - ICDPE",
@@ -270,13 +264,6 @@ def _specs() -> list[ServiceItemSpec]:
                 income_account_number="412001",
                 cost_center_name=cc,
             ),
-            ServiceItemSpec(
-                item_code=f"ICDPE-PACKS-CLASES-ACT-{slug}",
-                item_name=f"Packs CLASES — {label}",
-                item_group="ICDPE / Packs actividades",
-                income_account_number="412002",
-                cost_center_name=cc,
-            ),
         ]
 
     # --- Fitness ---
@@ -286,13 +273,6 @@ def _specs() -> list[ServiceItemSpec]:
             item_name="Arancel mensual actividad — Gimnasio de musculación",
             item_group="ICDPE / Aranceles fitness",
             income_account_number="412001",
-            cost_center_name="Fitness - Gimnasio de Musculacion - ICDPE",
-        ),
-        ServiceItemSpec(
-            item_code="ICDPE-PACKS-CLASES-FITNESS-MUSC",
-            item_name="Packs CLASES — Gimnasio de musculación",
-            item_group="ICDPE / Packs fitness",
-            income_account_number="412002",
             cost_center_name="Fitness - Gimnasio de Musculacion - ICDPE",
         ),
     ]
@@ -392,10 +372,11 @@ def _specs() -> list[ServiceItemSpec]:
 def run() -> dict[str, object]:
     _ensure_uom("Servicio")
 
+    company = resolve_icdpe_company()
     results: list[dict[str, str]] = []
     for spec in _specs():
         action = upsert_service_item(spec)
-        income_account = _resolve_income_account(COMPANY, spec.income_account_number)
+        income_account = _resolve_income_account(company, spec.income_account_number)
         results.append(
             {
                 "item_code": spec.item_code,
@@ -407,7 +388,7 @@ def run() -> dict[str, object]:
             }
         )
 
-    return {"company": COMPANY, "count": len(results), "items": results}
+    return {"company": company, "count": len(results), "items": results}
 
 
 def print_summary(items: Iterable[dict[str, str]]) -> None:

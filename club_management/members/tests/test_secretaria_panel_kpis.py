@@ -56,9 +56,11 @@ class TestSecretariaPanelKpis(MembersTestCase):
 		data = get_panel_lists_payload()
 		self.assertIn("metricas", data)
 		self.assertIn("cuotas_sociales", data)
+		self.assertIn("solicitudes_pendientes", data)
 		self.assertNotIn("socios_morosos", data)
 		self.assertIn("morosos", data["metricas"]["socios"])
 		self.assertIn("recaudacion", data["metricas"])
+		self.assertIn("segmentos", data["metricas"]["socios"])
 
 	def test_ver_mas_filters_en_metricas(self) -> None:
 		data = get_panel_metricas_payload()

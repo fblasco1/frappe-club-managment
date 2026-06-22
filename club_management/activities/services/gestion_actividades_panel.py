@@ -11,7 +11,7 @@ ACTIVIDAD_DOCTYPE = "Actividad"
 GRUPO_DOCTYPE = "Grupo Actividad"
 EQUIPO_DOCTYPE = "Equipo Actividad"
 INSCRIPCION_DOCTYPE = "Inscripcion Actividad"
-ARANCEL_DOCTYPES = frozenset({ACTIVIDAD_DOCTYPE, GRUPO_DOCTYPE})
+ARANCEL_DOCTYPES = frozenset({ACTIVIDAD_DOCTYPE, GRUPO_DOCTYPE, EQUIPO_DOCTYPE})
 
 
 def get_catalog_payload() -> dict[str, Any]:
@@ -31,7 +31,7 @@ def get_catalog_payload() -> dict[str, Any]:
 	equipos = frappe.get_all(
 		EQUIPO_DOCTYPE,
 		filters={"habilitada": 1},
-		fields=["name", "titulo", "grupo_actividad", "orden"],
+		fields=["name", "titulo", "grupo_actividad", "item", "orden"],
 		order_by="orden asc, titulo asc",
 	)
 
@@ -395,10 +395,13 @@ def _format_grupo_row(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def _format_equipo_row(row: dict[str, Any]) -> dict[str, Any]:
+	item = row.get("item") or ""
 	return {
 		"name": row["name"],
 		"titulo": row.get("titulo") or row["name"],
 		"grupo_actividad": row.get("grupo_actividad"),
+		"item": item,
+		"rate": _resolve_item_rate(item),
 	}
 
 

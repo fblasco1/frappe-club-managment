@@ -10,10 +10,12 @@ Actividad (ej. Basquet Masculino, Zumba, Ritmos Latinos)
 ```
 
 - **Grupo Actividad**: tira o división (Tira Azul, Primera División B). Cada uno tiene su **Item** de arancel mensual.
-- **Equipo Actividad**: categoría dentro del grupo (Categoría U11). No cambia el arancel salvo que se configure un ítem propio a futuro.
+- **Equipo Actividad**: categoría dentro del grupo (U11, U13, …). Puede tener **Item** propio (aranceles básquet ICDPE).
 - **Inscripcion Actividad**: `socio` + `actividad` + `grupo_actividad` (obligatorio si `usa_grupos`) + `equipo_actividad` (opcional).
 
 **Zumba** y **Ritmos Latinos** son actividades distintas (`usa_grupos = 0` por defecto).
+
+Aranceles básquet: ver `specs/basquet_aranceles_icdpe.md` (sin packs CLASES).
 
 ## Scenario: actividad con grupos exige tira al inscribir
 
@@ -41,14 +43,14 @@ Then devuelve Item arancel A (no el de la actividad padre si el grupo tiene íte
 ## Scenario: catálogo ICDPE incluye Zumba y Ritmos Latinos
 
 Given el patch de sincronización ICDPE
-Then existen 13 actividades habilitadas incluyendo **Zumba** y **Ritmos Latinos** como filas separadas.
+Then existen 14 actividades habilitadas incluyendo **Basquet Escuelita** (mixta), **Zumba** y **Ritmos Latinos** como filas separadas.
 
 ## Scenario: seed operativo del club
 
 Given el patch `seed_estructura_actividades_completa`
-Then las 13 actividades ICDPE están habilitadas
-And **Basquet Masculino**, **Basquet Femenino**, **Voley Femenino** y **Futbol** tienen `usa_grupos = 1`
-And cada tira del básquet masculino (Tira Azul, Tira Amarilla, Tira Flex, Primera Division B) tiene equipos U7–U17 y Primera
+Then las 14 actividades ICDPE están habilitadas
+And **Basquet Masculino**, **Basquet Escuelita**, **Basquet Femenino**, **Voley Femenino** y **Futbol** tienen `usa_grupos = 1`
+And cada tira del básquet masculino (Tira Azul, Tira Amarilla, Tira Flex) tiene equipos con ítem de arancel
 And vóley y fútbol tienen sus divisiones seed (Primera, Reserva, Juveniles, etc.) con las mismas categorías de equipo.
 
 Fuente de datos: `activities/data/estructura_actividades_club.py` + `estructura_actividades_seed.py`.

@@ -47,29 +47,22 @@
 
 
 		get_mount_parent() {
-
 			const ws = frappe.workspace;
-
 			if (!ws || !ws.body) return null;
-
+			ws.body.addClass("club-secretaria-workspace-body");
 			const container = ws.body.find(".editor-js-container");
-
 			if (!container.length) return null;
-
 			container.addClass("club-secretaria-workspace");
-
 			return container;
-
 		},
 
 
 
 		clear_mount() {
-
 			$(`#${PANEL_ID}`).remove();
-
-			frappe.workspace?.body?.find(".editor-js-container")?.removeClass("club-secretaria-workspace");
-
+			const ws = frappe.workspace;
+			ws?.body?.find(".editor-js-container")?.removeClass("club-secretaria-workspace");
+			ws?.body?.removeClass("club-secretaria-workspace-body");
 		},
 
 
@@ -117,156 +110,233 @@
 
 
 
-		render_kpi_cards(metricas) {
-
-			const socios = metricas.socios || {};
-
-			const recaudacion = metricas.recaudacion || {};
-
-			const verMas = metricas.ver_mas || {};
-
-			const cuotas = recaudacion.cuotas_sociales || {};
-
-			const aranceles = recaudacion.aranceles || {};
-
-			const actividadRows = (aranceles.por_actividad || [])
-
+		render_segmentos(segmentos) {
+			const s = segmentos || {};
+			const parts = [
+				["Mayores", s.mayores],
+				["Menores", s.menores],
+				["Adherentes", s.adherentes],
+				["Jubilados", s.jubilados],
+			]
+				.filter(([, n]) => Number(n) > 0)
 				.map(
-
-					(row) =>
-
-						`<li><strong>${frappe.utils.escape_html(row.actividad)}</strong>: ${row.porcentaje}%</li>`
-
+					([label, n]) =>
+						`<span class="club-secretaria-segmento">${frappe.utils.escape_html(label)}: ${n}</span>`
 				)
-
 				.join("");
+			return parts
+				? `<div class="club-secretaria-segmentos">${parts}</div>`
+				: "";
+		},
 
-			const actividadDetail =
+		render_altas_bajas(altasBajas) {
+			const altas = Number(altasBajas?.altas) || 0;
+			const bajas = Number(altasBajas?.bajas) || 0;
+			return `<span class="club-secretaria-altas-bajas">+${altas} / -${bajas}</span>`;
+		},
 
-				actividadRows.length > 0
-
-					? `<details class="club-secretaria-aranceles-detail">
-
-						<summary>${__("Detalle por actividad")}</summary>
-
-						<ul>${actividadRows}</ul>
-
-					</details>`
-
-					: "";
-
-
-
-			const morososDeudaLabel =
-				socios.morosos_deuda_label ||
-				frappe.format(socios.morosos_deuda || 0, { fieldtype: "Currency" });
+		render_kpi_cards(metricas) {
+			const socios = metricas.socios || {};
+			const recaudacion = metricas.recaudacion || {};
+			const verMas = metricas.ver_mas || {};
+			const cuotas = recaudacion.cuotas_sociales || {};
+			const mora = socios.mora_1_3 || {};
+			const moraDeudaLabel =
+				mora.monto_label || frappe.format(mora.monto || 0, { fieldtype: "Currency" });
 
 			return `
-
 				<div class="club-secretaria-kpi-grid">
-
-					<div class="club-secretaria-kpi-card club-secretaria-kpi-card--morosos">
-
-						<p class="club-secretaria-kpi-title">${__("Socios en mora")}</p>
-
-						<div class="club-secretaria-kpi-value">${socios.morosos ?? 0}</div>
-
-						<p class="club-secretaria-kpi-deuda">${frappe.utils.escape_html(morososDeudaLabel)}</p>
-
-						<div class="club-secretaria-kpi-footer">
-
-							${this.render_ver_mas_btn(
-
-								verMas.socios_morosos_doctype,
-
-								verMas.socios_morosos_filters
-
-							)}
-
-						</div>
-
-					</div>
-
 					<div class="club-secretaria-kpi-card">
-
-						<p class="club-secretaria-kpi-title">${__("Cantidad de socios")}</p>
-
+						<p class="club-secretaria-kpi-title">${__("Total socios activos")}</p>
 						<div class="club-secretaria-kpi-value">${socios.total ?? 0}</div>
-
-						${this.render_delta(socios.delta_mes)}
-
+						${this.render_segmentos(socios.segmentos)}
 						<div class="club-secretaria-kpi-footer">
-
 							${this.render_ver_mas_btn(verMas.socios_total_doctype, verMas.socios_total_filters)}
-
 						</div>
-
 					</div>
-
 					<div class="club-secretaria-kpi-card">
-
-						<p class="club-secretaria-kpi-title">${__("Cuotas sociales recaudadas")}</p>
-
+						<p class="club-secretaria-kpi-title">${__("Tasa de cobrabilidad del mes")}</p>
 						<div class="club-secretaria-kpi-value club-secretaria-kpi-value--pct">${cuotas.porcentaje ?? 0}%</div>
-
 						<span class="text-muted small">${__("Mes")} ${frappe.utils.escape_html(recaudacion.periodo || "")}</span>
-
 					</div>
-
 					<div class="club-secretaria-kpi-card">
-
-						<p class="club-secretaria-kpi-title">${__("Aranceles recaudados")}</p>
-
-						<div class="club-secretaria-kpi-value club-secretaria-kpi-value--pct">${aranceles.porcentaje ?? 0}%</div>
-
-						<span class="text-muted small">${__("Mes")} ${frappe.utils.escape_html(recaudacion.periodo || "")}</span>
-
-						${actividadDetail}
-
+						<p class="club-secretaria-kpi-title">${__("Altas vs bajas (mes)")}</p>
+						<div class="club-secretaria-kpi-value club-secretaria-kpi-value--ratio">
+							${this.render_altas_bajas(socios.altas_bajas)}
+						</div>
 					</div>
-
+					<div class="club-secretaria-kpi-card club-secretaria-kpi-card--morosos">
+						<p class="club-secretaria-kpi-title">${__("Socios en mora (1–3 meses)")}</p>
+						<div class="club-secretaria-kpi-value">${mora.cantidad ?? 0}</div>
+						<p class="club-secretaria-kpi-deuda">${frappe.utils.escape_html(moraDeudaLabel)}</p>
+						<div class="club-secretaria-kpi-footer">
+							${this.render_ver_mas_btn(verMas.socios_deuda_doctype, verMas.socios_deuda_filters)}
+						</div>
+					</div>
 				</div>
-
 			`;
+		},
 
+		render_charts(metricas) {
+			const tendencia = metricas.tendencia_recaudacion || {};
+			const medios = metricas.medios_pago || {};
+			const showTrend = tendencia.disponible && (tendencia.meses || []).length;
+			const showMedios =
+				medios.disponible &&
+				(medios.debito_automatico ||
+					medios.efectivo_pos ||
+					medios.transferencia ||
+					medios.otros);
+			if (!showTrend && !showMedios) {
+				return "";
+			}
+			return `
+				<div class="club-secretaria-charts-grid">
+					${showTrend ? `<div class="club-secretaria-chart-card"><h6>${__("Tendencia de recaudación")}</h6><div class="club-secretaria-chart-trend"></div></div>` : ""}
+					${showMedios ? `<div class="club-secretaria-chart-card"><h6>${__("Medios de pago del mes")}</h6><div class="club-secretaria-chart-medios"></div></div>` : ""}
+				</div>
+			`;
+		},
+
+		mount_charts($panel, metricas) {
+			this._destroy_charts();
+			const tendencia = metricas.tendencia_recaudacion || {};
+			const medios = metricas.medios_pago || {};
+			const $trend = $panel.find(".club-secretaria-chart-trend");
+			if ($trend.length && tendencia.meses?.length) {
+				this._chart_trend = new frappe.Chart($trend[0], {
+					type: "line",
+					height: 220,
+					colors: ["#29cd42", "#7575ff"],
+					data: {
+						labels: tendencia.meses.map((row) => row.periodo),
+						datasets: [
+							{ name: __("Recaudado"), values: tendencia.meses.map((r) => r.recaudado) },
+							{ name: __("Emitido"), values: tendencia.meses.map((r) => r.emitido) },
+						],
+					},
+					truncateLegends: 1,
+					axisOptions: { shortenYAxisNumbers: 1 },
+				});
+			}
+			const $medios = $panel.find(".club-secretaria-chart-medios");
+			if ($medios.length && medios.disponible) {
+				this._chart_medios = new frappe.Chart($medios[0], {
+					type: "donut",
+					height: 220,
+					colors: ["#5e64ff", "#29cd42", "#f39c12", "#95a5a6"],
+					data: {
+						labels: [
+							__("Débito automático"),
+							__("Efectivo / POS"),
+							__("Transferencia"),
+							__("Otros"),
+						],
+						datasets: [
+							{
+								values: [
+									medios.debito_automatico || 0,
+									medios.efectivo_pos || 0,
+									medios.transferencia || 0,
+									medios.otros || 0,
+								],
+							},
+						],
+					},
+				});
+			}
+		},
+
+		_destroy_charts() {
+			this._chart_trend = null;
+			this._chart_medios = null;
+		},
+
+		render_solicitudes_table(solicitudes, verMas) {
+			const rows = solicitudes || [];
+			if (!rows.length) {
+				return `
+					<div class="club-secretaria-list-card">
+						<div class="club-secretaria-list-header">
+							<span class="club-secretaria-list-icon">📋</span>
+							<h5 class="mb-0">${__("Solicitudes de socios")}</h5>
+						</div>
+						<p class="text-muted mb-0">${__("No hay solicitudes pendientes.")}</p>
+					</div>
+				`;
+			}
+			const body = rows
+				.map(
+					(row) => `
+				<tr class="club-secretaria-solicitud-row" data-name="${frappe.utils.escape_html(row.name)}" role="button" tabindex="0">
+					<td>${frappe.utils.escape_html(row.titulo)}</td>
+					<td>${frappe.utils.escape_html(row.dni)}</td>
+					<td>${frappe.utils.escape_html(row.estado_label || "")}</td>
+					<td>${frappe.utils.escape_html(row.fecha_label || "")}</td>
+				</tr>`
+				)
+				.join("");
+			return `
+				<div class="club-secretaria-list-card">
+					<div class="club-secretaria-list-header">
+						<span class="club-secretaria-list-icon">📋</span>
+						<h5 class="mb-0">${__("Solicitudes de socios")}</h5>
+						<div class="ms-auto">
+							${this.render_ver_mas_btn(verMas.solicitudes_doctype, verMas.solicitudes_filters)}
+						</div>
+					</div>
+					<div class="table-responsive club-secretaria-solicitudes-table-wrap">
+						<table class="table table-sm mb-0 club-secretaria-solicitudes-table">
+							<thead>
+								<tr>
+									<th>${__("Nombre")}</th>
+									<th>${__("DNI")}</th>
+									<th>${__("Estado")}</th>
+									<th>${__("Ingreso")}</th>
+								</tr>
+							</thead>
+							<tbody>${body}</tbody>
+						</table>
+					</div>
+				</div>
+			`;
+		},
+
+		render_quick_actions() {
+			return `
+				<div class="club-secretaria-quick-actions">
+					<button type="button" class="btn btn-primary club-secretaria-nuevo-socio">
+						${__("+ Nueva alta de socio")}
+					</button>
+					<button type="button" class="btn btn-secondary club-secretaria-cobranza">
+						${__("Emitir cupón / Registrar cobro")}
+					</button>
+					<button type="button" class="btn btn-default" disabled title="${__("Próximamente")}">
+						${__("Enviar recordatorio de deuda masivo")}
+					</button>
+				</div>
+			`;
 		},
 
 
 
 		render_lists($panel, data) {
-
 			const metricas = data.metricas || {};
-
+			const verMas = metricas.ver_mas || {};
 			this._cuotas_state = data.cuotas_sociales || null;
 
-
-
 			$panel.html(`
-
-				<div class="club-secretaria-panel-actions">
-
-					<button type="button" class="btn btn-primary club-secretaria-nuevo-socio">
-
-						${__("Nuevo socio")}
-
-					</button>
-
-				</div>
-
+				${this.render_quick_actions()}
 				${this.render_kpi_cards(metricas)}
-
-				<div class="col-12">
-
+				${this.render_charts(metricas)}
+				${this.render_solicitudes_table(data.solicitudes_pendientes, verMas)}
+				<div class="club-secretaria-cuotas-section">
 					${this.render_cuotas_html(this._cuotas_state)}
-
 				</div>
-
 			`);
 
-
-
+			this.mount_charts($panel, metricas);
 			this.bind_panel_handlers($panel);
-
 		},
 
 
@@ -397,15 +467,36 @@
 			$panel.find(".club-secretaria-save-cuotas").on("click", () => this.save_cuotas($panel));
 
 			$panel.find(".club-secretaria-nuevo-socio").on("click", () => {
-
 				if (club_management_socio_alta_guiada?.open) {
-
 					club_management_socio_alta_guiada.open();
-
 				}
-
 			});
 
+			$panel.find(".club-secretaria-cobranza").on("click", () => {
+				frappe.route_options = { saldo_deuda: [">", 0] };
+				frappe.set_route("List", "Socio");
+			});
+
+			$panel.find(".club-secretaria-solicitud-row").on("click", (e) => {
+				const name = $(e.currentTarget).data("name");
+				if (name) {
+					this.open_solicitud(name);
+				}
+			});
+
+			$panel.find(".club-secretaria-solicitud-row").on("keydown", (e) => {
+				if (e.key !== "Enter" && e.key !== " ") {
+					return;
+				}
+				e.preventDefault();
+				$(e.currentTarget).trigger("click");
+			});
+		},
+
+		open_solicitud(name) {
+			if (name) {
+				frappe.set_route("Form", "Solicitud Asociacion", name);
+			}
 		},
 
 

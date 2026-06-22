@@ -24,17 +24,22 @@ class ActividadCatalogEntry:
 # Orden y títulos acordados con Secretaría / plan de cuentas ICDPE.
 ACTIVIDADES_CATALOGO_ICDPE: tuple[ActividadCatalogEntry, ...] = (
 	ActividadCatalogEntry("Basquet Masculino", 10, "ICDPE-ARANCEL-MENSUAL-basquet-masculino"),
+	ActividadCatalogEntry("Basquet Escuelita", 15, "ICDPE-BASQUET-ESCUELITA"),
 	ActividadCatalogEntry("Basquet Femenino", 20, "ICDPE-ARANCEL-MENSUAL-basquet-femenino"),
 	ActividadCatalogEntry("Voley Femenino", 30, "ICDPE-ARANCEL-MENSUAL-voley"),
 	ActividadCatalogEntry("Futbol", 40, "ICDPE-ARANCEL-MENSUAL-futbol"),
-	ActividadCatalogEntry("Patin Artistico", 50, "ICDPE-ARANCEL-MENSUAL-patin"),
-	ActividadCatalogEntry("Gimnasia Artistica", 60, "ICDPE-ARANCEL-MENSUAL-gimnasia-artistica"),
-	ActividadCatalogEntry("Iniciacion Deportiva", 70, "ICDPE-ARANCEL-MENSUAL-ACT-iniciacion-deportiva"),
-	ActividadCatalogEntry("Danza", 80, "ICDPE-ARANCEL-MENSUAL-ACT-danza"),
-	ActividadCatalogEntry("Gimnasio Fitness", 90, "ICDPE-ARANCEL-MENSUAL-FITNESS-MUSC"),
+	ActividadCatalogEntry("Patin Artistico", 50, "ICDPE-PATIN-MINI"),
+	ActividadCatalogEntry("Boxeo", 52, "ICDPE-BOXEO-1-CLASE"),
+	ActividadCatalogEntry("Gimnasia Artistica", 60, "ICDPE-GIMNASIA-ARTISTICA-1-CLASE"),
+	ActividadCatalogEntry("Iniciacion Deportiva", 70, "ICDPE-INICIACION-DEPORTIVA-1-CLASE"),
+	ActividadCatalogEntry("Danza", 80, "ICDPE-DANZA"),
+	ActividadCatalogEntry("Yoga", 82, "ICDPE-YOGA-1-CLASE"),
+	ActividadCatalogEntry("Gimnasio Fitness", 90, "ICDPE-GYM-PASE-LIBRE-SOCIO"),
+	ActividadCatalogEntry("Taekwondo", 92, "ICDPE-TAEKWONDO"),
+	ActividadCatalogEntry("Shui Lu", 94, "ICDPE-SHUI-LU"),
 	ActividadCatalogEntry("Funcional", 100, "ICDPE-ARANCEL-MENSUAL-ACT-funcional"),
 	ActividadCatalogEntry("Crossfit", 110, "ICDPE-ARANCEL-MENSUAL-ACT-crossfit"),
-	ActividadCatalogEntry("Ritmos Latinos", 120, "ICDPE-ARANCEL-MENSUAL-ACT-ritmos-latinos"),
+	ActividadCatalogEntry("Ritmos Latinos", 120, "ICDPE-RITMOS-LATINOS"),
 	ActividadCatalogEntry("Zumba", 130, "ICDPE-ARANCEL-MENSUAL-ACT-zumba"),
 )
 
@@ -42,9 +47,16 @@ ACTIVIDADES_CATALOGO_ICDPE: tuple[ActividadCatalogEntry, ...] = (
 ACTIVIDADES_CON_GRUPOS: frozenset[str] = frozenset(
 	{
 		"Basquet Masculino",
+		"Basquet Escuelita",
 		"Basquet Femenino",
 		"Voley Femenino",
 		"Futbol",
+		"Patin Artistico",
+		"Gimnasia Artistica",
+		"Iniciacion Deportiva",
+		"Boxeo",
+		"Yoga",
+		"Gimnasio Fitness",
 	}
 )
 

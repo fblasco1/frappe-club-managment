@@ -192,9 +192,14 @@ scheduler_events = {
 # Overriding Methods
 # ------------------------------
 #
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "club_management.event.get_events"
-# }
+override_whitelisted_methods = {
+	"frappe.desk.doctype.number_card.number_card.get_result": (
+		"club_management.integrations.number_card_postgres.get_result"
+	),
+	"frappe.desk.doctype.number_card.number_card.get_percentage_difference": (
+		"club_management.integrations.number_card_postgres.get_percentage_difference"
+	),
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,

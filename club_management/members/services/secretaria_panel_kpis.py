@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from typing import Any
 
 import frappe
-from frappe.utils import flt, fmt_money, getdate, today
+from frappe.utils import add_months, flt, fmt_money, get_first_day, get_last_day, getdate, today
 
 from club_management.activities.services.inscripcion_socio import (
 	INSCRIPCION_DOCTYPE,
@@ -26,6 +26,18 @@ from club_management.members.services.cobranza_periodica import (
 SOCIO_DOCTYPE = "Socio"
 ESTADOS_EXCLUIDOS_TOTAL = frozenset({"Baja"})
 SALES_INVOICE_ITEM_DOCTYPE = "Sales Invoice Item"
+PAYMENT_ENTRY_DOCTYPE = "Payment Entry"
+PAYMENT_ENTRY_REFERENCE_DOCTYPE = "Payment Entry Reference"
+RECARGO_SUFFIX = "-REC"
+
+SEGMENTO_MAYORES = frozenset({"Activo", "2° Hermano", "3° Hermano"})
+SEGMENTO_MENORES = frozenset({"Menor"})
+SEGMENTO_ADHERENTES = frozenset({"Adherente"})
+SEGMENTO_JUBILADOS = frozenset({"Jubilado", "Vitalicio"})
+
+MEDIO_PAGO_DEBITO = frozenset({"Credit Card", "Bank Draft"})
+MEDIO_PAGO_EFECTIVO = frozenset({"Cash", "Cheque"})
+MEDIO_PAGO_TRANSFERENCIA = frozenset({"Wire Transfer"})
 
 
 def _last_day_previous_month(reference: date) -> date:
@@ -56,20 +68,211 @@ def get_morosos_deuda_total() -> float:
 	return sum(flt(value) for value in rows)
 
 
+def get_socios_por_segmento(*, reference_date: str | date | None = None) -> dict[str, Any]:
+	"""Total socios activos (no Baja) desglosado por segmento de categoría."""
+	_ = reference_date
+	rows = frappe.get_all(
+		SOCIO_DOCTYPE,
+		filters={"estado": ["not in", list(ESTADOS_EXCLUIDOS_TOTAL)]},
+		fields=["categoria"],
+	)
+	segmentos = {"mayores": 0, "menores": 0, "adherentes": 0, "jubilados": 0}
+	for row in rows:
+		categoria = row.categoria or ""
+		if categoria in SEGMENTO_MAYORES:
+			segmentos["mayores"] += 1
+		elif categoria in SEGMENTO_MENORES:
+			segmentos["menores"] += 1
+		elif categoria in SEGMENTO_ADHERENTES:
+			segmentos["adherentes"] += 1
+		elif categoria in SEGMENTO_JUBILADOS:
+			segmentos["jubilados"] += 1
+		else:
+			segmentos["mayores"] += 1
+	total = sum(segmentos.values())
+	return {"total": total, **segmentos}
+
+
+def count_altas_bajas_mes(*, reference_date: str | date | None = None) -> dict[str, int]:
+	ref = getdate(reference_date or today())
+	first = get_first_day(ref)
+	last = get_last_day(ref)
+	altas = frappe.db.count(
+		SOCIO_DOCTYPE,
+		{
+			"fecha_alta": ["between", [first, last]],
+			"estado": ["not in", list(ESTADOS_EXCLUIDOS_TOTAL)],
+		},
+	)
+	bajas = frappe.db.count(
+		SOCIO_DOCTYPE,
+		{
+			"estado": "Baja",
+			"ultimo_cambio_estado_en": ["between", [f"{first} 00:00:00", f"{last} 23:59:59"]],
+		},
+	)
+	return {"altas": altas, "bajas": bajas}
+
+
+def _count_periodos_cuota_impagos(socio_name: str) -> int:
+	if not erpnext_cobranza_disponible():
+		return 0
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	campo_periodo = _campo_periodo_cobro()
+	if not campo_socio or not campo_periodo:
+		return 0
+	rows = frappe.get_all(
+		SALES_INVOICE_DOCTYPE,
+		filters={
+			campo_socio: socio_name,
+			"docstatus": 1,
+			"outstanding_amount": [">", 0],
+		},
+		fields=["name", campo_periodo],
+	)
+	periodos: set[str] = set()
+	for row in rows:
+		periodo = (row.get(campo_periodo) or "").strip()
+		if not periodo or periodo.endswith(RECARGO_SUFFIX):
+			continue
+		periodos.add(periodo)
+	return len(periodos)
+
+
+def get_mora_1_3_meses_payload() -> dict[str, Any]:
+	"""Socios con 1–3 períodos mensuales impagos y monto total de su deuda."""
+	rows = frappe.get_all(
+		SOCIO_DOCTYPE,
+		filters={"estado": ["not in", list(ESTADOS_EXCLUIDOS_TOTAL)], "saldo_deuda": [">", 0]},
+		fields=["name", "saldo_deuda"],
+	)
+	cantidad = 0
+	monto = 0.0
+	for row in rows:
+		periodos = _count_periodos_cuota_impagos(row.name)
+		if 1 <= periodos <= 3:
+			cantidad += 1
+			monto += flt(row.saldo_deuda)
+	return {
+		"cantidad": cantidad,
+		"monto": monto,
+		"monto_label": fmt_money(monto),
+	}
+
+
+def get_recaudacion_tendencia_payload(
+	*,
+	months: int = 12,
+	reference_date: str | date | None = None,
+) -> dict[str, Any]:
+	"""Serie mensual emitido vs recaudado (cuotas sociales)."""
+	ref = getdate(reference_date or today())
+	months = max(1, min(int(months), 12))
+	series: list[dict[str, Any]] = []
+	for offset in range(months - 1, -1, -1):
+		month_ref = add_months(ref, -offset)
+		data = get_recaudacion_mes_payload(reference_date=month_ref)
+		cuotas = data.get("cuotas_sociales") or {}
+		series.append(
+			{
+				"periodo": data.get("periodo") or format_periodo_cobro(month_ref),
+				"emitido": flt(cuotas.get("emitido")),
+				"recaudado": flt(cuotas.get("recaudado")),
+			}
+		)
+	return {"meses": series, "disponible": erpnext_cobranza_disponible()}
+
+
+def _agrupar_modo_pago(mode: str | None) -> str:
+	mode = (mode or "").strip()
+	if mode in MEDIO_PAGO_DEBITO:
+		return "debito_automatico"
+	if mode in MEDIO_PAGO_EFECTIVO:
+		return "efectivo_pos"
+	if mode in MEDIO_PAGO_TRANSFERENCIA:
+		return "transferencia"
+	return "otros"
+
+
+def get_medios_pago_payload(*, reference_date: str | date | None = None) -> dict[str, Any]:
+	"""Distribución de cobros del mes por medio de pago agrupado."""
+	ref = getdate(reference_date or today())
+	periodo = format_periodo_cobro(ref)
+	empty = {
+		"periodo": periodo,
+		"disponible": False,
+		"debito_automatico": 0.0,
+		"efectivo_pos": 0.0,
+		"transferencia": 0.0,
+		"otros": 0.0,
+	}
+	if not erpnext_cobranza_disponible():
+		return empty
+	if not frappe.db.exists("DocType", PAYMENT_ENTRY_DOCTYPE):
+		return empty
+
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	if not campo_socio:
+		return empty
+
+	first = get_first_day(ref)
+	last = get_last_day(ref)
+	invoices = frappe.get_all(
+		SALES_INVOICE_DOCTYPE,
+		filters={campo_socio: ["is", "set"], "docstatus": 1},
+		pluck="name",
+	)
+	if not invoices:
+		return {**empty, "disponible": True}
+
+	pe_names = frappe.get_all(
+		PAYMENT_ENTRY_REFERENCE_DOCTYPE,
+		filters={
+			"reference_doctype": SALES_INVOICE_DOCTYPE,
+			"reference_name": ["in", invoices],
+			"parenttype": PAYMENT_ENTRY_DOCTYPE,
+		},
+		pluck="parent",
+		distinct=True,
+	)
+	if not pe_names:
+		return {**empty, "disponible": True}
+
+	totals = {"debito_automatico": 0.0, "efectivo_pos": 0.0, "transferencia": 0.0, "otros": 0.0}
+	for row in frappe.get_all(
+		PAYMENT_ENTRY_DOCTYPE,
+		filters={
+			"name": ["in", pe_names],
+			"docstatus": 1,
+			"posting_date": ["between", [first, last]],
+		},
+		fields=["mode_of_payment", "paid_amount"],
+	):
+		key = _agrupar_modo_pago(row.mode_of_payment)
+		totals[key] += flt(row.paid_amount)
+
+	return {"periodo": periodo, "disponible": True, **totals}
+
+
 def get_socio_metricas_payload(*, reference_date: str | date | None = None) -> dict[str, Any]:
 	ref = getdate(reference_date or today())
-	total = count_socios_total()
+	segmentos = get_socios_por_segmento(reference_date=ref)
+	total = segmentos["total"]
 	total_mes_anterior = count_socios_total(as_of=_last_day_previous_month(ref))
 	delta = total - total_mes_anterior
 	morosos = frappe.db.count(SOCIO_DOCTYPE, {"estado": "Moroso"})
 	morosos_deuda = get_morosos_deuda_total()
+	mora_1_3 = get_mora_1_3_meses_payload()
 	return {
 		"total": total,
+		"segmentos": segmentos,
 		"total_mes_anterior": total_mes_anterior,
 		"delta_mes": delta,
+		"altas_bajas": count_altas_bajas_mes(reference_date=ref),
 		"morosos": morosos,
 		"morosos_deuda": morosos_deuda,
 		"morosos_deuda_label": fmt_money(morosos_deuda),
+		"mora_1_3": mora_1_3,
 	}
 
 
@@ -204,10 +407,18 @@ def get_panel_metricas_payload(*, reference_date: str | date | None = None) -> d
 	return {
 		"socios": socios,
 		"recaudacion": recaudacion,
+		"tendencia_recaudacion": get_recaudacion_tendencia_payload(reference_date=reference_date),
+		"medios_pago": get_medios_pago_payload(reference_date=reference_date),
 		"ver_mas": {
 			"socios_morosos_doctype": SOCIO_DOCTYPE,
 			"socios_morosos_filters": [["Socio", "estado", "=", "Moroso"]],
 			"socios_total_doctype": SOCIO_DOCTYPE,
 			"socios_total_filters": [["Socio", "estado", "!=", "Baja"]],
+			"socios_deuda_doctype": SOCIO_DOCTYPE,
+			"socios_deuda_filters": [["Socio", "saldo_deuda", ">", 0]],
+			"solicitudes_doctype": "Solicitud Asociacion",
+			"solicitudes_filters": [
+				["Solicitud Asociacion", "workflow_state", "in", ["Pendiente", "Requiere Corrección"]]
+			],
 		},
 	}

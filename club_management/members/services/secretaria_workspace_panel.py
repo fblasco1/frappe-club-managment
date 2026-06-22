@@ -12,17 +12,18 @@ from club_management.members.services.secretaria_panel_kpis import get_panel_met
 LIST_LIMIT = 5
 
 SOLICITUD_DOCTYPE = "Solicitud Asociacion"
+SOLICITUD_ESTADOS_PENDIENTES = ("Pendiente", "Requiere Corrección")
 SOCIO_DOCTYPE = "Socio"
 INSCRIPCION_DOCTYPE = "Inscripcion Actividad"
 
 
 def get_solicitudes_pendientes_preview(*, limit: int = LIST_LIMIT) -> list[dict[str, Any]]:
-	"""Solicitudes `Pendiente`, más antiguas primero (máx. `limit`)."""
+	"""Solicitudes pendientes de revisión o corrección del socio (máx. `limit`)."""
 	limit = max(1, min(int(limit), LIST_LIMIT))
 	rows = frappe.get_all(
 		SOLICITUD_DOCTYPE,
-		filters={"workflow_state": "Pendiente"},
-		fields=["name", "nombre", "apellido", "dni", "creation"],
+		filters={"workflow_state": ["in", list(SOLICITUD_ESTADOS_PENDIENTES)]},
+		fields=["name", "nombre", "apellido", "dni", "creation", "workflow_state"],
 		order_by="creation asc",
 		limit=limit,
 	)
@@ -118,10 +119,11 @@ def save_cuotas_sociales_payload(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def get_panel_lists_payload() -> dict[str, Any]:
-	"""Payload completo para el panel (métricas + cuotas)."""
+	"""Payload completo para el panel (métricas + cuotas + solicitudes)."""
 	return {
 		"metricas": get_panel_metricas_payload(),
 		"cuotas_sociales": get_cuotas_sociales_payload(),
+		"solicitudes_pendientes": get_solicitudes_pendientes_preview(),
 	}
 
 
@@ -130,12 +132,15 @@ def _format_solicitud_row(row: dict[str, Any]) -> dict[str, Any]:
 	apellido = (row.get("apellido") or "").strip()
 	titulo = " ".join(part for part in (nombre, apellido) if part) or row["name"]
 	creation = row.get("creation")
+	estado = row.get("workflow_state") or ""
 	return {
 		"name": row["name"],
 		"titulo": titulo,
 		"dni": row.get("dni") or "",
 		"creation": creation,
 		"fecha_label": formatdate(creation) if creation else "",
+		"estado": estado,
+		"estado_label": estado or "—",
 	}
 
 

@@ -111,12 +111,11 @@ class TestSecretariaWorkspacePanelService(MembersTestCase):
 		self.assertIn("socios", data["metricas"])
 		self.assertIn("recaudacion", data["metricas"])
 		self.assertIn("cuotas_sociales", data)
-		self.assertNotIn("solicitudes_pendientes", data)
-		self.assertNotIn("socios_morosos", data)
+		self.assertIn("solicitudes_pendientes", data)
 		self.assertIn("morosos", data["metricas"]["socios"])
 		ver_mas = data["metricas"]["ver_mas"]
 		self.assertEqual(ver_mas["socios_morosos_doctype"], "Socio")
-		self.assertNotIn("solicitudes_doctype", ver_mas)
+		self.assertIn("solicitudes_doctype", ver_mas)
 
 	def test_save_cuotas_sociales_inline(self) -> None:
 		user = make_secretaria_user("sec.cuotas@example.com")
@@ -146,7 +145,7 @@ class TestSecretariaWorkspacePanelPermissions(MembersTestCase):
 		data = get_panel_lists()
 		self.assertIn("metricas", data)
 		self.assertIn("socios", data["metricas"])
-		self.assertNotIn("solicitudes_pendientes", data)
+		self.assertIn("solicitudes_pendientes", data)
 		frappe.set_user("Administrator")
 
 	def test_guest_no_puede_guardar_cuotas(self) -> None:

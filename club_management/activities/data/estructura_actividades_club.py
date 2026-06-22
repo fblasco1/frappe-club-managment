@@ -7,7 +7,48 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Categorías de equipo habituales en divisiones formativas.
+from club_management.activities.data.basquet_aranceles_icdpe import (
+	ITEM_ESCUELITA,
+	ITEM_FEMENINO_SUP,
+	ITEM_FORMATIVAS_AMARILLA,
+	ITEM_FORMATIVAS_AZUL,
+	ITEM_FORMATIVAS_FLEX,
+	ITEM_MINIBASQUET,
+)
+from club_management.activities.data.futbol_aranceles_icdpe import (
+	GRUPO_FUTBOL_ESCUELITA,
+	ITEM_FUTBOL_FAFI,
+	ITEM_FUTBOL_TABI_A,
+	ITEM_FUTBOL_TABI_B,
+)
+from club_management.activities.data.otras_actividades_aranceles_icdpe import (
+	ITEM_BOXEO_1_CLASE,
+	ITEM_BOXEO_2_CLASES,
+	ITEM_BOXEO_3_CLASES,
+	ITEM_GIMNASIA_1_CLASE,
+	ITEM_GIMNASIA_2_CLASES,
+	ITEM_GYM_NO_SOCIO,
+	ITEM_GYM_SOCIO,
+	ITEM_INICIACION_1_CLASE,
+	ITEM_INICIACION_2_CLASES,
+	ITEM_YOGA_1_CLASE,
+	ITEM_YOGA_2_CLASES,
+)
+from club_management.activities.data.patin_aranceles_icdpe import (
+	ITEM_PATIN_AVANZADO,
+	ITEM_PATIN_DANZA,
+	ITEM_PATIN_INTERMEDIO,
+	ITEM_PATIN_MINI,
+	ITEM_PATIN_TEENS,
+)
+from club_management.activities.data.voley_aranceles_icdpe import (
+	ITEM_VOLEY_ESCUELA_ADOLESCENTE,
+	ITEM_VOLEY_ESCUELITA_MINIVOLEY,
+	ITEM_VOLEY_TIRA_21500,
+	ITEM_VOLEY_TIRA_30500,
+)
+
+# Categorías genéricas para deportes sin matriz ICDPE detallada (vóley, fútbol).
 CATEGORIAS_EQUIPO: tuple[str, ...] = (
 	"Categoria U7",
 	"Categoria U9",
@@ -20,11 +61,21 @@ CATEGORIAS_EQUIPO: tuple[str, ...] = (
 
 
 @dataclass(frozen=True)
+class EquipoSeed:
+	titulo: str
+	orden: int
+	item_code: str
+	descripcion: str = ""
+
+
+@dataclass(frozen=True)
 class GrupoSeed:
 	titulo: str
 	orden: int
 	item_code: str | None = None
-	"""`item_code` ERPNext del arancel de la tira (opcional hasta cargar Items)."""
+	"""Arancel único del grupo si todos los equipos comparten ítem."""
+	equipos: tuple[EquipoSeed, ...] = ()
+	"""Equipos con ítem propio (básquet ICDPE). Vacío → seed genérico `CATEGORIAS_EQUIPO`."""
 
 
 @dataclass(frozen=True)
@@ -33,40 +84,242 @@ class ActividadEstructuraSeed:
 	grupos: tuple[GrupoSeed, ...]
 
 
-# Tiras del básquet (masculino y femenino comparten nomenclatura operativa).
-_TIRAS_BASQUET: tuple[GrupoSeed, ...] = (
-	GrupoSeed("Tira Azul", 10, "ICDPE-ARANCEL-MENSUAL-basquet-tira-azul"),
-	GrupoSeed("Tira Amarilla", 20, "ICDPE-ARANCEL-MENSUAL-basquet-tira-amarilla"),
-	GrupoSeed("Tira Flex", 30, "ICDPE-ARANCEL-MENSUAL-basquet-tira-flex"),
-	GrupoSeed("Primera Division B", 40, "ICDPE-ARANCEL-MENSUAL-basquet-primera-b"),
+def _eq(titulo: str, orden: int, item_code: str, descripcion: str = "") -> EquipoSeed:
+	return EquipoSeed(titulo, orden, item_code, descripcion)
+
+
+def _eq_basquet(titulo: str, orden: int, item_code: str, descripcion: str = "") -> EquipoSeed:
+	return _eq(titulo, orden, item_code, descripcion)
+
+
+def _grupo_leaf(grupo_titulo: str, orden: int, item_code: str) -> GrupoSeed:
+	return GrupoSeed(grupo_titulo, orden, equipos=(_eq(grupo_titulo, 10, item_code),))
+
+
+ESTRUCTURA_BASQUET_MASCULINO = ActividadEstructuraSeed(
+	"Basquet Masculino",
+	(
+		GrupoSeed(
+			"Tira Azul",
+			10,
+			equipos=(
+				_eq_basquet("U9", 10, ITEM_MINIBASQUET, "PRE MINI"),
+				_eq_basquet("U11", 20, ITEM_MINIBASQUET, "MINI"),
+				_eq_basquet("U13", 30, ITEM_MINIBASQUET, "INFANTIL"),
+				_eq_basquet("U15", 40, ITEM_FORMATIVAS_AZUL, "CADETE"),
+				_eq_basquet("U17", 50, ITEM_FORMATIVAS_AZUL, "JUVENIL"),
+				_eq_basquet("U21", 60, ITEM_FORMATIVAS_AZUL, "LIGA PROXIMO"),
+			),
+		),
+		GrupoSeed(
+			"Tira Amarilla",
+			20,
+			equipos=(
+				_eq_basquet("U9", 10, ITEM_MINIBASQUET, "PRE MINI"),
+				_eq_basquet("U11", 20, ITEM_MINIBASQUET, "MINI"),
+				_eq_basquet("U13", 30, ITEM_MINIBASQUET, "INFANTIL"),
+				_eq_basquet("U15", 40, ITEM_FORMATIVAS_AMARILLA, "CADETE"),
+				_eq_basquet("U17", 50, ITEM_FORMATIVAS_AMARILLA, "JUVENIL"),
+				_eq_basquet("U21", 60, ITEM_FORMATIVAS_AMARILLA, "LIGA PROXIMO"),
+			),
+		),
+		GrupoSeed(
+			"Tira Flex",
+			30,
+			equipos=(
+				_eq_basquet("U15", 10, ITEM_FORMATIVAS_FLEX, "CADETE"),
+				_eq_basquet("U19", 20, ITEM_FORMATIVAS_FLEX, "JUVENIL"),
+				_eq_basquet("Superior C", 30, ITEM_FORMATIVAS_FLEX, 'SUPERIOR "C"'),
+			),
+		),
+	),
 )
 
+ESTRUCTURA_BASQUET_ESCUELITA = ActividadEstructuraSeed(
+	"Basquet Escuelita",
+	(
+		GrupoSeed(
+			"Mixta",
+			10,
+			equipos=(
+				_eq_basquet("U7 / U9", 10, ITEM_ESCUELITA),
+				_eq_basquet("U11 / U13", 20, ITEM_ESCUELITA),
+			),
+		),
+	),
+)
+
+ESTRUCTURA_BASQUET_FEMENINO = ActividadEstructuraSeed(
+	"Basquet Femenino",
+	(
+		GrupoSeed(
+			"Femenino",
+			10,
+			equipos=(
+				_eq_basquet("U9", 10, ITEM_ESCUELITA),
+				_eq_basquet("U11", 20, ITEM_ESCUELITA),
+				_eq_basquet("U13", 30, ITEM_ESCUELITA),
+				_eq_basquet("U15", 40, ITEM_ESCUELITA),
+				_eq_basquet("U17", 50, ITEM_ESCUELITA),
+				_eq_basquet("Superior Fem", 60, ITEM_FEMENINO_SUP),
+			),
+		),
+	),
+)
+
+ESTRUCTURA_VOLEY_FEMENINO = ActividadEstructuraSeed(
+	"Voley Femenino",
+	(
+		GrupoSeed(
+			"Tira",
+			10,
+			equipos=(
+				_eq("U11", 10, ITEM_VOLEY_TIRA_21500),
+				_eq("U12", 20, ITEM_VOLEY_TIRA_21500),
+				_eq("U13", 30, ITEM_VOLEY_TIRA_30500),
+				_eq("U14", 40, ITEM_VOLEY_TIRA_30500),
+				_eq("U15", 50, ITEM_VOLEY_TIRA_30500),
+				_eq("U16", 60, ITEM_VOLEY_TIRA_30500),
+				_eq("U18", 70, ITEM_VOLEY_TIRA_30500),
+				_eq("U21", 80, ITEM_VOLEY_TIRA_30500),
+				_eq("Superior A", 90, ITEM_VOLEY_TIRA_30500, 'SUPERIOR "A"'),
+				_eq("Superior B", 100, ITEM_VOLEY_TIRA_30500, 'SUPERIOR "B"'),
+			),
+		),
+		GrupoSeed(
+			"Escuela Adolescente",
+			20,
+			equipos=(_eq("Escuela Adolescente", 10, ITEM_VOLEY_ESCUELA_ADOLESCENTE),),
+		),
+		GrupoSeed(
+			"Escuelita Minivoley",
+			30,
+			equipos=(_eq("Escuelita Minivoley", 10, ITEM_VOLEY_ESCUELITA_MINIVOLEY),),
+		),
+	),
+)
+
+ESTRUCTURA_FUTBOL = ActividadEstructuraSeed(
+	"Futbol",
+	(
+		GrupoSeed(
+			"FAFI",
+			10,
+			equipos=(
+				_eq("2019", 10, ITEM_FUTBOL_FAFI),
+				_eq("2018", 20, ITEM_FUTBOL_FAFI),
+				_eq("2017", 30, ITEM_FUTBOL_FAFI),
+				_eq("2016", 40, ITEM_FUTBOL_FAFI),
+				_eq("2014", 50, ITEM_FUTBOL_FAFI),
+				_eq("2013", 60, ITEM_FUTBOL_FAFI),
+				_eq("2012", 70, ITEM_FUTBOL_FAFI),
+			),
+		),
+		GrupoSeed(
+			"TABI A",
+			20,
+			equipos=(
+				_eq("2019", 10, ITEM_FUTBOL_TABI_A),
+				_eq("2018", 20, ITEM_FUTBOL_TABI_A),
+				_eq("2017", 30, ITEM_FUTBOL_TABI_A),
+				_eq("2016", 40, ITEM_FUTBOL_TABI_A),
+				_eq("2014", 50, ITEM_FUTBOL_TABI_A),
+				_eq("2013", 60, ITEM_FUTBOL_TABI_A),
+			),
+		),
+		GrupoSeed(
+			GRUPO_FUTBOL_ESCUELITA,
+			30,
+			equipos=(
+				_eq("2014/2015", 10, ITEM_FUTBOL_TABI_B),
+				_eq("2016/2017", 20, ITEM_FUTBOL_TABI_B),
+				_eq("2018/2019", 30, ITEM_FUTBOL_TABI_B),
+				_eq("2020/2021", 40, ITEM_FUTBOL_TABI_B),
+			),
+		),
+	),
+)
+
+
+ESTRUCTURA_PATIN = ActividadEstructuraSeed(
+	"Patin Artistico",
+	(
+		GrupoSeed(
+			"Patin Avanzado",
+			10,
+			equipos=(
+				_eq("A", 10, ITEM_PATIN_AVANZADO),
+				_eq("B", 20, ITEM_PATIN_AVANZADO),
+				_eq("C1", 30, ITEM_PATIN_AVANZADO),
+				_eq("C2", 40, ITEM_PATIN_AVANZADO),
+			),
+		),
+		GrupoSeed(
+			"Patin Intermedio",
+			20,
+			equipos=(
+				_eq("1", 10, ITEM_PATIN_INTERMEDIO),
+				_eq("2", 20, ITEM_PATIN_INTERMEDIO),
+			),
+		),
+		_grupo_leaf("Patin Mini", 30, ITEM_PATIN_MINI),
+		_grupo_leaf("Patin Teens", 40, ITEM_PATIN_TEENS),
+		_grupo_leaf("Patin Danza", 50, ITEM_PATIN_DANZA),
+	),
+)
+
+ESTRUCTURA_GIMNASIA_ARTISTICA = ActividadEstructuraSeed(
+	"Gimnasia Artistica",
+	(
+		_grupo_leaf("1 Clase por Semana", 10, ITEM_GIMNASIA_1_CLASE),
+		_grupo_leaf("2 Clases por Semana", 20, ITEM_GIMNASIA_2_CLASES),
+	),
+)
+
+ESTRUCTURA_BOXEO = ActividadEstructuraSeed(
+	"Boxeo",
+	(
+		_grupo_leaf("1 Clase por Semana", 10, ITEM_BOXEO_1_CLASE),
+		_grupo_leaf("2 Clases por Semana", 20, ITEM_BOXEO_2_CLASES),
+		_grupo_leaf("3 Clases por Semana", 30, ITEM_BOXEO_3_CLASES),
+	),
+)
+
+ESTRUCTURA_YOGA = ActividadEstructuraSeed(
+	"Yoga",
+	(
+		_grupo_leaf("1 Clase por Semana", 10, ITEM_YOGA_1_CLASE),
+		_grupo_leaf("2 Clases por Semana", 20, ITEM_YOGA_2_CLASES),
+	),
+)
+
+ESTRUCTURA_GIMNASIO_FITNESS = ActividadEstructuraSeed(
+	"Gimnasio Fitness",
+	(
+		_grupo_leaf("No Socio", 10, ITEM_GYM_NO_SOCIO),
+		_grupo_leaf("Socio", 20, ITEM_GYM_SOCIO),
+	),
+)
+
+ESTRUCTURA_INICIACION_DEPORTIVA = ActividadEstructuraSeed(
+	"Iniciacion Deportiva",
+	(
+		_grupo_leaf("1 Clase por Semana", 10, ITEM_INICIACION_1_CLASE),
+		_grupo_leaf("2 Clases por Semana", 20, ITEM_INICIACION_2_CLASES),
+	),
+)
+
+
 ESTRUCTURA_CON_GRUPOS: tuple[ActividadEstructuraSeed, ...] = (
-	ActividadEstructuraSeed("Basquet Masculino", _TIRAS_BASQUET),
-	ActividadEstructuraSeed(
-		"Basquet Femenino",
-		(
-			GrupoSeed("Tira Azul", 10, "ICDPE-ARANCEL-MENSUAL-basquet-fem-tira-azul"),
-			GrupoSeed("Tira Amarilla", 20, "ICDPE-ARANCEL-MENSUAL-basquet-fem-tira-amarilla"),
-			GrupoSeed("Tira Flex", 30, "ICDPE-ARANCEL-MENSUAL-basquet-fem-tira-flex"),
-			GrupoSeed("Primera Division B", 40, "ICDPE-ARANCEL-MENSUAL-basquet-fem-primera-b"),
-		),
-	),
-	ActividadEstructuraSeed(
-		"Voley Femenino",
-		(
-			GrupoSeed("Primera Division", 10, "ICDPE-ARANCEL-MENSUAL-voley-primera"),
-			GrupoSeed("Segunda Division", 20, "ICDPE-ARANCEL-MENSUAL-voley-segunda"),
-			GrupoSeed("Juveniles", 30, "ICDPE-ARANCEL-MENSUAL-voley-juveniles"),
-		),
-	),
-	ActividadEstructuraSeed(
-		"Futbol",
-		(
-			GrupoSeed("Primera Division", 10, "ICDPE-ARANCEL-MENSUAL-futbol-primera"),
-			GrupoSeed("Reserva", 20, "ICDPE-ARANCEL-MENSUAL-futbol-reserva"),
-			GrupoSeed("Juveniles", 30, "ICDPE-ARANCEL-MENSUAL-futbol-juveniles"),
-			GrupoSeed("Femenino", 40, "ICDPE-ARANCEL-MENSUAL-futbol-femenino"),
-		),
-	),
+	ESTRUCTURA_BASQUET_MASCULINO,
+	ESTRUCTURA_BASQUET_ESCUELITA,
+	ESTRUCTURA_BASQUET_FEMENINO,
+	ESTRUCTURA_VOLEY_FEMENINO,
+	ESTRUCTURA_FUTBOL,
+	ESTRUCTURA_PATIN,
+	ESTRUCTURA_GIMNASIA_ARTISTICA,
+	ESTRUCTURA_INICIACION_DEPORTIVA,
+	ESTRUCTURA_BOXEO,
+	ESTRUCTURA_YOGA,
+	ESTRUCTURA_GIMNASIO_FITNESS,
 )
