@@ -7,6 +7,7 @@ frappe.pages["valores-cuota-social"].on_page_load = function (wrapper) {
 	club_management.valores_cuota_social_page.init(page);
 };
 
-frappe.pages["valores-cuota-social"].on_page_show = function () {
-	club_management.club_desk_navigation?.schedule_refresh?.();
-};
+	frappe.pages["valores-cuota-social"].on_page_show = function () {
+		club_management.secretaria_sidebar?.refresh?.();
+		club_management.club_desk_navigation?.schedule_refresh?.();
+	};

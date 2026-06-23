@@ -49,7 +49,9 @@
 			if (!ws || !ws.body) return null;
 			ws.body.addClass("club-secretaria-workspace-body");
 			ws.body
-				.parents(".layout-main-section-wrapper, .layout-main-section, .page-body, .container")
+				.parents(
+					".layout-main-section-wrapper, .layout-main-section, .page-body, .container, .layout-main, main"
+				)
 				.addClass("club-secretaria-workspace-body");
 			const container = ws.body.find(".editor-js-container");
 			if (!container.length) return null;
@@ -65,7 +67,9 @@
 			ws?.body?.find(".editor-js-container")?.removeClass("club-secretaria-workspace");
 			ws?.body?.removeClass("club-secretaria-workspace-body");
 			ws?.body
-				?.parents(".layout-main-section-wrapper, .layout-main-section, .page-body, .container")
+				?.parents(
+					".layout-main-section-wrapper, .layout-main-section, .page-body, .container, .layout-main, main"
+				)
 				?.removeClass("club-secretaria-workspace-body");
 		},
 
@@ -475,6 +479,8 @@
 				return;
 
 			}
+
+			club_management.secretaria_sidebar?.refresh?.();
 
 
 

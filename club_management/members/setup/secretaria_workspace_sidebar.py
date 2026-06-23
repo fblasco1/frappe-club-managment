@@ -95,7 +95,11 @@ def sync_secretaria_workspace_sidebar() -> None:
 			continue
 		if item.get("link_type") == "Page" and not frappe.db.exists("Page", item["link_to"]):
 			continue
-		rows.append({**item, "idx": idx})
+		row = {**item, "idx": idx}
+		if row.get("type") != "Link":
+			row.pop("link_type", None)
+			row.pop("link_to", None)
+		rows.append(row)
 
 	frappe.db.delete("Workspace Sidebar Item", {"parent": WORKSPACE_NAME})
 	for row in rows:
