@@ -16,8 +16,6 @@
 
 		_refresh_timer: null,
 
-		_cuotas_state: null,
-
 
 
 		schedule_refresh() {
@@ -359,106 +357,16 @@
 		render_lists($panel, data) {
 			const metricas = data.metricas || {};
 			const verMas = metricas.ver_mas || {};
-			this._cuotas_state = data.cuotas_sociales || null;
 
 			$panel.html(`
 				${this.render_quick_actions()}
 				${this.render_kpi_cards(metricas)}
 				${this.render_charts(metricas)}
 				${this.render_solicitudes_table(data.solicitudes_pendientes, verMas)}
-				<div class="club-secretaria-cuotas-section">
-					${this.render_cuotas_html(this._cuotas_state)}
-				</div>
 			`);
 
 			this.mount_charts($panel, metricas);
 			this.bind_panel_handlers($panel);
-		},
-
-
-
-		render_cuotas_html(cuotasData) {
-
-			const cuotas = cuotasData?.cuotas || [];
-
-			if (!cuotas.length) {
-
-				return "";
-
-			}
-
-			const rows = cuotas
-
-				.map(
-
-					(row) => `
-
-				<tr data-categoria="${frappe.utils.escape_html(row.categoria)}">
-
-					<td>${frappe.utils.escape_html(row.categoria)}</td>
-
-					<td>
-
-						<input type="number" class="form-control form-control-sm club-cuota-monto"
-
-							min="0" step="0.01" value="${frappe.utils.escape_html(String(row.monto || 0))}">
-
-					</td>
-
-					<td class="text-muted small">${frappe.utils.escape_html(row.item || cuotasData.item_cuota_social_default || "")}</td>
-
-				</tr>`
-
-				)
-
-				.join("");
-
-			return `
-
-				<details class="club-secretaria-cuotas-collapse">
-
-					<summary>
-
-						<span class="club-secretaria-list-icon">💰</span>
-
-						${__("Cuotas sociales por categoría")}
-
-					</summary>
-
-					<div class="table-responsive">
-
-						<table class="table table-sm club-cuotas-table mb-2">
-
-							<thead>
-
-								<tr>
-
-									<th>${__("Categoría")}</th>
-
-									<th>${__("Monto mensual")}</th>
-
-									<th>${__("Ítem ERPNext")}</th>
-
-								</tr>
-
-							</thead>
-
-							<tbody>${rows}</tbody>
-
-						</table>
-
-					</div>
-
-					<button type="button" class="btn btn-primary btn-sm club-secretaria-save-cuotas">
-
-						${__("Guardar cuotas")}
-
-					</button>
-
-				</details>
-
-			`;
-
 		},
 
 
@@ -498,10 +406,6 @@
 				this.open_list($btn.attr("data-doctype"), $btn.attr("data-filters"));
 			});
 
-
-
-			$panel.find(".club-secretaria-save-cuotas").on("click", () => this.save_cuotas($panel));
-
 			$panel.find(".club-secretaria-nuevo-socio").on("click", () => {
 				if (club_management_socio_alta_guiada?.open) {
 					club_management_socio_alta_guiada.open();
@@ -534,52 +438,6 @@
 				frappe.set_route("Form", "Solicitud Asociacion", name);
 			}
 		},
-
-
-
-		save_cuotas($panel) {
-
-			const rows = [];
-
-			$panel.find(".club-cuotas-table tbody tr").each((_, tr) => {
-
-				const $tr = $(tr);
-
-				rows.push({
-
-					categoria: $tr.data("categoria"),
-
-					monto: parseFloat($tr.find(".club-cuota-monto").val()) || 0,
-
-				});
-
-			});
-
-			frappe.call({
-
-				method: "club_management.members.api.secretaria_workspace.save_cuotas_sociales",
-
-				args: { rows },
-
-				freeze: true,
-
-				callback: (r) => {
-
-					if (r.message) {
-
-						frappe.show_alert({ message: __("Cuotas guardadas"), indicator: "green" });
-
-						this._cuotas_state = r.message;
-
-					}
-
-				},
-
-			});
-
-		},
-
-
 
 		open_list(doctype, raw_filters) {
 			if (!doctype) {

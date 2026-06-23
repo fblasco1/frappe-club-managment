@@ -108,19 +108,21 @@ Given Secretaría en Desk dentro del contexto de socios (workspace `Secretaría`
 When observa la sidebar izquierda del workspace
 Then ve **Secretaría** para volver al panel del workspace
 And ve **Socio** para abrir el listado de socios
+And ve **Valores de Cuota Social** para abrir la página de montos por categoría
 And no ve `Grupo Familiar` ni `Solicitud Asociacion`
 And ve una sección **Informes** con acceso a **Deuda por equipo** y **Pagos por equipo**.
 
 ---
 
-## Scenario: cuotas sociales inline en panel Secretaría
+## Scenario: cuotas sociales en página dedicada
 
 Given `Club Settings` con filas en `cuotas_categoria`
-When Secretaria consulta `get_cuotas_sociales`
-Then recibe categoría, monto e ítem por fila
-When Secretaria llama `save_cuotas_sociales` con montos válidos
+When Secretaria abre la página **Valores de Cuota Social** desde la sidebar
+Then ve categoría, monto e ítem por fila
+When llama `save_cuotas_sociales` con montos válidos
 Then se persisten en `Club Settings` sin abrir el formulario Single
 And un usuario sin rol `Secretaria` recibe error de permisos.
+And el dashboard del workspace **Secretaría** no incluye la tabla de cuotas inline.
 
 ---
 

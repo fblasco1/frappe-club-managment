@@ -7,6 +7,8 @@ import frappe
 from club_management.members.setup.inicio_workspace import CLUB_DESK_REPORTS
 from club_management.members.setup.secretaria_workspace import WORKSPACE_NAME
 
+VALORES_CUOTA_SOCIAL_PAGE = "valores-cuota-social"
+
 SIDEBAR_ITEMS: list[dict] = [
 	{
 		"label": "Secretaría",
@@ -21,6 +23,13 @@ SIDEBAR_ITEMS: list[dict] = [
 		"link_type": "DocType",
 		"link_to": "Socio",
 		"icon": "user",
+	},
+	{
+		"label": "Valores de Cuota Social",
+		"type": "Link",
+		"link_type": "Page",
+		"link_to": VALORES_CUOTA_SOCIAL_PAGE,
+		"icon": "wallet",
 	},
 	{
 		"label": "Informes",
@@ -52,6 +61,16 @@ def secretaria_sidebar_fixture_path() -> str:
 	)
 
 
+def valores_cuota_social_page_fixture_path() -> str:
+	return frappe.get_app_path(
+		"club_management",
+		"members",
+		"page",
+		"valores_cuota_social",
+		"valores_cuota_social.json",
+	)
+
+
 def sync_secretaria_workspace_sidebar() -> None:
 	"""Reemplaza ítems de la sidebar pública del workspace Secretaría."""
 	if not frappe.db.exists("Workspace", WORKSPACE_NAME):
@@ -73,6 +92,8 @@ def sync_secretaria_workspace_sidebar() -> None:
 	rows = []
 	for idx, item in enumerate(SIDEBAR_ITEMS, start=1):
 		if item.get("link_type") == "Report" and not frappe.db.exists("Report", item["link_to"]):
+			continue
+		if item.get("link_type") == "Page" and not frappe.db.exists("Page", item["link_to"]):
 			continue
 		rows.append({**item, "idx": idx})
 

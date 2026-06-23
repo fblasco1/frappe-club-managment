@@ -58,6 +58,14 @@
 
 
 
+	club_management.club_desk_navigation.CLUB_PAGES = new Set([
+
+		"valores-cuota-social",
+
+	]);
+
+
+
 	club_management.club_desk_navigation.CLUB_SOCIOS_DOCTYPES = new Set(["Socio"]);
 
 
@@ -154,6 +162,32 @@
 
 
 
+	club_management.club_desk_navigation.get_active_page = function () {
+
+		const route = frappe.get_route() || [];
+
+		if (route.length === 1 && route[0] && this.CLUB_PAGES.has(route[0])) {
+
+			return route[0];
+
+		}
+
+		return null;
+
+	};
+
+
+
+	club_management.club_desk_navigation.is_club_page = function (page_name) {
+
+		const active = page_name || this.get_active_page();
+
+		return active ? this.CLUB_PAGES.has(active) : false;
+
+	};
+
+
+
 	club_management.club_desk_navigation.is_club_socio_page = function () {
 
 		const doctype = this.get_active_doctype();
@@ -196,7 +230,9 @@
 
 			this.is_club_report() ||
 
-			this.is_club_socio_page()
+			this.is_club_socio_page() ||
+
+			this.is_club_page()
 
 		);
 
@@ -215,6 +251,12 @@
 		}
 
 		if (this.is_club_socio_page()) {
+
+			return this.TABS.find((tab) => tab.workspace === "Secretaría") || null;
+
+		}
+
+		if (this.is_club_page()) {
 
 			return this.TABS.find((tab) => tab.workspace === "Secretaría") || null;
 
@@ -344,7 +386,7 @@
 
 	club_management.club_desk_navigation.get_mount_parent = function () {
 
-		if (this.is_club_report() || this.is_club_socio_page()) {
+		if (this.is_club_report() || this.is_club_socio_page() || this.is_club_page()) {
 
 			const $report = $(".page-content, .layout-main-section").first();
 

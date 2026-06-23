@@ -32,6 +32,7 @@ class TestSecretariaWorkspaceSidebar(FrappeTestCase):
 		labels = [row.get("label") for row in data.get("items") or []]
 		self.assertEqual(labels[0], "Secretaría")
 		self.assertIn("Socio", labels)
+		self.assertIn("Valores de Cuota Social", labels)
 		self.assertIn("Informes", labels)
 		for report_name in CLUB_DESK_REPORTS:
 			self.assertIn(report_name, labels)
@@ -42,6 +43,7 @@ class TestSecretariaWorkspaceSidebar(FrappeTestCase):
 		labels = [row["label"] for row in SIDEBAR_ITEMS]
 		self.assertIn("Secretaría", labels)
 		self.assertIn("Socio", labels)
+		self.assertIn("Valores de Cuota Social", labels)
 		self.assertIn("Informes", labels)
 		for hidden in HIDDEN_SIDEBAR_LINKS:
 			self.assertNotIn(hidden, labels)
@@ -75,6 +77,7 @@ class TestSecretariaWorkspaceSidebar(FrappeTestCase):
 		labels = [row["label"] for row in items]
 		self.assertIn("Secretaría", labels)
 		self.assertIn("Socio", labels)
+		self.assertIn("Valores de Cuota Social", labels)
 		self.assertIn("Informes", labels)
 		for hidden in HIDDEN_SIDEBAR_LINKS:
 			self.assertNotIn(hidden, labels)

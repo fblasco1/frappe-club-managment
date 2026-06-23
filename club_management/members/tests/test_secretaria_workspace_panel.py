@@ -105,12 +105,12 @@ class TestSecretariaWorkspacePanelService(MembersTestCase):
 		match = [r for r in rows if r["identificador"].startswith("SOC-") and "Fútbol" in r["actividad"]]
 		self.assertEqual(len(match), 1)
 
-	def test_get_panel_lists_metricas_y_cuotas(self) -> None:
+	def test_get_panel_lists_metricas_sin_cuotas_inline(self) -> None:
 		data = get_panel_lists()
 		self.assertIn("metricas", data)
 		self.assertIn("socios", data["metricas"])
 		self.assertIn("recaudacion", data["metricas"])
-		self.assertIn("cuotas_sociales", data)
+		self.assertNotIn("cuotas_sociales", data)
 		self.assertIn("solicitudes_pendientes", data)
 		self.assertIn("morosos", data["metricas"]["socios"])
 		ver_mas = data["metricas"]["ver_mas"]

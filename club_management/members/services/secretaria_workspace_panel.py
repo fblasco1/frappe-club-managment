@@ -119,10 +119,9 @@ def save_cuotas_sociales_payload(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def get_panel_lists_payload() -> dict[str, Any]:
-	"""Payload completo para el panel (métricas + cuotas + solicitudes)."""
+	"""Payload completo para el panel (métricas + solicitudes)."""
 	return {
 		"metricas": get_panel_metricas_payload(),
-		"cuotas_sociales": get_cuotas_sociales_payload(),
 		"solicitudes_pendientes": get_solicitudes_pendientes_preview(),
 	}
 
