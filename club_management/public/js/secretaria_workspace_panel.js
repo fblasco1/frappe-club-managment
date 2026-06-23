@@ -50,6 +50,9 @@
 			const ws = frappe.workspace;
 			if (!ws || !ws.body) return null;
 			ws.body.addClass("club-secretaria-workspace-body");
+			ws.body
+				.parents(".layout-main-section-wrapper, .layout-main-section, .page-body, .container")
+				.addClass("club-secretaria-workspace-body");
 			const container = ws.body.find(".editor-js-container");
 			if (!container.length) return null;
 			container.addClass("club-secretaria-workspace");
@@ -63,6 +66,9 @@
 			const ws = frappe.workspace;
 			ws?.body?.find(".editor-js-container")?.removeClass("club-secretaria-workspace");
 			ws?.body?.removeClass("club-secretaria-workspace-body");
+			ws?.body
+				?.parents(".layout-main-section-wrapper, .layout-main-section, .page-body, .container")
+				?.removeClass("club-secretaria-workspace-body");
 		},
 
 
@@ -110,25 +116,6 @@
 
 
 
-		render_segmentos(segmentos) {
-			const s = segmentos || {};
-			const parts = [
-				["Mayores", s.mayores],
-				["Menores", s.menores],
-				["Adherentes", s.adherentes],
-				["Jubilados", s.jubilados],
-			]
-				.filter(([, n]) => Number(n) > 0)
-				.map(
-					([label, n]) =>
-						`<span class="club-secretaria-segmento">${frappe.utils.escape_html(label)}: ${n}</span>`
-				)
-				.join("");
-			return parts
-				? `<div class="club-secretaria-segmentos">${parts}</div>`
-				: "";
-		},
-
 		render_altas_bajas(altasBajas) {
 			const altas = Number(altasBajas?.altas) || 0;
 			const bajas = Number(altasBajas?.bajas) || 0;
@@ -149,8 +136,8 @@
 					<div class="club-secretaria-kpi-card">
 						<p class="club-secretaria-kpi-title">${__("Total socios activos")}</p>
 						<div class="club-secretaria-kpi-value">${socios.total ?? 0}</div>
-						${this.render_segmentos(socios.segmentos)}
 						<div class="club-secretaria-kpi-footer">
+							${this.render_delta(socios.delta_mes)}
 							${this.render_ver_mas_btn(verMas.socios_total_doctype, verMas.socios_total_filters)}
 						</div>
 					</div>
@@ -177,31 +164,79 @@
 			`;
 		},
 
+		has_segmentos_chart(segmentos) {
+			const s = segmentos || {};
+			return (s.total || 0) > 0;
+		},
+
 		render_charts(metricas) {
+			const socios = metricas.socios || {};
 			const tendencia = metricas.tendencia_recaudacion || {};
 			const medios = metricas.medios_pago || {};
 			const showTrend = tendencia.disponible && (tendencia.meses || []).length;
+			const showSegmentos = this.has_segmentos_chart(socios.segmentos);
 			const showMedios =
 				medios.disponible &&
 				(medios.debito_automatico ||
 					medios.efectivo_pos ||
 					medios.transferencia ||
 					medios.otros);
-			if (!showTrend && !showMedios) {
+			if (!showTrend && !showSegmentos && !showMedios) {
 				return "";
 			}
-			return `
-				<div class="club-secretaria-charts-grid">
-					${showTrend ? `<div class="club-secretaria-chart-card"><h6>${__("Tendencia de recaudación")}</h6><div class="club-secretaria-chart-trend"></div></div>` : ""}
-					${showMedios ? `<div class="club-secretaria-chart-card"><h6>${__("Medios de pago del mes")}</h6><div class="club-secretaria-chart-medios"></div></div>` : ""}
-				</div>
-			`;
+			const trendHtml = showTrend
+				? `<div class="club-secretaria-charts-row club-secretaria-charts-row--trend">
+					<div class="club-secretaria-chart-card club-secretaria-chart-card--wide">
+						<h6>${__("Tendencia de recaudación")}</h6>
+						<div class="club-secretaria-chart-trend"></div>
+					</div>
+				</div>`
+				: "";
+			const secondaryHtml =
+				showSegmentos || showMedios
+					? `<div class="club-secretaria-charts-row club-secretaria-charts-row--secondary">
+					${showSegmentos ? `<div class="club-secretaria-chart-card"><h6>${__("Socios por categoría")}</h6><div class="club-secretaria-chart-segmentos"></div></div>` : ""}
+					${showMedios ? `<div class="club-secretaria-chart-card club-secretaria-chart-card--medios"><h6>${__("Medios de pago del mes")}</h6><div class="club-secretaria-chart-medios"></div></div>` : ""}
+				</div>`
+					: "";
+			return `${trendHtml}${secondaryHtml}`;
 		},
 
 		mount_charts($panel, metricas) {
 			this._destroy_charts();
+			const socios = metricas.socios || {};
 			const tendencia = metricas.tendencia_recaudacion || {};
 			const medios = metricas.medios_pago || {};
+			const segmentos = socios.segmentos || {};
+			const $segmentos = $panel.find(".club-secretaria-chart-segmentos");
+			if ($segmentos.length && this.has_segmentos_chart(segmentos)) {
+				this._chart_segmentos = new frappe.Chart($segmentos[0], {
+					type: "bar",
+					height: 240,
+					colors: ["#5e64ff"],
+					data: {
+						labels: [
+							__("Mayores"),
+							__("Menores"),
+							__("Adherentes"),
+							__("Jubilados"),
+						],
+						datasets: [
+							{
+								name: __("Socios"),
+								values: [
+									segmentos.mayores || 0,
+									segmentos.menores || 0,
+									segmentos.adherentes || 0,
+									segmentos.jubilados || 0,
+								],
+							},
+						],
+					},
+					barOptions: { spaceRatio: 0.45 },
+					axisOptions: { shortenYAxisNumbers: 1 },
+				});
+			}
 			const $trend = $panel.find(".club-secretaria-chart-trend");
 			if ($trend.length && tendencia.meses?.length) {
 				this._chart_trend = new frappe.Chart($trend[0], {
@@ -223,7 +258,7 @@
 			if ($medios.length && medios.disponible) {
 				this._chart_medios = new frappe.Chart($medios[0], {
 					type: "donut",
-					height: 220,
+					height: 260,
 					colors: ["#5e64ff", "#29cd42", "#f39c12", "#95a5a6"],
 					data: {
 						labels: [
@@ -249,6 +284,7 @@
 
 		_destroy_charts() {
 			this._chart_trend = null;
+			this._chart_segmentos = null;
 			this._chart_medios = null;
 		},
 

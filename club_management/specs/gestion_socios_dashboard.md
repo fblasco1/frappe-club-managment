@@ -12,9 +12,9 @@ recaudación y medios de pago.
 
 Given existen socios con `estado != Baja` en distintas categorías
 When Secretaria consulta el dashboard
-Then ve el **total** de socios activos (no dados de baja)
-And un desglose sutil: **Mayores** (`Activo`, `2° Hermano`, `3° Hermano`),
-**Menores** (`Menor`), **Adherentes** (`Adherente`), **Jubilados** (`Jubilado`, `Vitalicio`).
+Then ve el **total** de socios activos (no dados de baja) en la card KPI
+And el desglose por segmento (**Mayores**, **Menores**, **Adherentes**, **Jubilados**)
+  se muestra en un **gráfico de barras** en la fila inferior, junto al gráfico de medios de pago.
 
 ---
 
