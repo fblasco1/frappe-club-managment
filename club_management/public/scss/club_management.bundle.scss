@@ -1,6 +1,6 @@
-/* Panel Secretaría + navegación club (fuente: public/css/) */
-@import "../css/secretaria_workspace_panel.css";
-@import "../css/club_desk_navigation.css";
+/* Panel Secretaría + navegación club */
+@import "./secretaria_workspace_panel";
+@import "./club_desk_navigation";
 
 /* Panel Gestión de Actividades */
 .club-actividades-workspace #editorjs {
