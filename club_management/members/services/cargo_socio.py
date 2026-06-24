@@ -16,6 +16,7 @@ from club_management.members.services.cobranza_manual import (
 	erpnext_cobranza_disponible,
 	sync_saldo_deuda_socio,
 )
+from club_management.integrations.payment_ledger_postgres import apply_patch
 from club_management.members.services.socio_operaciones_secretaria import (
 	ensure_secretaria_operacion_access,
 )
@@ -59,6 +60,7 @@ def facturar_cargo_socio(cargo_name: str) -> dict[str, Any]:
 			],
 		}
 	)
+	apply_patch()
 	invoice.insert(ignore_permissions=True)
 	invoice.submit()
 

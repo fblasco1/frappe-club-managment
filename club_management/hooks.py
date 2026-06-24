@@ -192,6 +192,9 @@ scheduler_events = {
 # Overriding Methods
 # ------------------------------
 #
+before_request = ["club_management.integrations.payment_ledger_postgres.apply_patch"]
+on_session_creation = ["club_management.integrations.payment_ledger_postgres.apply_patch"]
+
 override_whitelisted_methods = {
 	"frappe.desk.doctype.number_card.number_card.get_result": (
 		"club_management.integrations.number_card_postgres.get_result"

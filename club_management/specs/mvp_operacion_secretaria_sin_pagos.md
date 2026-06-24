@@ -66,7 +66,7 @@ Given `Club Settings` con cuota social para la categoría del socio
 And el socio tiene `Customer` ERPNext vinculado
 And inscripciones activas con ítems de arancel (si aplica)
 When Secretaría ejecuta **Generar cargo**
-Then se crea una `Sales Invoice` submitted con líneas de cuota social y aranceles
+Then se crea una `Sales Invoice` submitted con líneas de cuota social, aranceles y cargos extra recurrentes vigentes (si `incluir_cargos_extra_en_deuda_mensual`)
 And la factura referencia al `Socio` (campo custom)
 And `Socio.saldo_deuda` refleja el saldo pendiente ERPNext.
 

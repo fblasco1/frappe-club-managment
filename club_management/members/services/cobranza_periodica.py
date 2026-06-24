@@ -171,6 +171,9 @@ def generar_deuda_mensual_socio(
 		payload[campo_periodo] = periodo
 
 	invoice = frappe.get_doc(payload)
+	from club_management.integrations.payment_ledger_postgres import apply_patch
+
+	apply_patch()
 	invoice.insert(ignore_permissions=True)
 	invoice.submit()
 	sync_saldo_deuda_socio(socio_name)

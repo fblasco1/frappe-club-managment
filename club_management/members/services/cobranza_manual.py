@@ -183,15 +183,24 @@ def generar_cargo_socio(
 	socio_name: str,
 	*,
 	incluir_actividades: bool = True,
+	incluir_cargos_extra: bool | None = None,
 ) -> str:
 	"""Genera y submittea una `Sales Invoice` para el socio."""
+	from club_management.integrations.payment_ledger_postgres import apply_patch
+
+	apply_patch()
 	if not erpnext_cobranza_disponible():
 		frappe.throw(_("ERPNext no está disponible para cobranza."), frappe.ValidationError)
 
 	ensure_secretaria_operacion_access()
+	settings = get_club_settings()
+	if incluir_cargos_extra is None:
+		incluir_cargos_extra = bool(settings.incluir_cargos_extra_en_deuda_mensual)
 	customer = ensure_customer_for_socio(socio_name)
 	invoice_items = build_invoice_items_for_socio(
-		socio_name, incluir_actividades=incluir_actividades
+		socio_name,
+		incluir_actividades=incluir_actividades,
+		incluir_cargos_extra=incluir_cargos_extra,
 	)
 	if not invoice_items:
 		frappe.throw(_("No hay conceptos para facturar."), frappe.ValidationError)
@@ -211,6 +220,7 @@ def generar_cargo_socio(
 			"items": invoice_items,
 		}
 	)
+	apply_patch()
 	invoice.insert(ignore_permissions=True)
 	invoice.submit()
 	sync_saldo_deuda_socio(socio_name)
@@ -236,6 +246,78 @@ def sync_saldo_deuda_socio(socio_name: str) -> float:
 	return total
 
 
+def _lineas_factura_pendiente(invoice_name: str) -> list[dict[str, Any]]:
+	rows = frappe.get_all(
+		"Sales Invoice Item",
+		filters={"parent": invoice_name},
+		fields=["item_code", "description", "amount"],
+		order_by="idx asc",
+	)
+	lineas: list[dict[str, Any]] = []
+	for row in rows:
+		concepto = (row.description or row.item_code or "").strip()
+		lineas.append(
+			{
+				"concepto": concepto or _("Concepto"),
+				"item_code": row.item_code,
+				"monto": flt(row.amount),
+			}
+		)
+	return lineas
+
+
+def _cargos_extra_pendientes_socio(socio_name: str) -> list[dict[str, Any]]:
+	"""Cargos extra aún no facturados (únicos pendientes o recurrentes vigentes)."""
+	if not frappe.db.exists("DocType", "Cargo Socio"):
+		return []
+
+	from frappe.utils import getdate, today
+
+	hoy = getdate(today())
+	rows = frappe.get_all(
+		"Cargo Socio",
+		filters={"socio": socio_name, "estado": "Pendiente"},
+		fields=["name", "titulo", "modo_cobro", "monto", "fecha_desde", "fecha_hasta"],
+		order_by="fecha_desde asc, modified desc",
+	)
+	result: list[dict[str, Any]] = []
+	for row in rows:
+		if row.modo_cobro == "Recurrente":
+			if row.fecha_desde and getdate(row.fecha_desde) > hoy:
+				continue
+			if row.fecha_hasta and getdate(row.fecha_hasta) < hoy:
+				continue
+		result.append(
+			{
+				"name": row.name,
+				"titulo": row.titulo or _("Cargo extra"),
+				"modo_cobro": row.modo_cobro,
+				"monto": flt(row.monto),
+				"fecha_desde": row.fecha_desde,
+				"fecha_hasta": row.fecha_hasta,
+			}
+		)
+	return result
+
+
+def get_detalle_deuda_socio(socio_name: str) -> dict[str, Any]:
+	"""Saldo impago y desglose por facturas / cargos extra pendientes."""
+	saldo = sync_saldo_deuda_socio(socio_name)
+	facturas: list[dict[str, Any]] = []
+	for row in list_facturas_pendientes_socio(socio_name):
+		facturas.append(
+			{
+				**row,
+				"lineas": _lineas_factura_pendiente(row["name"]),
+			}
+		)
+	return {
+		"saldo_deuda": saldo,
+		"facturas": facturas,
+		"cargos_pendientes": _cargos_extra_pendientes_socio(socio_name),
+	}
+
+
 def list_facturas_pendientes_socio(socio_name: str) -> list[dict[str, Any]]:
 	"""Facturas submitteadas con saldo pendiente vinculadas al socio."""
 	if not erpnext_cobranza_disponible():
@@ -255,6 +337,9 @@ def list_facturas_pendientes_socio(socio_name: str) -> list[dict[str, Any]]:
 
 def registrar_cobro_manual(socio_name: str, sales_invoice_name: str) -> str:
 	"""Registra un `Payment Entry` contra la factura y actualiza deuda/estado."""
+	from club_management.integrations.payment_ledger_postgres import apply_patch
+
+	apply_patch()
 	if not erpnext_cobranza_disponible():
 		frappe.throw(_("ERPNext no está disponible para cobranza."), frappe.ValidationError)
 

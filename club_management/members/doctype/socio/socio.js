@@ -18,6 +18,7 @@ frappe.ui.form.on("Socio", {
 		}
 		club_management_socio_desk.add_operaciones_buttons(frm);
 		club_management_socio_desk.render_inscripciones(frm);
+		club_management_socio_desk.render_deuda_pendiente(frm);
 	},
 });
 
@@ -462,6 +463,110 @@ club_management_socio_desk.actualizar_saldo = function (frm) {
 			if (!r.exc) {
 				frm.reload_doc();
 			}
+		},
+	});
+};
+
+club_management_socio_desk.render_deuda_pendiente = function (frm) {
+	if (!frm.fields_dict.saldo_deuda || frm.is_new()) {
+		return;
+	}
+
+	let $panel = frm.fields_dict.saldo_deuda.$wrapper
+		.closest(".form-section")
+		.find(".club-deuda-pendiente-panel");
+	if (!$panel.length) {
+		$panel = $(
+			'<div class="club-deuda-pendiente-panel" style="margin: 1rem 0; clear: both;"></div>'
+		);
+		frm.fields_dict.saldo_deuda.$wrapper.after($panel);
+	}
+
+	$panel.html(`<p class="text-muted small">${__("Cargando deuda pendiente…")}</p>`);
+
+	frappe.call({
+		method: "club_management.members.api.cobranza_desk.list_detalle_deuda",
+		args: { socio: frm.doc.name },
+		callback(r) {
+			if (r.exc) {
+				$panel.html(
+					`<div class="text-danger small">${__("No se pudo cargar el detalle de deuda.")}</div>`
+				);
+				return;
+			}
+			const data = r.message || {};
+			const facturas = data.facturas || [];
+			const cargos = data.cargos_pendientes || [];
+			const saldo = flt(data.saldo_deuda);
+
+			if (!saldo && !facturas.length && !cargos.length) {
+				$panel.html(
+					`<div class="text-muted small">${__("Sin deuda pendiente.")}</div>`
+				);
+				return;
+			}
+
+			const saldo_label = frappe.format(saldo, { fieldtype: "Currency" });
+			const $title = $(`<h6 class="mb-2">${__("Detalle de deuda")} — ${saldo_label}</h6>`);
+			const $table = $(`
+				<table class="table table-bordered table-sm club-deuda-pendiente-table">
+					<thead>
+						<tr>
+							<th>${__("Concepto")}</th>
+							<th>${__("Tipo")}</th>
+							<th>${__("Monto")}</th>
+						</tr>
+					</thead>
+					<tbody></tbody>
+				</table>
+			`);
+			const $tbody = $table.find("tbody");
+
+			facturas.forEach((factura) => {
+				const lineas = factura.lineas || [];
+				if (!lineas.length) {
+					const monto = frappe.format(factura.outstanding_amount, { fieldtype: "Currency" });
+					$tbody.append(`
+						<tr>
+							<td>${frappe.utils.escape_html(factura.name)}</td>
+							<td>${__("Factura")}</td>
+							<td>${monto}</td>
+						</tr>
+					`);
+					return;
+				}
+				lineas.forEach((linea, idx) => {
+					const monto = frappe.format(linea.monto, { fieldtype: "Currency" });
+					const concepto =
+						idx === 0
+							? `${frappe.utils.escape_html(factura.name)} — ${frappe.utils.escape_html(linea.concepto)}`
+							: frappe.utils.escape_html(linea.concepto);
+					$tbody.append(`
+						<tr>
+							<td>${concepto}</td>
+							<td>${__("Factura")}</td>
+							<td>${monto}</td>
+						</tr>
+					`);
+				});
+			});
+
+			cargos.forEach((cargo) => {
+				const monto = frappe.format(cargo.monto, { fieldtype: "Currency" });
+				const tipo =
+					cargo.modo_cobro === "Recurrente"
+						? __("Cargo extra (recurrente, sin facturar en este mes)")
+						: __("Cargo extra — usar «Facturar cargo»");
+				$tbody.append(`
+					<tr>
+						<td>${frappe.utils.escape_html(cargo.titulo || cargo.name)}</td>
+						<td>${tipo}</td>
+						<td>${monto}</td>
+					</tr>
+				`);
+			});
+
+			$panel.empty().append($title, $table);
 		},
 	});
 };

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import frappe
 
+from club_management.integrations.payment_ledger_postgres import apply_patch
 from club_management.members.services.cargo_socio import (
 	cancelar_cargo_socio as _cancelar_cargo_socio,
 	facturar_cargo_socio as _facturar_cargo_socio,
@@ -11,6 +12,7 @@ from club_management.members.services.cargo_socio import (
 from club_management.members.services.cobranza_manual import (
 	ensure_customer_for_socio,
 	generar_cargo_socio,
+	get_detalle_deuda_socio,
 	list_facturas_pendientes_socio,
 	registrar_cobro_manual,
 	sync_saldo_deuda_socio,
@@ -29,6 +31,7 @@ def crear_cliente_socio(socio: str) -> dict[str, str]:
 
 @frappe.whitelist()
 def generar_cargo(socio: str, incluir_actividades: int = 1) -> dict[str, str]:
+	apply_patch()
 	ensure_secretaria_operacion_access()
 	invoice = generar_cargo_socio(socio, incluir_actividades=bool(incluir_actividades))
 	saldo = sync_saldo_deuda_socio(socio)
@@ -39,6 +42,12 @@ def generar_cargo(socio: str, incluir_actividades: int = 1) -> dict[str, str]:
 def list_facturas_pendientes(socio: str) -> list[dict]:
 	ensure_secretaria_operacion_access()
 	return list_facturas_pendientes_socio(socio)
+
+
+@frappe.whitelist()
+def list_detalle_deuda(socio: str) -> dict:
+	ensure_secretaria_operacion_access()
+	return get_detalle_deuda_socio(socio)
 
 
 @frappe.whitelist()
@@ -64,6 +73,7 @@ def actualizar_saldo_deuda(socio: str) -> dict[str, float]:
 
 @frappe.whitelist()
 def facturar_cargo_socio(cargo: str) -> dict[str, str | float]:
+	apply_patch()
 	return _facturar_cargo_socio(cargo)
 
 
