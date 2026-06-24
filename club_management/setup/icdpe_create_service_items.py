@@ -36,6 +36,11 @@ from club_management.setup.icdpe_company import resolve_icdpe_company
 # Raíz estándar ERPNext para Item Group (si no existe, se crea bajo "All Item Groups")
 DEFAULT_ITEM_GROUP_ROOT = "All Item Groups"
 
+# Cuenta de ingreso para conceptos generales (multas / cargos varios a socios).
+OTROS_CARGOS_ACCOUNT_NUMBER = "491003"
+OTROS_CARGOS_ACCOUNT_LABEL = "Multas y cargos a socios"
+OTROS_INGRESOS_PARENT_NUMBER = "4900"
+
 
 @dataclass(frozen=True)
 class ServiceItemSpec:
@@ -96,6 +101,43 @@ def _resolve_income_account(company: str, account_number: str) -> str:
             f"Hay más de una cuenta con account_number={account_number!r} en company={company!r}: {rows}"
         )
     return rows[0]
+
+
+def _ensure_otros_cargos_account(company: str) -> str:
+    """Cuenta de ingreso para multas/cargos varios (idempotente)."""
+    existing = frappe.db.get_value(
+        "Account",
+        {"company": company, "account_number": OTROS_CARGOS_ACCOUNT_NUMBER, "is_group": 0},
+        "name",
+    )
+    if existing:
+        return existing
+
+    parent = frappe.db.get_value(
+        "Account",
+        {"company": company, "account_number": OTROS_INGRESOS_PARENT_NUMBER, "is_group": 1},
+        "name",
+    )
+    if not parent:
+        frappe.throw(
+            f"No existe la cuenta padre «Otros ingresos» ({OTROS_INGRESOS_PARENT_NUMBER}) "
+            f"para company={company!r}."
+        )
+
+    doc = frappe.get_doc(
+        {
+            "doctype": "Account",
+            "account_name": OTROS_CARGOS_ACCOUNT_LABEL,
+            "parent_account": parent,
+            "company": company,
+            "account_number": OTROS_CARGOS_ACCOUNT_NUMBER,
+            "root_type": "Income",
+            "account_type": "Income Account",
+            "is_group": 0,
+        }
+    )
+    doc.insert(ignore_permissions=True)
+    return doc.name
 
 
 def _resolve_cost_center(company: str, cost_center_name: str) -> None:
@@ -366,13 +408,41 @@ def _specs() -> list[ServiceItemSpec]:
         ),
     ]
 
-    return institutional + sports_items + act_items + fitness_items + gastro_items + rental_items + other_items
+    # --- Conceptos generales para cargos extra (sin actividad) ---
+    cargos_varios_items = [
+        ServiceItemSpec(
+            item_code="ICDPE-MULTA",
+            item_name="Multa",
+            item_group="ICDPE / Cargos varios",
+            income_account_number=OTROS_CARGOS_ACCOUNT_NUMBER,
+            cost_center_name="Administración - ICDPE",
+        ),
+        ServiceItemSpec(
+            item_code="ICDPE-CARGO-VARIOS",
+            item_name="Cargo varios",
+            item_group="ICDPE / Cargos varios",
+            income_account_number=OTROS_CARGOS_ACCOUNT_NUMBER,
+            cost_center_name="Administración - ICDPE",
+        ),
+    ]
+
+    return (
+        institutional
+        + sports_items
+        + act_items
+        + fitness_items
+        + gastro_items
+        + rental_items
+        + other_items
+        + cargos_varios_items
+    )
 
 
 def run() -> dict[str, object]:
     _ensure_uom("Servicio")
 
     company = resolve_icdpe_company()
+    _ensure_otros_cargos_account(company)
     results: list[dict[str, str]] = []
     for spec in _specs():
         action = upsert_service_item(spec)
@@ -389,6 +459,24 @@ def run() -> dict[str, object]:
         )
 
     return {"company": company, "count": len(results), "items": results}
+
+
+def ensure_cargos_varios_items() -> dict[str, object]:
+    """Crea (idempotente) solo la cuenta y los ítems generales para cargos extra.
+
+    No depende del resto del catálogo deportivo, por lo que es seguro de correr
+    como patch aunque falten centros de costo de otras áreas.
+    """
+    _ensure_uom("Servicio")
+    company = resolve_icdpe_company()
+    _ensure_otros_cargos_account(company)
+
+    results: list[dict[str, str]] = []
+    for spec in _specs():
+        if spec.item_group != "ICDPE / Cargos varios":
+            continue
+        results.append({"item_code": spec.item_code, "action": upsert_service_item(spec)})
+    return {"company": company, "items": results}
 
 
 def print_summary(items: Iterable[dict[str, str]]) -> None:

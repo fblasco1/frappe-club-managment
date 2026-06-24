@@ -30,11 +30,13 @@ Secretaría debe poder crear cargos como **Cuota Federativa**, **Multa FEBAMBA**
 
 Given `Socio` `Activo` con `Customer`
 When Secretaría crea `Cargo Socio` con `modo_cobro = Unico`, monto 15000, ítem válido
-Then queda `estado = Pendiente`
-When ejecuta **Facturar cargo** (acción Desk o API `facturar_cargo_socio`)
-Then se crea `Sales Invoice` submitted con una línea
+Then se crea automáticamente `Sales Invoice` submitted con una línea
 And `Cargo Socio.estado = Facturado` y `sales_invoice` poblado
 And `Socio.saldo_deuda` actualizado.
+
+> Detalle del flujo de conceptos sugeridos y la facturación automática al crear:
+> ver `cargo_extra_conceptos_y_facturacion.md`. La acción **Facturar cargo**
+> queda como respaldo para cargos `Pendiente` legados.
 
 ---
 

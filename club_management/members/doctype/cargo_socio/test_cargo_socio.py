@@ -84,23 +84,11 @@ class TestCargoSocio(MembersTestCase):
 			payload["fecha_hasta"] = fecha_hasta
 		return frappe.get_doc(payload).insert(ignore_permissions=True).name
 
-	def test_crear_cargo_unico_queda_pendiente(self) -> None:
+	def test_crear_cargo_unico_se_factura_automaticamente(self) -> None:
 		socio = self._socio_activo(dni="74001001", email="cargo.unico@example.com")
 		name = self._crear_cargo(socio.name)
-		self.assertEqual(frappe.db.get_value("Cargo Socio", name, "estado"), "Pendiente")
 
-	def test_facturar_cargo_unico_crea_invoice(self) -> None:
-		socio = self._socio_activo(dni="74001002", email="cargo.fact@example.com")
-		cargo_name = self._crear_cargo(socio.name)
-
-		frappe.set_user(self._secretaria)
-		try:
-			result = facturar_cargo_socio(cargo_name)
-		finally:
-			frappe.set_user("Administrator")
-
-		self.assertEqual(result["status"], "ok")
-		cargo = frappe.get_doc("Cargo Socio", cargo_name)
+		cargo = frappe.get_doc("Cargo Socio", name)
 		self.assertEqual(cargo.estado, "Facturado")
 		self.assertTrue(cargo.sales_invoice)
 		invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, cargo.sales_invoice)
@@ -109,9 +97,28 @@ class TestCargoSocio(MembersTestCase):
 		self.assertEqual(invoice.items[0].item_code, self._item)
 		self.assertGreater(sync_saldo_deuda_socio(socio.name), 0)
 
-	def test_cancelar_cargo_pendiente(self) -> None:
+	def test_crear_cargo_unico_como_secretaria_se_factura(self) -> None:
+		socio = self._socio_activo(dni="74001002", email="cargo.fact@example.com")
+
+		frappe.set_user(self._secretaria)
+		try:
+			cargo_name = self._crear_cargo(socio.name)
+		finally:
+			frappe.set_user("Administrator")
+
+		cargo = frappe.get_doc("Cargo Socio", cargo_name)
+		self.assertEqual(cargo.estado, "Facturado")
+		self.assertTrue(cargo.sales_invoice)
+
+	def test_cancelar_cargo_recurrente_pendiente(self) -> None:
 		socio = self._socio_activo(dni="74001003", email="cargo.cancel@example.com")
-		cargo_name = self._crear_cargo(socio.name)
+		cargo_name = self._crear_cargo(
+			socio.name,
+			modo_cobro="Recurrente",
+			fecha_desde="2026-06-01",
+			fecha_hasta="2026-12-31",
+		)
+		self.assertEqual(frappe.db.get_value("Cargo Socio", cargo_name, "estado"), "Pendiente")
 
 		frappe.set_user(self._secretaria)
 		try:

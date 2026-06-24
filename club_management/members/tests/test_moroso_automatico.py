@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import frappe
 
-from club_management.members.services.cargo_socio import facturar_cargo_socio
 from club_management.members.services.cobranza_manual import (
 	erpnext_cobranza_disponible,
 	registrar_cobro_manual,
@@ -106,7 +105,8 @@ class TestMorosoAutomatico(MembersTestCase):
 		invoice_mensual = self._factura_mensual(socio.name)
 		registrar_cobro_manual(socio.name, invoice_mensual)
 
-		cargo_name = frappe.get_doc(
+		# El cargo único se factura automáticamente al crearse.
+		frappe.get_doc(
 			{
 				"doctype": "Cargo Socio",
 				"socio": socio.name,
@@ -118,13 +118,7 @@ class TestMorosoAutomatico(MembersTestCase):
 				"fecha_desde": self._GEN,
 				"estado": "Pendiente",
 			}
-		).insert(ignore_permissions=True).name
-
-		frappe.set_user(self._secretaria)
-		try:
-			facturar_cargo_socio(cargo_name)
-		finally:
-			frappe.set_user("Administrator")
+		).insert(ignore_permissions=True)
 
 		periodo = format_periodo_cobro(self._GEN)
 		self.assertEqual(saldo_periodo_corriente(socio.name, periodo), 0.0)

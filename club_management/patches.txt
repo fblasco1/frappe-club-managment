@@ -42,3 +42,4 @@ club_management.patches.v1_0.hide_stock_workspace_icdpe
 club_management.patches.v1_0.sync_basquet_aranceles_icdpe
 club_management.patches.v1_0.sync_voley_futbol_aranceles_icdpe
 club_management.patches.v1_0.sync_patin_otras_actividades_aranceles_icdpe
+club_management.patches.v1_0.create_cargos_varios_items

@@ -6,7 +6,6 @@ import frappe
 from frappe.utils import flt
 
 from club_management.members.api.cobranza_desk import list_detalle_deuda
-from club_management.members.services.cargo_socio import facturar_cargo_socio
 from club_management.members.services.cobranza_manual import (
 	SALES_INVOICE_DOCTYPE,
 	erpnext_cobranza_disponible,
@@ -94,27 +93,23 @@ class TestDeudaSocioDesk(MembersTestCase):
 
 	def test_detalle_deuda_muestra_factura_y_cargo_pendiente(self) -> None:
 		socio = self._socio_activo(dni="75001002", email="deuda.det@example.com")
-		cargo_unico = (
-			frappe.get_doc(
-				{
-					"doctype": "Cargo Socio",
-					"socio": socio.name,
-					"titulo": "Multa test",
-					"tipo_cargo": "Multa",
-					"modo_cobro": "Unico",
-					"item": self._item,
-					"monto": 5_000,
-					"fecha_desde": "2026-06-01",
-					"estado": "Pendiente",
-				}
-			)
-			.insert(ignore_permissions=True)
-			.name
-		)
+		# El cargo único se factura automáticamente al crearse.
+		frappe.get_doc(
+			{
+				"doctype": "Cargo Socio",
+				"socio": socio.name,
+				"titulo": "Multa test",
+				"tipo_cargo": "Multa",
+				"modo_cobro": "Unico",
+				"item": self._item,
+				"monto": 5_000,
+				"fecha_desde": "2026-06-01",
+				"estado": "Pendiente",
+			}
+		).insert(ignore_permissions=True)
 
 		frappe.set_user(self._secretaria)
 		try:
-			facturar_cargo_socio(cargo_unico)
 			detalle = get_detalle_deuda_socio(socio.name)
 			api_detalle = list_detalle_deuda(socio.name)
 		finally:

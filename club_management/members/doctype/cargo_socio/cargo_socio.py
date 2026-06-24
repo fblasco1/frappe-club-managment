@@ -36,3 +36,26 @@ class CargoSocio(Document):
 	def on_trash(self) -> None:
 		if self.estado == "Facturado":
 			frappe.throw(_("No se puede eliminar un cargo ya facturado. Cancele si aplica."))
+
+	def after_insert(self) -> None:
+		"""Cargo Único se factura automáticamente al crearse (spec
+		cargo_extra_conceptos_y_facturacion.md). Los Recurrentes entran en la
+		deuda mensual y no se facturan al instante."""
+		if self.modo_cobro != "Unico" or self.estado != "Pendiente":
+			return
+		if (
+			frappe.flags.in_migrate
+			or frappe.flags.in_install
+			or frappe.flags.in_import
+			or getattr(frappe.flags, "in_patch", False)
+		):
+			return
+		from club_management.members.services.cobranza_manual import (
+			erpnext_cobranza_disponible,
+		)
+
+		if not erpnext_cobranza_disponible():
+			return
+		from club_management.members.services.cargo_socio import facturar_cargo_socio
+
+		facturar_cargo_socio(self.name)
