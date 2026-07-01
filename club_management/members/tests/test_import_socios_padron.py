@@ -45,6 +45,7 @@ class TestImportSociosPadronContactoDomicilio(MembersTestCase):
         self.assertEqual(payload["provincia"], "Buenos Aires")
         self.assertEqual(payload["ciudad"], "La Plata")
         self.assertEqual(payload["localidad_barrio"], "Centro")
+        self.assertEqual(payload["numero_socio"], 100)
         self.assertNotIn("domicilio", payload)
         self.assertNotIn("telefono", payload)
 
@@ -75,3 +76,61 @@ class TestImportSociosPadronContactoDomicilio(MembersTestCase):
         }
         with self.assertRaises(frappe.ValidationError):
             build_socio_payload(row)
+
+    def test_fila_incompleta_usa_placeholder_dni_y_numero_socio_legacy(self) -> None:
+        row = {
+            "nro_socio": "31",
+            "socio": "CIBEIRA ROBERTO JORGE",
+            "fecha_alta": "",
+            "fecha_nacimiento": "",
+            "doc_identidad": "",
+            "categoria_socio": "VITALICIO",
+            "matrícula": "",
+            "cobrador": "",
+            "teléfono": "",
+            "tel_movil": "",
+            "email": "",
+            "cuenta": "",
+            "foto": "NO",
+            "notas": "",
+            "calle": "",
+            "numero": "",
+            "piso": "",
+            "departamento": "",
+            "provincia": "",
+            "ciudad": "",
+            "localidad_barrio": "",
+            "codigo_postal": "",
+        }
+        payload = build_socio_payload(row)
+        self.assertEqual(payload["numero_socio"], 31)
+        self.assertEqual(payload["dni"], "PEND-31")
+        self.assertNotIn("fecha_nacimiento", payload)
+
+    def test_fila_incompleta_estricta_falla_sin_dni(self) -> None:
+        row = {
+            "nro_socio": "32",
+            "socio": "SIN DATOS",
+            "fecha_alta": "",
+            "fecha_nacimiento": "",
+            "doc_identidad": "",
+            "categoria_socio": "ACTIVO",
+            "matrícula": "",
+            "cobrador": "",
+            "teléfono": "",
+            "tel_movil": "",
+            "email": "",
+            "cuenta": "",
+            "foto": "NO",
+            "notas": "",
+            "calle": "",
+            "numero": "",
+            "piso": "",
+            "departamento": "",
+            "provincia": "",
+            "ciudad": "",
+            "localidad_barrio": "",
+            "codigo_postal": "",
+        }
+        with self.assertRaises(frappe.MandatoryError):
+            build_socio_payload(row, allow_incomplete=False)

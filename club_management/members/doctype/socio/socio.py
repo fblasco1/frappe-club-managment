@@ -19,6 +19,7 @@ from datetime import date
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.query_builder.functions import Max
 from frappe.utils import getdate, today
 
 
@@ -35,6 +36,48 @@ def format_socio_nombre_completo(apellido: str | None, nombre: str | None) -> st
 
 
 class Socio(Document):
+	def before_insert(self) -> None:
+		"""Asigna el número de socio (PK) según la estrategia de naming.
+
+		- **Migración histórica (alta manual desde el Desk):** si `numero_socio`
+		  viene cargado, se respeta el número real del club.
+		- **Alta nueva (validación de Solicitud vía web):** si `numero_socio` está
+		  vacío, se calcula `MAX(numero_socio) + 1` (con respaldo en `name` numérico).
+
+		Se ejecuta antes de `set_new_name`; con `autoname = "field:numero_socio"`
+		Frappe deriva el `name` desde este campo. Se fija `self.name` explícitamente
+		para dejar la invariante (PK == número de socio) clara y robusta.
+		"""
+		if self.numero_socio:
+			self.numero_socio = int(self.numero_socio)
+		else:
+			self.numero_socio = self._siguiente_numero_socio()
+		self.name = str(self.numero_socio)
+
+	@staticmethod
+	def _siguiente_numero_socio() -> int:
+		"""Devuelve el siguiente número de socio para PostgreSQL v14.
+
+		Prioriza ``MAX(numero_socio)`` (columna entera del DocType). Durante la
+		migración desde series ``SOC-…``, filas legacy pueden tener
+		``numero_socio = 0`` pero ``name`` ya numérico; en ese caso se usa
+		``MAX(name::INTEGER)`` solo sobre nombres puramente numéricos.
+		"""
+		socio = frappe.qb.DocType("Socio")
+		resultado = frappe.qb.from_(socio).select(Max(socio.numero_socio)).run()
+		max_numero = int((resultado[0][0] if resultado and resultado[0] else 0) or 0)
+
+		max_name = frappe.db.sql(
+			"""
+			SELECT MAX(name::INTEGER)
+			FROM "tabSocio"
+			WHERE name ~ '^[0-9]+$'
+			"""
+		)[0][0]
+		max_name = int(max_name or 0)
+
+		return max(max_numero, max_name) + 1
+
 	def validate(self) -> None:
 		self._sync_nombre_completo()
 		self._validate_estado_solo_via_servicio()

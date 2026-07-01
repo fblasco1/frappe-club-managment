@@ -25,6 +25,7 @@ import datetime
 import unittest
 
 import frappe
+from frappe.utils import getdate
 
 from club_management.members.test_helpers import (
     DUMMY_DNI_DORSO,
@@ -46,7 +47,9 @@ class TestSocioCamposObligatorios(MembersTestCase):
 
     def test_alta_adulto_minima_es_valida(self) -> None:
         socio = insert_socio()
-        self.assertTrue(socio.name.startswith("SOC-"))
+        # Naming numérico: el `name` es el número de socio entero (no `SOC-...`).
+        self.assertTrue(socio.name.isdigit())
+        self.assertEqual(str(socio.numero_socio), socio.name)
         self.assertEqual(socio.estado, "Pendiente de Validación")
         self.assertFalse(socio.get("fecha_alta"))
 
@@ -82,6 +85,52 @@ class TestSocioCamposObligatorios(MembersTestCase):
         insert_socio(dni="30123456", email="familia@example.com")
         otro = insert_socio(dni="30654321", email="familia@example.com")
         self.assertEqual(otro.email, "familia@example.com")
+
+
+class TestSocioNumeroSocioNaming(MembersTestCase):
+    """Naming: `numero_socio` entero, histórico y autoincremental, es el `name`.
+
+    Spec: `socio_minimo.md` → "Naming y número de socio".
+    """
+
+    def test_name_es_el_numero_socio_en_string(self) -> None:
+        socio = insert_socio(dni="40000001", email="naming1@example.com")
+        self.assertTrue(socio.numero_socio)
+        self.assertEqual(socio.name, str(int(socio.numero_socio)))
+        self.assertTrue(socio.name.isdigit())
+
+    def test_numero_socio_autoincremental(self) -> None:
+        primero = insert_socio(dni="40000002", email="naming2@example.com")
+        segundo = insert_socio(dni="40000003", email="naming3@example.com")
+        self.assertEqual(int(segundo.numero_socio), int(primero.numero_socio) + 1)
+
+    def test_numero_socio_manual_se_respeta(self) -> None:
+        # Migración histórica desde el Desk: Secretaría carga el número real.
+        socio = insert_socio(
+            dni="40000004",
+            email="naming4@example.com",
+            numero_socio=9001,
+        )
+        self.assertEqual(int(socio.numero_socio), 9001)
+        self.assertEqual(socio.name, "9001")
+
+    def test_autoincremento_parte_del_maximo_existente(self) -> None:
+        manual = insert_socio(
+            dni="40000005",
+            email="naming5@example.com",
+            numero_socio=9500,
+        )
+        nuevo = insert_socio(dni="40000006", email="naming6@example.com")
+        self.assertEqual(int(nuevo.numero_socio), int(manual.numero_socio) + 1)
+
+    def test_numero_socio_es_inmutable(self) -> None:
+        meta = frappe.get_meta("Socio")
+        self.assertEqual(meta.autoname, "field:numero_socio")
+        self.assertFalse(meta.allow_rename)
+
+    def test_fecha_ingreso_default_hoy(self) -> None:
+        socio = insert_socio(dni="40000007", email="naming7@example.com")
+        self.assertEqual(getdate(socio.fecha_ingreso), datetime.date.today())
 
 
 class TestSocioEstadoReadOnly(MembersTestCase):

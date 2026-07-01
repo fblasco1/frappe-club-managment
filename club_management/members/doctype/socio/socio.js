@@ -323,12 +323,13 @@ club_management_socio_desk.confirmar_registrar_cobro = function (frm, invoice_ro
 				freeze: true,
 				callback(res) {
 					if (!res.exc && res.message) {
-						frappe.msgprint(
-							__("Cobro {0} registrado. Saldo: {1}", [
-								res.message.payment_entry,
-								frappe.format(res.message.saldo_deuda, { fieldtype: "Currency" }),
-							])
-						);
+						frappe.show_alert({
+							message: __("Cobro {0} registrado", [res.message.payment_entry]),
+							indicator: "green",
+						});
+						if (res.message.recibo && club_management_recibo_pago?.imprimir_despues_cobro) {
+							club_management_recibo_pago.imprimir_despues_cobro(res.message.recibo);
+						}
 						frm.reload_doc();
 					}
 				},

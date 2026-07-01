@@ -1,12 +1,14 @@
 {
  "actions": [],
  "allow_rename": 0,
- "autoname": "format:SOC-{YYYY}-{####}",
+ "autoname": "field:numero_socio",
  "creation": "2026-05-11 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
   "field_order": [
   "datos_personales_section",
+  "numero_socio",
+  "fecha_ingreso",
   "nombre_completo",
   "nombre",
   "apellido",
@@ -55,6 +57,8 @@
  ],
  "fields": [
   { "fieldname": "datos_personales_section", "fieldtype": "Section Break", "label": "Datos personales" },
+  { "fieldname": "numero_socio", "fieldtype": "Int", "label": "N\u00famero de socio", "reqd": 1, "in_list_view": 1, "in_standard_filter": 1, "description": "Identificador hist\u00f3rico y autoincremental; es el `name` (PK), por lo que su unicidad la garantiza la clave primaria. Si se deja vac\u00edo en un alta nueva, el controller asigna autom\u00e1ticamente el m\u00e1ximo existente + 1." },
+  { "fieldname": "fecha_ingreso", "fieldtype": "Date", "label": "Fecha de ingreso", "default": "Today", "description": "Ingreso administrativo del socio (a\u00f1o de ingreso). Distinto de `fecha_alta`, que marca el primer pase a Activo." },
   { "fieldname": "nombre_completo", "fieldtype": "Data", "label": "Nombre completo", "read_only": 1, "hidden": 1, "in_global_search": 1, "in_standard_filter": 1 },
   { "fieldname": "nombre", "fieldtype": "Data", "label": "Nombre", "reqd": 1, "in_list_view": 1 },
   { "fieldname": "apellido", "fieldtype": "Data", "label": "Apellido", "reqd": 1, "in_list_view": 1 },
@@ -107,7 +111,7 @@
  "modified_by": "Administrator",
  "module": "Members",
  "name": "Socio",
- "naming_rule": "Expression",
+ "naming_rule": "By fieldname",
  "search_fields": "apellido,nombre,dni,nombre_completo",
  "title_field": "nombre_completo",
  "owner": "Administrator",

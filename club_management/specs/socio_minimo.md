@@ -22,7 +22,8 @@ Esta primera entrega del DocType `Socio` cubre el flujo prioritario
 - Adjuntos obligatorios (foto, DNI ambas caras, ficha médica validada por MIME/tamaño).
 - Auditoría server-side de transiciones de estado y alta validada.
 - Política de `User`: opcional para menores cuyo email es compartido por su tutor.
-- Login dual DNI / Número de Socio para Socios con `User` propio.
+- Login DNI / email para Socios con `User` propio (el número de socio es el `name`
+  entero, no un identificador de login).
 - `Grupo Familiar` y `tutor` integrados desde Sprint 0 (DocType `Grupo Familiar`
   definido en su propio spec, `grupo_familiar_minimo.md`).
 
@@ -38,6 +39,13 @@ Quedan **fuera** de Sprint 0 (cubiertos por `socios_categoria_validacion.md`):
 
 ## Campos propuestos
 
+
+### Identidad (naming)
+
+| Campo           | Tipo | Reqd | Read-only en UI | Comentario                                                  |
+| --------------- | ---- | ---- | --------------- | ----------------------------------------------------------- |
+| `numero_socio`  | Int  | sí   | no              | **Es el `name` (PK)**. Histórico y autoincremental; vacío en alta nueva ⇒ `MAX + 1`. Inmutable (`allow_rename = 0`) |
+| `fecha_ingreso` | Date | no   | no              | Ingreso administrativo (año de ingreso); default `Today`. Distinto de `fecha_alta` |
 
 ### Datos personales
 
@@ -98,9 +106,37 @@ Quedan **fuera** de Sprint 0 (cubiertos por `socios_categoria_validacion.md`):
 > las transiciones de estado y la procedencia del alta.
 
 
-**Naming y "número de socio":** `autoname` por serie estable `SOC-.{YYYY}.-.####`.
-El **número de socio** es ese `name` (ej. `SOC-2026-0042`) y es único e inmutable.
-El DNI también es único pero es un identificador externo, no la PK del DocType.
+**Naming y "número de socio":** `autoname = "field:numero_socio"` (`naming_rule = "By fieldname"`).
+El **número de socio** es un entero histórico y autoincremental que **es** el `name`
+(PK) del documento; es único e inmutable (`allow_rename = 0`). El DNI también es único
+pero es un identificador externo, no la PK del DocType.
+
+Reglas de asignación (controller `Socio.before_insert`):
+
+- **Migración de base histórica (alta manual desde el Desk):** Secretaría carga
+  `numero_socio` con el número real del socio (p. ej. `1500`). Ese valor se usa
+  tal cual como `name` para respetar la numeración existente del club.
+- **Altas nuevas (aprobación de `Solicitud Asociacion` vía web):** si `numero_socio`
+  viene vacío, el controller calcula `MAX(numero_socio) + 1` y lo asigna al campo y
+  al `name`. La consulta usa el **query builder de Frappe** (`frappe.qb` + `Max`),
+  DB-agnóstico y compatible con **PostgreSQL v14**; **no** se usa SQL crudo con
+  `CAST(... AS UNSIGNED)` (sintaxis MariaDB que falla en PostgreSQL).
+- **Concurrencia:** `MAX + 1` tiene una ventana de carrera teórica. El backstop es
+  el `name` (PK único): dos inserts simultáneos con el mismo número fallan con
+  `DuplicateEntryError` (fallo seguro, sin corrupción). El volumen del club (altas
+  una a una) hace despreciable el riesgo.
+- **Orden operativo:** migrar primero la base histórica (1500 socios) y recién
+  después habilitar altas web, para que el autoincremento parta del máximo real.
+- **Unicidad por PK (no `unique` de campo):** `numero_socio` **no** lleva
+  `"unique": 1`. La unicidad ya la garantiza el `name` (PK), y un `unique` de campo
+  sería peligroso al correr `bench migrate` sobre una base con filas `Socio`
+  preexistentes: Frappe crea la columna `Int` con `DEFAULT 0`, por lo que todas las
+  filas legacy quedarían en `0` y un índice único colisionaría. Los registros
+  legacy quedan en `numero_socio = 0` hasta que se los renumere en la migración.
+
+**`fecha_ingreso` vs `fecha_alta`:** `fecha_ingreso` (Date, default `Today`) registra
+el ingreso administrativo del socio (año de ingreso) sin ensuciar el `name`.
+Es distinta de `fecha_alta`, que marca el primer pase a `Activo`.
 
 **Política de User (login del portal):**
 
@@ -126,17 +162,17 @@ Regla:
 **No se crean emails técnicos sintéticos.** Si un `Socio` no tiene `User` propio,
 es porque está bajo la gestión de su tutor.
 
-**Login dual: DNI o Número de Socio (solo aplica a Socios con `User` propio)**
+**Login (solo aplica a Socios con `User` propio)**
 
-Para los socios que tienen `User` propio, tanto el **DNI** como el **Número de Socio**
-(`SOC-…`) sirven como identificador de login. El DNI es el `User.username` persistido;
-el Número de Socio se resuelve en tiempo de autenticación.
+Para los socios que tienen `User` propio, el login se hace con **email** o con **DNI**
+(el DNI es el `User.username` persistido; Frappe lo resuelve con
+`allow_login_using_user_name = 1`).
 
-Implementación esperada: un `auth_hook` (registrado en `hooks.py` como `auth_hooks`)
-que, ante un intento de login, si el identificador recibido tiene el formato
-`SOC-{YYYY}-{####}`, busca el `Socio` con ese `name`, obtiene su `dni` y delega al
-`LoginManager` estándar con ese DNI como `username`. Si el formato no matchea, el
-flujo de Frappe sigue normal (acepta email o username = DNI directamente).
+> **Cambio de diseño (refactor de naming a número de socio entero):** al pasar el
+> `name` del `Socio` a un entero, el login por número de socio **se elimina** para
+> evitar la ambigüedad con el DNI (ambos serían numéricos). El `auth_hook`
+> `resolve_login_user` mantiene la traducción `TNS-{YYYY}-{####} → Tutor No Socio.user`,
+> pero **ya no** reescribe identificadores de `Socio`. Ver `login_dual.md`.
 
 **Estados (`estado`):**
 
@@ -265,29 +301,26 @@ propio documento.
 
 ---
 
-## Scenario: login dual — Número de Socio funciona como username
+## Scenario: login — Número de Socio numérico NO se intercepta
 
-Given el mismo `Socio` con `name = "SOC-2026-0042"` y `dni = "30123456"`
-And un `auth_hook` está registrado en `hooks.py` (`auth_hooks`)
-When el usuario intenta iniciar sesión usando `"SOC-2026-0042"` como identificador
-Then el `auth_hook` reconoce el formato `SOC-{YYYY}-{####}`, busca el `Socio` con
-ese `name`, obtiene su `dni` ("30123456") y delega al `LoginManager` con el DNI
-And la autenticación tiene éxito con la misma contraseña que el caso DNI directo
-And se crea una sesión equivalente al login por DNI.
+Given un `Socio` con `name = "1500"` (número de socio entero), `dni = "30123456"`
+y `user = "ana@example.com"`
+And el `auth_hook` `resolve_login_user` está registrado en `hooks.py` (`auth_hooks`)
+When el usuario intenta iniciar sesión usando `"1500"` como identificador
+Then el `auth_hook` **no** reescribe el identificador (el login por número de socio
+fue eliminado en el refactor de naming para evitar ambigüedad con el DNI)
+And Frappe procesa el identificador por su flujo estándar (email / `username`),
+fallando con error de credenciales si no corresponde a ningún `User`.
 
 ---
 
-## Scenario: login dual — formato inválido o `SOC-` inexistente cae al flujo normal
+## Scenario: login — identificador cae al flujo normal de Frappe
 
-Given un identificador de login que **no** matchea el formato `SOC-{YYYY}-{####}`
-(por ejemplo "SOC-foo", "SOCIO-2026-0001", "30123456", "ana@example.com")
+Given un identificador de login que **no** matchea el formato `TNS-{YYYY}-{####}`
+(por ejemplo "30123456", "ana@example.com", "1500")
 When el usuario intenta iniciar sesión con ese identificador
 Then el `auth_hook` no intercepta y delega al flujo estándar de Frappe (login por
-email o por `username`)
-And si el identificador **sí** matchea el formato `SOC-{YYYY}-{####}` pero **no**
-existe ningún `Socio` con ese `name`, el `auth_hook` no inventa un fallback
-silencioso: deja que el flujo estándar reciba el identificador y falle con
-`frappe.AuthenticationError`
+email o por `username = DNI`)
 And el mensaje de error mostrado al usuario no distingue entre "no existe" y
 "contraseña incorrecta" (evitar enumeración de socios).
 

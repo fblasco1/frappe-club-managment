@@ -147,6 +147,7 @@ def run(
 	dry_run: bool = False,
 	commit_every: int = 50,
 	default_estado: str = "Activo",
+	allow_incomplete: bool = True,
 ) -> dict[str, Any]:
 	"""Punto de entrada para `bench execute`."""
 	path = Path(csv_path or _default_csv_path())
@@ -158,6 +159,7 @@ def run(
 		dry_run=dry_run,
 		commit_every=commit_every,
 		default_estado=default_estado,
+		allow_incomplete=allow_incomplete,
 	)
 	_print_resumen(stats, dry_run=dry_run)
 	return stats.to_dict()
@@ -169,6 +171,7 @@ def migrate_padron_csv(
 	dry_run: bool = False,
 	commit_every: int = 50,
 	default_estado: str = "Activo",
+	allow_incomplete: bool = True,
 ) -> MigrationStats:
 	"""Lee el CSV completo e intenta insertar cada fila en `Socio`."""
 	stats = MigrationStats()
@@ -186,6 +189,7 @@ def migrate_padron_csv(
 				meta_fieldnames=meta_fieldnames,
 				default_estado=default_estado,
 				return_telefonos_invalidos=True,
+				allow_incomplete=allow_incomplete,
 			)
 			for numero in telefonos_invalidos:
 				stats.registrar_advertencia(
@@ -225,6 +229,7 @@ def build_socio_payload(
 	meta_fieldnames: set[str] | None = None,
 	default_estado: str = "Activo",
 	return_telefonos_invalidos: bool = False,
+	allow_incomplete: bool = True,
 ) -> dict[str, Any] | tuple[dict[str, Any], list[str]]:
 	"""Transforma una fila del CSV en el dict para `frappe.get_doc`."""
 	meta_fieldnames = meta_fieldnames or {
@@ -233,6 +238,8 @@ def build_socio_payload(
 
 	apellido, nombre = _split_socio_name(row.get("socio", ""))
 	dni = _normalize_dni(row.get("doc_identidad", ""))
+	if not dni and allow_incomplete:
+		dni = _placeholder_dni(row)
 	categoria = _map_categoria(row.get("categoria_socio", ""))
 	basket_context = _basketball_context(row)
 	matricula = _transform_basketball_category(
@@ -257,7 +264,6 @@ def build_socio_payload(
 		"apellido": apellido or "Sin apellido",
 		"dni": dni,
 		"nacionalidad": "Argentina",
-		"fecha_nacimiento": fecha_nacimiento,
 		"genero": "Prefiero no decir",
 		"email": email,
 		"telefono_fijo": telefono_fijo,
@@ -278,6 +284,13 @@ def build_socio_payload(
 		"ficha_medica": MIGRATION_FICHA_MEDICA,
 	}
 
+	nro_socio_raw = (row.get("nro_socio") or "").strip()
+	if nro_socio_raw.isdigit():
+		payload["numero_socio"] = int(nro_socio_raw)
+
+	if fecha_nacimiento:
+		payload["fecha_nacimiento"] = fecha_nacimiento
+
 	if fecha_alta:
 		payload["fecha_alta"] = fecha_alta
 
@@ -285,7 +298,7 @@ def build_socio_payload(
 	if matricula and "matricula_padron" in meta_fieldnames:
 		payload["matricula_padron"] = matricula
 
-	_validate_required_mapping(payload, row)
+	_validate_required_mapping(payload, row, allow_incomplete=allow_incomplete)
 	if return_telefonos_invalidos:
 		return payload, telefonos_invalidos
 	return payload
@@ -365,8 +378,11 @@ def _first_non_empty(*values: str | None) -> str:
 
 
 def _normalize_email(raw: str) -> str:
-	email = (raw or "").strip().lower()
-	return email if email else ""
+	text = (raw or "").strip().lower()
+	if not text:
+		return ""
+	match = re.search(r"([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})", text)
+	return match.group(1) if match else ""
 
 
 def _parse_date(raw: str) -> str | None:
@@ -399,20 +415,35 @@ def _assign_legacy_fields(
 			payload[fieldname] = value
 
 
-def _validate_required_mapping(payload: dict[str, Any], row: dict[str, str]) -> None:
-	"""Validaciones previas para mensajes de error más claros antes del insert."""
-	if not payload.get("dni"):
-		frappe.throw(
-			"Falta campo obligatorio: doc_identidad (DNI)",
-			MandatoryError,
-		)
-	if not payload.get("fecha_nacimiento"):
-		frappe.throw(
-			"Falta campo obligatorio: fecha_nacimiento",
-			MandatoryError,
-		)
+def _placeholder_dni(row: dict[str, str]) -> str:
+	"""DNI temporal único para migración; Secretaría debe reemplazarlo."""
+	nro = (row.get("nro_socio") or "").strip()
+	if nro.isdigit():
+		return f"PEND-{nro}"
+	socio = re.sub(r"\W+", "-", (row.get("socio") or "SIN-NOMBRE").strip().upper())
+	return f"PEND-{socio[:40] or 'X'}"
 
-	email = (row.get("email") or "").strip().lower()
+
+def _validate_required_mapping(
+	payload: dict[str, Any],
+	row: dict[str, str],
+	*,
+	allow_incomplete: bool = True,
+) -> None:
+	"""Validaciones previas para mensajes de error más claros antes del insert."""
+	if not allow_incomplete:
+		if not payload.get("dni"):
+			frappe.throw(
+				"Falta campo obligatorio: doc_identidad (DNI)",
+				MandatoryError,
+			)
+		if not payload.get("fecha_nacimiento"):
+			frappe.throw(
+				"Falta campo obligatorio: fecha_nacimiento",
+				MandatoryError,
+			)
+
+	email = _normalize_email(row.get("email", ""))
 	if email and not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
 		frappe.throw(
 			"Formato de correo inválido",
