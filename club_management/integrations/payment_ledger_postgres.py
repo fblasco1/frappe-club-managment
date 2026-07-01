@@ -2,13 +2,14 @@
 
 - Payment Ledger: GROUP BY estricto en consultas de saldo.
 - Period Closing Voucher: MAX sin ORDER BY inválido en get_value.
+- Cancelación de facturas: `delinked`/`is_cancelled` como smallint, no boolean.
 """
 
 from __future__ import annotations
 
 import frappe
 from frappe import _
-from frappe.utils import formatdate, getdate
+from frappe.utils import formatdate, getdate, now, flt
 from frappe import qb
 from frappe.query_builder import AliasedQuery, Case, Criterion, Table
 from frappe.query_builder.functions import Max, Sum
@@ -21,6 +22,7 @@ def apply_patch() -> None:
 
 	_patch_payment_ledger_query()
 	_patch_validate_against_pcv()
+	_patch_delink_original_entry()
 
 
 def _patch_validate_against_pcv() -> None:
@@ -34,6 +36,71 @@ def _patch_validate_against_pcv() -> None:
 
 	general_ledger.validate_against_pcv = _validate_against_pcv_postgres
 	general_ledger._club_validate_pcv_pg_patch = True
+
+
+def _patch_delink_original_entry() -> None:
+	try:
+		import erpnext.accounts.utils as accounts_utils
+	except ImportError:
+		return
+
+	if getattr(accounts_utils, "_club_delink_original_entry_pg_patch", False):
+		return
+
+	accounts_utils.delink_original_entry = _delink_original_entry_postgres
+	accounts_utils._club_delink_original_entry_pg_patch = True
+
+
+def _delink_original_entry_postgres(pl_entry, partial_cancel: bool = False) -> None:
+	"""Copia de ERPNext `delink_original_entry` con `delinked=1` (smallint PG)."""
+	from erpnext.accounts.utils import is_immutable_ledger_enabled
+
+	if not pl_entry:
+		return
+
+	if pl_entry.doctype == "Advance Payment Ledger Entry":
+		adv = qb.DocType("Advance Payment Ledger Entry")
+
+		(
+			qb.update(adv)
+			.set(adv.delinked, 1)
+			.set(adv.event, "Cancel")
+			.set(adv.modified, now())
+			.set(adv.modified_by, frappe.session.user)
+			.where(adv.voucher_type == pl_entry.voucher_type)
+			.where(adv.voucher_no == pl_entry.voucher_no)
+			.where(adv.against_voucher_type == pl_entry.against_voucher_type)
+			.where(adv.against_voucher_no == pl_entry.against_voucher_no)
+			.where(adv.event == pl_entry.event)
+			.run()
+		)
+		return
+
+	ple = qb.DocType("Payment Ledger Entry")
+	query = (
+		qb.update(ple)
+		.set(ple.modified, now())
+		.set(ple.modified_by, frappe.session.user)
+		.where(
+			(ple.company == pl_entry.company)
+			& (ple.account_type == pl_entry.account_type)
+			& (ple.account == pl_entry.account)
+			& (ple.party_type == pl_entry.party_type)
+			& (ple.party == pl_entry.party)
+			& (ple.voucher_type == pl_entry.voucher_type)
+			& (ple.voucher_no == pl_entry.voucher_no)
+			& (ple.against_voucher_type == pl_entry.against_voucher_type)
+			& (ple.against_voucher_no == pl_entry.against_voucher_no)
+		)
+	)
+
+	if partial_cancel:
+		query = query.where(ple.voucher_detail_no == pl_entry.voucher_detail_no)
+
+	if not is_immutable_ledger_enabled():
+		query = query.set(ple.delinked, 1)
+
+	query.run()
 
 
 def _validate_against_pcv_postgres(is_opening, posting_date, company) -> None:
@@ -136,7 +203,7 @@ def _query_for_outstanding_postgres(self) -> None:
 			.where(Criterion.all(self.voucher_posting_date))
 			.groupby(ple.against_voucher_type, ple.against_voucher_no, ple.party_type, ple.party)
 			.orderby(ple.invoice_date, ple.voucher_no)
-			.having(qb.Field("amount_in_account_currency") > 0)
+			.having(Sum(ple.amount_in_account_currency) > 0)
 			.limit(self.limit)
 			.run()
 		)
@@ -246,22 +313,24 @@ def _query_for_outstanding_postgres(self) -> None:
 		.where(Criterion.all(filter_on_outstanding_amount))
 	)
 
-	if self.get_invoices:
-		self.cte_query_voucher_amount_and_outstanding = (
-			self.cte_query_voucher_amount_and_outstanding.having(
-				qb.Field("outstanding_in_account_currency") > 0
-			)
-		)
-	elif self.get_payments:
-		self.cte_query_voucher_amount_and_outstanding = (
-			self.cte_query_voucher_amount_and_outstanding.having(
-				qb.Field("outstanding_in_account_currency") < 0
-			)
-		)
-
 	if self.limit:
 		self.cte_query_voucher_amount_and_outstanding = (
 			self.cte_query_voucher_amount_and_outstanding.limit(self.limit)
 		)
 
 	self.voucher_outstandings = self.cte_query_voucher_amount_and_outstanding.run(as_dict=True)
+
+	# PostgreSQL no admite HAVING sin GROUP BY (MariaDB sí). ERPNext filtra de nuevo en
+	# Python en get_outstanding_invoices; este post-filtro mantiene la semántica.
+	if self.get_invoices:
+		self.voucher_outstandings = [
+			row
+			for row in self.voucher_outstandings
+			if flt(row.get("outstanding_in_account_currency")) > 0
+		]
+	elif self.get_payments:
+		self.voucher_outstandings = [
+			row
+			for row in self.voucher_outstandings
+			if flt(row.get("outstanding_in_account_currency")) < 0
+		]

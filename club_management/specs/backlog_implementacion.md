@@ -701,3 +701,20 @@ print(result)  # facturas_creadas, errores, invoice_names
 | Tests E2E supervisados flujo completo Secretaría | Media | Skill `qa-solicitud-supervisada` adaptable |
 
 
+
+---
+
+
+
+## Bugs conocidos — producción
+
+
+
+| # | Bug | Prioridad | Detalle |
+
+|---|-----|-----------|---------|
+
+| B1 | **Cancelación de Sales Invoice falla en PostgreSQL** | ~~Alta~~ **Resuelto 2026-07-01** | `delink_original_entry` asignaba `delinked=true` (boolean) a columna `smallint`. Parche en `payment_ledger_postgres.py` + spec `sales_invoice_cancel_postgres.md` + test `test_sales_invoice_cancel_postgres.py`. Desplegar y reiniciar workers para activar. |
+| B2 | **`get_negative_outstanding_invoices` en Payment Entry (PostgreSQL)** | Media | Al registrar cobro manual, `payment_entry.py` usa SQL con `"Sales Invoice" as voucher_type` (identificador PG, no literal). Falla `test_moroso_automatico` en `registrar_cobro_manual`. Parche aparte en `payment_ledger_postgres.py` o wrapper. |
+
+
