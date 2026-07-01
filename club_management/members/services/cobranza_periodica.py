@@ -2,10 +2,7 @@
 
 Spec: `club_management/specs/cobranza_periodica_mensual.md`
 
-La fuente única de facturación mensual de cuota social es este job (no
-`Subscription.submit_invoice` de ERPNext). Al migrar a fase 2, cancelar
-suscripciones de cuota social existentes.
-"""
+La fuente única de facturación mensual es este job (`submit_invoice = 0` en suscripciones)."""
 
 from __future__ import annotations
 
@@ -21,21 +18,18 @@ from club_management.members.services.cobranza_manual import (
 	SALES_INVOICE_DOCTYPE,
 	SOCIO_DOCTYPE,
 	_campo_socio_en,
+	_campo_periodo_cobro,
 	_default_company,
 	build_invoice_items_for_socio,
 	ensure_customer_for_socio,
 	erpnext_cobranza_disponible,
+	factura_periodo_existe,
+	format_periodo_cobro,
 	get_club_settings,
 	sync_saldo_deuda_socio,
 )
 
 ESTADOS_ELEGIBLES = frozenset({"Activo", "Moroso"})
-
-
-def format_periodo_cobro(reference_date: str | date) -> str:
-	"""Período `MM/YYYY` para idempotencia."""
-	d = getdate(reference_date)
-	return d.strftime("%m/%Y")
 
 
 def es_dia_generacion_deuda(reference_date: str | date | None = None) -> bool:
@@ -55,11 +49,7 @@ def resolve_fechas_factura_mensual(
 	reference_date: str | date,
 	dia_primer_vencimiento: int,
 ) -> tuple[date, date]:
-	"""Posting y vencimiento válidos para ERPNext (`due_date` >= `posting_date`).
-
-	Si la generación corre después del día de deuda del período, usa hoy como
-	`posting_date` y ajusta `due_date` cuando el primer vencimiento ya pasó.
-	"""
+	"""Posting y vencimiento válidos para ERPNext (`due_date` >= `posting_date`)."""
 	ref = getdate(reference_date)
 	now = getdate(today())
 	due = primer_vencimiento(ref, dia_primer_vencimiento)
@@ -69,8 +59,7 @@ def resolve_fechas_factura_mensual(
 	return posting, due
 
 
-def segundo_vencimiento(reference_date: str | date, dia_segundo_vencimiento: str) -> date:
-	"""Segundo vencimiento del período (último día del mes o día fijo)."""
+def segundo_vencimiento(reference_date: str | date, dia_segundo_vencimiento: str) -> date:	"""Segundo vencimiento del período (último día del mes o día fijo)."""
 	d = getdate(reference_date)
 	ultimo = calendar.monthrange(d.year, d.month)[1]
 	opcion = (dia_segundo_vencimiento or "Ultimo dia del mes").strip()
@@ -90,30 +79,7 @@ def periodo_recargo(periodo_cobro: str) -> str:
 	return f"{periodo_cobro}-REC"
 
 
-def _campo_periodo_cobro() -> str | None:
-	for fieldname in ("periodo_cobro", "custom_periodo_cobro"):
-		if frappe.get_meta(SALES_INVOICE_DOCTYPE).has_field(fieldname):
-			return fieldname
-	return None
-
-
-def factura_periodo_existe(socio_name: str, periodo_cobro: str) -> bool:
-	"""True si ya hay factura submitted/draft del período para el socio."""
-	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
-	if not campo_socio:
-		return False
-
-	filters: dict[str, Any] = {campo_socio: socio_name, "docstatus": ["!=", 2]}
-	campo_periodo = _campo_periodo_cobro()
-	if campo_periodo:
-		filters[campo_periodo] = periodo_cobro
-	else:
-		filters["remarks"] = ["like", f"%cuota mensual {periodo_cobro}%"]
-	return bool(frappe.db.exists(SALES_INVOICE_DOCTYPE, filters))
-
-
-def socios_elegibles_deuda_mensual() -> list[str]:
-	return frappe.get_all(
+def socios_elegibles_deuda_mensual() -> list[str]:	return frappe.get_all(
 		SOCIO_DOCTYPE,
 		filters={"estado": ["in", list(ESTADOS_ELEGIBLES)]},
 		pluck="name",
@@ -142,8 +108,8 @@ def generar_deuda_mensual_socio(
 		incluir_actividades=bool(settings.incluir_aranceles_en_deuda_mensual),
 		incluir_cargos_extra=bool(settings.incluir_cargos_extra_en_deuda_mensual),
 		reference_date=str(ref),
-	)
-	if not invoice_items:
+		periodo_cobro=periodo,
+	)	if not invoice_items:
 		return None
 
 	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)

@@ -1,8 +1,11 @@
 # Cuotas sociales y suscripción ERPNext
 
 Montos por categoría en `members/data/cuotas_sociales_vigentes.py`.  
-Suscripción mensual **solo cuota social** (`CLUB-Cuota-Social-Base`).
+Suscripción mensual de **cuota social** (`CLUB-Cuota-Social-Base`) y, en el modelo objetivo,
+**un plan por arancel** de cada inscripción activa.
 
+**Calendario y facturación:** ver **`cobranza_suscripcion_mensual_unificada.md`**
+(emisión día 1, 1.er vencimiento día 10, 2.º vencimiento último día del mes).
 ## Scenario: Setup cuota social única
 
 Given ERPNext Subscriptions disponible
@@ -25,4 +28,13 @@ Then se cancelan sus suscripciones de cuota social activas
 When se ejecuta `retire_aranceles_mayo_2026`
 Then se eliminan ítems `ICDPE-ARANCEL-MAYO26-*` y sus planes/precios
 And se deshabilitan los grupos/tiras creados por ese seed
-And **no** se crean suscripciones por inscripción a actividades
+And **no** se crean suscripciones por inscripción a actividades *(legacy seed Mayo 2026)*
+
+## Scenario: arancel de actividad en suscripción *(objetivo)*
+
+Given un socio activo inscripto en una actividad con ítem de arancel
+When la inscripción queda activa
+Then se agrega el plan de arancel a la suscripción del socio
+And la deuda mensual se emite el día 1 con vencimientos según `cobranza_suscripcion_mensual_unificada.md`
+
+*(Implementación pendiente; hoy los aranceles entran solo vía job `generar_deuda_mensual_socio`.)*

@@ -82,7 +82,7 @@ class TestSuscripcionesCobroMensual(MembersTestCase):
 		self.assertEqual(sub.party_type, "Customer")
 		self.assertEqual(sub.party, customer)
 		self.assertEqual(sub.status, "Active")
-		self.assertEqual(int(sub.submit_invoice or 0), 1)
+		self.assertEqual(int(sub.submit_invoice or 0), 0)
 		self.assertEqual(len(sub.plans), 1)
 		self.assertEqual(sub.plans[0].plan, plan)
 

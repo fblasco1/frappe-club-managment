@@ -139,6 +139,13 @@ has_permission = {
 # ---------------
 # Hook on document methods and events
 
+doc_events = {
+	"Inscripcion Actividad": {
+		"after_insert": "club_management.members.services.suscripciones_socio.sync_suscripcion_tras_inscripcion",
+		"on_update": "club_management.members.services.suscripciones_socio.sync_suscripcion_tras_inscripcion",
+	},
+}
+
 # doc_events = {
 # 	"*": {
 # 		"on_update": "method",

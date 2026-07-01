@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 import frappe
 from frappe import _
-from frappe.utils import flt, today
+from frappe.utils import flt, getdate, today
 
 from club_management.activities.services.inscripcion_socio import (
 	INSCRIPCION_DOCTYPE,
-	resolve_item_arancel_inscripcion,
+	resolve_monto_arancel_inscripcion,
 )
 from club_management.members.services.socio_operaciones_secretaria import (
 	ensure_secretaria_operacion_access,
@@ -35,6 +36,59 @@ def _campo_socio_en(doctype: str) -> str | None:
 
 def get_club_settings() -> frappe._dict:
 	return frappe.get_single("Club Settings")
+
+
+def format_periodo_cobro(reference_date: str | date) -> str:
+	d = getdate(reference_date)
+	return d.strftime("%m/%Y")
+
+
+def _campo_periodo_cobro() -> str | None:
+	for fieldname in ("periodo_cobro", "custom_periodo_cobro"):
+		if frappe.get_meta(SALES_INVOICE_DOCTYPE).has_field(fieldname):
+			return fieldname
+	return None
+
+
+def factura_periodo_existe(socio_name: str, periodo_cobro: str) -> bool:
+	"""True si ya hay factura del período mensual para el socio."""
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	if not campo_socio:
+		return False
+
+	filters: dict[str, Any] = {campo_socio: socio_name, "docstatus": ["!=", 2]}
+	campo_periodo = _campo_periodo_cobro()
+	if campo_periodo:
+		filters[campo_periodo] = periodo_cobro
+	else:
+		filters["remarks"] = ["like", f"%cuota mensual {periodo_cobro}%"]
+	return bool(frappe.db.exists(SALES_INVOICE_DOCTYPE, filters))
+
+
+def item_codes_facturados_en_periodo(socio_name: str, periodo_cobro: str) -> set[str]:
+	"""Ítems de cuota/aranceles ya facturados en el período (facturas no canceladas)."""
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	if not campo_socio:
+		return set()
+
+	filters: dict[str, Any] = {campo_socio: socio_name, "docstatus": ["!=", 2]}
+	campo_periodo = _campo_periodo_cobro()
+	if campo_periodo:
+		filters[campo_periodo] = periodo_cobro
+	else:
+		filters["remarks"] = ["like", f"%cuota mensual {periodo_cobro}%"]
+
+	invoice_names = frappe.get_all(SALES_INVOICE_DOCTYPE, filters=filters, pluck="name")
+	codes: set[str] = set()
+	for invoice_name in invoice_names:
+		for item_code in frappe.get_all(
+			"Sales Invoice Item",
+			filters={"parent": invoice_name},
+			pluck="item_code",
+		):
+			if item_code:
+				codes.add(item_code)
+	return codes
 
 
 def resolve_cuota_social(socio_name: str) -> tuple[float, str | None]:
@@ -136,19 +190,37 @@ def build_invoice_items_for_socio(
 	incluir_actividades: bool = True,
 	incluir_cargos_extra: bool = False,
 	reference_date: str | None = None,
+	periodo_cobro: str | None = None,
+	excluir_ya_facturados: bool = True,
 ) -> list[dict[str, Any]]:
 	"""Líneas de factura: cuota social, aranceles activos y cargos extra opcionales."""
+	ref = reference_date or today()
+	periodo = periodo_cobro or format_periodo_cobro(ref)
+	ya_facturados = (
+		item_codes_facturados_en_periodo(socio_name, periodo) if excluir_ya_facturados else set()
+	)
+
 	items: list[dict[str, Any]] = []
-	monto, item_cuota = resolve_cuota_social(socio_name)
-	if monto > 0 and item_cuota:
+	seen: set[str] = set()
+
+	def _append_item(item_code: str, rate: float, description: str) -> None:
+		if not item_code or flt(rate) <= 0:
+			return
+		if item_code in ya_facturados or item_code in seen:
+			return
+		seen.add(item_code)
 		items.append(
 			{
-				"item_code": item_cuota,
+				"item_code": item_code,
 				"qty": 1,
-				"rate": monto,
-				"description": _("Cuota social"),
+				"rate": flt(rate),
+				"description": description,
 			}
 		)
+
+	monto, item_cuota = resolve_cuota_social(socio_name)
+	if monto > 0 and item_cuota:
+		_append_item(item_cuota, monto, _("Cuota social"))
 
 	if incluir_actividades:
 		for ins in frappe.get_all(
@@ -156,26 +228,13 @@ def build_invoice_items_for_socio(
 			filters={"socio": socio_name, "estado": "Activa"},
 			pluck="name",
 		):
-			item_code = resolve_item_arancel_inscripcion(ins)
-			if not item_code:
-				continue
-			items.append(
-				{
-					"item_code": item_code,
-					"qty": 1,
-					"rate": frappe.db.get_value(
-						"Item Price", {"item_code": item_code}, "price_list_rate"
-					)
-					or frappe.db.get_value("Item", item_code, "standard_rate")
-					or 0,
-					"description": _("Arancel actividad"),
-				}
-			)
+			item_code, monto = resolve_monto_arancel_inscripcion(ins)
+			if item_code:
+				_append_item(item_code, monto, _("Arancel actividad"))
 
 	if incluir_cargos_extra:
-		items.extend(
-			_cargos_extra_items_for_socio(socio_name, reference_date=reference_date)
-		)
+		for row in _cargos_extra_items_for_socio(socio_name, reference_date=reference_date):
+			_append_item(row["item_code"], row["rate"], row.get("description") or _("Cargo extra"))
 	return items
 
 
@@ -184,8 +243,9 @@ def generar_cargo_socio(
 	*,
 	incluir_actividades: bool = True,
 	incluir_cargos_extra: bool | None = None,
+	reference_date: str | date | None = None,
 ) -> str:
-	"""Genera y submittea una `Sales Invoice` para el socio."""
+	"""Genera y submittea una `Sales Invoice` mensual para el socio (Secretaría)."""
 	from club_management.integrations.payment_ledger_postgres import apply_patch
 
 	apply_patch()
@@ -193,6 +253,16 @@ def generar_cargo_socio(
 		frappe.throw(_("ERPNext no está disponible para cobranza."), frappe.ValidationError)
 
 	ensure_secretaria_operacion_access()
+	ref = getdate(reference_date or today())
+	periodo = format_periodo_cobro(ref)
+	if factura_periodo_existe(socio_name, periodo):
+		frappe.throw(
+			_("Ya existe deuda mensual para el período {0}. Use «Registrar cobro» o espere al próximo mes.").format(
+				periodo
+			),
+			frappe.ValidationError,
+		)
+
 	settings = get_club_settings()
 	if incluir_cargos_extra is None:
 		incluir_cargos_extra = bool(settings.incluir_cargos_extra_en_deuda_mensual)
@@ -201,25 +271,43 @@ def generar_cargo_socio(
 		socio_name,
 		incluir_actividades=incluir_actividades,
 		incluir_cargos_extra=incluir_cargos_extra,
+		reference_date=str(ref),
+		periodo_cobro=periodo,
 	)
 	if not invoice_items:
-		frappe.throw(_("No hay conceptos para facturar."), frappe.ValidationError)
+		frappe.throw(
+			_("No hay conceptos pendientes de facturar para {0} (cuota/aranceles ya cargados este mes).").format(
+				periodo
+			),
+			frappe.ValidationError,
+		)
 
 	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
 	if not campo_socio:
 		frappe.throw(_("Falta el campo Socio en Sales Invoice (ejecute migrate)."), frappe.ValidationError)
 
-	invoice = frappe.get_doc(
-		{
-			"doctype": SALES_INVOICE_DOCTYPE,
-			"customer": customer,
-			"company": _default_company(),
-			"posting_date": today(),
-			"due_date": today(),
-			campo_socio: socio_name,
-			"items": invoice_items,
-		}
+	from club_management.members.services.cobranza_periodica import resolve_fechas_factura_mensual
+
+	posting, due = resolve_fechas_factura_mensual(
+		ref,
+		int(settings.dia_primer_vencimiento or 10),
 	)
+
+	payload: dict[str, Any] = {
+		"doctype": SALES_INVOICE_DOCTYPE,
+		"customer": customer,
+		"company": _default_company(),
+		"posting_date": posting,
+		"due_date": due,
+		campo_socio: socio_name,
+		"remarks": _("Cuota mensual {0}").format(periodo),
+		"items": invoice_items,
+	}
+	campo_periodo = _campo_periodo_cobro()
+	if campo_periodo:
+		payload[campo_periodo] = periodo
+
+	invoice = frappe.get_doc(payload)
 	apply_patch()
 	invoice.insert(ignore_permissions=True)
 	invoice.submit()

@@ -172,6 +172,9 @@ def baja_inscripcion_desk(
 	doc.estado = "Baja"
 	doc.save(ignore_permissions=True)
 	sync_socio_actividad_resumen(socio_name)
+	from club_management.members.services.suscripciones_socio import cancel_arancel_inscripcion
+
+	cancel_arancel_inscripcion(inscripcion_name)
 
 	return {
 		"status": "ok",
@@ -293,6 +296,11 @@ def inscribir_socio_selecciones(
 				"equipo_actividad": equipo_name,
 			}
 		))
+		from club_management.members.services.suscripciones_socio import (
+			enroll_socio_arancel_inscripcion,
+		)
+
+		enroll_socio_arancel_inscripcion(doc.name)
 
 	sync_socio_actividad_resumen(socio_name)
 	if activar:

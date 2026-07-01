@@ -452,6 +452,157 @@ def _find_active_subscription_for_plan(customer_name: str, plan_name: str) -> st
 	return None
 
 
+def _get_active_subscriptions(customer_name: str) -> list[str]:
+	if not customer_name:
+		return []
+	return frappe.get_all(
+		"Subscription",
+		filters={
+			"party_type": "Customer",
+			"party": customer_name,
+			"status": ["in", list(_ACTIVE_SUBSCRIPTION_STATUSES)],
+		},
+		pluck="name",
+		order_by="creation asc",
+	)
+
+
+def _get_primary_active_subscription(customer_name: str) -> str | None:
+	subs = _get_active_subscriptions(customer_name)
+	return subs[0] if subs else None
+
+
+def _subscription_has_plan(sub_name: str, plan_name: str) -> bool:
+	return bool(
+		frappe.db.exists(
+			"Subscription Plan Detail",
+			{"parent": sub_name, "parenttype": "Subscription", "plan": plan_name},
+		)
+	)
+
+
+def _create_member_subscription(
+	customer_name: str,
+	plan_name: str,
+	*,
+	start_date: str | None = None,
+) -> frappe.model.document.Document:
+	company = _resolve_company()
+	cost_center = _resolve_cost_center(company)
+	sub_start = getdate(start_date or nowdate())
+	subscription = frappe.get_doc(
+		{
+			"doctype": "Subscription",
+			"party_type": "Customer",
+			"party": customer_name,
+			"company": company,
+			"cost_center": cost_center,
+			"start_date": sub_start,
+			"submit_invoice": 0,
+			"generate_invoice_at": "Beginning of the current subscription period",
+			"generate_new_invoices_past_due_date": 0,
+			"plans": [{"plan": plan_name, "qty": 1}],
+		}
+	)
+	subscription.insert(ignore_permissions=True)
+	return subscription
+
+
+def consolidate_customer_subscriptions(customer_name: str) -> str | None:
+	"""Unifica planes de varias suscripciones activas en la primera (migración legacy)."""
+	subs = _get_active_subscriptions(customer_name)
+	if not subs:
+		return None
+	primary = subs[0]
+	if len(subs) == 1:
+		return primary
+
+	primary_doc = frappe.get_doc("Subscription", primary)
+	for sub_name in subs[1:]:
+		other = frappe.get_doc("Subscription", sub_name)
+		for row in other.plans or []:
+			if row.plan and not _subscription_has_plan(primary, row.plan):
+				primary_doc.append("plans", {"plan": row.plan, "qty": row.qty or 1})
+		other.flags.ignore_permissions = True
+		if other.status != "Cancelled":
+			other.cancel_subscription()
+	primary_doc.flags.ignore_permissions = True
+	primary_doc.save(ignore_permissions=True)
+	return primary
+
+
+def add_plan_to_member_subscription(
+	customer_name: str,
+	plan_name: str,
+	*,
+	start_date: str | None = None,
+) -> dict[str, Any]:
+	"""Agrega un plan a la suscripción activa del cliente (una suscripción unificada)."""
+	if not erpnext_subscriptions_disponible():
+		frappe.throw(_("ERPNext Subscriptions no está disponible en este sitio."))
+	if not customer_name or not frappe.db.exists("Customer", customer_name):
+		frappe.throw(_("Cliente inválido: {0}").format(customer_name or "—"))
+	if not plan_name or not frappe.db.exists("Subscription Plan", plan_name):
+		frappe.throw(_("Plan de suscripción inválido: {0}").format(plan_name or "—"))
+
+	consolidate_customer_subscriptions(customer_name)
+	existing = _find_active_subscription_for_plan(customer_name, plan_name)
+	if existing:
+		return {
+			"subscription": existing,
+			"created": False,
+			"status": frappe.db.get_value("Subscription", existing, "status"),
+		}
+
+	sub_name = _get_primary_active_subscription(customer_name)
+	if sub_name:
+		subscription = frappe.get_doc("Subscription", sub_name)
+		subscription.append("plans", {"plan": plan_name, "qty": 1})
+		subscription.flags.ignore_permissions = True
+		subscription.save(ignore_permissions=True)
+		return {
+			"subscription": subscription.name,
+			"created": False,
+			"plan_added": True,
+			"status": subscription.status,
+		}
+
+	subscription = _create_member_subscription(customer_name, plan_name, start_date=start_date)
+	return {
+		"subscription": subscription.name,
+		"created": True,
+		"status": subscription.status,
+	}
+
+
+def remove_plan_from_member_subscription(customer_name: str, plan_name: str) -> dict[str, Any] | None:
+	"""Quita un plan de la suscripción activa; cancela la suscripción si queda vacía."""
+	if not erpnext_subscriptions_disponible() or not customer_name or not plan_name:
+		return None
+
+	sub_name = _find_active_subscription_for_plan(customer_name, plan_name)
+	if not sub_name:
+		return None
+
+	subscription = frappe.get_doc("Subscription", sub_name)
+	subscription.plans = [row for row in (subscription.plans or []) if row.plan != plan_name]
+	subscription.flags.ignore_permissions = True
+	if not subscription.plans:
+		if subscription.status != "Cancelled":
+			subscription.cancel_subscription()
+		return {
+			"subscription": sub_name,
+			"cancelled": True,
+			"status": frappe.db.get_value("Subscription", sub_name, "status"),
+		}
+	subscription.save(ignore_permissions=True)
+	return {
+		"subscription": sub_name,
+		"plan_removed": True,
+		"status": subscription.status,
+	}
+
+
 def enroll_member_to_subscription(
 	customer_name: str,
 	plan_name: str,
@@ -464,77 +615,15 @@ def enroll_member_to_subscription(
 	- `customer_name`: ID del `Customer` ERPNext (socio facturable).
 	- `plan_name`: ID del `Subscription Plan` (campo `plan_name`).
 
-	Crea un `Subscription` activo con generación automática de Sales Invoice
-	(`submit_invoice = 1`). Si ya existe una suscripción activa al mismo plan,
-	devuelve la existente (idempotente).
+	Crea o amplía la suscripción activa del cliente con el plan indicado.
+	La factura mensual la emite el job del club (`submit_invoice = 0`).
 	"""
-	if not erpnext_subscriptions_disponible():
-		frappe.throw(_("ERPNext Subscriptions no está disponible en este sitio."))
-
-	if not customer_name or not frappe.db.exists("Customer", customer_name):
-		frappe.throw(_("Cliente inválido: {0}").format(customer_name or "—"))
-
-	if not plan_name or not frappe.db.exists("Subscription Plan", plan_name):
-		frappe.throw(_("Plan de suscripción inválido: {0}").format(plan_name or "—"))
-
-	existing = _find_active_subscription_for_plan(customer_name, plan_name)
-	if existing:
-		return {
-			"subscription": existing,
-			"created": False,
-			"status": frappe.db.get_value("Subscription", existing, "status"),
-		}
-
-	company = _resolve_company()
-	cost_center = _resolve_cost_center(company)
-	sub_start = getdate(start_date or nowdate())
-
-	subscription = frappe.get_doc(
-		{
-			"doctype": "Subscription",
-			"party_type": "Customer",
-			"party": customer_name,
-			"company": company,
-			"cost_center": cost_center,
-			"start_date": sub_start,
-			"submit_invoice": 1,
-			"generate_invoice_at": "Beginning of the current subscription period",
-			"generate_new_invoices_past_due_date": 0,
-			"plans": [{"plan": plan_name, "qty": 1}],
-		}
-	)
-	subscription.insert(ignore_permissions=True)
-
-	return {
-		"subscription": subscription.name,
-		"created": True,
-		"status": subscription.status,
-	}
+	return add_plan_to_member_subscription(customer_name, plan_name, start_date=start_date)
 
 
 def cancel_member_subscription_for_plan(customer_name: str, plan_name: str) -> dict[str, Any] | None:
-	"""
-	Cancela la suscripción activa del cliente para un plan dado (idempotente).
-	"""
-	if not erpnext_subscriptions_disponible():
-		return None
-	if not customer_name or not plan_name:
-		return None
-
-	sub_name = _find_active_subscription_for_plan(customer_name, plan_name)
-	if not sub_name:
-		return None
-
-	subscription = frappe.get_doc("Subscription", sub_name)
-	subscription.flags.ignore_permissions = True
-	if subscription.status != "Cancelled":
-		subscription.cancel_subscription()
-
-	return {
-		"subscription": sub_name,
-		"cancelled": True,
-		"status": frappe.db.get_value("Subscription", sub_name, "status"),
-	}
+	"""Quita el plan de la suscripción activa del cliente (idempotente)."""
+	return remove_plan_from_member_subscription(customer_name, plan_name)
 
 
 def cancel_all_member_subscriptions(customer_name: str) -> list[dict[str, Any]]:
