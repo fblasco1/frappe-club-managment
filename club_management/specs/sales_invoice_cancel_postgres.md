@@ -22,9 +22,18 @@ En sitios **PostgreSQL**, cancelar una `Sales Invoice` enviada falla durante
 - **Given** un worker Frappe en PostgreSQL
 - **When** se ejecuta `club_management.integrations.payment_ledger_postgres.apply_patch()`
 - **Then** `delink_original_entry` usa valores smallint (`1`) y no booleanos
+- **And** `get_negative_outstanding_invoices` usa parámetros SQL para `voucher_type`
 - **And** ejecutar `apply_patch()` nuevamente no duplica el reemplazo
+
+### Scenario: Registrar cobro manual sin error SQL
+
+- **Given** un socio activo con factura mensual pendiente
+- **When** Secretaría registra el cobro manual contra esa factura
+- **Then** se crea un `Payment Entry` enviado
+- **And** la factura queda con `outstanding_amount = 0`
+- **And** `QueryPaymentLedger` agrupa cobros y facturas por comprobante (no por `posting_date`)
 
 ## Implementación
 
 - Parche runtime en `integrations/payment_ledger_postgres.py` (sin modificar `erpnext`).
-- Tests en `club_management/tests/test_sales_invoice_cancel_postgres.py`.
+- Tests en `club_management/tests/test_sales_invoice_cancel_postgres.py` y `test_registrar_cobro_postgres.py`.

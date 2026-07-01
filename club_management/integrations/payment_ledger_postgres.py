@@ -3,6 +3,7 @@
 - Payment Ledger: GROUP BY estricto en consultas de saldo.
 - Period Closing Voucher: MAX sin ORDER BY inválido en get_value.
 - Cancelación de facturas: `delinked`/`is_cancelled` como smallint, no boolean.
+- Payment Entry: literales de voucher_type y COALESCE en get_negative_outstanding_invoices.
 """
 
 from __future__ import annotations
@@ -12,7 +13,8 @@ from frappe import _
 from frappe.utils import formatdate, getdate, now, flt
 from frappe import qb
 from frappe.query_builder import AliasedQuery, Case, Criterion, Table
-from frappe.query_builder.functions import Max, Sum
+from frappe.query_builder.functions import Count, Max, Min, Sum
+from frappe.query_builder import Tuple
 
 
 def apply_patch() -> None:
@@ -23,6 +25,29 @@ def apply_patch() -> None:
 	_patch_payment_ledger_query()
 	_patch_validate_against_pcv()
 	_patch_delink_original_entry()
+	_patch_payment_entry_sql()
+
+
+def _pg_amount_expr(rounded_field: str, grand_field: str) -> str:
+	"""Equivalente PG de `if(rounded, rounded, grand)` en SQL MariaDB de ERPNext."""
+	return f"COALESCE(NULLIF({rounded_field}, 0), {grand_field})"
+
+
+def _patch_payment_entry_sql() -> None:
+	try:
+		import erpnext.accounts.doctype.payment_entry.payment_entry as payment_entry
+	except ImportError:
+		return
+
+	if getattr(payment_entry, "_club_payment_entry_sql_pg_patch", False):
+		return
+
+	payment_entry.get_negative_outstanding_invoices = _get_negative_outstanding_invoices_postgres
+	payment_entry.get_orders_to_be_billed = _get_orders_to_be_billed_postgres
+	payment_entry.get_matched_payment_request_of_references = (
+		_get_matched_payment_request_of_references_postgres
+	)
+	payment_entry._club_payment_entry_sql_pg_patch = True
 
 
 def _patch_validate_against_pcv() -> None:
@@ -101,6 +126,199 @@ def _delink_original_entry_postgres(pl_entry, partial_cancel: bool = False) -> N
 		query = query.set(ple.delinked, 1)
 
 	query.run()
+
+
+def _get_negative_outstanding_invoices_postgres(
+	party_type,
+	party,
+	party_account,
+	party_account_currency,
+	company_currency,
+	cost_center=None,
+	condition=None,
+):
+	"""Copia PG de ERPNext `get_negative_outstanding_invoices` (literales SQL compatibles)."""
+	from frappe import scrub
+
+	if party_type not in ["Customer", "Supplier"]:
+		return []
+
+	voucher_type = "Sales Invoice" if party_type == "Customer" else "Purchase Invoice"
+	account_col = "debit_to" if voucher_type == "Sales Invoice" else "credit_to"
+	supplier_condition = ""
+	if voucher_type == "Purchase Invoice":
+		supplier_condition = "and (release_date is null or release_date <= CURRENT_DATE)"
+
+	if party_account_currency == company_currency:
+		grand_total_field = "base_grand_total"
+		rounded_total_field = "base_rounded_total"
+	else:
+		grand_total_field = "grand_total"
+		rounded_total_field = "rounded_total"
+
+	party_field = scrub(party_type)
+	condition_sql = condition or ""
+	amount_expr = _pg_amount_expr(rounded_total_field, grand_total_field)
+
+	return frappe.db.sql(
+		f"""
+		select
+			%s as voucher_type, name as voucher_no, {account_col} as account,
+			{amount_expr} as invoice_amount,
+			outstanding_amount, posting_date,
+			due_date, conversion_rate as exchange_rate
+		from
+			"tab{voucher_type}"
+		where
+			{party_field} = %s and {account_col} = %s and docstatus = 1 and
+			outstanding_amount < 0
+			{supplier_condition}
+			{condition_sql}
+		order by
+			posting_date, name
+		""",
+		(voucher_type, party, party_account),
+		as_dict=True,
+	)
+
+
+def _get_orders_to_be_billed_postgres(
+	posting_date,
+	party_type,
+	party,
+	company,
+	party_account_currency,
+	company_currency,
+	cost_center=None,
+	filters=None,
+):
+	"""Copia PG de ERPNext `get_orders_to_be_billed` (sin función if() MariaDB)."""
+	from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import get_dimensions
+	from frappe import scrub
+
+	voucher_type = None
+	if party_type == "Customer":
+		voucher_type = "Sales Order"
+	elif party_type == "Supplier":
+		voucher_type = "Purchase Order"
+
+	if not voucher_type:
+		return []
+
+	doc = frappe.get_doc({"doctype": voucher_type})
+	condition = ""
+	if doc and hasattr(doc, "cost_center") and doc.cost_center and cost_center:
+		condition = f" and cost_center='{cost_center}'"
+
+	active_dimensions = get_dimensions()[0]
+	filters = filters or {}
+	for dim in active_dimensions:
+		if filters.get(dim.fieldname):
+			condition += f" and {dim.fieldname}='{filters.get(dim.fieldname)}'"
+
+	if party_account_currency == company_currency:
+		grand_total_field = "base_grand_total"
+		rounded_total_field = "base_rounded_total"
+	else:
+		grand_total_field = "grand_total"
+		rounded_total_field = "rounded_total"
+
+	amount_expr = _pg_amount_expr(rounded_total_field, grand_total_field)
+	party_field = scrub(party_type)
+
+	orders = frappe.db.sql(
+		f"""
+		select
+			name as voucher_no,
+			{amount_expr} as invoice_amount,
+			({amount_expr} - advance_paid) as outstanding_amount,
+			transaction_date as posting_date
+		from
+			"tab{voucher_type}"
+		where
+			{party_field} = %s
+			and docstatus = 1
+			and company = %s
+			and status != 'Closed'
+			and {amount_expr} > advance_paid
+			and abs(100 - per_billed) > 0.01
+			{condition}
+		order by
+			transaction_date, name
+		""",
+		(party, company),
+		as_dict=True,
+	)
+
+	order_list = []
+	for d in orders:
+		if (
+			filters
+			and filters.get("outstanding_amt_greater_than")
+			and filters.get("outstanding_amt_less_than")
+			and not (
+				flt(filters.get("outstanding_amt_greater_than"))
+				<= flt(d.outstanding_amount)
+				<= flt(filters.get("outstanding_amt_less_than"))
+			)
+		):
+			continue
+
+		d["voucher_type"] = voucher_type
+		from erpnext.accounts.utils import get_exchange_rate
+
+		d["exchange_rate"] = get_exchange_rate(
+			party_account_currency, company_currency, posting_date
+		)
+		order_list.append(d)
+
+	return order_list
+
+
+def _get_matched_payment_request_of_references_postgres(references=None):
+	"""Copia PG: Min(name) en subquery con GROUP BY (PostgreSQL estricto)."""
+	if not references:
+		return
+
+	refs = {
+		(row.reference_doctype, row.reference_name, row.allocated_amount)
+		for row in references
+		if row.reference_doctype and row.reference_name and row.allocated_amount
+	}
+
+	if not refs:
+		return
+
+	pr = frappe.qb.DocType("Payment Request")
+
+	subquery = (
+		frappe.qb.from_(pr)
+		.select(
+			pr.reference_doctype,
+			pr.reference_name,
+			pr.outstanding_amount.as_("allocated_amount"),
+			Min(pr.name).as_("payment_request"),
+			Count("*").as_("count"),
+		)
+		.where(Tuple(pr.reference_doctype, pr.reference_name, pr.outstanding_amount).isin(refs))
+		.where(pr.status != "Paid")
+		.where(pr.docstatus == 1)
+		.groupby(pr.reference_doctype, pr.reference_name, pr.outstanding_amount)
+	)
+
+	matched_prs = (
+		frappe.qb.from_(subquery)
+		.select(
+			subquery.reference_doctype,
+			subquery.reference_name,
+			subquery.allocated_amount,
+			subquery.payment_request,
+		)
+		.where(subquery.count == 1)
+		.run()
+	)
+
+	return matched_prs if matched_prs else None
 
 
 def _validate_against_pcv_postgres(is_opening, posting_date, company) -> None:
@@ -216,65 +434,45 @@ def _query_for_outstanding_postgres(self) -> None:
 	query_voucher_amount = (
 		qb.from_(ple)
 		.select(
-			ple.account,
+			Max(ple.account).as_("account"),
 			ple.voucher_type,
 			ple.voucher_no,
 			ple.party_type,
 			ple.party,
-			ple.posting_date,
-			ple.due_date,
-			ple.account_currency.as_("currency"),
-			ple.cost_center.as_("cost_center"),
+			Max(ple.posting_date).as_("posting_date"),
+			Max(ple.due_date).as_("due_date"),
+			Max(ple.account_currency).as_("currency"),
+			Max(ple.cost_center).as_("cost_center"),
 			Sum(ple.amount).as_("amount"),
 			Sum(ple.amount_in_account_currency).as_("amount_in_account_currency"),
-			ple.remarks,
+			Max(ple.remarks).as_("remarks"),
 		)
 		.where(ple.delinked == 0)
 		.where(Criterion.all(filter_on_voucher_no))
 		.where(Criterion.all(self.common_filter))
 		.where(Criterion.all(self.dimensions_filter))
 		.where(Criterion.all(self.voucher_posting_date))
-		.groupby(
-			ple.account,
-			ple.voucher_type,
-			ple.voucher_no,
-			ple.party_type,
-			ple.party,
-			ple.posting_date,
-			ple.due_date,
-			ple.account_currency,
-			ple.cost_center,
-			ple.remarks,
-		)
+		.groupby(ple.voucher_type, ple.voucher_no, ple.party_type, ple.party)
 	)
 
 	query_voucher_outstanding = (
 		qb.from_(ple)
 		.select(
-			ple.account,
+			Max(ple.account).as_("account"),
 			ple.against_voucher_type.as_("voucher_type"),
 			ple.against_voucher_no.as_("voucher_no"),
 			ple.party_type,
 			ple.party,
-			ple.posting_date,
-			ple.due_date,
-			ple.account_currency.as_("currency"),
+			Max(ple.posting_date).as_("posting_date"),
+			Max(ple.due_date).as_("due_date"),
+			Max(ple.account_currency).as_("currency"),
 			Sum(ple.amount).as_("amount"),
 			Sum(ple.amount_in_account_currency).as_("amount_in_account_currency"),
 		)
 		.where(ple.delinked == 0)
 		.where(Criterion.all(filter_on_against_voucher_no))
 		.where(Criterion.all(self.common_filter))
-		.groupby(
-			ple.account,
-			ple.against_voucher_type,
-			ple.against_voucher_no,
-			ple.party_type,
-			ple.party,
-			ple.posting_date,
-			ple.due_date,
-			ple.account_currency,
-		)
+		.groupby(ple.against_voucher_type, ple.against_voucher_no, ple.party_type, ple.party)
 	)
 
 	self.cte_query_voucher_amount_and_outstanding = (
