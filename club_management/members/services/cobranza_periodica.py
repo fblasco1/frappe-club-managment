@@ -59,7 +59,8 @@ def resolve_fechas_factura_mensual(
 	return posting, due
 
 
-def segundo_vencimiento(reference_date: str | date, dia_segundo_vencimiento: str) -> date:	"""Segundo vencimiento del período (último día del mes o día fijo)."""
+def segundo_vencimiento(reference_date: str | date, dia_segundo_vencimiento: str) -> date:
+	"""Segundo vencimiento del período (último día del mes o día fijo)."""
 	d = getdate(reference_date)
 	ultimo = calendar.monthrange(d.year, d.month)[1]
 	opcion = (dia_segundo_vencimiento or "Ultimo dia del mes").strip()
@@ -79,7 +80,8 @@ def periodo_recargo(periodo_cobro: str) -> str:
 	return f"{periodo_cobro}-REC"
 
 
-def socios_elegibles_deuda_mensual() -> list[str]:	return frappe.get_all(
+def socios_elegibles_deuda_mensual() -> list[str]:
+	return frappe.get_all(
 		SOCIO_DOCTYPE,
 		filters={"estado": ["in", list(ESTADOS_ELEGIBLES)]},
 		pluck="name",
@@ -109,7 +111,8 @@ def generar_deuda_mensual_socio(
 		incluir_cargos_extra=bool(settings.incluir_cargos_extra_en_deuda_mensual),
 		reference_date=str(ref),
 		periodo_cobro=periodo,
-	)	if not invoice_items:
+	)
+	if not invoice_items:
 		return None
 
 	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
