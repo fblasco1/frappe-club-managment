@@ -57,11 +57,11 @@
  ],
  "fields": [
   { "fieldname": "datos_personales_section", "fieldtype": "Section Break", "label": "Datos personales" },
-  { "fieldname": "numero_socio", "fieldtype": "Int", "label": "N\u00famero de socio", "reqd": 1, "in_list_view": 1, "in_standard_filter": 1, "description": "Identificador hist\u00f3rico y autoincremental; es el `name` (PK), por lo que su unicidad la garantiza la clave primaria. Si se deja vac\u00edo en un alta nueva, el controller asigna autom\u00e1ticamente el m\u00e1ximo existente + 1." },
+  { "fieldname": "numero_socio", "fieldtype": "Int", "label": "N\u00famero de Socio", "reqd": 1, "in_list_view": 1, "in_standard_filter": 1, "description": "Identificador hist\u00f3rico y autoincremental; es el `name` (PK), por lo que su unicidad la garantiza la clave primaria. Si se deja vac\u00edo en un alta nueva, el controller asigna autom\u00e1ticamente el m\u00e1ximo existente + 1." },
   { "fieldname": "fecha_ingreso", "fieldtype": "Date", "label": "Fecha de ingreso", "default": "Today", "description": "Ingreso administrativo del socio (a\u00f1o de ingreso). Distinto de `fecha_alta`, que marca el primer pase a Activo." },
-  { "fieldname": "nombre_completo", "fieldtype": "Data", "label": "Nombre completo", "read_only": 1, "hidden": 1, "in_global_search": 1, "in_standard_filter": 1 },
-  { "fieldname": "nombre", "fieldtype": "Data", "label": "Nombre", "reqd": 1, "in_list_view": 1 },
-  { "fieldname": "apellido", "fieldtype": "Data", "label": "Apellido", "reqd": 1, "in_list_view": 1 },
+  { "fieldname": "nombre_completo", "fieldtype": "Data", "label": "Nombre Apellido", "read_only": 1, "hidden": 1, "in_list_view": 1, "in_global_search": 1, "in_standard_filter": 1 },
+  { "fieldname": "nombre", "fieldtype": "Data", "label": "Nombre", "reqd": 1 },
+  { "fieldname": "apellido", "fieldtype": "Data", "label": "Apellido", "reqd": 1 },
   { "fieldname": "dni", "fieldtype": "Data", "label": "DNI", "reqd": 1, "unique": 1 },
   { "fieldname": "nacionalidad", "fieldtype": "Link", "label": "Nacionalidad", "options": "Country", "reqd": 1, "default": "Argentina" },
   { "fieldname": "fecha_nacimiento", "fieldtype": "Date", "label": "Fecha de nacimiento", "reqd": 1 },
@@ -120,8 +120,8 @@
   { "role": "Secretaria", "create": 1, "read": 1, "write": 1, "delete": 0, "report": 1, "export": 1, "share": 0, "print": 1, "email": 1 },
   { "role": "Socio", "create": 0, "read": 1, "write": 0, "delete": 0, "report": 1, "export": 0, "share": 0, "print": 1, "email": 0 }
  ],
- "sort_field": "creation",
- "sort_order": "DESC",
+ "sort_field": "numero_socio",
+ "sort_order": "ASC",
  "states": [],
  "track_changes": 1
 }

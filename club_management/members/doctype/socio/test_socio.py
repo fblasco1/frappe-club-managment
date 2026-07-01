@@ -61,6 +61,24 @@ class TestSocioCamposObligatorios(MembersTestCase):
             "García, Ana",
         )
 
+    def test_list_view_columnas_padron(self) -> None:
+        meta = frappe.get_meta("Socio")
+        list_fields = [f.fieldname for f in meta.fields if f.in_list_view]
+        self.assertEqual(
+            list_fields,
+            ["numero_socio", "nombre_completo", "estado", "categoria", "actividad"],
+        )
+        labels = {
+            f.fieldname: f.label
+            for f in meta.fields
+            if f.fieldname
+            in ("numero_socio", "nombre_completo", "estado", "categoria", "actividad")
+        }
+        self.assertEqual(labels["numero_socio"], "Número de Socio")
+        self.assertEqual(labels["nombre_completo"], "Nombre Apellido")
+        self.assertEqual(frappe.get_meta("Socio").sort_field, "numero_socio")
+        self.assertEqual(frappe.get_meta("Socio").sort_order, "ASC")
+
     def test_dni_obligatorio(self) -> None:
         payload = make_socio_payload(dni="")
         with self.assertRaises(frappe.MandatoryError):

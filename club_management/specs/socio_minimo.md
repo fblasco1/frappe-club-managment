@@ -138,6 +138,15 @@ Reglas de asignación (controller `Socio.before_insert`):
 el ingreso administrativo del socio (año de ingreso) sin ensuciar el `name`.
 Es distinta de `fecha_alta`, que marca el primer pase a `Activo`.
 
+### Listado Desk (`Socio`)
+
+Given Secretaría abre la lista de socios en Desk
+When se muestra la grilla por defecto del DocType `Socio`
+Then las columnas visibles son, en este orden: `Número de Socio`, `Nombre Apellido`,
+`Estado`, `Categoría`, `Actividad`
+And `Nombre Apellido` muestra el campo calculado `nombre_completo` (`Apellido, Nombre/s`)
+And la lista ordena por `numero_socio` ascendente
+
 **Política de User (login del portal):**
 
 En Frappe, `User.name` es el email y `User.email` es **único**. Como en este modelo
