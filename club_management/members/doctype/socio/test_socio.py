@@ -66,18 +66,13 @@ class TestSocioCamposObligatorios(MembersTestCase):
         list_fields = [f.fieldname for f in meta.fields if f.in_list_view]
         self.assertEqual(
             list_fields,
-            ["numero_socio", "nombre_completo", "estado", "categoria", "actividad"],
+            ["nombre", "apellido", "estado", "categoria", "actividad"],
         )
-        labels = {
-            f.fieldname: f.label
-            for f in meta.fields
-            if f.fieldname
-            in ("numero_socio", "nombre_completo", "estado", "categoria", "actividad")
-        }
-        self.assertEqual(labels["numero_socio"], "Número de Socio")
-        self.assertEqual(labels["nombre_completo"], "Nombre Apellido")
-        self.assertEqual(frappe.get_meta("Socio").sort_field, "numero_socio")
-        self.assertEqual(frappe.get_meta("Socio").sort_order, "ASC")
+        self.assertEqual(meta.title_field, "numero_socio")
+        self.assertEqual(meta.sort_field, "numero_socio")
+        self.assertEqual(meta.sort_order, "ASC")
+        numero = meta.get_field("numero_socio")
+        self.assertFalse(numero.in_list_view)
 
     def test_dni_obligatorio(self) -> None:
         payload = make_socio_payload(dni="")

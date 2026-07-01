@@ -5,6 +5,9 @@ frappe.ui.form.on("Socio", {
 		if (!es_secretaria) {
 			return;
 		}
+		if (!frm.is_new() && frm.doc.nombre_completo) {
+			frm.page.set_title(frm.doc.nombre_completo);
+		}
 		frm.set_df_property("grupo_familiar", "hidden", 1);
 		frm.set_df_property("solicitud_origen", "hidden", 1);
 		if (frm.is_new()) {

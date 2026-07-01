@@ -142,9 +142,8 @@ Es distinta de `fecha_alta`, que marca el primer pase a `Activo`.
 
 Given Secretaría abre la lista de socios en Desk
 When se muestra la grilla por defecto del DocType `Socio`
-Then las columnas visibles son, en este orden: `Número de Socio`, `Nombre Apellido`,
-`Estado`, `Categoría`, `Actividad`
-And `Nombre Apellido` muestra el campo calculado `nombre_completo` (`Apellido, Nombre/s`)
+Then la primera columna enlazable es `Número de Socio` (`numero_socio` / `name`) sin repetir ese valor en otra columna
+And las columnas siguientes son: `Nombre`, `Apellido`, `Estado`, `Categoría`, `Actividad`
 And la lista ordena por `numero_socio` ascendente
 
 **Política de User (login del portal):**
