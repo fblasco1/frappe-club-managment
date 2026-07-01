@@ -16,7 +16,16 @@
   "item_recargo_mora",
   "column_break_cobranza",
   "incluir_aranceles_en_deuda_mensual",
-  "incluir_cargos_extra_en_deuda_mensual"
+  "incluir_cargos_extra_en_deuda_mensual",
+  "recibo_section",
+  "recibo_institucion_nombre",
+  "recibo_institucion_direccion",
+  "recibo_cuit",
+  "recibo_condicion_iva",
+  "column_break_recibo",
+  "recibo_mensaje_pie",
+  "recibo_ancho_papel_mm",
+  "recibo_impresora_url"
  ],
  "fields": [
   {
@@ -98,6 +107,58 @@
    "fieldname": "incluir_cargos_extra_en_deuda_mensual",
    "fieldtype": "Check",
    "label": "Incluir cargos extra recurrentes"
+  },
+  {
+   "fieldname": "recibo_section",
+   "fieldtype": "Section Break",
+   "label": "Recibo de pago (impresora térmica)"
+  },
+  {
+   "default": "Institucion Cultural y Deportiva Pedro Echague",
+   "fieldname": "recibo_institucion_nombre",
+   "fieldtype": "Data",
+   "label": "Nombre institución (recibo)"
+  },
+  {
+   "default": "PORTELA 836 - CABA",
+   "fieldname": "recibo_institucion_direccion",
+   "fieldtype": "Data",
+   "label": "Dirección (recibo)"
+  },
+  {
+   "default": "30-59845346-9",
+   "fieldname": "recibo_cuit",
+   "fieldtype": "Data",
+   "label": "CUIT (recibo)"
+  },
+  {
+   "default": "IVA EXENTO",
+   "fieldname": "recibo_condicion_iva",
+   "fieldtype": "Data",
+   "label": "Condición IVA (recibo)"
+  },
+  {
+   "fieldname": "column_break_recibo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "SOMOS ECHAGUE, SOMOS FAMILIA !!",
+   "fieldname": "recibo_mensaje_pie",
+   "fieldtype": "Small Text",
+   "label": "Mensaje pie de recibo"
+  },
+  {
+   "default": "58",
+   "fieldname": "recibo_ancho_papel_mm",
+   "fieldtype": "Select",
+   "label": "Ancho papel térmico (mm)",
+   "options": "58\n80"
+  },
+  {
+   "fieldname": "recibo_impresora_url",
+   "fieldtype": "Data",
+   "label": "URL impresora Star WebPRNT",
+   "description": "Opcional. Ej: http://192.168.1.50/StarWebPRNT/SendMessage"
   }
  ],
  "issingle": 1,

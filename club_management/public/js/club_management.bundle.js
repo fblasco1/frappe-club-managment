@@ -6,3 +6,4 @@ import "./socio_alta_guiada.js";
 import "./secretaria_workspace_panel.js";
 import "./gestion_actividades_workspace_panel.js";
 import "./valores_cuota_social_page.js";
+import "./recibo_pago_escpos.js";
