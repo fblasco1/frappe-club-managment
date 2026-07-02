@@ -11,7 +11,10 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate, today
 
-from club_management.activities.services.inscripcion_socio import INSCRIPCION_DOCTYPE
+from club_management.activities.services.inscripcion_socio import (
+	INSCRIPCION_DOCTYPE,
+	resolve_item_arancel_inscripcion,
+)
 from club_management.members.doctype.socio.socio import format_socio_nombre_completo
 from club_management.members.services.cobranza_manual import (
 	SALES_INVOICE_DOCTYPE,
@@ -214,9 +217,30 @@ def calcular_pagos_en_rango(
 	socio_name: str,
 	fecha_desde: str,
 	fecha_hasta: str,
+	*,
+	item_arancel: str | None = None,
+	inscripcion_name: str | None = None,
 ) -> tuple[float, int]:
-	"""Suma importe cobrado de facturas del socio emitidas en el rango."""
-	if not erpnext_cobranza_disponible():
+	"""Suma aranceles cobrados del socio en el rango (solo líneas del ítem de arancel)."""
+	if inscripcion_name and not item_arancel:
+		item_arancel = resolve_item_arancel_inscripcion(inscripcion_name)
+	return calcular_pagos_arancel_en_rango(
+		socio_name,
+		fecha_desde=fecha_desde,
+		fecha_hasta=fecha_hasta,
+		item_arancel=item_arancel,
+	)
+
+
+def calcular_pagos_arancel_en_rango(
+	socio_name: str,
+	*,
+	fecha_desde: str,
+	fecha_hasta: str,
+	item_arancel: str | None,
+) -> tuple[float, int]:
+	"""Importe cobrado de líneas de factura que coinciden con el ítem de arancel."""
+	if not item_arancel or not erpnext_cobranza_disponible():
 		return 0.0, 0
 
 	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
@@ -230,15 +254,29 @@ def calcular_pagos_en_rango(
 			"docstatus": 1,
 			"posting_date": ["between", [getdate(fecha_desde), getdate(fecha_hasta)]],
 		},
-		fields=["grand_total", "outstanding_amount"],
+		fields=["name", "grand_total", "outstanding_amount"],
 	)
-	paid_rows = [
-		row
-		for row in invoices
-		if flt(row.grand_total) - flt(row.outstanding_amount) > 0
-	]
-	total = sum(flt(row.grand_total) - flt(row.outstanding_amount) for row in paid_rows)
-	return total, len(paid_rows)
+	total = 0.0
+	count = 0
+	for invoice in invoices:
+		paid = flt(invoice.grand_total) - flt(invoice.outstanding_amount)
+		if paid <= 0:
+			continue
+		lines = frappe.get_all(
+			"Sales Invoice Item",
+			filters={"parent": invoice.name, "item_code": item_arancel},
+			fields=["amount"],
+		)
+		arancel_amount = sum(flt(line.amount) for line in lines)
+		if arancel_amount <= 0:
+			continue
+		grand_total = flt(invoice.grand_total)
+		if grand_total <= 0:
+			continue
+		paid_ratio = min(paid / grand_total, 1.0)
+		total += arancel_amount * paid_ratio
+		count += 1
+	return total, count
 
 
 def get_pagos_por_equipo_data(filters: dict[str, Any] | frappe._dict) -> list[dict[str, Any]]:
@@ -270,6 +308,7 @@ def get_pagos_por_equipo_data(filters: dict[str, Any] | frappe._dict) -> list[di
 			socio_name,
 			str(filters.fecha_desde),
 			str(filters.fecha_hasta),
+			inscripcion_name=ins.name,
 		)
 		if not int(filters.get("incluir_saldo_cero") or 0) and pagos_en_rango <= 0:
 			continue
@@ -316,22 +355,22 @@ def get_pagos_report_columns() -> list[dict[str, Any]]:
 			"width": 140,
 		},
 		{
-			"label": _("Pagos en rango"),
+			"label": _("Arancel pagado en rango"),
 			"fieldname": "pagos_en_rango",
 			"fieldtype": "Currency",
-			"width": 130,
+			"width": 150,
 		},
 		{
-			"label": _("Liquidación entrenador (80%)"),
+			"label": _("Liquidación entrenador (80 %)"),
 			"fieldname": "liquidacion_entrenador",
 			"fieldtype": "Currency",
-			"width": 170,
+			"width": 180,
 		},
 		{
-			"label": _("Cantidad de pagos"),
+			"label": _("Facturas con arancel cobrado"),
 			"fieldname": "cantidad_pagos",
 			"fieldtype": "Int",
-			"width": 120,
+			"width": 150,
 		},
 	]
 

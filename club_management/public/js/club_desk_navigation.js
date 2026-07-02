@@ -58,6 +58,22 @@
 
 
 
+	club_management.club_desk_navigation.CLUB_REPORTS_SOCIOS = new Set([
+
+		"Deuda por equipo",
+
+	]);
+
+
+
+	club_management.club_desk_navigation.CLUB_REPORTS_ACTIVIDADES = new Set([
+
+		"Pagos por equipo",
+
+	]);
+
+
+
 	club_management.club_desk_navigation.CLUB_PAGES = new Set([
 
 		"valores-cuota-social",
@@ -264,6 +280,12 @@
 		const report = this.get_active_report();
 
 		if (report && this.CLUB_REPORTS.has(report)) {
+
+			if (this.CLUB_REPORTS_ACTIVIDADES?.has(report)) {
+
+				return this.TABS.find((tab) => tab.tab === "actividades") || null;
+
+			}
 
 			return this.TABS.find((tab) => tab.workspace === "Secretaría") || null;
 

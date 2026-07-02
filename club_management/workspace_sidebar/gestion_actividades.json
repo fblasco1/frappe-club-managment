@@ -77,6 +77,40 @@
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "file-text",
+   "indent": 1,
+   "keep_closed": 0,
+   "label": "Informes",
+   "show_arrow": 0,
+   "type": "Section Break"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "table",
+   "indent": 1,
+   "keep_closed": 0,
+   "label": "Pagos por equipo",
+   "link_to": "Pagos por equipo",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "table",
+   "indent": 1,
+   "keep_closed": 0,
+   "label": "Deuda por equipo",
+   "link_to": "Deuda por equipo",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
   }
  ],
  "modified": "2026-07-02 12:00:00.000000",

@@ -1,4 +1,11 @@
 frappe.query_reports["Pagos por equipo"] = {
+	onload(report) {
+		report.page.add_inner_message(
+			__(
+				"Muestra el arancel cobrado por socio según el ítem del equipo/grupo/actividad. La liquidación del entrenador es el 80 % del arancel pagado en el rango."
+			)
+		);
+	},
 	filters: [
 		{
 			fieldname: "actividad",

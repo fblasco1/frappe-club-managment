@@ -20,6 +20,7 @@ from club_management.members.services.cuotas_sociales_setup import sync_cuotas_s
 from club_management.members.services.liquidacion_equipo import (
 	build_inscripcion_filters,
 	calcular_deuda_en_rango,
+	calcular_pagos_arancel_en_rango,
 	calcular_pagos_en_rango,
 	get_deuda_por_equipo_data,
 	get_facturas_pendientes_socio_en_rango,
@@ -30,6 +31,8 @@ from club_management.members.services.liquidacion_equipo import (
 )
 from club_management.members.services.socio_transitions import cambiar_estado
 from club_management.members.test_helpers import MembersTestCase, insert_socio, make_secretaria_user
+
+ARANCEL_ITEM_CODE = "LIQ-TEST-ARANCEL"
 
 
 class TestLiquidacionEquipo(MembersTestCase):
@@ -94,7 +97,25 @@ class TestLiquidacionEquipo(MembersTestCase):
 				"habilitada": 1,
 			}
 		).insert(ignore_permissions=True)
+		self._ensure_arancel_item()
+		frappe.db.set_value("Equipo Actividad", equipo.name, "item", ARANCEL_ITEM_CODE)
 		return actividad.name, grupo.name, equipo.name
+
+	def _ensure_arancel_item(self) -> None:
+		if frappe.db.exists("Item", ARANCEL_ITEM_CODE):
+			return
+		item_group = frappe.db.get_value("Item Group", {}, "name") or "All Item Groups"
+		frappe.get_doc(
+			{
+				"doctype": "Item",
+				"item_code": ARANCEL_ITEM_CODE,
+				"item_name": "Arancel Liq Test",
+				"item_group": item_group,
+				"is_stock_item": 0,
+				"is_sales_item": 1,
+				"standard_rate": 5000,
+			}
+		).insert(ignore_permissions=True)
 
 	def _socio_activo(self, **kwargs):
 		socio = insert_socio(**kwargs)
@@ -115,6 +136,18 @@ class TestLiquidacionEquipo(MembersTestCase):
 
 	def _crear_factura(self, socio_name: str, posting_date: str, amount: float = 5000) -> str:
 		"""Crea factura con posting_date explícita (>= hoy simulado del test)."""
+		return self._crear_factura_items(
+			socio_name,
+			posting_date,
+			[{"item_code": CUOTA_SOCIAL_ITEM_CODE, "qty": 1, "rate": amount}],
+		)
+
+	def _crear_factura_items(
+		self,
+		socio_name: str,
+		posting_date: str,
+		items: list[dict],
+	) -> str:
 		campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
 		customer = ensure_customer_for_socio(socio_name, skip_permission_check=True)
 		posting = getdate(posting_date)
@@ -129,19 +162,18 @@ class TestLiquidacionEquipo(MembersTestCase):
 				"posting_date": posting,
 				"due_date": posting,
 				campo_socio: socio_name,
-				"items": [
-					{
-						"item_code": CUOTA_SOCIAL_ITEM_CODE,
-						"qty": 1,
-						"rate": amount,
-					}
-				],
+				"items": items,
 			}
 		)
 		invoice.set_posting_time = 1
 		invoice.insert(ignore_permissions=True)
 		invoice.submit()
 		return invoice.name
+
+	def _marcar_factura_pagada(self, invoice_name: str) -> None:
+		grand_total = flt(frappe.db.get_value(SALES_INVOICE_DOCTYPE, invoice_name, "grand_total"))
+		frappe.db.set_value(SALES_INVOICE_DOCTYPE, invoice_name, "outstanding_amount", 0)
+		frappe.db.set_value(SALES_INVOICE_DOCTYPE, invoice_name, "paid_amount", grand_total)
 
 	def _filtros_equipo(self, **overrides):
 		base = {
@@ -192,14 +224,13 @@ class TestLiquidacionEquipo(MembersTestCase):
 		socio_b = self._socio_activo(dni="74001012", email="pagos.b@example.com")
 		for socio in (socio_a, socio_b):
 			self._inscribir(socio.name)
-		invoice_a = self._crear_factura(socio_a.name, "2026-03-20", 8000)
-		self._crear_factura(socio_b.name, "2026-03-20", 6000)
-		registrar_cobro_liquidacion(
+		invoice_a = self._crear_factura_items(
 			socio_a.name,
-			invoice_a,
-			self._MARZO_DESDE,
-			self._MARZO_HASTA,
+			"2026-03-20",
+			[{"item_code": ARANCEL_ITEM_CODE, "qty": 1, "rate": 8000}],
 		)
+		self._crear_factura(socio_b.name, "2026-03-20", 6000)
+		self._marcar_factura_pagada(invoice_a)
 
 		rows = get_pagos_por_equipo_data(self._filtros_equipo())
 		by_socio = {row["socio"]: row for row in rows}
@@ -208,6 +239,35 @@ class TestLiquidacionEquipo(MembersTestCase):
 		self.assertEqual(by_socio[socio_a.name]["pagos_en_rango"], 8000.0)
 		self.assertEqual(by_socio[socio_a.name]["liquidacion_entrenador"], 6400.0)
 		self.assertEqual(by_socio[socio_a.name]["nombre_apellido"], "Lopez, Juan")
+
+	def test_pagos_arancel_proporcional_pago_parcial(self) -> None:
+		socio = self._socio_activo(dni="74001014", email="pagos.prop@example.com")
+		self._inscribir(socio.name)
+		invoice_name = self._crear_factura_items(
+			socio.name,
+			"2026-03-20",
+			[
+				{"item_code": CUOTA_SOCIAL_ITEM_CODE, "qty": 1, "rate": 10000},
+				{"item_code": ARANCEL_ITEM_CODE, "qty": 1, "rate": 5000},
+			],
+		)
+		frappe.db.set_value(SALES_INVOICE_DOCTYPE, invoice_name, "outstanding_amount", 7500)
+		pagos, count = calcular_pagos_arancel_en_rango(
+			socio.name,
+			fecha_desde=self._MARZO_DESDE,
+			fecha_hasta=self._MARZO_HASTA,
+			item_arancel=ARANCEL_ITEM_CODE,
+		)
+		self.assertEqual(count, 1)
+		self.assertEqual(pagos, 2500.0)
+
+	def test_pagos_equipo_excluye_cuota_social(self) -> None:
+		socio = self._socio_activo(dni="74001013", email="pagos.cuota@example.com")
+		self._inscribir(socio.name)
+		invoice = self._crear_factura(socio.name, "2026-03-20", 9000)
+		self._marcar_factura_pagada(invoice)
+		rows = get_pagos_por_equipo_data(self._filtros_equipo())
+		self.assertEqual([row for row in rows if row["socio"] == socio.name], [])
 
 	def test_filtro_grupo_sin_equipo(self) -> None:
 		equipo_u13 = frappe.get_doc(

@@ -48,6 +48,28 @@
 			link_to: "Inscripcion Actividad",
 			icon: "edit",
 		},
+		{
+			label: __("Informes"),
+			type: "Section Break",
+			icon: "file-text",
+			indent: 1,
+		},
+		{
+			label: __("Pagos por equipo"),
+			type: "Link",
+			link_type: "Report",
+			link_to: "Pagos por equipo",
+			icon: "table",
+			child: 1,
+		},
+		{
+			label: __("Deuda por equipo"),
+			type: "Link",
+			link_type: "Report",
+			link_to: "Deuda por equipo",
+			icon: "table",
+			child: 1,
+		},
 	];
 
 	club_management.actividades_sidebar.ensure_boot = function () {

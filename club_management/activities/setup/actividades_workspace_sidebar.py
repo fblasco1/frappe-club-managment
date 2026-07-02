@@ -51,6 +51,28 @@ SIDEBAR_ITEMS: list[dict] = [
 		"link_to": "Inscripcion Actividad",
 		"icon": "edit",
 	},
+	{
+		"label": "Informes",
+		"type": "Section Break",
+		"icon": "file-text",
+		"indent": 1,
+	},
+	{
+		"label": "Pagos por equipo",
+		"type": "Link",
+		"link_type": "Report",
+		"link_to": "Pagos por equipo",
+		"icon": "table",
+		"child": 1,
+	},
+	{
+		"label": "Deuda por equipo",
+		"type": "Link",
+		"link_type": "Report",
+		"link_to": "Deuda por equipo",
+		"icon": "table",
+		"child": 1,
+	},
 ]
 
 
@@ -93,6 +115,8 @@ def sync_actividades_workspace_sidebar() -> None:
 	rows = []
 	for idx, item in enumerate(SIDEBAR_ITEMS, start=1):
 		if item.get("link_type") == "Page" and not frappe.db.exists("Page", item["link_to"]):
+			continue
+		if item.get("link_type") == "Report" and not frappe.db.exists("Report", item["link_to"]):
 			continue
 		row = {**item, "idx": idx}
 		if row.get("type") != "Link":

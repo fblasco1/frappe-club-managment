@@ -23,6 +23,8 @@ def build_actividades_sidebar_boot_items() -> list[dict[str, Any]]:
 		link_type = row.get("link_type")
 		if link_type == "Page" and link_to and not frappe.db.exists("Page", link_to):
 			continue
+		if link_type == "Report" and link_to and not frappe.db.exists("Report", link_to):
+			continue
 		item: dict[str, Any] = {
 			"label": frappe._(row["label"]),
 			"type": row["type"],
