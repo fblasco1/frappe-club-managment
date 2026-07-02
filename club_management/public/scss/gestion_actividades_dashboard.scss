@@ -17,6 +17,16 @@ body.club-actividades-active-workspace {
 		width: 100% !important;
 		max-width: none !important;
 	}
+
+	.codex-editor,
+	.codex-editor__redactor {
+		min-height: unset !important;
+	}
+
+	.editor-holder,
+	#editorjs {
+		display: none;
+	}
 }
 
 /* Dashboard Gestión de Actividades y Deportes — ancho completo (patrón Secretaría) */
@@ -68,6 +78,11 @@ body.club-actividades-active-workspace .layout-main .layout-main-section-wrapper
 	max-width: none;
 	padding-left: 0;
 	padding-right: 0;
+}
+
+.club-actividades-workspace .codex-editor,
+.club-actividades-workspace .codex-editor__redactor {
+	min-height: unset !important;
 }
 
 .club-actividades-workspace .editor-holder,

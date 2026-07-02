@@ -46,7 +46,7 @@
 
 			clearTimeout(this._refresh_timer);
 
-			this._refresh_timer = setTimeout(() => this.refresh(), 400);
+			this._refresh_timer = setTimeout(() => this.refresh(), 150);
 
 		},
 
@@ -71,6 +71,8 @@
 		get_mount_parent() {
 			const ws = frappe.workspace;
 			if (!ws || !ws.body) return null;
+			const container = ws.body.find(".editor-js-container");
+			if (!container.length) return null;
 			$("body").addClass("club-secretaria-active-workspace");
 			ws.body.addClass("club-secretaria-workspace-body");
 			ws.body
@@ -79,8 +81,6 @@
 				)
 				.addClass("club-secretaria-workspace-body");
 			ws.body.closest(".layout-main-section-wrapper").addClass("club-secretaria-workspace-body");
-			const container = ws.body.find(".editor-js-container");
-			if (!container.length) return null;
 			container.addClass("club-secretaria-workspace");
 			return container;
 		},

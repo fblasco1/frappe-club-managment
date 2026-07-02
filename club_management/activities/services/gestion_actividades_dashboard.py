@@ -362,6 +362,16 @@ def get_infraestructura_payload() -> dict[str, Any]:
 	return {"disponible": False, "mensaje": frappe._("Próximamente")}
 
 
+def get_actividades_opciones() -> list[dict[str, str]]:
+	"""Opciones ligeras para el filtro del dashboard (sin catálogo completo)."""
+	return frappe.get_all(
+		ACTIVIDAD_DOCTYPE,
+		filters={"habilitada": 1},
+		fields=["name", "titulo"],
+		order_by="titulo asc, name asc",
+	)
+
+
 def get_dashboard_payload(
 	*,
 	reference_date: str | date | None = None,
@@ -381,6 +391,7 @@ def get_dashboard_payload(
 			"crecimiento": crecimiento,
 			"mas_socios": mas_socios,
 		},
+		"actividades_opciones": get_actividades_opciones(),
 		"ocupacion_por_deporte": get_ocupacion_por_deporte_payload(actividad=actividad),
 		"lista_espera": get_lista_espera_top_payload(),
 		"asistencia": get_asistencia_semanal_payload(reference_date=ref, actividad=actividad),

@@ -5,6 +5,17 @@
 
 	const SIDEBAR_KEY = "gestión de actividades";
 
+	const REPORT_META = {
+		"Deuda por equipo": {
+			report_type: "Script Report",
+			ref_doctype: "Inscripcion Actividad",
+		},
+		"Pagos por equipo": {
+			report_type: "Script Report",
+			ref_doctype: "Inscripcion Actividad",
+		},
+	};
+
 	const SIDEBAR_ITEMS = [
 		{
 			label: __("Gestión de Actividades"),
@@ -72,18 +83,38 @@
 		},
 	];
 
+	function withReportMeta(items) {
+		return (items || []).map((item) => {
+			if (item.link_type !== "Report" || item.report) {
+				return item;
+			}
+			const meta = REPORT_META[item.link_to];
+			return meta ? { ...item, report: meta } : item;
+		});
+	}
+
+	function mergeSidebarItems(existing, canonical) {
+		const base = existing?.length ? existing : canonical;
+		const enriched = withReportMeta(base);
+		if (!existing?.length) {
+			return enriched;
+		}
+		const labels = new Set(enriched.map((item) => item.label));
+		const missing = withReportMeta(canonical).filter((item) => !labels.has(item.label));
+		return enriched.concat(missing);
+	}
+
 	club_management.actividades_sidebar.ensure_boot = function () {
 		if (!club_management.club_desk_navigation?.has_panel_role?.()) {
 			return;
 		}
 		const boot = frappe.boot.workspace_sidebar_item || {};
 		frappe.boot.workspace_sidebar_item = boot;
-		if (boot[SIDEBAR_KEY]?.items?.length) {
-			return;
-		}
+		const existing = boot[SIDEBAR_KEY]?.items;
+		const items = mergeSidebarItems(existing, SIDEBAR_ITEMS);
 		boot[SIDEBAR_KEY] = {
 			label: __("Gestión de Actividades"),
-			items: SIDEBAR_ITEMS,
+			items,
 			header_icon: "activity",
 			module: "Activities",
 			app: "club_management",

@@ -16,6 +16,13 @@ class TestSecretariaSidebarBoot(MembersTestCase):
 		self.assertIn("Valores de Cuota Social", labels)
 		self.assertIn("Socio", labels)
 
+	def test_build_sidebar_boot_items_incluye_metadata_reportes(self) -> None:
+		items = {row["label"]: row for row in build_secretaria_sidebar_boot_items()}
+		for label in ("Pagos por equipo", "Deuda por equipo"):
+			report = items[label].get("report") or {}
+			self.assertEqual(report.get("report_type"), "Script Report")
+			self.assertEqual(report.get("ref_doctype"), "Inscripcion Actividad")
+
 	def test_apply_boot_inyecta_sidebar_para_secretaria(self) -> None:
 		user = make_secretaria_user("sec.sidebar.boot@example.com")
 		bootinfo: dict = {"user": {"name": user, "roles": [{"role": "Secretaria"}]}}

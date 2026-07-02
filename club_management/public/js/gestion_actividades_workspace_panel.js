@@ -89,7 +89,7 @@
 
 		schedule_refresh() {
 			clearTimeout(this._refresh_timer);
-			this._refresh_timer = setTimeout(() => this.refresh(), 400);
+			this._refresh_timer = setTimeout(() => this.refresh(), 150);
 		},
 
 		is_actividades_workspace() {
@@ -110,6 +110,10 @@
 			if (!ws?.body?.length) {
 				return null;
 			}
+			const container = ws.body.find(".editor-js-container");
+			if (!container.length) {
+				return null;
+			}
 			$("body").addClass("club-actividades-active-workspace");
 			ws.body.addClass("club-actividades-workspace-body");
 			ws.body
@@ -118,10 +122,6 @@
 				)
 				.addClass("club-actividades-workspace-body");
 			ws.body.closest(".layout-main-section-wrapper").addClass("club-actividades-workspace-body");
-			const container = ws.body.find(".editor-js-container");
-			if (!container.length) {
-				return null;
-			}
 			container.addClass("club-actividades-workspace");
 			return container;
 		},
@@ -380,7 +380,7 @@
 
 		render_dashboard($panel, data) {
 			this._dashboard = data;
-			const actividades = this._catalog || [];
+			const actividades = data.actividades_opciones || this._catalog || [];
 			$panel.html(`
 				<h4 class="mb-2">${__("Gestión de Actividades y Deportes")}</h4>
 				${this.render_dashboard_filters(actividades)}
@@ -420,17 +420,7 @@
 					if (!r.message) {
 						return;
 					}
-					frappe.call({
-						method: "club_management.activities.api.gestion_actividades_workspace.get_catalog",
-						callback: (catalogResponse) => {
-							this._catalog = catalogResponse.message?.actividades || [];
-							this.render_dashboard($panel, r.message);
-						},
-						error: () => {
-							this._catalog = [];
-							this.render_dashboard($panel, r.message);
-						},
-					});
+					this.render_dashboard($panel, r.message);
 				},
 				error: () => {
 					$panel.html(`<p class="text-danger">${__("No se pudo cargar el panel de actividades.")}</p>`);

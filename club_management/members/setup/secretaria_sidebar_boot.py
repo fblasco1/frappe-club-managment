@@ -8,6 +8,7 @@ import frappe
 
 from club_management.members.setup.secretaria_workspace import WORKSPACE_NAME
 from club_management.members.setup.secretaria_workspace_sidebar import SIDEBAR_ITEMS
+from club_management.utils.desk_sidebar_boot import enrich_sidebar_link_item
 
 _PANEL_ROLES = frozenset({"Secretaria", "System Manager"})
 
@@ -39,6 +40,7 @@ def build_secretaria_sidebar_boot_items() -> list[dict[str, Any]]:
 		if row["type"] == "Link":
 			item["link_to"] = link_to
 			item["link_type"] = link_type
+			enrich_sidebar_link_item(item)
 		items.append(item)
 	return items
 

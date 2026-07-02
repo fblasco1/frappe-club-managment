@@ -116,6 +116,14 @@ class TestGestionActividadesDashboardKpis(MembersTestCase):
 		self.assertNotIn("ocupacion", kpis)
 		self.assertNotIn("aptos_filters", payload.get("ver_mas", {}))
 
+	def test_dashboard_incluye_actividades_opciones(self) -> None:
+		titulo = "Dash Test Opciones Filtro"
+		actividad = self._actividad_sin_grupos(titulo)
+		payload = get_dashboard_payload(reference_date=self._REFERENCE)
+		opciones = {row["name"]: row for row in payload.get("actividades_opciones", [])}
+		self.assertIn(actividad, opciones)
+		self.assertEqual(opciones[actividad].get("titulo"), titulo)
+
 	def test_ocupacion_por_deporte_segmenta_grupos(self) -> None:
 		actividad = frappe.get_doc(
 			{
