@@ -8,3 +8,4 @@ import "./actividades_sidebar_boot.js";
 import "./gestion_actividades_workspace_panel.js";
 import "./valores_cuota_social_page.js";
 import "./recibo_pago_escpos.js";
+import "./club_equipo_report_layout.js";

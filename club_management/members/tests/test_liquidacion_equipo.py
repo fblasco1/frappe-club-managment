@@ -349,6 +349,12 @@ class TestLiquidacionEquipo(MembersTestCase):
 		self.assertEqual(filters["equipo_actividad"], self._equipo)
 		self.assertEqual(filters["estado"], "Activa")
 
+	def test_reporte_deuda_por_equipo_habilita_fila_totales(self) -> None:
+		self.assertEqual(
+			frappe.db.get_value("Report", "Deuda por equipo", "add_total_row"),
+			1,
+		)
+
 
 class TestLiquidacionEquipoDesk(MembersTestCase):
 	_MARZO_DESDE = "2026-03-01"

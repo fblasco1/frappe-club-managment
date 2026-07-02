@@ -109,6 +109,9 @@ No filtrar solo `Moroso`: la liquidación sirve también para cobrar antes del c
 
 Orden default: `deuda_en_rango` descendente, luego `nombre_apellido` ascendente.
 
+**Fila de totales:** el reporte muestra una fila **Total** al pie con la suma de
+`deuda_en_rango`, `saldo_total` y `cantidad_facturas` de las filas visibles.
+
 ---
 
 ## Scenario: Secretaría consulta deuda del equipo en un mes
