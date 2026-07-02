@@ -11,7 +11,7 @@
  "icon": "activity",
  "idx": 0,
  "is_hidden": 0,
- "label": "Gestión de Actividades",
+ "label": "Gestión de Actividades y Deportes",
  "links": [
   {
    "hidden": 0,
@@ -83,6 +83,6 @@
  ],
  "sequence_id": 0.15,
  "shortcuts": [],
- "title": "Gestión de Actividades",
+ "title": "Gestión de Actividades y Deportes",
  "type": "Workspace"
 }

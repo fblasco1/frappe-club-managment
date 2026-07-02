@@ -1,20 +1,29 @@
 {
  "actions": [],
  "allow_rename": 0,
- "autoname": "prompt",
- "creation": "2026-06-04 00:00:00",
+ "autoname": "format:LEA-{YYYY}-{#####}",
+ "creation": "2026-07-02 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "socio",
   "actividad",
-  "titulo",
-  "item",
-  "habilitada",
-  "capacidad",
-  "orden",
-  "descripcion"
+  "grupo_actividad",
+  "equipo_actividad",
+  "fecha_solicitud",
+  "estado",
+  "orden"
  ],
  "fields": [
+  {
+   "fieldname": "socio",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Socio",
+   "options": "Socio",
+   "reqd": 1
+  },
   {
    "fieldname": "actividad",
    "fieldtype": "Link",
@@ -25,64 +34,51 @@
    "reqd": 1
   },
   {
-   "fieldname": "titulo",
-   "fieldtype": "Data",
+   "fieldname": "grupo_actividad",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Grupo / tira",
+   "options": "Grupo Actividad"
+  },
+  {
+   "fieldname": "equipo_actividad",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Equipo / categoría",
+   "options": "Equipo Actividad"
+  },
+  {
+   "default": "Today",
+   "fieldname": "fecha_solicitud",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Fecha de solicitud",
    "reqd": 1
   },
   {
-   "fieldname": "item",
-   "fieldtype": "Link",
+   "default": "En espera",
+   "fieldname": "estado",
+   "fieldtype": "Select",
    "in_list_view": 1,
-   "label": "\u00cdtem (arancel mensual)",
-   "options": "Item",
-   "description": "Arancel de esta tira o divisi\u00f3n (puede diferir por grupo)."
-  },
-  {
-   "default": "1",
-   "fieldname": "habilitada",
-   "fieldtype": "Check",
-   "in_list_view": 1,
-   "label": "Habilitada"
-  },
-  {
-   "default": "0",
-   "fieldname": "capacidad",
-   "fieldtype": "Int",
-   "label": "Capacidad (cupos)",
-   "description": "Cupos máximos de la tira o división (si no hay equipos con cupo propio)."
+   "in_standard_filter": 1,
+   "label": "Estado",
+   "options": "En espera\nAsignado\nCancelado",
+   "reqd": 1
   },
   {
    "default": "0",
    "fieldname": "orden",
    "fieldtype": "Int",
-   "label": "Orden"
-  },
-  {
-   "fieldname": "descripcion",
-   "fieldtype": "Small Text",
-   "label": "Descripci\u00f3n"
+   "label": "Orden en cola"
   }
  ],
  "index_web_pages_for_search": 1,
- "links": [
-  {
-   "group": "Equipos / categorías",
-   "link_doctype": "Equipo Actividad",
-   "link_fieldname": "grupo_actividad"
-  },
-  {
-   "group": "Inscripciones",
-   "link_doctype": "Inscripcion Actividad",
-   "link_fieldname": "grupo_actividad"
-  }
- ],
- "modified": "2026-06-04 00:00:00",
+ "links": [],
+ "modified": "2026-07-02 00:00:00",
  "modified_by": "Administrator",
  "module": "Activities",
- "name": "Grupo Actividad",
- "naming_rule": "Set by user",
+ "name": "Lista Espera Actividad",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
@@ -117,7 +113,7 @@
    "write": 0
   }
  ],
- "sort_field": "orden",
+ "sort_field": "fecha_solicitud",
  "sort_order": "ASC",
  "track_changes": 1
 }

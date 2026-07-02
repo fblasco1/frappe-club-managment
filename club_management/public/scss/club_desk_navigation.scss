@@ -1,6 +1,10 @@
 /* Barra de navegación entre workspaces del club */
-.club-desk-with-nav.club-secretaria-workspace-body {
+.club-desk-with-nav.club-secretaria-workspace-body,
+.club-desk-with-nav.club-actividades-workspace-body,
+.club-desk-with-nav.page-content {
 	padding-top: 0.25rem;
+	width: 100%;
+	max-width: none;
 }
 
 .club-desk-nav {
@@ -11,6 +15,8 @@
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.5rem;
+	align-items: center;
+	width: 100%;
 }
 
 .club-desk-nav-tab {

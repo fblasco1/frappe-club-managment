@@ -10,6 +10,7 @@
   "item",
   "usa_grupos",
   "habilitada",
+  "capacidad",
   "orden",
   "descripcion"
  ],
@@ -43,6 +44,13 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Habilitada"
+  },
+  {
+   "default": "0",
+   "fieldname": "capacidad",
+   "fieldtype": "Int",
+   "label": "Capacidad (cupos)",
+   "description": "Cupos máximos cuando la actividad no usa grupos/tiras."
   },
   {
    "default": "0",

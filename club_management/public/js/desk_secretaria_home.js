@@ -18,6 +18,6 @@ $(document).on("app_ready", function () {
 
 	const slug = frappe.router.slug(ws.name);
 	if (frappe.workspaces && frappe.workspaces[slug]) {
-		frappe.set_route(slug);
+		frappe.set_route("Workspaces", ws.name);
 	}
 });

@@ -32,7 +32,7 @@
 
 		{
 
-			label: __("Gestión de Actividades"),
+			label: __("Gestión de Actividades y Deportes"),
 
 			workspace: "Gestión de Actividades",
 
@@ -62,6 +62,24 @@
 
 		"valores-cuota-social",
 
+		"catalogo-actividades",
+
+	]);
+
+
+
+	club_management.club_desk_navigation.CLUB_PAGES_SOCIOS = new Set([
+
+		"valores-cuota-social",
+
+	]);
+
+
+
+	club_management.club_desk_navigation.CLUB_PAGES_ACTIVIDADES = new Set([
+
+		"catalogo-actividades",
+
 	]);
 
 
@@ -87,6 +105,7 @@
 
 
 	club_management.club_desk_navigation._refresh_timer = null;
+	club_management.club_desk_navigation._search_timer = null;
 
 
 
@@ -258,7 +277,15 @@
 
 		if (this.is_club_page()) {
 
-			return this.TABS.find((tab) => tab.workspace === "Secretaría") || null;
+			const page = this.get_active_page();
+
+			if (page && this.CLUB_PAGES_ACTIVIDADES?.has(page)) {
+
+				return this.TABS.find((tab) => tab.tab === "actividades") || null;
+
+			}
+
+			return this.TABS.find((tab) => tab.tab === "socios") || null;
 
 		}
 
@@ -319,6 +346,16 @@
 		} else {
 
 			setTimeout(show, 80);
+
+		}
+
+		if (workspace === "Secretaría") {
+
+			club_management.secretaria_sidebar?.refresh?.();
+
+		} else if (workspace === "Gestión de Actividades") {
+
+			club_management.actividades_sidebar?.refresh?.();
 
 		}
 
@@ -510,12 +547,78 @@
 
 
 
-		$nav.html(`<div class="club-desk-nav-inner">${tabs_html}</div>`);
+		$nav.html(`<div class="club-desk-nav-inner">${tabs_html}
+			<div class="club-desk-nav-search-wrap">
+				<input type="search" class="form-control form-control-sm club-desk-nav-search"
+					placeholder="${__("Buscar socio por DNI o apellido…")}" autocomplete="off" aria-label="${__("Buscar socio")}">
+				<div class="club-desk-nav-search-results" role="listbox"></div>
+			</div>
+		</div>`);
 
 		$nav.find('[data-workspace="Inicio"], [data-workspace="Inicio Club"]').remove();
 
 		this.bind_nav_tab_handlers($nav);
+		this.bind_nav_search_handlers($nav);
+	};
 
+
+
+	club_management.club_desk_navigation.bind_nav_search_handlers = function ($nav) {
+		const nav = club_management.club_desk_navigation;
+		const $input = $nav.find(".club-desk-nav-search");
+		const $results = $nav.find(".club-desk-nav-search-results");
+
+		const close_results = () => {
+			$results.removeClass("is-open").empty();
+		};
+
+		$input.off("input.club_search").on("input.club_search", function () {
+			clearTimeout(nav._search_timer);
+			const query = ($(this).val() || "").trim();
+			if (query.length < 2) {
+				close_results();
+				return;
+			}
+			nav._search_timer = setTimeout(() => {
+				frappe.call({
+					method: "club_management.members.api.club_desk.search_socio_desk",
+					args: { query, limit: 8 },
+					callback: (r) => {
+						const rows = r.message || [];
+						if (!rows.length) {
+							$results
+								.html(`<div class="text-muted small p-2">${__("Sin resultados")}</div>`)
+								.addClass("is-open");
+							return;
+						}
+						const html = rows
+							.map(
+								(row) => `
+							<button type="button" class="club-desk-nav-search-item" data-name="${frappe.utils.escape_html(row.name)}" role="option">
+								${frappe.utils.escape_html(row.label)}
+							</button>`
+							)
+							.join("");
+						$results.html(html).addClass("is-open");
+					},
+				});
+			}, 250);
+		});
+
+		$results.off("click.club_search").on("click.club_search", ".club-desk-nav-search-item", function () {
+			const name = $(this).attr("data-name");
+			close_results();
+			$input.val("");
+			if (name) {
+				frappe.set_route("Form", "Socio", name);
+			}
+		});
+
+		$(document).off("click.club_search_outside").on("click.club_search_outside", (event) => {
+			if (!$(event.target).closest(".club-desk-nav-search-wrap").length) {
+				close_results();
+			}
+		});
 	};
 
 
@@ -586,18 +689,13 @@
 
 
 
-	frappe.router.on("change", () => {
-
+	$(document).on("page-change app_ready", () => {
+		club_management.club_desk_navigation.redirect_slug_aliases();
 		club_management.club_desk_navigation.schedule_refresh();
-
 	});
 
-
-
-	$(document).on("page-change app_ready", () => {
-
+	frappe.router.on("change", () => {
 		club_management.club_desk_navigation.schedule_refresh();
-
 	});
 
 })();

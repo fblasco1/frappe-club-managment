@@ -19,6 +19,7 @@ from club_management.activities.services.gestion_actividades_panel import (
 	update_equipo,
 	update_grupo,
 )
+from club_management.activities.services.gestion_actividades_dashboard import get_dashboard_payload
 
 _PANEL_ROLES = {"Secretaria", "System Manager"}
 
@@ -35,6 +36,15 @@ def _ensure_panel_access() -> None:
 def get_catalog() -> dict[str, Any]:
 	_ensure_panel_access()
 	return get_catalog_payload()
+
+
+@frappe.whitelist()
+def get_dashboard(
+	reference_date: str | None = None,
+	actividad: str | None = None,
+) -> dict[str, Any]:
+	_ensure_panel_access()
+	return get_dashboard_payload(reference_date=reference_date, actividad=actividad or None)
 
 
 @frappe.whitelist()

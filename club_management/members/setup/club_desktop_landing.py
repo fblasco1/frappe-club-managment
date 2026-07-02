@@ -31,7 +31,7 @@ CLUB_DESK_LANDING_ICONS: tuple[dict[str, Any], ...] = (
 		"icon": "activity",
 		"icon_type": "Link",
 		"link_type": "External",
-		"link": f"/desk/{slug('Gestión de Actividades')}",
+		"link": "/desk/Workspaces/Gestión de Actividades",
 		"bg_color": "blue",
 		"app": "club_management",
 		"idx": 2,

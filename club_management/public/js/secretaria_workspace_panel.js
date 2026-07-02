@@ -15,8 +15,32 @@
 	club_management.secretaria_panel = {
 
 		_refresh_timer: null,
+		_selected_tendencia_month: null,
 
 
+
+		get_tendencia_month_value() {
+			if (this._selected_tendencia_month) {
+				return this._selected_tendencia_month;
+			}
+			const now = frappe.datetime.str_to_obj(frappe.datetime.get_today());
+			const month = String(now.getMonth() + 1).padStart(2, "0");
+			return `${now.getFullYear()}-${month}`;
+		},
+
+		tendencia_reference_date() {
+			return `${this.get_tendencia_month_value()}-01`;
+		},
+
+		render_tendencia_month_input(selectedMonth) {
+			return `
+				<label class="club-secretaria-trend-month">
+					<span class="text-muted small">${__("Mes")}</span>
+					<input type="month" class="form-control form-control-sm club-secretaria-trend-month-input"
+						value="${frappe.utils.escape_html(selectedMonth)}" />
+				</label>
+			`;
+		},
 
 		schedule_refresh() {
 
@@ -178,7 +202,7 @@
 			const socios = metricas.socios || {};
 			const tendencia = metricas.tendencia_recaudacion || {};
 			const medios = metricas.medios_pago || {};
-			const showTrend = tendencia.disponible && (tendencia.meses || []).length;
+			const showTrend = tendencia.disponible && (tendencia.dias || []).length;
 			const showSegmentos = this.has_segmentos_chart(socios.segmentos);
 			const showMedios =
 				medios.disponible &&
@@ -192,7 +216,10 @@
 			const trendHtml = showTrend
 				? `<div class="club-secretaria-charts-row club-secretaria-charts-row--trend">
 					<div class="club-secretaria-chart-card club-secretaria-chart-card--wide">
-						<h6>${__("Tendencia de recaudación")}</h6>
+						<div class="club-secretaria-chart-header">
+							<h6>${__("Tendencia de recaudación")}</h6>
+							${this.render_tendencia_month_input(this.get_tendencia_month_value())}
+						</div>
 						<div class="club-secretaria-chart-trend"></div>
 					</div>
 				</div>`
@@ -243,16 +270,16 @@
 				});
 			}
 			const $trend = $panel.find(".club-secretaria-chart-trend");
-			if ($trend.length && tendencia.meses?.length) {
+			if ($trend.length && tendencia.dias?.length) {
 				this._chart_trend = new frappe.Chart($trend[0], {
 					type: "line",
 					height: 220,
 					colors: ["#29cd42", "#7575ff"],
 					data: {
-						labels: tendencia.meses.map((row) => row.periodo),
+						labels: tendencia.dias.map((row) => row.label),
 						datasets: [
-							{ name: __("Recaudado"), values: tendencia.meses.map((r) => r.recaudado) },
-							{ name: __("Emitido"), values: tendencia.meses.map((r) => r.emitido) },
+							{ name: __("Recaudado"), values: tendencia.dias.map((r) => r.recaudado) },
+							{ name: __("Emitido"), values: tendencia.dias.map((r) => r.emitido) },
 						],
 					},
 					truncateLegends: 1,
@@ -408,6 +435,14 @@
 		},
 
 		bind_panel_handlers($panel) {
+			$panel.find(".club-secretaria-trend-month-input").on("change", (e) => {
+				const value = e.currentTarget.value;
+				if (value) {
+					this._selected_tendencia_month = value;
+					this.refresh();
+				}
+			});
+
 			$panel.find(".club-secretaria-ver-mas").on("click", (e) => {
 				const $btn = $(e.currentTarget);
 				this.open_list($btn.attr("data-doctype"), $btn.attr("data-filters"));
@@ -483,6 +518,7 @@
 
 			}
 
+			club_management.actividades_panel?.clear_mount?.();
 			club_management.secretaria_sidebar?.refresh?.();
 
 
@@ -508,6 +544,9 @@
 			frappe.call({
 
 				method: "club_management.members.api.secretaria_workspace.get_panel_lists",
+				args: {
+					tendencia_reference_date: this.tendencia_reference_date(),
+				},
 
 				callback: (r) => {
 
@@ -528,9 +567,10 @@
 
 
 	frappe.router.on("change", () => {
-
+		if (!club_management.secretaria_panel.is_secretaria_workspace()) {
+			club_management.secretaria_panel.clear_mount();
+		}
 		club_management.secretaria_panel.schedule_refresh();
-
 	});
 
 

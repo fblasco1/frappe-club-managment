@@ -11,6 +11,7 @@
   "titulo",
   "item",
   "habilitada",
+  "capacidad",
   "orden",
   "descripcion"
  ],
@@ -47,6 +48,13 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Habilitada"
+  },
+  {
+   "default": "0",
+   "fieldname": "capacidad",
+   "fieldtype": "Int",
+   "label": "Capacidad (cupos)",
+   "description": "Cupos máximos del equipo o categoría."
   },
   {
    "default": "0",

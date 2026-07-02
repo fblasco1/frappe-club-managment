@@ -4,10 +4,14 @@
 
 	const ACTIVIDADES_WORKSPACE_NAME = "Gestión de Actividades";
 	const PANEL_ID = "club-actividades-catalog";
+	const DASHBOARD_ID = "club-actividades-dashboard";
 
 	club_management.actividades_panel = {
 		_refresh_timer: null,
 		_catalog: null,
+		_dashboard: null,
+		_dashboard_actividad: "",
+		_chart_ocupacion: null,
 		_selected_actividad: null,
 		_grupo_expandido: null,
 		_filter: "",
@@ -97,42 +101,341 @@
 			return page?.name === ACTIVIDADES_WORKSPACE_NAME;
 		},
 
+		is_catalog_page() {
+			return club_management.club_desk_navigation?.get_active_page?.() === "catalogo-actividades";
+		},
+
 		get_mount_parent() {
 			const ws = frappe.workspace;
 			if (!ws?.body?.length) {
 				return null;
 			}
+			$("body").addClass("club-actividades-active-workspace");
+			ws.body.addClass("club-actividades-workspace-body");
+			ws.body
+				.parents(
+					".layout-main-section-wrapper, .layout-main-section, .page-body, .container, .layout-main, main"
+				)
+				.addClass("club-actividades-workspace-body");
+			ws.body.closest(".layout-main-section-wrapper").addClass("club-actividades-workspace-body");
 			const container = ws.body.find(".editor-js-container");
 			if (!container.length) {
-				return ws.body;
+				return null;
 			}
 			container.addClass("club-actividades-workspace");
 			return container;
 		},
 
 		clear_mount() {
-			$(`#${PANEL_ID}`).remove();
-			frappe.workspace?.body
-				?.find(".editor-js-container")
-				?.removeClass("club-actividades-workspace");
+			$(`#${DASHBOARD_ID}`).remove();
+			$("body").removeClass("club-actividades-active-workspace club-actividades-catalog-active");
+			const ws = frappe.workspace;
+			ws?.body?.find(".editor-js-container")?.removeClass("club-actividades-workspace");
+			ws?.body?.removeClass("club-actividades-workspace-body");
+			ws?.body
+				?.parents(
+					".layout-main-section-wrapper, .layout-main-section, .page-body, .container, .layout-main, main"
+				)
+				?.removeClass("club-actividades-workspace-body");
 		},
 
-		ensure_mount_point($parent) {
-			if ($(`#${PANEL_ID}`).length) {
-				return $(`#${PANEL_ID}`);
+		ensure_dashboard_mount($parent) {
+			if ($(`#${DASHBOARD_ID}`).length) {
+				return $(`#${DASHBOARD_ID}`);
 			}
-			const $panel = $(`<div id="${PANEL_ID}" class="club-actividades-catalog"></div>`);
+			const $dash = $(`<div id="${DASHBOARD_ID}" class="club-actividades-dashboard"></div>`);
 			const $editor = $parent.find("#editorjs");
 			if ($editor.length) {
-				$editor.before($panel);
+				$editor.before($dash);
 			} else {
-				$parent.prepend($panel);
+				$parent.prepend($dash);
 			}
-			return $panel;
+			return $dash;
+		},
+
+		init_catalog_page(page) {
+			this._catalog_page = page;
+			$("body").addClass("club-actividades-catalog-active");
+			page.main.addClass("club-actividades-catalog-page");
+			page.main
+				.parents(
+					".layout-main-section-wrapper, .layout-main-section, .page-body, .container, .layout-main, main"
+				)
+				.addClass("club-actividades-catalog-page");
+			if (!page.main.find(`#${PANEL_ID}`).length) {
+				page.main.html(`<div id="${PANEL_ID}" class="club-actividades-catalog"></div>`);
+			}
+			this.refresh_catalog_page();
+		},
+
+		refresh_catalog_page() {
+			const $panel = this._catalog_page?.main?.find(`#${PANEL_ID}`);
+			if (!$panel?.length) {
+				return;
+			}
+			this.load_catalog($panel);
+		},
+
+		load_catalog($panel) {
+			this.render_loading($panel);
+			frappe.call({
+				method: "club_management.activities.api.gestion_actividades_workspace.get_catalog",
+				callback: (r) => {
+					if (r.message) {
+						this.render_catalog($panel, r.message);
+					}
+				},
+				error: () => {
+					$panel.html(
+						`<p class="text-danger">${__("No se pudo cargar el catálogo de actividades.")}</p>`
+					);
+				},
+			});
 		},
 
 		render_loading($panel) {
 			$panel.html(`<div class="text-muted">${__("Cargando catálogo…")}</div>`);
+		},
+
+		render_dashboard_loading($panel) {
+			$panel.html(`<div class="text-muted">${__("Cargando panel de actividades…")}</div>`);
+		},
+
+		render_semaforo_class(semaforo) {
+			if (semaforo === "amarillo") return "is-semaforo-amarillo";
+			if (semaforo === "rojo") return "is-semaforo-rojo";
+			return "";
+		},
+
+		render_ver_mas_btn(doctype, filters) {
+			if (!doctype) return "";
+			const filters_json = JSON.stringify(filters || []).replace(/'/g, "&#39;");
+			return `
+				<button type="button" class="btn btn-link btn-sm club-actividades-ver-mas px-0"
+					data-doctype="${frappe.utils.escape_html(doctype)}"
+					data-filters="${filters_json.replace(/"/g, "&quot;")}">
+					${__("Ver más")}
+				</button>
+			`;
+		},
+
+		normalize_filters(raw) {
+			if (raw == null || raw === "") return [];
+			if (Array.isArray(raw)) return raw;
+			if (typeof raw === "string") {
+				try {
+					return JSON.parse(raw);
+				} catch {
+					return [];
+				}
+			}
+			return [];
+		},
+
+		open_list(doctype, raw_filters) {
+			if (!doctype) return;
+			const filters = this.normalize_filters(raw_filters);
+			if (filters.length) {
+				frappe.route_options = filters.reduce((acc, filter) => {
+					if (!Array.isArray(filter) || filter.length < 4) return acc;
+					const field = filter[1];
+					const value = [filter[2], filter[3]];
+					if (acc[field]) acc[field].push(value);
+					else acc[field] = [value];
+					return acc;
+				}, {});
+			} else {
+				frappe.route_options = {};
+			}
+			frappe.set_route("List", doctype);
+		},
+
+		render_dashboard_quick_actions() {
+			return `
+				<div class="club-actividades-quick-actions">
+					<button type="button" class="btn btn-primary club-actividades-inscribir">
+						${__("+ Inscribir socio a actividad")}
+					</button>
+					<button type="button" class="btn btn-secondary club-actividades-cupos">
+						${__("Modificar cupos / horarios")}
+					</button>
+				</div>
+			`;
+		},
+
+		render_dashboard_kpis(data) {
+			const kpis = data.kpis || {};
+			const verMas = data.ver_mas || {};
+			const crecimiento = kpis.crecimiento || {};
+			const masSocios = kpis.mas_socios || {};
+			return `
+				<div class="club-actividades-kpi-grid">
+					<div class="club-actividades-kpi-card">
+						<p class="club-actividades-kpi-title">${__("Inscripciones activas")}</p>
+						<div class="club-actividades-kpi-value">${kpis.inscripciones_activas ?? 0}</div>
+						<div class="club-actividades-kpi-footer">
+							${this.render_ver_mas_btn(verMas.inscripciones_doctype, verMas.inscripciones_filters)}
+						</div>
+					</div>
+					<div class="club-actividades-kpi-card">
+						<p class="club-actividades-kpi-title">${__("Actividad con mayor crecimiento del mes")}</p>
+						<div class="club-actividades-kpi-value">${frappe.utils.escape_html(crecimiento.actividad || "—")}</div>
+						<span class="text-muted small">+${crecimiento.altas_mes ?? 0} (${crecimiento.delta_mes_anterior ?? 0} ${__("vs mes anterior")})</span>
+					</div>
+					<div class="club-actividades-kpi-card">
+						<p class="club-actividades-kpi-title">${__("Actividad con más socios inscriptos")}</p>
+						<div class="club-actividades-kpi-value">${frappe.utils.escape_html(masSocios.actividad || "—")}</div>
+						<span class="text-muted small">${masSocios.socios ?? 0} ${__("socios")}</span>
+						<div class="club-actividades-kpi-footer">
+							${this.render_ver_mas_btn(verMas.mas_socios_doctype, verMas.mas_socios_filters)}
+						</div>
+					</div>
+				</div>
+			`;
+		},
+
+		render_dashboard_charts_html(data) {
+			const ocupacion = data.ocupacion_por_deporte || {};
+			const infra = data.infraestructura || {};
+			const lista = data.lista_espera || {};
+			const ocupacionHtml = ocupacion.disponible
+				? `<div class="club-actividades-chart-card club-actividades-chart-card--wide"><h6>${__("Ocupación por deporte / categoría")}</h6><div class="club-actividades-chart-ocupacion"></div></div>`
+				: "";
+			const listaRows = (lista.filas || [])
+				.map(
+					(row) => `
+				<tr>
+					<td>${frappe.utils.escape_html(row.actividad || "")}</td>
+					<td>${frappe.utils.escape_html(row.grupo_actividad || row.equipo_actividad || "—")}</td>
+					<td>${row.cantidad ?? 0}</td>
+					<td>${frappe.datetime.str_to_user(row.fecha_mas_antigua) || ""}</td>
+				</tr>`
+				)
+				.join("");
+			const listaHtml = `
+				<div class="club-actividades-list-card">
+					<div class="d-flex align-items-center gap-2 mb-2">
+						<h6 class="mb-0">${__("Lista de espera (top 5)")}</h6>
+						<div class="ms-auto">${this.render_ver_mas_btn(data.ver_mas?.lista_espera_doctype, data.ver_mas?.lista_espera_filters)}</div>
+					</div>
+					${listaRows ? `<div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>${__("Actividad")}</th><th>${__("Grupo / equipo")}</th><th>${__("En espera")}</th><th>${__("Desde")}</th></tr></thead><tbody>${listaRows}</tbody></table></div>` : `<p class="text-muted mb-0">${__("No hay socios en lista de espera.")}</p>`}
+				</div>`;
+			const infraHtml = `
+				<div class="club-actividades-chart-card">
+					<h6>${__("Disponibilidad de infraestructura")}</h6>
+					<p class="club-actividades-infra-placeholder">${frappe.utils.escape_html(infra.mensaje || __("Próximamente"))}</p>
+				</div>`;
+			return `
+				<div class="club-actividades-charts-row">
+					${ocupacionHtml}
+				</div>
+				<div class="club-actividades-charts-row club-actividades-charts-row--dual">
+					${listaHtml}
+					${infraHtml}
+				</div>
+			`;
+		},
+
+		mount_dashboard_charts($panel, data) {
+			this._chart_ocupacion = null;
+			const ocupacion = data.ocupacion_por_deporte || {};
+			const $ocup = $panel.find(".club-actividades-chart-ocupacion");
+			if ($ocup.length && ocupacion.disponible && ocupacion.labels?.length) {
+				this._chart_ocupacion = new frappe.Chart($ocup[0], {
+					type: "bar",
+					height: 260,
+					colors: ["#5e64ff", "#29cd42", "#f39c12", "#e74c3c", "#9b59b6"],
+					data: {
+						labels: ocupacion.labels,
+						datasets: (ocupacion.datasets || []).map((ds) => ({
+							name: ds.name,
+							values: ds.values,
+						})),
+					},
+					barOptions: { stacked: 1, spaceRatio: 0.45 },
+					axisOptions: { shortenYAxisNumbers: 1 },
+				});
+			}
+		},
+
+		render_dashboard_filters(actividades) {
+			const options = (actividades || [])
+				.map(
+					(act) =>
+						`<option value="${frappe.utils.escape_html(act.name)}" ${act.name === this._dashboard_actividad ? "selected" : ""}>${frappe.utils.escape_html(act.titulo || act.name)}</option>`
+				)
+				.join("");
+			return `
+				<div class="club-actividades-dashboard-filters">
+					<div class="form-group">
+						<label class="small text-muted">${__("Filtrar por actividad")}</label>
+						<select class="form-control form-control-sm club-actividades-filter-actividad">
+							<option value="">${__("Todas las actividades")}</option>
+							${options}
+						</select>
+					</div>
+				</div>
+			`;
+		},
+
+		render_dashboard($panel, data) {
+			this._dashboard = data;
+			const actividades = this._catalog || [];
+			$panel.html(`
+				<h4 class="mb-2">${__("Gestión de Actividades y Deportes")}</h4>
+				${this.render_dashboard_filters(actividades)}
+				${this.render_dashboard_quick_actions()}
+				${this.render_dashboard_kpis(data)}
+				${this.render_dashboard_charts_html(data)}
+			`);
+			this.mount_dashboard_charts($panel, data);
+			this.bind_dashboard_handlers($panel, data);
+		},
+
+		bind_dashboard_handlers($panel, data) {
+			const verMas = data.ver_mas || {};
+			$panel.find(".club-actividades-ver-mas").on("click", (e) => {
+				const $btn = $(e.currentTarget);
+				this.open_list($btn.attr("data-doctype"), $btn.attr("data-filters"));
+			});
+			$panel.find(".club-actividades-inscribir").on("click", () => {
+				frappe.new_doc("Inscripcion Actividad");
+			});
+			$panel.find(".club-actividades-cupos").on("click", () => {
+				frappe.set_route("catalogo-actividades");
+			});
+			$panel.find(".club-actividades-filter-actividad").on("change", (e) => {
+				this._dashboard_actividad = $(e.currentTarget).val() || "";
+				this.load_dashboard($(`#${DASHBOARD_ID}`));
+			});
+		},
+
+		load_dashboard($panel) {
+			if (!$panel?.length) return;
+			this.render_dashboard_loading($panel);
+			frappe.call({
+				method: "club_management.activities.api.gestion_actividades_workspace.get_dashboard",
+				args: { actividad: this._dashboard_actividad || null },
+				callback: (r) => {
+					if (!r.message) {
+						return;
+					}
+					frappe.call({
+						method: "club_management.activities.api.gestion_actividades_workspace.get_catalog",
+						callback: (catalogResponse) => {
+							this._catalog = catalogResponse.message?.actividades || [];
+							this.render_dashboard($panel, r.message);
+						},
+						error: () => {
+							this._catalog = [];
+							this.render_dashboard($panel, r.message);
+						},
+					});
+				},
+				error: () => {
+					$panel.html(`<p class="text-danger">${__("No se pudo cargar el panel de actividades.")}</p>`);
+				},
+			});
 		},
 
 		render_toolbar() {
@@ -941,34 +1244,30 @@
 		},
 
 		refresh() {
+			if (this.is_catalog_page()) {
+				this.clear_mount();
+				return;
+			}
 			if (!this.is_actividades_workspace()) {
 				this.clear_mount();
 				return;
 			}
+			club_management.secretaria_panel?.clear_mount?.();
+			club_management.actividades_sidebar?.refresh?.();
 			const $parent = this.get_mount_parent();
 			if (!$parent) {
 				this.schedule_refresh();
 				return;
 			}
-			const $panel = this.ensure_mount_point($parent);
-			this.render_loading($panel);
-			frappe.call({
-				method: "club_management.activities.api.gestion_actividades_workspace.get_catalog",
-				callback: (r) => {
-					if (r.message) {
-						this.render_catalog($panel, r.message);
-					}
-				},
-				error: () => {
-					$panel.html(
-						`<p class="text-danger">${__("No se pudo cargar el catálogo de actividades.")}</p>`
-					);
-				},
-			});
+			const $dash = this.ensure_dashboard_mount($parent);
+			this.load_dashboard($dash);
 		},
 	};
 
 	frappe.router.on("change", () => {
+		if (!club_management.actividades_panel.is_actividades_workspace()) {
+			club_management.actividades_panel.clear_mount();
+		}
 		club_management.actividades_panel.schedule_refresh();
 	});
 
