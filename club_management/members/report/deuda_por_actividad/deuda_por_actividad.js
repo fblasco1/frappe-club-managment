@@ -1,7 +1,7 @@
 (function () {
 	const layout = club_management.equipo_report.settings;
 
-	frappe.query_reports["Deuda del club por actividad"] = {
+	frappe.query_reports["Deuda por actividad"] = {
 		filters: [
 			{
 				fieldname: "fecha_desde",

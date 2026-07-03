@@ -2,7 +2,7 @@
 
 Secretaría consulta los **aranceles cobrados** de socios inscriptos en una
 actividad / grupo / equipo en un rango de fechas, y la **liquidación del 80 %**
-para el entrenador según política del club.
+para el entrenador según la política configurada.
 
 **Relacionado:** `liquidacion_equipo_deuda_rango.md`, `activities_jerarquia.md`
 
@@ -39,12 +39,12 @@ And la columna **% entrenador** muestra 70.
 
 ---
 
-## Scenario: porcentaje por defecto del club
+## Scenario: porcentaje por defecto
 
 Given equipo sin `pct_liquidacion_entrenador` definido
 And `Club Settings.pct_liquidacion_entrenador_default` = 80
 When se calcula la liquidación
-Then se aplica el 80 % del club.
+Then se aplica el 80 % por defecto.
 
 ---
 

@@ -676,7 +676,7 @@ def get_pagos_report_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]
 	]
 
 
-def get_deuda_club_report_columns() -> list[dict[str, Any]]:
+def get_deuda_por_actividad_report_columns() -> list[dict[str, Any]]:
 	return [
 		{
 			"label": _("Actividad"),
@@ -724,8 +724,8 @@ def get_deuda_club_report_columns() -> list[dict[str, Any]]:
 	]
 
 
-def get_deuda_club_por_actividad_data(filters: dict[str, Any] | frappe._dict) -> list[dict[str, Any]]:
-	"""Filas del Script Report «Deuda del club por actividad»."""
+def get_deuda_por_actividad_data(filters: dict[str, Any] | frappe._dict) -> list[dict[str, Any]]:
+	"""Filas del Script Report «Deuda por actividad»."""
 	if not erpnext_cobranza_disponible():
 		frappe.throw(_("La consulta de deuda requiere ERPNext (Sales Invoice)."), frappe.ValidationError)
 
@@ -795,7 +795,7 @@ def get_deuda_club_por_actividad_data(filters: dict[str, Any] | frappe._dict) ->
 
 	rows.sort(key=lambda row: (-flt(row["deuda_total"]), row["actividad"]))
 	total_row = {
-		"actividad": _("Total club"),
+		"actividad": _("Total"),
 		"deuda_cuota_social": _sum_currency(rows, "deuda_cuota_social"),
 		"deuda_arancel": _sum_currency(rows, "deuda_arancel"),
 		"deuda_cuota_federativa": _sum_currency(rows, "deuda_cuota_federativa"),

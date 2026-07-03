@@ -115,7 +115,7 @@ No filtrar solo `Moroso`: la liquidación sirve también para cobrar antes del c
 (actividad / grupo / equipo) para `deuda_cuota_social`, `deuda_arancel`,
 `deuda_cuota_federativa` y `deuda_en_rango`.
 
-**Informe complementario:** `Deuda del club por actividad` (ver `deuda_club_por_actividad.md`).
+**Informe complementario:** `Deuda por actividad` (ver `deuda_por_actividad.md`).
 
 Orden default: `deuda_en_rango` descendente, luego `nombre_apellido` ascendente.
 

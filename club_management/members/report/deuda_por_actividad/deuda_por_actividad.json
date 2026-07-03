@@ -11,11 +11,11 @@
  "modified": "2026-07-03 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Members",
- "name": "Deuda del club por actividad",
+ "name": "Deuda por actividad",
  "owner": "Administrator",
  "prepared_report": 0,
  "ref_doctype": "Actividad",
- "report_name": "Deuda del club por actividad",
+ "report_name": "Deuda por actividad",
  "report_type": "Script Report",
  "roles": [
   {

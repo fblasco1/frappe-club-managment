@@ -14,7 +14,7 @@
 			report_type: "Script Report",
 			ref_doctype: "Inscripcion Actividad",
 		},
-		"Deuda del club por actividad": {
+		"Deuda por actividad": {
 			report_type: "Script Report",
 			ref_doctype: "Actividad",
 		},
@@ -65,10 +65,10 @@
 			child: 1,
 		},
 		{
-			label: __("Deuda del club por actividad"),
+			label: __("Deuda por actividad"),
 			type: "Link",
 			link_type: "Report",
-			link_to: "Deuda del club por actividad",
+			link_to: "Deuda por actividad",
 			icon: "table",
 			child: 1,
 		},

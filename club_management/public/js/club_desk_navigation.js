@@ -54,7 +54,7 @@
 
 		"Pagos por equipo",
 
-		"Deuda del club por actividad",
+		"Deuda por actividad",
 
 	]);
 
@@ -66,7 +66,7 @@
 
 		"Pagos por equipo",
 
-		"Deuda del club por actividad",
+		"Deuda por actividad",
 
 	]);
 
@@ -531,7 +531,7 @@
 
 			$nav = $(
 
-				`<nav id="${NAV_ID}" class="club-desk-nav" aria-label="${__("Navegación del club")}"></nav>`
+				`<nav id="${NAV_ID}" class="club-desk-nav" aria-label="${__("Navegación")}"></nav>`
 
 			);
 

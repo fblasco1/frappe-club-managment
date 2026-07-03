@@ -23,7 +23,7 @@ from club_management.members.services.liquidacion_equipo import (
 	calcular_deuda_en_rango,
 	calcular_pagos_arancel_en_rango,
 	calcular_pagos_en_rango,
-	get_deuda_club_por_actividad_data,
+	get_deuda_por_actividad_data,
 	get_deuda_por_equipo_data,
 	get_facturas_pendientes_socio_en_rango,
 	get_pagos_por_equipo_data,
@@ -365,7 +365,7 @@ class TestLiquidacionEquipo(MembersTestCase):
 		socio = self._socio_activo(dni="74001018", email="club.act@example.com")
 		self._inscribir(socio.name)
 		self._crear_factura(socio.name, "2026-03-20", 12000)
-		rows = get_deuda_club_por_actividad_data(
+		rows = get_deuda_por_actividad_data(
 			{
 				"fecha_desde": self._MARZO_DESDE,
 				"fecha_hasta": self._MARZO_HASTA,
@@ -375,7 +375,7 @@ class TestLiquidacionEquipo(MembersTestCase):
 		self.assertGreater(actividad_row["deuda_total"], 0)
 		self.assertGreaterEqual(actividad_row["socios_deudores"], 1)
 		total_row = rows[-1]
-		self.assertEqual(total_row["actividad"], "Total club")
+		self.assertEqual(total_row["actividad"], "Total")
 		self.assertGreater(total_row["deuda_total"], 0)
 
 	def test_pagos_arancel_proporcional_pago_parcial(self) -> None:

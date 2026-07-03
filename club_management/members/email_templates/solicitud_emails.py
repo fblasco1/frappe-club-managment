@@ -18,7 +18,7 @@ def render_solicitud_validada_email(*, nombre: str, pago_url: str) -> str:
 <p>Tu solicitud de asociación fue <strong>validada</strong>.</p>
 <p>Para abonar la primera cuota, usá este enlace:</p>
 <p><a href="{pago_url_seguro}">Pagar primera cuota</a></p>
-<p>Equipo del club</p>"""
+<p>Secretaría</p>"""
 
 
 def render_solicitud_requiere_correccion_email(
@@ -35,4 +35,4 @@ def render_solicitud_requiere_correccion_email(
 <p>{obs_seguras}</p>
 <p>Tu token de seguimiento: <strong>{token_seguro}</strong></p>
 <p>Podés consultar el estado y corregirla en: <a href="{portal_url}">seguimiento</a></p>
-<p>Equipo del club</p>"""
+<p>Secretaría</p>"""

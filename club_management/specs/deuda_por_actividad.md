@@ -1,6 +1,6 @@
-# Spec: Deuda del club por actividad
+# Spec: Deuda por actividad
 
-Resumen de deuda pendiente del club desglosada por **actividad deportiva**.
+Resumen de deuda pendiente desglosada por **actividad deportiva**.
 
 **Relacionado:** `liquidacion_equipo_deuda_rango.md`, `activities_jerarquia.md`
 
@@ -9,7 +9,7 @@ Resumen de deuda pendiente del club desglosada por **actividad deportiva**.
 ## Scenario: informe visible en Secretaría
 
 Given Secretaría en workspace **Secretaría** o **Gestión de Actividades**
-When abre **Deuda del club por actividad**
+When abre **Deuda por actividad**
 Then ve un Script Report con filtro de rango de fechas
 And una fila por cada actividad con inscripciones activas.
 
@@ -27,9 +27,9 @@ And **socios_deudores** = cantidad de socios con deuda > 0 en el rango.
 
 ---
 
-## Scenario: fila de total del club
+## Scenario: fila de total
 
 Given el reporte con varias actividades
 When Secretaría lo ejecuta
-Then ve una fila **Total club** con la suma de todas las columnas monetarias
+Then ve una fila **Total** con la suma de todas las columnas monetarias
 And el promedio de meses es ponderado por socios deudores.

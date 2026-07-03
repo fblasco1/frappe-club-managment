@@ -1,11 +1,11 @@
-"""Agrega enlace al reporte Deuda del club por actividad."""
+"""Agrega enlace al reporte Deuda por actividad."""
 
 from __future__ import annotations
 
 import frappe
 
 WORKSPACES = ("Secretaría", "Gestión de Actividades")
-REPORT_NAME = "Deuda del club por actividad"
+REPORT_NAME = "Deuda por actividad"
 
 
 def execute() -> None:
@@ -30,7 +30,7 @@ def execute() -> None:
 				"parent": workspace,
 				"parenttype": "Workspace",
 				"parentfield": "links",
-				"label": "Deuda del club por actividad",
+				"label": "Deuda por actividad",
 				"link_type": "Report",
 				"link_to": REPORT_NAME,
 				"type": "Link",

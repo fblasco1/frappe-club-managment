@@ -22,7 +22,7 @@ LINKS = [
 	},
 	{"label": "Actividades", "link_to": "Actividad", "link_type": "DocType", "type": "Link"},
 	{
-		"label": "Configuración del club",
+		"label": "Configuración",
 		"link_to": "Club Settings",
 		"link_type": "DocType",
 		"type": "Link",
