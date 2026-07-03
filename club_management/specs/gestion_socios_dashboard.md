@@ -8,13 +8,15 @@ recaudación y medios de pago.
 
 ---
 
-## Scenario: total de socios activos segmentado
+## Scenario: total de socios activos por categoría
 
 Given existen socios con `estado != Baja` en distintas categorías
 When Secretaria consulta el dashboard
 Then ve el **total** de socios activos (no dados de baja) en la card KPI
-And el desglose por segmento (**Mayores**, **Menores**, **Adherentes**, **Jubilados**)
-  se muestra en un **gráfico de barras** en la fila inferior, junto al gráfico de medios de pago.
+And el desglose por categoría (**Activo**, **Menor**, **Adherente**, **Jubilado**, **Vitalicio**)
+  se muestra en un **gráfico de barras** en la fila inferior, junto al gráfico de medios de pago
+And las categorías `2° Hermano` y `3° Hermano` se clasifican como **Menor** si son
+  menores de 18 años o como **Activo** si son mayores de edad (según `fecha_nacimiento`).
 
 ---
 
@@ -53,7 +55,9 @@ And **Ver más** abre `Socio` filtrado a `Moroso`.
 
 Given facturación y cobros de cuotas sociales en un mes calendario
 When Secretaria consulta el dashboard
-Then ve un gráfico de línea con **recaudado** y **emitido** por **día del mes** (1 … último día)
+Then ve un gráfico de línea con dos series acumuladas por **día del mes** (1 … último día):
+  **Deuda del mes** (línea roja) = emitido acumulado − recaudado acumulado (baja al abonarse)
+  **Recaudado** (línea verde) = cobros acumulados del mes (sube con cada pago)
 And puede elegir el **mes** a visualizar con un selector (por defecto el mes en curso)
 And al cambiar el mes solo se actualiza el gráfico de tendencia (sin recargar todo el panel)
 And el resto de KPIs del panel siguen referidos al mes en curso salvo el gráfico de tendencia.

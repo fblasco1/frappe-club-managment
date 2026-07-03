@@ -273,12 +273,12 @@
 			this._chart_trend = new frappe.Chart($container[0], {
 				type: "line",
 				height: 220,
-				colors: ["#29cd42", "#7575ff"],
+				colors: ["#e74c3c", "#29cd42"],
 				data: {
 					labels: data.dias.map((row) => row.label),
 					datasets: [
+						{ name: __("Deuda del mes"), values: data.dias.map((r) => r.deuda) },
 						{ name: __("Recaudado"), values: data.dias.map((r) => r.recaudado) },
-						{ name: __("Emitido"), values: data.dias.map((r) => r.emitido) },
 					],
 				},
 				truncateLegends: 1,
@@ -329,19 +329,21 @@
 					colors: ["#5e64ff"],
 					data: {
 						labels: [
-							__("Mayores"),
-							__("Menores"),
-							__("Adherentes"),
-							__("Jubilados"),
+							__("Activo"),
+							__("Menor"),
+							__("Adherente"),
+							__("Jubilado"),
+							__("Vitalicio"),
 						],
 						datasets: [
 							{
 								name: __("Socios"),
 								values: [
-									segmentos.mayores || 0,
-									segmentos.menores || 0,
-									segmentos.adherentes || 0,
-									segmentos.jubilados || 0,
+									segmentos.Activo || 0,
+									segmentos.Menor || 0,
+									segmentos.Adherente || 0,
+									segmentos.Jubilado || 0,
+									segmentos.Vitalicio || 0,
 								],
 							},
 						],

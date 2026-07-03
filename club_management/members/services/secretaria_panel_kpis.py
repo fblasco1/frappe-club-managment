@@ -32,10 +32,9 @@ PAYMENT_ENTRY_DOCTYPE = "Payment Entry"
 PAYMENT_ENTRY_REFERENCE_DOCTYPE = "Payment Entry Reference"
 RECARGO_SUFFIX = "-REC"
 
-SEGMENTO_MAYORES = frozenset({"Activo", "2° Hermano", "3° Hermano"})
-SEGMENTO_MENORES = frozenset({"Menor"})
-SEGMENTO_ADHERENTES = frozenset({"Adherente"})
-SEGMENTO_JUBILADOS = frozenset({"Jubilado", "Vitalicio"})
+CATEGORIAS_GRAFICO = ("Activo", "Menor", "Adherente", "Jubilado", "Vitalicio")
+CATEGORIAS_HERMANO = frozenset({"2° Hermano", "3° Hermano"})
+_EDAD_MAYORIA = 18
 
 from club_management.members.services.modos_pago_desk import agrupar_modo_pago_chart
 
@@ -68,29 +67,51 @@ def get_morosos_deuda_total() -> float:
 	return sum(flt(value) for value in rows)
 
 
-def get_socios_por_segmento(*, reference_date: str | date | None = None) -> dict[str, Any]:
-	"""Total socios activos (no Baja) desglosado por segmento de categoría."""
-	_ = reference_date
+def _es_menor_edad(fecha_nacimiento: str | date | None, *, as_of: date) -> bool:
+	if not fecha_nacimiento:
+		return False
+	nac = getdate(fecha_nacimiento)
+	edad = as_of.year - nac.year - ((as_of.month, as_of.day) < (nac.month, nac.day))
+	return edad < _EDAD_MAYORIA
+
+
+def _categoria_grafico_socio(
+	categoria: str,
+	fecha_nacimiento: str | date | None,
+	*,
+	as_of: date,
+) -> str | None:
+	if categoria in CATEGORIAS_HERMANO:
+		return "Menor" if _es_menor_edad(fecha_nacimiento, as_of=as_of) else "Activo"
+	if categoria in CATEGORIAS_GRAFICO:
+		return categoria
+	return None
+
+
+def get_socios_por_categoria(*, reference_date: str | date | None = None) -> dict[str, Any]:
+	"""Total socios activos (no Baja) desglosado por categoría del gráfico."""
+	as_of = getdate(reference_date or today())
 	rows = frappe.get_all(
 		SOCIO_DOCTYPE,
 		filters={"estado": ["not in", list(ESTADOS_EXCLUIDOS_TOTAL)]},
-		fields=["categoria"],
+		fields=["categoria", "fecha_nacimiento"],
 	)
-	segmentos = {"mayores": 0, "menores": 0, "adherentes": 0, "jubilados": 0}
+	categorias = {categoria: 0 for categoria in CATEGORIAS_GRAFICO}
 	for row in rows:
-		categoria = row.categoria or ""
-		if categoria in SEGMENTO_MAYORES:
-			segmentos["mayores"] += 1
-		elif categoria in SEGMENTO_MENORES:
-			segmentos["menores"] += 1
-		elif categoria in SEGMENTO_ADHERENTES:
-			segmentos["adherentes"] += 1
-		elif categoria in SEGMENTO_JUBILADOS:
-			segmentos["jubilados"] += 1
-		else:
-			segmentos["mayores"] += 1
-	total = sum(segmentos.values())
-	return {"total": total, **segmentos}
+		bucket = _categoria_grafico_socio(
+			row.categoria or "",
+			row.fecha_nacimiento,
+			as_of=as_of,
+		)
+		if bucket:
+			categorias[bucket] += 1
+	total = sum(categorias.values())
+	return {"total": total, **categorias}
+
+
+def get_socios_por_segmento(*, reference_date: str | date | None = None) -> dict[str, Any]:
+	"""Compatibilidad: delega en get_socios_por_categoria."""
+	return get_socios_por_categoria(reference_date=reference_date)
 
 
 def count_altas_bajas_mes(*, reference_date: str | date | None = None) -> dict[str, int]:
@@ -160,17 +181,27 @@ def get_mora_1_3_meses_payload() -> dict[str, Any]:
 	}
 
 
+def _finalize_tendencia_dias(dias: list[dict[str, Any]]) -> None:
+	emitido_acum = 0.0
+	recaudado_acum = 0.0
+	for row in dias:
+		emitido_acum += flt(row.pop("emitido_dia", 0))
+		recaudado_acum += flt(row.pop("recaudado_dia", 0))
+		row["recaudado"] = round(recaudado_acum, 2)
+		row["deuda"] = round(max(emitido_acum - recaudado_acum, 0), 2)
+
+
 def get_recaudacion_tendencia_payload(
 	*,
 	reference_date: str | date | None = None,
 ) -> dict[str, Any]:
-	"""Serie diaria emitido vs recaudado (cuotas sociales) para un mes calendario."""
+	"""Serie diaria acumulada: deuda pendiente vs recaudado (cuotas sociales) en un mes."""
 	ref = getdate(reference_date or today())
 	first = get_first_day(ref)
 	last = get_last_day(ref)
 	periodo = format_periodo_cobro(ref)
 	dias: list[dict[str, Any]] = [
-		{"dia": day, "label": str(day), "emitido": 0.0, "recaudado": 0.0}
+		{"dia": day, "label": str(day), "emitido_dia": 0.0, "recaudado_dia": 0.0}
 		for day in range(1, last.day + 1)
 	]
 	by_day = {row["dia"]: row for row in dias}
@@ -181,11 +212,13 @@ def get_recaudacion_tendencia_payload(
 		"disponible": False,
 	}
 	if not erpnext_cobranza_disponible():
+		_finalize_tendencia_dias(dias)
 		return payload
 
 	campo_periodo = _campo_periodo_cobro()
 	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
 	if not campo_periodo or not campo_socio:
+		_finalize_tendencia_dias(dias)
 		return payload
 
 	settings = get_club_settings()
@@ -196,7 +229,8 @@ def get_recaudacion_tendencia_payload(
 		fields=["name", "posting_date", "grand_total"],
 	)
 	if not invoices:
-		return {**payload, "disponible": True}
+		_finalize_tendencia_dias(dias)
+		return {**payload, "dias": dias, "disponible": True}
 
 	lines_by_parent = _invoice_lines_by_parent([row.name for row in invoices])
 	invoice_by_name = {row.name: row for row in invoices}
@@ -209,7 +243,7 @@ def get_recaudacion_tendencia_payload(
 		for line in lines_by_parent.get(invoice.name, []):
 			if (line.get("item_code") or "") not in cuota_items:
 				continue
-			by_day[day]["emitido"] += flt(line.get("amount"))
+			by_day[day]["emitido_dia"] += flt(line.get("amount"))
 
 	pe_names = frappe.get_all(
 		PAYMENT_ENTRY_REFERENCE_DOCTYPE,
@@ -251,12 +285,9 @@ def get_recaudacion_tendencia_payload(
 				continue
 			cuota_paid = flt(ref.allocated_amount) * (cuota_total / grand_total)
 			day = getdate(pe.posting_date).day
-			by_day[day]["recaudado"] += cuota_paid
+			by_day[day]["recaudado_dia"] += cuota_paid
 
-	for row in dias:
-		row["emitido"] = round(flt(row["emitido"]), 2)
-		row["recaudado"] = round(flt(row["recaudado"]), 2)
-
+	_finalize_tendencia_dias(dias)
 	return {**payload, "dias": dias, "disponible": True}
 
 
@@ -326,7 +357,7 @@ def get_medios_pago_payload(*, reference_date: str | date | None = None) -> dict
 
 def get_socio_metricas_payload(*, reference_date: str | date | None = None) -> dict[str, Any]:
 	ref = getdate(reference_date or today())
-	segmentos = get_socios_por_segmento(reference_date=ref)
+	segmentos = get_socios_por_categoria(reference_date=ref)
 	total = segmentos["total"]
 	total_mes_anterior = count_socios_total(as_of=_last_day_previous_month(ref))
 	delta = total - total_mes_anterior

@@ -21,7 +21,7 @@ from club_management.members.services.secretaria_panel_kpis import (
 	get_mora_1_3_meses_payload,
 	get_panel_metricas_payload,
 	get_recaudacion_tendencia_payload,
-	get_socios_por_segmento,
+	get_socios_por_categoria,
 )
 from club_management.members.services.secretaria_workspace_panel import (
 	get_panel_lists_payload,
@@ -30,8 +30,10 @@ from club_management.members.services.secretaria_workspace_panel import (
 from club_management.members.services.socio_transitions import cambiar_estado
 from club_management.members.test_helpers import (
 	MembersTestCase,
+	adult_birthdate,
 	insert_socio,
 	insert_solicitud_asociacion,
+	minor_birthdate,
 )
 from club_management.members.workflow.solicitud_asociacion_workflow import (
 	STATE_PENDIENTE,
@@ -39,24 +41,44 @@ from club_management.members.workflow.solicitud_asociacion_workflow import (
 )
 
 
-class TestGestionSociosDashboardSegmentos(MembersTestCase):
+class TestGestionSociosDashboardCategorias(MembersTestCase):
 	_REFERENCE = "2026-06-15"
 
-	def test_socios_por_segmento(self) -> None:
-		insert_socio(dni="74001001", email="seg.may@example.com", categoria="Activo", estado="Activo")
+	def test_socios_por_categoria(self) -> None:
+		insert_socio(dni="74001001", email="seg.act@example.com", categoria="Activo", estado="Activo")
 		insert_socio(dni="74001002", email="seg.men@example.com", categoria="Menor", estado="Activo")
 		insert_socio(dni="74001003", email="seg.adh@example.com", categoria="Adherente", estado="Activo")
 		insert_socio(dni="74001004", email="seg.jub@example.com", categoria="Jubilado", estado="Activo")
-		insert_socio(dni="74001005", email="seg.baja@example.com", categoria="Activo", estado="Baja")
+		insert_socio(dni="74001005", email="seg.vit@example.com", categoria="Vitalicio", estado="Activo")
+		insert_socio(
+			dni="74001006",
+			email="seg.her.ad@example.com",
+			categoria="2° Hermano",
+			estado="Activo",
+			fecha_nacimiento=adult_birthdate(25),
+		)
+		insert_socio(
+			dni="74001008",
+			email="seg.her.men@example.com",
+			categoria="3° Hermano",
+			estado="Activo",
+			fecha_nacimiento=minor_birthdate(12),
+		)
+		insert_socio(dni="74001007", email="seg.baja@example.com", categoria="Activo", estado="Baja")
 
-		data = get_socios_por_segmento(reference_date=self._REFERENCE)
-		self.assertGreaterEqual(data["total"], 4)
-		self.assertGreaterEqual(data["mayores"], 1)
-		self.assertGreaterEqual(data["menores"], 1)
-		self.assertGreaterEqual(data["adherentes"], 1)
-		self.assertGreaterEqual(data["jubilados"], 1)
+		data = get_socios_por_categoria(reference_date=self._REFERENCE)
+		self.assertGreaterEqual(data["total"], 7)
+		self.assertGreaterEqual(data["Activo"], 2)
+		self.assertGreaterEqual(data["Menor"], 2)
+		self.assertGreaterEqual(data["Adherente"], 1)
+		self.assertGreaterEqual(data["Jubilado"], 1)
+		self.assertGreaterEqual(data["Vitalicio"], 1)
 		self.assertEqual(
-			data["mayores"] + data["menores"] + data["adherentes"] + data["jubilados"],
+			data["Activo"]
+			+ data["Menor"]
+			+ data["Adherente"]
+			+ data["Jubilado"]
+			+ data["Vitalicio"],
 			data["total"],
 		)
 
@@ -123,15 +145,31 @@ class TestGestionSociosDashboardRecaudacion(MembersTestCase):
 			self.skipTest("ERPNext Sales Invoice no instalado")
 		sync_cuotas_sociales_club()
 
-	def test_tendencia_recaudacion_por_dias_del_mes(self) -> None:
+	def test_tendencia_recaudacion_deuda_y_recaudado_acumulados(self) -> None:
+		socio = insert_socio(dni="74003001", email="tend.rec@example.com", categoria="Activo")
+		cambiar_estado(socio.name, "Activo", motivo="Test tendencia")
+		generar_deuda_mensual_socio(socio.name, reference_date=self._REFERENCE)
+		campo_socio = "socio" if frappe.get_meta(SALES_INVOICE_DOCTYPE).has_field("socio") else "custom_socio"
+		invoice_name = frappe.db.get_value(
+			SALES_INVOICE_DOCTYPE,
+			{campo_socio: socio.name, "docstatus": 1},
+			"name",
+		)
+		self.assertTrue(invoice_name)
+		registrar_cobro_manual(socio.name, invoice_name, mode_of_payment="Cash")
+
 		data = get_recaudacion_tendencia_payload(reference_date=self._REFERENCE)
 		self.assertEqual(data["periodo"], format_periodo_cobro(self._REFERENCE))
 		self.assertEqual(len(data["dias"]), 30)
 		for row in data["dias"]:
 			self.assertIn("dia", row)
 			self.assertIn("label", row)
-			self.assertIn("emitido", row)
+			self.assertIn("deuda", row)
 			self.assertIn("recaudado", row)
+
+		last = data["dias"][-1]
+		self.assertGreater(last["recaudado"], 0)
+		self.assertEqual(last["deuda"], 0)
 
 	def test_mora_1_3_monto_label_pesos(self) -> None:
 		data = get_mora_1_3_meses_payload()
