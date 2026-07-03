@@ -41,6 +41,7 @@ And **Ver más** abre el listado general de `Socio` (excluyendo `Baja`).
 Given facturas mensuales del período corriente (`periodo_cobro = MM/YYYY`) con líneas de cuota social
 When Secretaria consulta el panel
 Then ve el **% recaudado** = monto cobrado de cuotas / monto emitido × 100
+And debajo del porcentaje ve **Total cobrado** y **Saldo por cobrar** del mes
 And si no hay deuda emitida en el mes, muestra 0 %.
 
 ---

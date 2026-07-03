@@ -6,7 +6,9 @@ from datetime import date, timedelta
 from typing import Any
 
 import frappe
-from frappe.utils import add_months, flt, fmt_money, get_first_day, get_last_day, getdate, today
+from frappe.utils import flt, get_first_day, get_last_day, getdate, today
+
+from club_management.members.services.recibo_pago import format_monto_ar
 
 from club_management.activities.services.inscripcion_socio import (
 	INSCRIPCION_DOCTYPE,
@@ -156,31 +158,108 @@ def get_mora_1_3_meses_payload() -> dict[str, Any]:
 	return {
 		"cantidad": cantidad,
 		"monto": monto,
-		"monto_label": fmt_money(monto),
+		"monto_label": format_monto_ar(monto),
 	}
 
 
 def get_recaudacion_tendencia_payload(
 	*,
-	months: int = 12,
 	reference_date: str | date | None = None,
 ) -> dict[str, Any]:
-	"""Serie mensual emitido vs recaudado (cuotas sociales)."""
+	"""Serie diaria emitido vs recaudado (cuotas sociales) para un mes calendario."""
 	ref = getdate(reference_date or today())
-	months = max(1, min(int(months), 12))
-	series: list[dict[str, Any]] = []
-	for offset in range(months - 1, -1, -1):
-		month_ref = add_months(ref, -offset)
-		data = get_recaudacion_mes_payload(reference_date=month_ref)
-		cuotas = data.get("cuotas_sociales") or {}
-		series.append(
-			{
-				"periodo": data.get("periodo") or format_periodo_cobro(month_ref),
-				"emitido": flt(cuotas.get("emitido")),
-				"recaudado": flt(cuotas.get("recaudado")),
-			}
-		)
-	return {"meses": series, "disponible": erpnext_cobranza_disponible()}
+	first = get_first_day(ref)
+	last = get_last_day(ref)
+	periodo = format_periodo_cobro(ref)
+	dias: list[dict[str, Any]] = [
+		{"dia": day, "label": str(day), "emitido": 0.0, "recaudado": 0.0}
+		for day in range(1, last.day + 1)
+	]
+	by_day = {row["dia"]: row for row in dias}
+	payload: dict[str, Any] = {
+		"periodo": periodo,
+		"reference_date": str(first),
+		"dias": dias,
+		"disponible": False,
+	}
+	if not erpnext_cobranza_disponible():
+		return payload
+
+	campo_periodo = _campo_periodo_cobro()
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	if not campo_periodo or not campo_socio:
+		return payload
+
+	settings = get_club_settings()
+	cuota_items = _cuota_item_codes(settings)
+	invoices = frappe.get_all(
+		SALES_INVOICE_DOCTYPE,
+		filters={campo_periodo: periodo, "docstatus": 1},
+		fields=["name", "posting_date", "grand_total"],
+	)
+	if not invoices:
+		return {**payload, "disponible": True}
+
+	lines_by_parent = _invoice_lines_by_parent([row.name for row in invoices])
+	invoice_by_name = {row.name: row for row in invoices}
+
+	for invoice in invoices:
+		posting = getdate(invoice.posting_date or first)
+		if posting < first or posting > last:
+			continue
+		day = posting.day
+		for line in lines_by_parent.get(invoice.name, []):
+			if (line.get("item_code") or "") not in cuota_items:
+				continue
+			by_day[day]["emitido"] += flt(line.get("amount"))
+
+	pe_names = frappe.get_all(
+		PAYMENT_ENTRY_REFERENCE_DOCTYPE,
+		filters={
+			"reference_doctype": SALES_INVOICE_DOCTYPE,
+			"reference_name": ["in", list(invoice_by_name)],
+			"parenttype": PAYMENT_ENTRY_DOCTYPE,
+		},
+		fields=["parent", "reference_name", "allocated_amount"],
+	)
+	if pe_names:
+		parent_names = sorted({row.parent for row in pe_names})
+		pe_by_name = {
+			row.name: row
+			for row in frappe.get_all(
+				PAYMENT_ENTRY_DOCTYPE,
+				filters={
+					"name": ["in", parent_names],
+					"docstatus": 1,
+					"posting_date": ["between", [first, last]],
+				},
+				fields=["name", "posting_date"],
+			)
+		}
+		for ref in pe_names:
+			pe = pe_by_name.get(ref.parent)
+			invoice = invoice_by_name.get(ref.reference_name)
+			if not pe or not invoice:
+				continue
+			grand_total = flt(invoice.grand_total)
+			if grand_total <= 0:
+				continue
+			cuota_total = sum(
+				flt(line.get("amount"))
+				for line in lines_by_parent.get(invoice.name, [])
+				if (line.get("item_code") or "") in cuota_items
+			)
+			if cuota_total <= 0:
+				continue
+			cuota_paid = flt(ref.allocated_amount) * (cuota_total / grand_total)
+			day = getdate(pe.posting_date).day
+			by_day[day]["recaudado"] += cuota_paid
+
+	for row in dias:
+		row["emitido"] = round(flt(row["emitido"]), 2)
+		row["recaudado"] = round(flt(row["recaudado"]), 2)
+
+	return {**payload, "dias": dias, "disponible": True}
 
 
 def _agrupar_modo_pago(mode: str | None) -> str:
@@ -271,7 +350,7 @@ def get_socio_metricas_payload(*, reference_date: str | date | None = None) -> d
 		"altas_bajas": count_altas_bajas_mes(reference_date=ref),
 		"morosos": morosos,
 		"morosos_deuda": morosos_deuda,
-		"morosos_deuda_label": fmt_money(morosos_deuda),
+		"morosos_deuda_label": format_monto_ar(morosos_deuda),
 		"mora_1_3": mora_1_3,
 	}
 
@@ -313,13 +392,25 @@ def _invoice_lines_by_parent(invoice_names: list[str]) -> dict[str, list[dict[st
 	return grouped
 
 
+def _cuotas_sociales_kpi_payload(*, emitido: float, recaudado: float) -> dict[str, Any]:
+	pendiente = max(flt(emitido) - flt(recaudado), 0.0)
+	return {
+		"emitido": emitido,
+		"recaudado": recaudado,
+		"saldo_por_cobrar": pendiente,
+		"recaudado_label": format_monto_ar(recaudado),
+		"saldo_por_cobrar_label": format_monto_ar(pendiente),
+		"porcentaje": _pct(recaudado, emitido),
+	}
+
+
 def get_recaudacion_mes_payload(*, reference_date: str | date | None = None) -> dict[str, Any]:
 	"""Recaudación de cuotas y aranceles del período MM/YYYY."""
 	ref = getdate(reference_date or today())
 	periodo = format_periodo_cobro(ref)
 	empty = {
 		"periodo": periodo,
-		"cuotas_sociales": {"porcentaje": 0.0, "emitido": 0.0, "recaudado": 0.0},
+		"cuotas_sociales": _cuotas_sociales_kpi_payload(emitido=0.0, recaudado=0.0),
 		"aranceles": {"porcentaje": 0.0, "emitido": 0.0, "recaudado": 0.0, "por_actividad": []},
 		"disponible": False,
 	}
@@ -387,11 +478,10 @@ def get_recaudacion_mes_payload(*, reference_date: str | date | None = None) -> 
 	return {
 		"periodo": periodo,
 		"disponible": True,
-		"cuotas_sociales": {
-			"emitido": cuota_emitido,
-			"recaudado": cuota_recaudado,
-			"porcentaje": _pct(cuota_recaudado, cuota_emitido),
-		},
+		"cuotas_sociales": _cuotas_sociales_kpi_payload(
+			emitido=cuota_emitido,
+			recaudado=cuota_recaudado,
+		),
 		"aranceles": {
 			"emitido": arancel_emitido,
 			"recaudado": arancel_recaudado,
@@ -401,14 +491,20 @@ def get_recaudacion_mes_payload(*, reference_date: str | date | None = None) -> 
 	}
 
 
-def get_panel_metricas_payload(*, reference_date: str | date | None = None) -> dict[str, Any]:
-	socios = get_socio_metricas_payload(reference_date=reference_date)
-	recaudacion = get_recaudacion_mes_payload(reference_date=reference_date)
+def get_panel_metricas_payload(
+	*,
+	reference_date: str | date | None = None,
+	tendencia_reference_date: str | date | None = None,
+) -> dict[str, Any]:
+	ref = getdate(reference_date or today())
+	tendencia_ref = getdate(tendencia_reference_date or ref)
+	socios = get_socio_metricas_payload(reference_date=ref)
+	recaudacion = get_recaudacion_mes_payload(reference_date=ref)
 	return {
 		"socios": socios,
 		"recaudacion": recaudacion,
-		"tendencia_recaudacion": get_recaudacion_tendencia_payload(reference_date=reference_date),
-		"medios_pago": get_medios_pago_payload(reference_date=reference_date),
+		"tendencia_recaudacion": get_recaudacion_tendencia_payload(reference_date=tendencia_ref),
+		"medios_pago": get_medios_pago_payload(reference_date=ref),
 		"ver_mas": {
 			"socios_morosos_doctype": SOCIO_DOCTYPE,
 			"socios_morosos_filters": [["Socio", "estado", "=", "Moroso"]],

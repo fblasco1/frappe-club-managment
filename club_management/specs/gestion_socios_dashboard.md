@@ -1,7 +1,7 @@
 # Spec: Dashboard Gestión de Socios (workspace Secretaría)
 
 Panel Desk para rol `Secretaria`: responde al instante cuántos somos, quiénes
-entraron/se fueron en el mes, quiénes deben dinero (1–3 meses), tendencia de
+entraron/se fueron en el mes, quiénes están en mora (`estado = Moroso`), tendencia de
 recaudación y medios de pago.
 
 **Relacionado:** `secretaria_workspace_panel_kpis.md`, `secretaria_workspace_listas.md`
@@ -23,6 +23,7 @@ And el desglose por segmento (**Mayores**, **Menores**, **Adherentes**, **Jubila
 Given facturas del período corriente (`periodo_cobro = MM/YYYY`) con líneas de cuota social
 When Secretaria consulta el dashboard
 Then ve el **% recaudado** = monto cobrado de cuotas / monto emitido × 100
+And debajo del porcentaje ve **Total cobrado** y **Saldo por cobrar** del mes (emitido − cobrado)
 And si no hay deuda emitida en el mes, muestra 0 %.
 
 ---
@@ -36,21 +37,25 @@ Then ve un ratio **+altas / -bajas** del mes en curso (ej. `+2 / -1`).
 
 ---
 
-## Scenario: socios en mora de 1 a 3 meses
+## Scenario: socios en mora
 
-Given socios con facturas mensuales impagas en 1, 2 o 3 períodos distintos (sin recargo)
+Given socios con `estado = Moroso` (marcados tras segundo vencimiento o por Secretaría)
+And socios activos con deuda del mes corriente aún no vencida
 When Secretaria consulta el dashboard
-Then ve la **cantidad** de esos socios
-And el **monto total** (`saldo_deuda` sumado de ellos)
-And **Ver más** abre `Socio` filtrado a `Moroso` o con deuda.
+Then la card **Socios en mora** cuenta solo los de `estado = Moroso`
+And no incluye activos que solo deben el período en curso
+And muestra el **monto total adeudado** (suma de `saldo_deuda` de morosos)
+And **Ver más** abre `Socio` filtrado a `Moroso`.
 
 ---
 
 ## Scenario: gráfico tendencia de recaudación
 
-Given histórico de facturación mensual de cuotas (últimos 12 meses)
+Given facturación y cobros de cuotas sociales en un mes calendario
 When Secretaria consulta el dashboard
-Then ve un gráfico de línea con **recaudado real** y **emitido proyectado** por mes.
+Then ve un gráfico de línea con **recaudado** y **emitido** por **día del mes** (1 … último día)
+And puede elegir el **mes** a visualizar con un selector (por defecto el mes en curso)
+And el resto de KPIs del panel siguen referidos al mes en curso salvo el gráfico de tendencia.
 
 ---
 

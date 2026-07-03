@@ -151,14 +151,35 @@
 			return `<span class="club-secretaria-altas-bajas">+${altas} / -${bajas}</span>`;
 		},
 
+		render_cobrabilidad_breakdown(cuotas) {
+			const cobrado =
+				cuotas?.recaudado_label ||
+				frappe.format(cuotas?.recaudado || 0, { fieldtype: "Currency" });
+			const pendiente =
+				cuotas?.saldo_por_cobrar_label ||
+				frappe.format(cuotas?.saldo_por_cobrar ?? 0, { fieldtype: "Currency" });
+			return `
+				<div class="club-secretaria-kpi-breakdown">
+					<div class="club-secretaria-kpi-breakdown-row">
+						<span>${__("Total cobrado")}:</span>
+						<strong>${frappe.utils.escape_html(cobrado)}</strong>
+					</div>
+					<div class="club-secretaria-kpi-breakdown-row">
+						<span>${__("Saldo por cobrar")}:</span>
+						<strong>${frappe.utils.escape_html(pendiente)}</strong>
+					</div>
+				</div>
+			`;
+		},
+
 		render_kpi_cards(metricas) {
 			const socios = metricas.socios || {};
 			const recaudacion = metricas.recaudacion || {};
 			const verMas = metricas.ver_mas || {};
 			const cuotas = recaudacion.cuotas_sociales || {};
-			const mora = socios.mora_1_3 || {};
-			const moraDeudaLabel =
-				mora.monto_label || frappe.format(mora.monto || 0, { fieldtype: "Currency" });
+			const morososDeudaLabel =
+				socios.morosos_deuda_label ||
+				frappe.format(socios.morosos_deuda || 0, { fieldtype: "Currency" });
 
 			return `
 				<div class="club-secretaria-kpi-grid">
@@ -174,6 +195,7 @@
 						<p class="club-secretaria-kpi-title">${__("Tasa de cobrabilidad del mes")}</p>
 						<div class="club-secretaria-kpi-value club-secretaria-kpi-value--pct">${cuotas.porcentaje ?? 0}%</div>
 						<span class="text-muted small">${__("Mes")} ${frappe.utils.escape_html(recaudacion.periodo || "")}</span>
+						${this.render_cobrabilidad_breakdown(cuotas)}
 					</div>
 					<div class="club-secretaria-kpi-card">
 						<p class="club-secretaria-kpi-title">${__("Altas vs bajas (mes)")}</p>
@@ -182,11 +204,11 @@
 						</div>
 					</div>
 					<div class="club-secretaria-kpi-card club-secretaria-kpi-card--morosos">
-						<p class="club-secretaria-kpi-title">${__("Socios en mora (1–3 meses)")}</p>
-						<div class="club-secretaria-kpi-value">${mora.cantidad ?? 0}</div>
-						<p class="club-secretaria-kpi-deuda">${frappe.utils.escape_html(moraDeudaLabel)}</p>
+						<p class="club-secretaria-kpi-title">${__("Socios en mora")}</p>
+						<div class="club-secretaria-kpi-value">${socios.morosos ?? 0}</div>
+						<p class="club-secretaria-kpi-deuda">${frappe.utils.escape_html(morososDeudaLabel)}</p>
 						<div class="club-secretaria-kpi-footer">
-							${this.render_ver_mas_btn(verMas.socios_deuda_doctype, verMas.socios_deuda_filters)}
+							${this.render_ver_mas_btn(verMas.socios_morosos_doctype, verMas.socios_morosos_filters)}
 						</div>
 					</div>
 				</div>

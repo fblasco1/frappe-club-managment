@@ -20,6 +20,9 @@ from club_management.members.services.secretaria_panel_kpis import (
 	get_recaudacion_mes_payload,
 	get_socio_metricas_payload,
 )
+from club_management.members.services.secretaria_panel_kpis import (
+	_cuotas_sociales_kpi_payload,
+)
 from club_management.members.services.secretaria_workspace_panel import get_panel_lists_payload
 from club_management.members.services.socio_transitions import cambiar_estado
 from club_management.members.test_helpers import MembersTestCase, insert_socio
@@ -28,13 +31,21 @@ from club_management.members.test_helpers import MembersTestCase, insert_socio
 class TestSecretariaPanelKpis(MembersTestCase):
 	_REFERENCE = "2026-06-15"
 
+	def test_cuotas_sociales_kpi_saldo_por_cobrar(self) -> None:
+		data = _cuotas_sociales_kpi_payload(emitido=10_000.0, recaudado=6_500.0)
+		self.assertEqual(data["saldo_por_cobrar"], 3_500.0)
+		self.assertEqual(data["porcentaje"], 65.0)
+		self.assertIn("recaudado_label", data)
+		self.assertIn("saldo_por_cobrar_label", data)
+
 	def test_socio_metricas_total_y_delta(self) -> None:
-		insert_socio(dni="73101001", email="kpi.a@example.com", estado="Activo")
+		insert_socio(dni="73101001", email="kpi.a@example.com", estado="Activo", saldo_deuda=5000)
 		insert_socio(dni="73101002", email="kpi.b@example.com", estado="Moroso")
 		insert_socio(dni="73101003", email="kpi.c@example.com", estado="Baja")
 
 		data = get_socio_metricas_payload(reference_date=self._REFERENCE)
 		self.assertEqual(data["morosos"], frappe.db.count("Socio", {"estado": "Moroso"}))
+		self.assertEqual(data["morosos"], 1)
 		self.assertGreaterEqual(data["total"], 2)
 		self.assertIn("delta_mes", data)
 		self.assertIn("total_mes_anterior", data)
@@ -143,7 +154,11 @@ class TestSecretariaPanelRecaudacion(MembersTestCase):
 		data = get_recaudacion_mes_payload(reference_date=self._REFERENCE)
 		self.assertTrue(data["disponible"])
 		self.assertEqual(data["periodo"], periodo)
-		self.assertGreaterEqual(data["cuotas_sociales"]["porcentaje"], 100.0)
+		cuotas = data["cuotas_sociales"]
+		self.assertGreaterEqual(cuotas["porcentaje"], 100.0)
+		self.assertEqual(cuotas["saldo_por_cobrar"], 0.0)
+		self.assertIn("recaudado_label", cuotas)
+		self.assertIn("saldo_por_cobrar_label", cuotas)
 
 	def test_recaudacion_aranceles_por_actividad(self) -> None:
 		actividad = "KPI Natación"
