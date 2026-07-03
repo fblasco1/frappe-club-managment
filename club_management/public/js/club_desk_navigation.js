@@ -445,6 +445,14 @@
 
 		if (this.is_club_report() || this.is_club_socio_page() || this.is_club_page()) {
 
+			const qrMain = frappe.query_report?.page?.main;
+
+			if (qrMain?.length) {
+
+				return qrMain;
+
+			}
+
 			const $report = $(".page-content, .layout-main-section").first();
 
 			if ($report.length) {

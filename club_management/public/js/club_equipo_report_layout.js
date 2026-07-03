@@ -5,8 +5,12 @@
 
 	club_management.equipo_report.enhance_page = function (report) {
 		report?.page?.main?.addClass?.("club-equipo-report-page");
-		club_management.club_desk_navigation?.schedule_refresh?.();
+		const nav = club_management.club_desk_navigation;
+		nav?.schedule_refresh?.();
 		club_management.secretaria_sidebar?.refresh?.();
+		setTimeout(() => {
+			nav?.refresh?.();
+		}, 200);
 	};
 
 	club_management.equipo_report.after_table_render = function () {
