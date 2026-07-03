@@ -29,7 +29,37 @@ And **no** incluye la cuota social ni otros ítems.
 
 ---
 
-## Scenario: liquidación entrenador al 80 %
+## Scenario: liquidación entrenador con porcentaje configurable
+
+Given `Equipo Actividad` E con `pct_liquidacion_entrenador` = 70
+And socio con arancel pagado en rango = 10.000
+When Secretaría ejecuta **Pagos por equipo** filtrando por E
+Then `liquidacion_entrenador` = 7.000
+And la columna **% entrenador** muestra 70.
+
+---
+
+## Scenario: porcentaje por defecto del club
+
+Given equipo sin `pct_liquidacion_entrenador` definido
+And `Club Settings.pct_liquidacion_entrenador_default` = 80
+When se calcula la liquidación
+Then se aplica el 80 % del club.
+
+---
+
+## Scenario: varios equipos en un mismo informe
+
+Given entrenador a cargo de equipos E1 (70 %) y E2 (90 %)
+And aranceles cobrados en el rango: 10.000 en E1 y 5.000 en E2
+When Secretaría selecciona ambos equipos en **Pagos por equipo**
+Then ve una fila agregada por socio con `pagos_en_rango` = 15.000
+And `liquidacion_entrenador` = 7.000 + 4.500 = 11.500
+And puede ver el total de liquidación en el pie del reporte.
+
+---
+
+## Scenario: liquidación entrenador al 80 % (default histórico)
 
 Given socio con `arancel_pagado_en_rango` = 10.000 en el reporte
 When Secretaría consulta la columna de liquidación

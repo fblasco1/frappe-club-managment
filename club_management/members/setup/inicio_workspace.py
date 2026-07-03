@@ -19,6 +19,7 @@ CLUB_DESK_NAV_TABS: list[tuple[str, str]] = [
 CLUB_DESK_REPORTS: tuple[str, ...] = (
 	"Deuda por equipo",
 	"Pagos por equipo",
+	"Deuda del club por actividad",
 )
 
 RETIRED_INICIO_CONTENT: list[dict] = []

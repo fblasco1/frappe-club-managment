@@ -19,14 +19,17 @@ from club_management.members.services.cobranza_manual import (
 from club_management.members.services.cuotas_sociales_setup import sync_cuotas_sociales_club
 from club_management.members.services.liquidacion_equipo import (
 	build_inscripcion_filters,
+	calcular_deuda_desglose_en_rango,
 	calcular_deuda_en_rango,
 	calcular_pagos_arancel_en_rango,
 	calcular_pagos_en_rango,
+	get_deuda_club_por_actividad_data,
 	get_deuda_por_equipo_data,
 	get_facturas_pendientes_socio_en_rango,
 	get_pagos_por_equipo_data,
 	liquidar_deuda_socio_en_rango,
 	registrar_cobro_liquidacion,
+	resolve_pct_liquidacion_entrenador,
 	validar_filtros_liquidacion,
 )
 from club_management.members.services.socio_transitions import cambiar_estado
@@ -238,7 +241,142 @@ class TestLiquidacionEquipo(MembersTestCase):
 		self.assertNotIn(socio_b.name, by_socio)
 		self.assertEqual(by_socio[socio_a.name]["pagos_en_rango"], 8000.0)
 		self.assertEqual(by_socio[socio_a.name]["liquidacion_entrenador"], 6400.0)
+		self.assertEqual(by_socio[socio_a.name]["pct_entrenador"], 80.0)
 		self.assertEqual(by_socio[socio_a.name]["nombre_apellido"], "Lopez, Juan")
+
+	def test_deuda_desglose_cuota_y_arancel(self) -> None:
+		socio = self._socio_activo(dni="74001015", email="desglose@example.com")
+		ins = frappe.get_doc(
+			{
+				"doctype": "Inscripcion Actividad",
+				"socio": socio.name,
+				"actividad": self._actividad,
+				"grupo_actividad": self._grupo,
+				"equipo_actividad": self._equipo,
+				"estado": "Activa",
+			}
+		).insert(ignore_permissions=True)
+		self._crear_factura_items(
+			socio.name,
+			"2026-03-20",
+			[
+				{"item_code": CUOTA_SOCIAL_ITEM_CODE, "qty": 1, "rate": 10000},
+				{"item_code": ARANCEL_ITEM_CODE, "qty": 1, "rate": 5000},
+			],
+		)
+		desglose = calcular_deuda_desglose_en_rango(
+			socio.name,
+			self._MARZO_DESDE,
+			self._MARZO_HASTA,
+			inscripcion_name=ins.name,
+		)
+		self.assertEqual(desglose["deuda_cuota_social"], 10000.0)
+		self.assertEqual(desglose["deuda_arancel"], 5000.0)
+		rows = get_deuda_por_equipo_data(self._filtros_equipo())
+		row = next(item for item in rows if item["socio"] == socio.name)
+		self.assertEqual(row["deuda_cuota_social"], 10000.0)
+		self.assertEqual(row["deuda_arancel"], 5000.0)
+		self.assertGreaterEqual(row["cantidad_meses_deuda"], 1)
+
+	def test_pct_liquidacion_configurable_en_equipo(self) -> None:
+		frappe.db.set_value("Equipo Actividad", self._equipo, "pct_liquidacion_entrenador", 70)
+		self.assertEqual(
+			resolve_pct_liquidacion_entrenador(
+				equipo_actividad=self._equipo,
+				grupo_actividad=self._grupo,
+			),
+			70.0,
+		)
+		socio = self._socio_activo(dni="74001016", email="pct.eq@example.com")
+		self._inscribir(socio.name)
+		invoice = self._crear_factura_items(
+			socio.name,
+			"2026-03-20",
+			[{"item_code": ARANCEL_ITEM_CODE, "qty": 1, "rate": 10000}],
+		)
+		self._marcar_factura_pagada(invoice)
+		rows = get_pagos_por_equipo_data(self._filtros_equipo())
+		row = next(item for item in rows if item["socio"] == socio.name)
+		self.assertEqual(row["liquidacion_entrenador"], 7000.0)
+		self.assertEqual(row["pct_entrenador"], 70.0)
+
+	def test_pagos_varios_equipos_agrega_liquidacion(self) -> None:
+		arancel_b = "LIQ-TEST-ARANCEL-B"
+		if not frappe.db.exists("Item", arancel_b):
+			item_group = frappe.db.get_value("Item Group", {}, "name") or "All Item Groups"
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": arancel_b,
+					"item_name": "Arancel Liq Test B",
+					"item_group": item_group,
+					"is_stock_item": 0,
+					"is_sales_item": 1,
+					"standard_rate": 5000,
+				}
+			).insert(ignore_permissions=True)
+		equipo_b = frappe.get_doc(
+			{
+				"doctype": "Equipo Actividad",
+				"grupo_actividad": self._grupo,
+				"titulo": "U17 Liq Pagos",
+				"habilitada": 1,
+				"item": arancel_b,
+				"pct_liquidacion_entrenador": 90,
+			}
+		).insert(ignore_permissions=True).name
+		socio = self._socio_activo(dni="74001017", email="multi.eq@example.com")
+		self._inscribir(socio.name, equipo=self._equipo)
+		frappe.get_doc(
+			{
+				"doctype": "Inscripcion Actividad",
+				"socio": socio.name,
+				"actividad": self._actividad,
+				"grupo_actividad": self._grupo,
+				"equipo_actividad": equipo_b,
+				"estado": "Activa",
+			}
+		).insert(ignore_permissions=True)
+		inv_a = self._crear_factura_items(
+			socio.name,
+			"2026-03-20",
+			[{"item_code": ARANCEL_ITEM_CODE, "qty": 1, "rate": 10000}],
+		)
+		inv_b = self._crear_factura_items(
+			socio.name,
+			"2026-03-21",
+			[{"item_code": arancel_b, "qty": 1, "rate": 5000}],
+		)
+		self._marcar_factura_pagada(inv_a)
+		self._marcar_factura_pagada(inv_b)
+		rows = get_pagos_por_equipo_data(
+			{
+				"equipos_actividad": [self._equipo, equipo_b],
+				"fecha_desde": self._MARZO_DESDE,
+				"fecha_hasta": self._MARZO_HASTA,
+				"incluir_saldo_cero": 0,
+			}
+		)
+		row = next(item for item in rows if item["socio"] == socio.name)
+		self.assertEqual(row["pagos_en_rango"], 15000.0)
+		self.assertEqual(row["liquidacion_entrenador"], 12500.0)
+
+	def test_deuda_club_por_actividad_totaliza(self) -> None:
+		socio = self._socio_activo(dni="74001018", email="club.act@example.com")
+		self._inscribir(socio.name)
+		self._crear_factura(socio.name, "2026-03-20", 12000)
+		rows = get_deuda_club_por_actividad_data(
+			{
+				"fecha_desde": self._MARZO_DESDE,
+				"fecha_hasta": self._MARZO_HASTA,
+			}
+		)
+		actividad_row = next(item for item in rows if item["actividad"] == self._actividad)
+		self.assertGreater(actividad_row["deuda_total"], 0)
+		self.assertGreaterEqual(actividad_row["socios_deudores"], 1)
+		total_row = rows[-1]
+		self.assertEqual(total_row["actividad"], "Total club")
+		self.assertGreater(total_row["deuda_total"], 0)
 
 	def test_pagos_arancel_proporcional_pago_parcial(self) -> None:
 		socio = self._socio_activo(dni="74001014", email="pagos.prop@example.com")

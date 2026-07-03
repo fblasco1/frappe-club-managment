@@ -22,6 +22,8 @@ class TestSecretariaSidebarBoot(MembersTestCase):
 			report = items[label].get("report") or {}
 			self.assertEqual(report.get("report_type"), "Script Report")
 			self.assertEqual(report.get("ref_doctype"), "Inscripcion Actividad")
+		club_report = items["Deuda del club por actividad"].get("report") or {}
+		self.assertEqual(club_report.get("ref_doctype"), "Actividad")
 
 	def test_apply_boot_inyecta_sidebar_para_secretaria(self) -> None:
 		user = make_secretaria_user("sec.sidebar.boot@example.com")

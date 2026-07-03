@@ -118,6 +118,17 @@ def _conceptos_generales() -> list[str]:
 	return codes
 
 
+def federativa_item_codes_inscripcion(inscripcion_name: str) -> list[str]:
+	"""Ítems de cuota federativa vinculados al centro de costo del arancel de la inscripción."""
+	item_arancel = resolve_item_arancel_inscripcion(inscripcion_name)
+	if not item_arancel:
+		return []
+	cc = _selling_cost_center(item_arancel)
+	if not cc:
+		return []
+	return _items_de_cost_centers({cc}, excluir={item_arancel})
+
+
 def item_codes_cargo_extra_socio(socio_name: str) -> list[str]:
 	"""Códigos de ítems ofrecibles como cargo extra para el socio."""
 	cost_centers, aranceles = _cost_centers_y_aranceles_socio(socio_name)

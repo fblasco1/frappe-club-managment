@@ -17,6 +17,8 @@
   "column_break_cobranza",
   "incluir_aranceles_en_deuda_mensual",
   "incluir_cargos_extra_en_deuda_mensual",
+  "liquidacion_entrenadores_section",
+  "pct_liquidacion_entrenador_default",
   "recibo_section",
   "recibo_institucion_nombre",
   "recibo_institucion_direccion",
@@ -107,6 +109,18 @@
    "fieldname": "incluir_cargos_extra_en_deuda_mensual",
    "fieldtype": "Check",
    "label": "Incluir cargos extra recurrentes"
+  },
+  {
+   "fieldname": "liquidacion_entrenadores_section",
+   "fieldtype": "Section Break",
+   "label": "Liquidación entrenadores"
+  },
+  {
+   "default": "80",
+   "fieldname": "pct_liquidacion_entrenador_default",
+   "fieldtype": "Percent",
+   "label": "% liquidación entrenador (default)",
+   "description": "Porcentaje sobre arancel cobrado cuando equipo/grupo no define uno propio."
   },
   {
    "fieldname": "recibo_section",

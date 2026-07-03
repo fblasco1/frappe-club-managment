@@ -9,6 +9,7 @@
   "actividad",
   "titulo",
   "item",
+  "pct_liquidacion_entrenador",
   "habilitada",
   "capacidad",
   "orden",
@@ -38,6 +39,12 @@
    "label": "\u00cdtem (arancel mensual)",
    "options": "Item",
    "description": "Arancel de esta tira o divisi\u00f3n (puede diferir por grupo)."
+  },
+  {
+   "fieldname": "pct_liquidacion_entrenador",
+   "fieldtype": "Percent",
+   "label": "% liquidación entrenador",
+   "description": "Opcional. Si está vacío, usa el default de Club Settings."
   },
   {
    "default": "1",

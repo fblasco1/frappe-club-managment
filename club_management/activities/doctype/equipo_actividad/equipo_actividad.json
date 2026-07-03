@@ -10,6 +10,7 @@
   "column_break_grupo_equipo",
   "titulo",
   "item",
+  "pct_liquidacion_entrenador",
   "habilitada",
   "capacidad",
   "orden",
@@ -41,6 +42,12 @@
    "fieldtype": "Link",
    "label": "\u00cdtem arancel",
    "options": "Item"
+  },
+  {
+   "fieldname": "pct_liquidacion_entrenador",
+   "fieldtype": "Percent",
+   "label": "% liquidación entrenador",
+   "description": "Opcional. Prioridad sobre grupo y Club Settings."
   },
   {
    "default": "1",

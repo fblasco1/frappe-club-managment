@@ -44,6 +44,27 @@
 					}
 					return { filters };
 				},
+				on_change: () => {
+					frappe.query_report.set_filter_value("equipos_actividad", "");
+				},
+			},
+			{
+				fieldname: "equipos_actividad",
+				label: __("Varios equipos / categorías"),
+				fieldtype: "MultiSelectList",
+				options: "Equipo Actividad",
+				get_data(txt) {
+					const grupo = frappe.query_report.get_filter_value("grupo_actividad");
+					const actividad = frappe.query_report.get_filter_value("actividad");
+					const filters = { habilitada: 1 };
+					if (grupo) {
+						filters.grupo_actividad = grupo;
+					}
+					return frappe.db.get_link_options("Equipo Actividad", txt, filters);
+				},
+				on_change: () => {
+					frappe.query_report.set_filter_value("equipo_actividad", "");
+				},
 			},
 			{
 				fieldname: "fecha_desde",

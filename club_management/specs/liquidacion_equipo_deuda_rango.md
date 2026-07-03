@@ -104,8 +104,18 @@ No filtrar solo `Moroso`: la liquidación sirve también para cobrar antes del c
 | `grupo_actividad` | Idem |
 | `equipo_actividad` | Idem |
 | `deuda_en_rango` | Currency; suma outstanding en rango |
+| `deuda_cuota_social` | Currency; saldo pendiente de líneas de cuota social |
+| `deuda_arancel` | Currency; saldo pendiente del arancel de la inscripción |
+| `deuda_cuota_federativa` | Currency; saldo pendiente de cuota federativa vinculada a la actividad |
+| `cantidad_meses_deuda` | Int; períodos distintos (`periodo_cobro`) o facturas pendientes en rango |
 | `saldo_total` | Currency; saldo impago total ERPNext |
 | `cantidad_facturas` | Int; facturas pendientes en rango |
+
+**Resumen en cabecera del reporte:** totales agregados del filtro jerárquico
+(actividad / grupo / equipo) para `deuda_cuota_social`, `deuda_arancel`,
+`deuda_cuota_federativa` y `deuda_en_rango`.
+
+**Informe complementario:** `Deuda del club por actividad` (ver `deuda_club_por_actividad.md`).
 
 Orden default: `deuda_en_rango` descendente, luego `nombre_apellido` ascendente.
 

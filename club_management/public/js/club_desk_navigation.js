@@ -54,6 +54,8 @@
 
 		"Pagos por equipo",
 
+		"Deuda del club por actividad",
+
 	]);
 
 
@@ -62,13 +64,15 @@
 
 		"Deuda por equipo",
 
+		"Pagos por equipo",
+
+		"Deuda del club por actividad",
+
 	]);
 
 
 
 	club_management.club_desk_navigation.CLUB_REPORTS_ACTIVIDADES = new Set([
-
-		"Pagos por equipo",
 
 	]);
 
@@ -281,13 +285,7 @@
 
 		if (report && this.CLUB_REPORTS.has(report)) {
 
-			if (this.CLUB_REPORTS_ACTIVIDADES?.has(report)) {
-
-				return this.TABS.find((tab) => tab.tab === "actividades") || null;
-
-			}
-
-			return this.TABS.find((tab) => tab.workspace === "Secretaría") || null;
+			return this.TABS.find((tab) => tab.tab === "socios") || null;
 
 		}
 
@@ -691,11 +689,65 @@
 
 
 
+	club_management.club_desk_navigation.refresh_sidebar = function () {
+
+		if (!this.has_panel_role()) {
+
+			return;
+
+		}
+
+		const report = this.get_active_report();
+
+		if (report && this.CLUB_REPORTS.has(report)) {
+
+			club_management.secretaria_sidebar?.refresh?.();
+
+			return;
+
+		}
+
+		if (this.is_club_socio_page()) {
+
+			club_management.secretaria_sidebar?.refresh?.();
+
+			return;
+
+		}
+
+		const page = this.get_active_page();
+
+		if (page && this.CLUB_PAGES_SOCIOS?.has(page)) {
+
+			club_management.secretaria_sidebar?.refresh?.();
+
+			return;
+
+		}
+
+		const workspace = this.get_club_workspace_name();
+
+		if (workspace === "Secretaría") {
+
+			club_management.secretaria_sidebar?.refresh?.();
+
+		} else if (workspace === "Gestión de Actividades") {
+
+			club_management.actividades_sidebar?.refresh?.();
+
+		}
+
+	};
+
+
+
 	club_management.club_desk_navigation.refresh = function () {
 
 		this.redirect_slug_aliases();
 
 		this.render_nav();
+
+		this.refresh_sidebar();
 
 	};
 
