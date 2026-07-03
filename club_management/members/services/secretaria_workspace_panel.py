@@ -118,10 +118,17 @@ def save_cuotas_sociales_payload(rows: list[dict[str, Any]]) -> dict[str, Any]:
 	return get_cuotas_sociales_payload()
 
 
-def get_panel_lists_payload() -> dict[str, Any]:
+def get_panel_lists_payload(
+	*,
+	reference_date: str | None = None,
+	tendencia_reference_date: str | None = None,
+) -> dict[str, Any]:
 	"""Payload completo para el panel (métricas + solicitudes)."""
 	return {
-		"metricas": get_panel_metricas_payload(),
+		"metricas": get_panel_metricas_payload(
+			reference_date=reference_date,
+			tendencia_reference_date=tendencia_reference_date,
+		),
 		"solicitudes_pendientes": get_solicitudes_pendientes_preview(),
 	}
 
