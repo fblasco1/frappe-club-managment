@@ -38,6 +38,9 @@ SEGMENTO_ADHERENTES = frozenset({"Adherente"})
 SEGMENTO_JUBILADOS = frozenset({"Jubilado", "Vitalicio"})
 
 from club_management.members.services.modos_pago_desk import agrupar_modo_pago_chart
+
+
+def _last_day_previous_month(reference: date) -> date:
 	first_current = reference.replace(day=1)
 	return first_current.replace(day=1) - timedelta(days=1)
 
