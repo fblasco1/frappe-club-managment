@@ -286,7 +286,7 @@ club_management_socio_desk.dialog_registrar_cobro = function (frm) {
 				return;
 			}
 			if (rows.length === 1) {
-				club_management_socio_desk.confirmar_registrar_cobro(frm, rows[0]);
+				club_management_socio_desk.prompt_modo_y_registrar_cobro(frm, rows[0]);
 				return;
 			}
 			const labels = rows.map((row) => {
@@ -306,7 +306,7 @@ club_management_socio_desk.dialog_registrar_cobro = function (frm) {
 				(values) => {
 					const invoice = (values.sales_invoice || "").split(" — ")[0].trim();
 					const row = rows.find((item) => item.name === invoice);
-					club_management_socio_desk.confirmar_registrar_cobro(frm, row || { name: invoice });
+					club_management_socio_desk.prompt_modo_y_registrar_cobro(frm, row || { name: invoice });
 				},
 				__("Registrar cobro"),
 				__("Continuar")
@@ -315,30 +315,72 @@ club_management_socio_desk.dialog_registrar_cobro = function (frm) {
 	});
 };
 
-club_management_socio_desk.confirmar_registrar_cobro = function (frm, invoice_row) {
-	const saldo_label = frappe.format(invoice_row.outstanding_amount, { fieldtype: "Currency" });
-	frappe.confirm(
-		__("¿Registrar cobro de {0} por {1}?", [invoice_row.name, saldo_label]),
-		() => {
-			frappe.call({
-				method: "club_management.members.api.cobranza_desk.registrar_cobro",
-				args: { socio: frm.doc.name, sales_invoice: invoice_row.name },
-				freeze: true,
-				callback(res) {
-					if (!res.exc && res.message) {
-						frappe.show_alert({
-							message: __("Cobro {0} registrado", [res.message.payment_entry]),
-							indicator: "green",
-						});
-						if (res.message.recibo && club_management_recibo_pago?.imprimir_despues_cobro) {
-							club_management_recibo_pago.imprimir_despues_cobro(res.message.recibo);
-						}
-						frm.reload_doc();
-					}
-				},
+club_management_socio_desk.prompt_modo_y_registrar_cobro = function (frm, invoice_row) {
+	frappe.call({
+		method: "club_management.members.api.cobranza_desk.list_modos_pago_cobranza",
+		callback(r) {
+			if (r.exc) {
+				return;
+			}
+			const modos = r.message || [];
+			const labelToValue = {};
+			const options = modos
+				.map((row) => {
+					labelToValue[row.label] = row.value;
+					return row.label;
+				})
+				.join("\n");
+			const saldo_label = frappe.format(invoice_row.outstanding_amount, {
+				fieldtype: "Currency",
 			});
-		}
-	);
+			frappe.prompt(
+				[
+					{
+						fieldname: "mode_of_payment",
+						fieldtype: "Select",
+						label: __("Medio de pago"),
+						options,
+						default: modos[0]?.label,
+						reqd: 1,
+					},
+				],
+				(values) => {
+					const mode = labelToValue[values.mode_of_payment] || "Cash";
+					club_management_socio_desk.ejecutar_registrar_cobro(frm, invoice_row, mode);
+				},
+				__("Registrar cobro de {0} — {1}", [invoice_row.name, saldo_label]),
+				__("Confirmar")
+			);
+		},
+	});
+};
+
+club_management_socio_desk.ejecutar_registrar_cobro = function (frm, invoice_row, mode_of_payment) {
+	frappe.call({
+		method: "club_management.members.api.cobranza_desk.registrar_cobro",
+		args: {
+			socio: frm.doc.name,
+			sales_invoice: invoice_row.name,
+			mode_of_payment,
+		},
+		freeze: true,
+		callback(res) {
+			if (!res.exc && res.message) {
+				frappe.show_alert({
+					message: __("Cobro {0} registrado", [res.message.payment_entry]),
+					indicator: "green",
+				});
+				if (res.message.recibo && club_management_recibo_pago?.imprimir_despues_cobro) {
+					club_management_recibo_pago.imprimir_despues_cobro(res.message.recibo);
+				}
+				frm.reload_doc();
+			}
+		},
+	});
+};
+
+club_management_socio_desk.confirmar_registrar_cobro = function (frm, invoice_row) {
+	club_management_socio_desk.prompt_modo_y_registrar_cobro(frm, invoice_row);
 };
 
 club_management_socio_desk.render_inscripciones = function (frm) {

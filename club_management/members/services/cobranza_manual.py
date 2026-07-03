@@ -423,9 +423,15 @@ def list_facturas_pendientes_socio(socio_name: str) -> list[dict[str, Any]]:
 	)
 
 
-def registrar_cobro_manual(socio_name: str, sales_invoice_name: str) -> str:
+def registrar_cobro_manual(
+	socio_name: str,
+	sales_invoice_name: str,
+	*,
+	mode_of_payment: str | None = None,
+) -> str:
 	"""Registra un `Payment Entry` contra la factura y actualiza deuda/estado."""
 	from club_management.integrations.payment_ledger_postgres import apply_patch
+	from club_management.members.services.modos_pago_desk import validar_modo_pago_desk
 
 	apply_patch()
 	if not erpnext_cobranza_disponible():
@@ -446,8 +452,7 @@ def registrar_cobro_manual(socio_name: str, sales_invoice_name: str) -> str:
 		raise frappe.ValidationError(_("ERPNext no está disponible para cobranza.")) from exc
 
 	pe = get_payment_entry(SALES_INVOICE_DOCTYPE, sales_invoice_name)
-	# Cobro manual en Secretaría: efectivo en caja (evita exigir referencia bancaria).
-	pe.mode_of_payment = "Cash"
+	pe.mode_of_payment = validar_modo_pago_desk(mode_of_payment)
 	if not pe.reference_no:
 		pe.reference_no = sales_invoice_name
 	if not pe.reference_date:

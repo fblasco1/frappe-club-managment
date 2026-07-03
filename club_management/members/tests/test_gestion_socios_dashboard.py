@@ -14,6 +14,7 @@ from club_management.members.services.cobranza_periodica import (
 	generar_deuda_mensual_socio,
 )
 from club_management.members.services.cuotas_sociales_setup import sync_cuotas_sociales_club
+from club_management.members.services.recibo_pago import format_monto_ar
 from club_management.members.services.secretaria_panel_kpis import (
 	count_altas_bajas_mes,
 	get_medios_pago_payload,
@@ -122,18 +123,23 @@ class TestGestionSociosDashboardRecaudacion(MembersTestCase):
 			self.skipTest("ERPNext Sales Invoice no instalado")
 		sync_cuotas_sociales_club()
 
-	def test_tendencia_recaudacion_ultimos_meses(self) -> None:
-		data = get_recaudacion_tendencia_payload(
-			months=3,
-			reference_date=self._REFERENCE,
-		)
-		self.assertEqual(len(data["meses"]), 3)
-		for row in data["meses"]:
-			self.assertIn("periodo", row)
+	def test_tendencia_recaudacion_por_dias_del_mes(self) -> None:
+		data = get_recaudacion_tendencia_payload(reference_date=self._REFERENCE)
+		self.assertEqual(data["periodo"], format_periodo_cobro(self._REFERENCE))
+		self.assertEqual(len(data["dias"]), 30)
+		for row in data["dias"]:
+			self.assertIn("dia", row)
+			self.assertIn("label", row)
 			self.assertIn("emitido", row)
 			self.assertIn("recaudado", row)
 
-	def test_medios_pago_agrupa_cash(self) -> None:
+	def test_mora_1_3_monto_label_pesos(self) -> None:
+		data = get_mora_1_3_meses_payload()
+		self.assertEqual(data["monto_label"], format_monto_ar(data["monto"]))
+		if data["monto"] > 0:
+			self.assertTrue(str(data["monto_label"]).startswith("$"))
+
+	def test_medios_pago_agrupa_efectivo(self) -> None:
 		from frappe.utils import today
 
 		ref = today()
@@ -147,9 +153,9 @@ class TestGestionSociosDashboardRecaudacion(MembersTestCase):
 			"name",
 		)
 		self.assertTrue(invoice_name)
-		registrar_cobro_manual(socio.name, invoice_name)
+		registrar_cobro_manual(socio.name, invoice_name, mode_of_payment="Cash")
 
 		data = get_medios_pago_payload(reference_date=ref)
 		self.assertTrue(data["disponible"])
 		self.assertEqual(data["periodo"], format_periodo_cobro(ref))
-		self.assertGreater(data["efectivo_pos"], 0)
+		self.assertGreater(data["efectivo"], 0)

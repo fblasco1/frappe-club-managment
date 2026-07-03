@@ -37,12 +37,7 @@ SEGMENTO_MENORES = frozenset({"Menor"})
 SEGMENTO_ADHERENTES = frozenset({"Adherente"})
 SEGMENTO_JUBILADOS = frozenset({"Jubilado", "Vitalicio"})
 
-MEDIO_PAGO_DEBITO = frozenset({"Credit Card", "Bank Draft"})
-MEDIO_PAGO_EFECTIVO = frozenset({"Cash", "Cheque"})
-MEDIO_PAGO_TRANSFERENCIA = frozenset({"Wire Transfer"})
-
-
-def _last_day_previous_month(reference: date) -> date:
+from club_management.members.services.modos_pago_desk import agrupar_modo_pago_chart
 	first_current = reference.replace(day=1)
 	return first_current.replace(day=1) - timedelta(days=1)
 
@@ -263,14 +258,7 @@ def get_recaudacion_tendencia_payload(
 
 
 def _agrupar_modo_pago(mode: str | None) -> str:
-	mode = (mode or "").strip()
-	if mode in MEDIO_PAGO_DEBITO:
-		return "debito_automatico"
-	if mode in MEDIO_PAGO_EFECTIVO:
-		return "efectivo_pos"
-	if mode in MEDIO_PAGO_TRANSFERENCIA:
-		return "transferencia"
-	return "otros"
+	return agrupar_modo_pago_chart(mode)
 
 
 def get_medios_pago_payload(*, reference_date: str | date | None = None) -> dict[str, Any]:
@@ -280,10 +268,10 @@ def get_medios_pago_payload(*, reference_date: str | date | None = None) -> dict
 	empty = {
 		"periodo": periodo,
 		"disponible": False,
-		"debito_automatico": 0.0,
-		"efectivo_pos": 0.0,
+		"efectivo": 0.0,
+		"tarjeta": 0.0,
 		"transferencia": 0.0,
-		"otros": 0.0,
+		"otro": 0.0,
 	}
 	if not erpnext_cobranza_disponible():
 		return empty
@@ -317,7 +305,7 @@ def get_medios_pago_payload(*, reference_date: str | date | None = None) -> dict
 	if not pe_names:
 		return {**empty, "disponible": True}
 
-	totals = {"debito_automatico": 0.0, "efectivo_pos": 0.0, "transferencia": 0.0, "otros": 0.0}
+	totals = {"efectivo": 0.0, "tarjeta": 0.0, "transferencia": 0.0, "otro": 0.0}
 	for row in frappe.get_all(
 		PAYMENT_ENTRY_DOCTYPE,
 		filters={

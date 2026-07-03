@@ -55,6 +55,7 @@ Given facturación y cobros de cuotas sociales en un mes calendario
 When Secretaria consulta el dashboard
 Then ve un gráfico de línea con **recaudado** y **emitido** por **día del mes** (1 … último día)
 And puede elegir el **mes** a visualizar con un selector (por defecto el mes en curso)
+And al cambiar el mes solo se actualiza el gráfico de tendencia (sin recargar todo el panel)
 And el resto de KPIs del panel siguen referidos al mes en curso salvo el gráfico de tendencia.
 
 ---
@@ -64,9 +65,10 @@ And el resto de KPIs del panel siguen referidos al mes en curso salvo el gráfic
 Given `Payment Entry` submitted del mes contra facturas de socios
 When Secretaria consulta el dashboard
 Then ve un gráfico de torta agrupado en:
-**Débito automático** (`Credit Card`, `Bank Draft`),
-**Efectivo / POS** (`Cash`, `Cheque`),
-**Transferencia** (`Wire Transfer`).
+**Efectivo** (`Cash`, `Cheque`),
+**Tarjeta** (`Credit Card`, `Bank Draft`),
+**Transferencia** (`Wire Transfer`),
+**Otro** (demás modos).
 
 ---
 

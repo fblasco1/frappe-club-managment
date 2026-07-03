@@ -86,7 +86,8 @@ Given un `Socio` con `saldo_deuda` > 0
 And facturas pendientes vinculadas al socio
 When Secretaría abre el formulario `Socio` en Desk
 Then ve el botón **Registrar cobro** en el grupo Cobranza manual
-And al confirmar se llama a `cobranza_desk.registrar_cobro` con la factura elegida.
+And al confirmar elige el **medio de pago** y se llama a `cobranza_desk.registrar_cobro`
+  con la factura y el medio elegidos.
 
 ---
 

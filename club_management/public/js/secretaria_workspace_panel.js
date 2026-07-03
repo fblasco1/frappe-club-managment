@@ -16,6 +16,7 @@
 
 		_refresh_timer: null,
 		_selected_tendencia_month: null,
+		_$panel: null,
 
 
 
@@ -228,10 +229,10 @@
 			const showSegmentos = this.has_segmentos_chart(socios.segmentos);
 			const showMedios =
 				medios.disponible &&
-				(medios.debito_automatico ||
-					medios.efectivo_pos ||
+				(medios.efectivo ||
+					medios.tarjeta ||
 					medios.transferencia ||
-					medios.otros);
+					medios.otro);
 			if (!showTrend && !showSegmentos && !showMedios) {
 				return "";
 			}
@@ -254,6 +255,64 @@
 				</div>`
 					: "";
 			return `${trendHtml}${secondaryHtml}`;
+		},
+
+		mount_trend_chart($container, tendencia) {
+			if (!$container?.length) {
+				return;
+			}
+			$container.empty();
+			const data = tendencia || {};
+			if (!data.disponible || !(data.dias || []).length) {
+				$container.html(
+					`<p class="text-muted mb-0">${__("Sin datos de recaudación para este mes.")}</p>`
+				);
+				this._chart_trend = null;
+				return;
+			}
+			this._chart_trend = new frappe.Chart($container[0], {
+				type: "line",
+				height: 220,
+				colors: ["#29cd42", "#7575ff"],
+				data: {
+					labels: data.dias.map((row) => row.label),
+					datasets: [
+						{ name: __("Recaudado"), values: data.dias.map((r) => r.recaudado) },
+						{ name: __("Emitido"), values: data.dias.map((r) => r.emitido) },
+					],
+				},
+				truncateLegends: 1,
+				axisOptions: { shortenYAxisNumbers: 1 },
+			});
+		},
+
+		mount_medios_chart($container, medios) {
+			if (!$container?.length || !medios?.disponible) {
+				return;
+			}
+			this._chart_medios = new frappe.Chart($container[0], {
+				type: "donut",
+				height: 260,
+				colors: ["#29cd42", "#5e64ff", "#f39c12", "#95a5a6"],
+				data: {
+					labels: [
+						__("Efectivo"),
+						__("Tarjeta"),
+						__("Transferencia"),
+						__("Otro"),
+					],
+					datasets: [
+						{
+							values: [
+								medios.efectivo || 0,
+								medios.tarjeta || 0,
+								medios.transferencia || 0,
+								medios.otro || 0,
+							],
+						},
+					],
+				},
+			});
 		},
 
 		mount_charts($panel, metricas) {
@@ -291,49 +350,27 @@
 					axisOptions: { shortenYAxisNumbers: 1 },
 				});
 			}
-			const $trend = $panel.find(".club-secretaria-chart-trend");
-			if ($trend.length && tendencia.dias?.length) {
-				this._chart_trend = new frappe.Chart($trend[0], {
-					type: "line",
-					height: 220,
-					colors: ["#29cd42", "#7575ff"],
-					data: {
-						labels: tendencia.dias.map((row) => row.label),
-						datasets: [
-							{ name: __("Recaudado"), values: tendencia.dias.map((r) => r.recaudado) },
-							{ name: __("Emitido"), values: tendencia.dias.map((r) => r.emitido) },
-						],
-					},
-					truncateLegends: 1,
-					axisOptions: { shortenYAxisNumbers: 1 },
-				});
+			this.mount_trend_chart($panel.find(".club-secretaria-chart-trend"), tendencia);
+			this.mount_medios_chart($panel.find(".club-secretaria-chart-medios"), medios);
+		},
+
+		refresh_tendencia_chart($panel) {
+			const $panelEl = $panel || this._$panel;
+			if (!$panelEl?.length) {
+				return;
 			}
-			const $medios = $panel.find(".club-secretaria-chart-medios");
-			if ($medios.length && medios.disponible) {
-				this._chart_medios = new frappe.Chart($medios[0], {
-					type: "donut",
-					height: 260,
-					colors: ["#5e64ff", "#29cd42", "#f39c12", "#95a5a6"],
-					data: {
-						labels: [
-							__("Débito automático"),
-							__("Efectivo / POS"),
-							__("Transferencia"),
-							__("Otros"),
-						],
-						datasets: [
-							{
-								values: [
-									medios.debito_automatico || 0,
-									medios.efectivo_pos || 0,
-									medios.transferencia || 0,
-									medios.otros || 0,
-								],
-							},
-						],
-					},
-				});
+			const $trend = $panelEl.find(".club-secretaria-chart-trend");
+			if (!$trend.length) {
+				return;
 			}
+			$trend.html(`<div class="text-muted small py-3">${__("Cargando gráfico…")}</div>`);
+			frappe.call({
+				method: "club_management.members.api.secretaria_workspace.get_tendencia_recaudacion",
+				args: { tendencia_reference_date: this.tendencia_reference_date() },
+				callback: (r) => {
+					this.mount_trend_chart($trend, r.message || {});
+				},
+			});
 		},
 
 		_destroy_charts() {
@@ -413,6 +450,7 @@
 		render_lists($panel, data) {
 			const metricas = data.metricas || {};
 			const verMas = metricas.ver_mas || {};
+			this._$panel = $panel;
 
 			$panel.html(`
 				${this.render_quick_actions()}
@@ -461,7 +499,7 @@
 				const value = e.currentTarget.value;
 				if (value) {
 					this._selected_tendencia_month = value;
-					this.refresh();
+					this.refresh_tendencia_chart($panel);
 				}
 			});
 

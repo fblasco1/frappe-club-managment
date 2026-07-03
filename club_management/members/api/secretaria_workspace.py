@@ -16,14 +16,11 @@ import frappe
 
 
 
+from club_management.members.services.secretaria_panel_kpis import get_recaudacion_tendencia_payload
 from club_management.members.services.secretaria_workspace_panel import (
-
 	get_cuotas_sociales_payload,
-
 	get_panel_lists_payload,
-
 	save_cuotas_sociales_payload,
-
 )
 
 
@@ -52,20 +49,29 @@ def _ensure_secretaria_panel_access() -> None:
 
 @frappe.whitelist()
 
-def get_panel_lists() -> dict[str, Any]:
+def get_panel_lists(
+	reference_date: str | None = None,
+	tendencia_reference_date: str | None = None,
+) -> dict[str, Any]:
 
 	"""Listas preview (máx. 5) para el workspace Secretaría."""
 
 	_ensure_secretaria_panel_access()
 
-	return get_panel_lists_payload()
-
-
-
+	return get_panel_lists_payload(
+		reference_date=reference_date,
+		tendencia_reference_date=tendencia_reference_date,
+	)
 
 
 @frappe.whitelist()
+def get_tendencia_recaudacion(tendencia_reference_date: str | None = None) -> dict[str, Any]:
+	"""Serie diaria de recaudación para el gráfico (sin recargar todo el panel)."""
+	_ensure_secretaria_panel_access()
+	return get_recaudacion_tendencia_payload(reference_date=tendencia_reference_date)
 
+
+@frappe.whitelist()
 def get_cuotas_sociales() -> dict[str, Any]:
 
 	_ensure_secretaria_panel_access()

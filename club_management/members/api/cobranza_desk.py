@@ -17,7 +17,7 @@ from club_management.members.services.cobranza_manual import (
 	registrar_cobro_manual,
 	sync_saldo_deuda_socio,
 )
-from club_management.members.services.recibo_pago import build_recibo_pago
+from club_management.members.services.modos_pago_desk import list_modos_pago_cobranza_payload
 from club_management.members.services.socio_operaciones_secretaria import (
 	ensure_secretaria_operacion_access,
 )
@@ -52,9 +52,23 @@ def list_detalle_deuda(socio: str) -> dict:
 
 
 @frappe.whitelist()
-def registrar_cobro(socio: str, sales_invoice: str) -> dict[str, str]:
+def list_modos_pago_cobranza() -> list[dict[str, str]]:
 	ensure_secretaria_operacion_access()
-	payment_entry = registrar_cobro_manual(socio, sales_invoice)
+	return list_modos_pago_cobranza_payload()
+
+
+@frappe.whitelist()
+def registrar_cobro(
+	socio: str,
+	sales_invoice: str,
+	mode_of_payment: str | None = None,
+) -> dict[str, str]:
+	ensure_secretaria_operacion_access()
+	payment_entry = registrar_cobro_manual(
+		socio,
+		sales_invoice,
+		mode_of_payment=mode_of_payment,
+	)
 	saldo = sync_saldo_deuda_socio(socio)
 	estado = frappe.db.get_value("Socio", socio, "estado")
 	recibo = build_recibo_pago(payment_entry)

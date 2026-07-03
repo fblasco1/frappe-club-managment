@@ -53,3 +53,24 @@ class TestRegistrarCobroPostgres(MembersTestCase):
             flt(frappe.db.get_value("Sales Invoice", invoice_name, "outstanding_amount")),
             0,
         )
+
+    def test_registrar_cobro_manual_respeta_modo_pago(self) -> None:
+        socio = insert_socio(dni="99003002", email="cobro.mop@example.com")
+        cambiar_estado(socio.name, "Activo", motivo="Test modo pago")
+        invoice_name = generar_deuda_mensual_socio(socio.name, reference_date=self._GEN)
+        self.assertTrue(invoice_name)
+
+        frappe.set_user(self._secretaria)
+        try:
+            pe_name = registrar_cobro_manual(
+                socio.name,
+                invoice_name,
+                mode_of_payment="Wire Transfer",
+            )
+        finally:
+            frappe.set_user("Administrator")
+
+        self.assertEqual(
+            frappe.db.get_value("Payment Entry", pe_name, "mode_of_payment"),
+            "Wire Transfer",
+        )
