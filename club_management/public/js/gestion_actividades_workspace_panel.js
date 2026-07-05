@@ -204,7 +204,7 @@
 				type: "bar",
 				height: 260,
 				colors,
-				truncateLegends: 0,
+				showLegend: 0,
 				data: {
 					labels: filtered.label_titulos || filtered.labels,
 					datasets: (ocupacion.datasets || []).map((ds) => ({
@@ -534,7 +534,7 @@
 			const lista = data.lista_espera || {};
 			const ocupacionHtml = ocupacion.disponible
 				? `<div class="club-actividades-chart-card club-actividades-chart-card--wide">
-					<h6>${__("Ocupación por deporte / categoría")}</h6>
+					<h6>${__("Inscripciones por deporte / actividad")}</h6>
 					${this.render_ocupacion_filtros(ocupacion)}
 					<div class="club-actividades-chart-ocupacion"></div>
 				</div>`

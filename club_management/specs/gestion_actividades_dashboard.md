@@ -68,11 +68,12 @@ Then **no** ve card, acción rápida ni enlace de aptos médicos.
 
 ---
 
-## Scenario: gráfico ocupación por deporte / categoría
+## Scenario: gráfico inscripciones por deporte / actividad
 
 Given inscripciones activas agrupadas por `actividad` y `grupo_actividad` (tira / color)
 When Secretaria consulta el dashboard
-Then ve un gráfico de barras apiladas con inscriptos por disciplina y segmento de grupo.
+Then ve un gráfico de barras apiladas titulado **Inscripciones por deporte / actividad**
+And el gráfico **no** muestra leyenda de grupos (el detalle por grupo/tira se ve en el tooltip al hover).
 
 ---
 

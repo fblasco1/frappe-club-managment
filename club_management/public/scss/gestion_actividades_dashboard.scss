@@ -208,6 +208,12 @@ body.club-actividades-active-workspace .layout-main .layout-main-section-wrapper
 	display: none !important;
 }
 
+.club-actividades-chart-ocupacion .legend-dataset,
+.club-actividades-chart-ocupacion .legend-dataset-label,
+.club-actividades-chart-ocupacion .legend-dataset-value {
+	display: none !important;
+}
+
 .club-actividades-ocupacion-filters {
 	margin-bottom: 0.85rem;
 }
