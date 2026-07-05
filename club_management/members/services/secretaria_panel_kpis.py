@@ -191,6 +191,24 @@ def _finalize_tendencia_dias(dias: list[dict[str, Any]]) -> None:
 		row["deuda"] = round(max(emitido_acum - recaudado_acum, 0), 2)
 
 
+def _dia_en_mes_periodo(
+	posting_date: str | date | None,
+	*,
+	period_first: date,
+	period_last: date,
+	fallback_day: int,
+) -> int | None:
+	"""Mapea una fecha contable al día 1…N del mes del período visualizado."""
+	if not posting_date:
+		return min(max(int(fallback_day), 1), period_last.day)
+	posting = getdate(posting_date)
+	if period_first <= posting <= period_last:
+		return posting.day
+	if posting < period_first:
+		return min(max(int(fallback_day), 1), period_last.day)
+	return period_last.day
+
+
 def get_recaudacion_tendencia_payload(
 	*,
 	reference_date: str | date | None = None,
@@ -223,6 +241,7 @@ def get_recaudacion_tendencia_payload(
 
 	settings = get_club_settings()
 	cuota_items = _cuota_item_codes(settings)
+	emit_day = int(settings.dia_generacion_deuda or 1)
 	invoices = frappe.get_all(
 		SALES_INVOICE_DOCTYPE,
 		filters={campo_periodo: periodo, "docstatus": 1},
@@ -236,10 +255,14 @@ def get_recaudacion_tendencia_payload(
 	invoice_by_name = {row.name: row for row in invoices}
 
 	for invoice in invoices:
-		posting = getdate(invoice.posting_date or first)
-		if posting < first or posting > last:
+		day = _dia_en_mes_periodo(
+			invoice.posting_date,
+			period_first=first,
+			period_last=last,
+			fallback_day=emit_day,
+		)
+		if day is None:
 			continue
-		day = posting.day
 		for line in lines_by_parent.get(invoice.name, []):
 			if (line.get("item_code") or "") not in cuota_items:
 				continue
@@ -263,7 +286,6 @@ def get_recaudacion_tendencia_payload(
 				filters={
 					"name": ["in", parent_names],
 					"docstatus": 1,
-					"posting_date": ["between", [first, last]],
 				},
 				fields=["name", "posting_date"],
 			)
@@ -284,7 +306,14 @@ def get_recaudacion_tendencia_payload(
 			if cuota_total <= 0:
 				continue
 			cuota_paid = flt(ref.allocated_amount) * (cuota_total / grand_total)
-			day = getdate(pe.posting_date).day
+			day = _dia_en_mes_periodo(
+				pe.posting_date,
+				period_first=first,
+				period_last=last,
+				fallback_day=emit_day,
+			)
+			if day is None:
+				continue
 			by_day[day]["recaudado_dia"] += cuota_paid
 
 	_finalize_tendencia_dias(dias)

@@ -11,6 +11,7 @@ from club_management.members.services.socio_transitions import cambiar_estado
 from club_management.members.test_helpers import MembersTestCase, insert_socio
 
 GRUPO_GENERAL = "ICDPE / Cargos varios"
+GRUPO_TEST_ITEMS = "Test Cargo Extra Items"
 
 
 class TestCargoExtraConceptos(MembersTestCase):
@@ -21,11 +22,25 @@ class TestCargoExtraConceptos(MembersTestCase):
 			self.skipTest("No hay Company configurada para Item Default")
 		self._cc_a = self._ensure_cost_center("CC Cargo Extra A")
 		self._cc_b = self._ensure_cost_center("CC Cargo Extra B")
-		self._arancel_a = self._ensure_item("TEST-ARANCEL-A", self._cc_a)
-		self._federativa_a = self._ensure_item("TEST-FEDERATIVA-A", self._cc_a)
-		self._arancel_b = self._ensure_item("TEST-ARANCEL-B", self._cc_b)
-		self._federativa_b = self._ensure_item("TEST-FEDERATIVA-B", self._cc_b)
+		self._ensure_item_group(GRUPO_TEST_ITEMS)
+		self._arancel_a = self._ensure_item("TEST-ARANCEL-A", self._cc_a, item_group=GRUPO_TEST_ITEMS)
+		self._federativa_a = self._ensure_item("TEST-FEDERATIVA-A", self._cc_a, item_group=GRUPO_TEST_ITEMS)
+		self._arancel_b = self._ensure_item("TEST-ARANCEL-B", self._cc_b, item_group=GRUPO_TEST_ITEMS)
+		self._federativa_b = self._ensure_item("TEST-FEDERATIVA-B", self._cc_b, item_group=GRUPO_TEST_ITEMS)
 		self._multa = self._ensure_item("TEST-MULTA-GENERAL", None, item_group=GRUPO_GENERAL)
+		for item_code, titulo in (
+			(self._arancel_a, "Fixture arancel A"),
+			(self._arancel_b, "Fixture arancel B"),
+		):
+			if not frappe.db.exists("Actividad", {"item": item_code}):
+				frappe.get_doc(
+					{
+						"doctype": "Actividad",
+						"titulo": titulo,
+						"item": item_code,
+						"habilitada": 0,
+					}
+				).insert(ignore_permissions=True)
 
 	def _resolve_company(self) -> str | None:
 		"""Empresa cuyo almacén por defecto evita el choque de validación."""
@@ -81,6 +96,20 @@ class TestCargoExtraConceptos(MembersTestCase):
 		if item_group:
 			group = self._ensure_item_group(item_group)
 		if frappe.db.exists("Item", code):
+			frappe.db.delete("Item Default", {"parent": code})
+			if cost_center:
+				frappe.get_doc(
+					{
+						"doctype": "Item Default",
+						"parent": code,
+						"parenttype": "Item",
+						"parentfield": "item_defaults",
+						"company": self._company,
+						"selling_cost_center": cost_center,
+					}
+				).insert(ignore_permissions=True)
+			if item_group:
+				frappe.db.set_value("Item", code, "item_group", item_group)
 			return code
 		payload: dict = {
 			"doctype": "Item",

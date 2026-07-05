@@ -22,6 +22,7 @@ ROUND_OFF_LABEL = "Diferencias de redondeo"
 
 MISSING_COST_CENTERS: tuple[tuple[str, str], ...] = (
 	("Actividades - Zumba", "Actividades - ICDPE"),
+	("Deportes - Basquet Escuelita", "Deportes - ICDPE"),
 )
 
 

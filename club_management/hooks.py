@@ -30,7 +30,7 @@ app_include_css = "club_management.bundle.css"
 app_include_js = "club_management.bundle.js"
 
 # include js, css files in header of web template
-# web_include_css = "/assets/club_management/css/club_management.css"
+web_include_css = "/assets/club_management/css/siclub_login.css"
 # web_include_js = "/assets/club_management/js/club_management.js"
 
 # include custom scss in every website theme (without file extension ".scss")

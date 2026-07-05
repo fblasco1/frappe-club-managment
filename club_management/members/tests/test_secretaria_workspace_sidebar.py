@@ -9,8 +9,8 @@ import json
 import os
 
 import frappe
-from frappe.tests.utils import FrappeTestCase
 
+from club_management.members.test_helpers import MembersTestCase
 from club_management.members.setup.inicio_workspace import CLUB_DESK_REPORTS
 from club_management.members.setup.secretaria_workspace import WORKSPACE_NAME
 from club_management.members.setup.secretaria_workspace_sidebar import (
@@ -21,7 +21,7 @@ from club_management.members.setup.secretaria_workspace_sidebar import (
 )
 
 
-class TestSecretariaWorkspaceSidebar(FrappeTestCase):
+class TestSecretariaWorkspaceSidebar(MembersTestCase):
 	def test_fixture_sidebar_tiene_secretaria_socio_e_informes(self) -> None:
 		path = secretaria_sidebar_fixture_path()
 		self.assertTrue(os.path.isfile(path))
@@ -72,7 +72,7 @@ class TestSecretariaWorkspaceSidebar(FrappeTestCase):
 			"Workspace Sidebar Item",
 			filters={"parent": WORKSPACE_NAME},
 			fields=["label", "link_to", "link_type", "type", "child"],
-			order_by="idx asc",
+			order_by="`tabWorkspace Sidebar Item`.idx asc",
 		)
 		labels = [row["label"] for row in items]
 		self.assertIn("Secretaría", labels)

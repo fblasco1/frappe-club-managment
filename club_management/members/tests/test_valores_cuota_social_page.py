@@ -9,8 +9,8 @@ import json
 import os
 
 import frappe
-from frappe.tests.utils import FrappeTestCase
 
+from club_management.members.test_helpers import MembersTestCase
 from club_management.members.setup.secretaria_workspace_sidebar import (
 	SIDEBAR_ITEMS,
 	VALORES_CUOTA_SOCIAL_PAGE,
@@ -18,7 +18,7 @@ from club_management.members.setup.secretaria_workspace_sidebar import (
 )
 
 
-class TestValoresCuotaSocialPage(FrappeTestCase):
+class TestValoresCuotaSocialPage(MembersTestCase):
 	def test_fixture_pagina_existe(self) -> None:
 		path = valores_cuota_social_page_fixture_path()
 		self.assertTrue(os.path.isfile(path))

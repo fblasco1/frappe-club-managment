@@ -13,6 +13,7 @@
 
 
 **Última revisión MVP producción:** 2026-06-16  
+**Última actualización backlog:** 2026-07-05 (sprint chats S0–BL-2)  
 
 **Destino producción:** Hetzner Cloud **CX23** (servidor aparte del devcontainer local)
 
@@ -265,6 +266,14 @@ Servicios críticos cobranza: **scheduler**, **queue-long**, **queue-short**, **
 | 1.4 | `gestion_actividades_edicion_panel.md` | gestion_actividades_panel | Editar / deshabilitar nodos en panel actividades — **hecho** |
 
 | 1.5 | `equipo_actividad_form_roster.md` | activities_jerarquia, inscripcion_gestion_desk | Roster socios en Equipo Actividad — **hecho** |
+
+| 1.7 | `cargo_extra_conceptos_y_facturacion.md` | cargo_extra_socio | Conceptos por actividad + auto-factura único — **hecho** (2026-07-05) |
+
+| 1.8 | `deuda_socio_desk.md` | mvp_operacion, cargo_extra_socio | Panel deuda en formulario Socio — **hecho** (2026-07-05) |
+
+| 1.9 | `valores_cuota_social_page.md` | secretaria_workspace_listas | Página Desk cuotas + sidebar — **hecho** (2026-07-05) |
+
+| 1.10 | `gestion_socios_dashboard.md` | secretaria_workspace_panel_kpis | Dashboard socios, tendencia recaudación, medios pago — **hecho** (2026-07-05) |
 
 
 
@@ -706,6 +715,30 @@ print(result)  # facturas_creadas, errores, invoice_names
 
 
 
+## Backlog — sesión 2026-07-05
+
+
+
+| # | Tema | Prioridad | Spec (a crear) | Notas |
+
+|---|------|-----------|----------------|-------|
+
+| BL-1 | **Beca al socio** | Media | `beca_socio.md` | **Hecho 2026-07-05** — DocType `Beca Socio`, integración en `build_invoice_items_for_socio`. |
+
+| BL-2 | **Login — estética SICLUB** | Media | `login_siclub_branding.md` | **Hecho 2026-07-05** — `siclub_login.css` + `web_include_css` en hooks. |
+
+| BL-3 | **Básquet — actividad única** | Media | `basquet_estructura_unificada.md` | Unificar en **Basquet** con grupos Masculino/Azul|Amarillo|Flex, **Femenino / Formativa**, **Femenino / Superior**, **Mixto / Escuela**. Nombres confirmados 2026-07-05. Pendiente: seed + migración inscripciones. |
+
+
+
+**Orden sugerido al retomar:** BL-3 (spec lista) → tests seed/migración → patch prod.
+
+
+
+---
+
+
+
 ## Bugs conocidos — producción
 
 
@@ -715,6 +748,6 @@ print(result)  # facturas_creadas, errores, invoice_names
 |---|-----|-----------|---------|
 
 | B1 | **Cancelación de Sales Invoice falla en PostgreSQL** | ~~Alta~~ **Resuelto 2026-07-01** | `delink_original_entry` asignaba `delinked=true` (boolean) a columna `smallint`. Parche en `payment_ledger_postgres.py` + spec `sales_invoice_cancel_postgres.md` + test `test_sales_invoice_cancel_postgres.py`. Desplegar y reiniciar workers para activar. |
-| B2 | **`get_negative_outstanding_invoices` en Payment Entry (PostgreSQL)** | Media | Al registrar cobro manual, `payment_entry.py` usa SQL con `"Sales Invoice" as voucher_type` (identificador PG, no literal). Falla `test_moroso_automatico` en `registrar_cobro_manual`. Parche aparte en `payment_ledger_postgres.py` o wrapper. |
+| B2 | **`get_negative_outstanding_invoices` en Payment Entry (PostgreSQL)** | ~~Media~~ **Resuelto 2026-07-05** | Parche en `payment_ledger_postgres.py`. `test_moroso_automatico`: 6/6 OK. |
 
 

@@ -5,18 +5,20 @@ from __future__ import annotations
 from typing import Any
 
 import frappe
-from frappe.desk.utils import slug
+
+from club_management.members.setup.inicio_workspace import GESTION_ACTIVIDADES_WORKSPACE_NAME
+from club_management.members.setup.secretaria_workspace import WORKSPACE_NAME as SECRETARIA_WORKSPACE_NAME
 
 SECRETARIA_LANDING_ROLES = frozenset({"Secretaria"})
 
+# Workspace Sidebar evita que Frappe Desktop trate la URL como externa (target=_blank).
 CLUB_DESK_LANDING_ICONS: tuple[dict[str, Any], ...] = (
 	{
 		"name": "club-landing-socios",
 		"label": "Socios",
 		"icon": "users",
 		"icon_type": "Link",
-		"link_type": "External",
-		"link": f"/desk/{slug('Secretaría')}",
+		"link_type": "Workspace Sidebar",
 		"bg_color": "blue",
 		"app": "club_management",
 		"idx": 1,
@@ -30,8 +32,7 @@ CLUB_DESK_LANDING_ICONS: tuple[dict[str, Any], ...] = (
 		"label": "Actividades",
 		"icon": "activity",
 		"icon_type": "Link",
-		"link_type": "External",
-		"link": "/desk/Workspaces/Gestión de Actividades",
+		"link_type": "Workspace Sidebar",
 		"bg_color": "blue",
 		"app": "club_management",
 		"idx": 2,
@@ -45,8 +46,7 @@ CLUB_DESK_LANDING_ICONS: tuple[dict[str, Any], ...] = (
 		"label": "Configuración de Sistema",
 		"icon": "setting",
 		"icon_type": "Link",
-		"link_type": "External",
-		"link": f"/desk/{slug('Club Settings')}",
+		"link_type": "Workspace Sidebar",
 		"bg_color": "gray",
 		"app": "club_management",
 		"idx": 3,
@@ -84,3 +84,41 @@ def apply_club_desktop_landing_to_boot(bootinfo: dict[str, Any]) -> None:
 	apps_data = bootinfo.setdefault("apps_data", {})
 	if not apps_data.get("default_path") or apps_data.get("default_path") == "/desk":
 		apps_data["default_path"] = "/desk"
+
+
+def apply_club_desktop_landing_sidebar_aliases(bootinfo: dict[str, Any]) -> None:
+	"""Sidebars por etiqueta de icono Desktop (Socios, Actividades, …)."""
+	user_name = (bootinfo.get("user") or {}).get("name") or frappe.session.user
+	if not user_sees_club_desktop_landing(user_name):
+		return
+
+	sidebars = bootinfo.setdefault("workspace_sidebar_item", {})
+	secretaria_key = SECRETARIA_WORKSPACE_NAME.lower()
+	actividades_key = GESTION_ACTIVIDADES_WORKSPACE_NAME.lower()
+
+	if secretaria := sidebars.get(secretaria_key):
+		sidebars["socios"] = {**secretaria, "label": "Socios"}
+
+	if actividades := sidebars.get(actividades_key):
+		sidebars["actividades"] = {**actividades, "label": "Actividades"}
+
+	sidebars["configuración de sistema"] = {
+		"label": "Configuración de Sistema",
+		"items": [
+			{
+				"label": frappe._("Club Settings"),
+				"type": "Link",
+				"link_type": "DocType",
+				"link_to": "Club Settings",
+				"icon": "setting",
+				"child": 0,
+				"collapsible": 1,
+				"indent": 0,
+				"keep_closed": 0,
+				"show_arrow": 0,
+			}
+		],
+		"header_icon": "setting",
+		"module": "Members",
+		"app": "club_management",
+	}

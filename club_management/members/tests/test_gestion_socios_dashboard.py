@@ -36,6 +36,7 @@ from club_management.members.test_helpers import (
 	minor_birthdate,
 )
 from club_management.members.workflow.solicitud_asociacion_workflow import (
+	ACTION_SOLICITAR_CORRECCION,
 	STATE_PENDIENTE,
 	STATE_REQUIERE_CORRECCION,
 )
@@ -46,7 +47,20 @@ class TestGestionSociosDashboardCategorias(MembersTestCase):
 
 	def test_socios_por_categoria(self) -> None:
 		insert_socio(dni="74001001", email="seg.act@example.com", categoria="Activo", estado="Activo")
-		insert_socio(dni="74001002", email="seg.men@example.com", categoria="Menor", estado="Activo")
+		insert_socio(
+			dni="74001002",
+			email="seg.men@example.com",
+			categoria="Menor",
+			estado="Activo",
+			fecha_nacimiento=minor_birthdate(12),
+			tipo_tutor="Socio",
+			tutor=insert_socio(
+				dni="74001009",
+				email="seg.tutor.men@example.com",
+				categoria="Activo",
+				estado="Activo",
+			).name,
+		)
 		insert_socio(dni="74001003", email="seg.adh@example.com", categoria="Adherente", estado="Activo")
 		insert_socio(dni="74001004", email="seg.jub@example.com", categoria="Jubilado", estado="Activo")
 		insert_socio(dni="74001005", email="seg.vit@example.com", categoria="Vitalicio", estado="Activo")
@@ -111,17 +125,25 @@ class TestGestionSociosDashboardSolicitudes(MembersTestCase):
 			nombre="Ana",
 			workflow_state=STATE_PENDIENTE,
 		)
-		insert_solicitud_asociacion(
+		correccion = insert_solicitud_asociacion(
 			dni="74003002",
 			email="sol.corr@example.com",
 			nombre="Luis",
-			workflow_state=STATE_REQUIERE_CORRECCION,
+			workflow_state=STATE_PENDIENTE,
 		)
-		insert_solicitud_asociacion(
+		frappe.model.workflow.apply_workflow(
+			frappe.get_doc(correccion.doctype, correccion.name),
+			ACTION_SOLICITAR_CORRECCION,
+		)
+		validada = insert_solicitud_asociacion(
 			dni="74003003",
 			email="sol.val@example.com",
 			nombre="María",
-			workflow_state="Validada",
+			workflow_state=STATE_PENDIENTE,
+		)
+		frappe.model.workflow.apply_workflow(
+			frappe.get_doc(validada.doctype, validada.name),
+			"Validar",
 		)
 
 		rows = get_solicitudes_pendientes_preview(limit=10)

@@ -112,7 +112,7 @@ def _lineas_desde_payment_entry(payment_entry_name: str) -> list[dict[str, Any]]
 			"reference_doctype": SALES_INVOICE_DOCTYPE,
 		},
 		fields=["reference_name"],
-		order_by="idx asc",
+		order_by="`tabSales Invoice Item`.idx asc",
 	)
 	lineas: list[dict[str, Any]] = []
 	for ref in refs:
@@ -120,7 +120,7 @@ def _lineas_desde_payment_entry(payment_entry_name: str) -> list[dict[str, Any]]
 			"Sales Invoice Item",
 			filters={"parent": ref.reference_name},
 			fields=["description", "item_code", "amount"],
-			order_by="idx asc",
+			order_by="`tabSales Invoice Item`.idx asc",
 		)
 		for item in items:
 			concepto = (item.description or item.item_code or _("Concepto")).strip()
