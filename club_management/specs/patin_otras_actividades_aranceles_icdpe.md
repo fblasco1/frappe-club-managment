@@ -13,6 +13,7 @@
 | Patin Intermedio | 36.000 | 1, 2 |
 | Patin Mini | 20.500 | (único) |
 | Patin Teens | 20.500 | (único) |
+| Adulto | 26.500 | (único) |
 | Patin Danza | 29.500 | (único) |
 
 ## Scenario: patín avanzado equipo B
@@ -26,6 +27,12 @@ Then devuelve `ICDPE-PATIN-AVANZADO` con tarifa 42.000.
 Given `Patin Artistico` / `Patin Mini`
 When se resuelve el arancel
 Then devuelve `ICDPE-PATIN-MINI` con tarifa 20.500.
+
+## Scenario: patín adulto
+
+Given `Patin Artistico` / `Adulto`
+When se resuelve el arancel
+Then devuelve `ICDPE-PATIN-ADULTO` con tarifa 26.500.
 
 ## Otras actividades con grupos (frecuencia / tipo de pase)
 

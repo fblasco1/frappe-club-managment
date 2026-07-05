@@ -66,7 +66,11 @@ class TestResolveLoginUserBasico(MembersTestCase):
 
 
 class TestResolveLoginUserSocio(MembersTestCase):
-    def test_socio_number_valido_resuelve_email(self) -> None:
+    """Tras el refactor de naming, el `name` del Socio es un entero y el login
+    por número de socio se eliminó (ambigüedad con el DNI). El hook NO debe
+    reescribir identificadores numéricos de Socio."""
+
+    def test_numero_socio_con_user_no_se_resuelve(self) -> None:
         _ensure_role_socio_exists()
         socio = insert_socio(
             dni="30100200",
@@ -75,14 +79,16 @@ class TestResolveLoginUserSocio(MembersTestCase):
         provision_user_for_socio(socio.name)
         socio.reload()
         self.assertEqual(socio.user, "ana.login@example.com")
+        # `name` numérico: el hook lo deja intacto (login por email o DNI).
+        self.assertTrue(socio.name.isdigit())
 
         lm = FakeLoginManager(user=socio.name)
         resolve_login_user(lm)
 
-        self.assertEqual(lm.user, "ana.login@example.com")
+        self.assertEqual(lm.user, socio.name)
 
-    def test_socio_inexistente_no_modifica_nada(self) -> None:
-        usr_inexistente = "SOC-2099-9999"
+    def test_numero_socio_inexistente_no_modifica_nada(self) -> None:
+        usr_inexistente = "999999"
         lm = FakeLoginManager(user=usr_inexistente)
         resolve_login_user(lm)
         self.assertEqual(lm.user, usr_inexistente)

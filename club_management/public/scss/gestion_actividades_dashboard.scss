@@ -195,6 +195,114 @@ body.club-actividades-active-workspace .layout-main .layout-main-section-wrapper
 	width: 100%;
 }
 
+.club-actividades-chart-ocupacion {
+	position: relative;
+	min-height: 260px;
+}
+
+.club-actividades-chart-ocupacion-canvas {
+	position: relative;
+}
+
+.club-actividades-chart-ocupacion .graph-svg-tip {
+	display: none !important;
+}
+
+.club-actividades-ocupacion-filters {
+	margin-bottom: 0.85rem;
+}
+
+.club-actividades-ocupacion-filters-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.35rem 0.75rem;
+	margin-bottom: 0.45rem;
+}
+
+.club-actividades-ocupacion-filters-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.club-actividades-ocupacion-filters-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem 0.65rem;
+}
+
+.club-actividades-ocupacion-filter {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	margin: 0;
+	font-size: var(--text-sm);
+	cursor: pointer;
+	user-select: none;
+}
+
+.club-actividades-ocupacion-tip {
+	position: absolute;
+	z-index: 5;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.12s ease;
+	min-width: 10rem;
+	max-width: min(18rem, 90vw);
+	padding: 0.55rem 0.65rem;
+	border-radius: var(--border-radius-sm);
+	background: var(--charts-tooltip-bg, #fff);
+	border: 1px solid var(--border-color);
+	box-shadow: var(--shadow-base);
+}
+
+.club-actividades-ocupacion-tip.is-visible {
+	opacity: 1;
+}
+
+.club-actividades-ocupacion-tip-title {
+	font-weight: 600;
+	margin-bottom: 0.15rem;
+}
+
+.club-actividades-ocupacion-tip-total {
+	font-size: var(--text-sm);
+	color: var(--text-muted);
+	margin-bottom: 0.35rem;
+}
+
+.club-actividades-ocupacion-tip-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.club-actividades-ocupacion-tip-list li {
+	display: grid;
+	grid-template-columns: 0.65rem 1fr auto;
+	align-items: center;
+	gap: 0.35rem 0.45rem;
+	font-size: var(--text-sm);
+}
+
+.club-actividades-ocupacion-tip-dot {
+	width: 0.65rem;
+	height: 0.65rem;
+	border-radius: 2px;
+}
+
+.club-actividades-ocupacion-tip-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.club-actividades-ocupacion-tip-value {
+	font-variant-numeric: tabular-nums;
+}
+
 body.club-actividades-catalog-active .layout-main-section-wrapper,
 body.club-actividades-catalog-active .layout-main .layout-main-section-wrapper,
 .club-actividades-catalog-page.layout-main-section-wrapper,

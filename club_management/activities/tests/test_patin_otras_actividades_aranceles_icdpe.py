@@ -34,6 +34,17 @@ class TestPatinOtrasActividadesArancelesIcdpe(MembersTestCase):
 		equipo = f"{patin} / Patin Mini / Patin Mini"
 		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), ITEM_PATIN_MINI)
 
+	def test_seed_patin_adulto(self) -> None:
+		from club_management.activities.data.patin_aranceles_icdpe import ITEM_PATIN_ADULTO
+
+		seed_estructura_actividades_completa(crear_equipos=True)
+		patin = frappe.db.get_value("Actividad", {"titulo": "Patin Artistico"}, "name")
+		grupo = f"{patin} / Adulto"
+		self.assertTrue(frappe.db.get_value("Grupo Actividad", grupo, "habilitada"))
+		equipo = f"{grupo} / Adulto"
+		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), ITEM_PATIN_ADULTO)
+		self.assertEqual(frappe.db.get_value("Item", ITEM_PATIN_ADULTO, "standard_rate"), 26500)
+
 	def test_seed_gimnasia_dos_clases(self) -> None:
 		seed_estructura_actividades_completa(crear_equipos=True)
 		ga = frappe.db.get_value("Actividad", {"titulo": "Gimnasia Artistica"}, "name")

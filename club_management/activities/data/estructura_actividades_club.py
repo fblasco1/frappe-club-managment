@@ -39,6 +39,7 @@ from club_management.activities.data.patin_aranceles_icdpe import (
 	ITEM_PATIN_DANZA,
 	ITEM_PATIN_INTERMEDIO,
 	ITEM_PATIN_MINI,
+	ITEM_PATIN_ADULTO,
 	ITEM_PATIN_TEENS,
 )
 from club_management.activities.data.voley_aranceles_icdpe import (
@@ -264,6 +265,7 @@ ESTRUCTURA_PATIN = ActividadEstructuraSeed(
 		),
 		_grupo_leaf("Patin Mini", 30, ITEM_PATIN_MINI),
 		_grupo_leaf("Patin Teens", 40, ITEM_PATIN_TEENS),
+		_grupo_leaf("Adulto", 45, ITEM_PATIN_ADULTO),
 		_grupo_leaf("Patin Danza", 50, ITEM_PATIN_DANZA),
 	),
 )
@@ -309,6 +311,17 @@ ESTRUCTURA_INICIACION_DEPORTIVA = ActividadEstructuraSeed(
 	),
 )
 
+ITEM_FUNCIONAL = "ICDPE-ARANCEL-MENSUAL-ACT-funcional"
+
+ESTRUCTURA_FUNCIONAL = ActividadEstructuraSeed(
+	"Funcional",
+	(
+		_grupo_leaf("1 Clase por Semana", 10, ITEM_FUNCIONAL),
+		_grupo_leaf("2 Clases por Semana", 20, ITEM_FUNCIONAL),
+		_grupo_leaf("GAP", 30, ITEM_FUNCIONAL),
+	),
+)
+
 
 ESTRUCTURA_CON_GRUPOS: tuple[ActividadEstructuraSeed, ...] = (
 	ESTRUCTURA_BASQUET_MASCULINO,
@@ -322,4 +335,5 @@ ESTRUCTURA_CON_GRUPOS: tuple[ActividadEstructuraSeed, ...] = (
 	ESTRUCTURA_BOXEO,
 	ESTRUCTURA_YOGA,
 	ESTRUCTURA_GIMNASIO_FITNESS,
+	ESTRUCTURA_FUNCIONAL,
 )

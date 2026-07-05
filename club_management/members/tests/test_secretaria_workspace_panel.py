@@ -80,7 +80,7 @@ class TestSecretariaWorkspacePanelService(MembersTestCase):
 		rows = get_socios_morosos_preview(limit=1)
 		self.assertEqual(len(rows), 1)
 		row = rows[0]
-		self.assertTrue(row["identificador"].startswith("SOC-"))
+		self.assertTrue(row["identificador"].isdigit())
 		self.assertEqual(row["nombre_apellido"], "Luis García")
 		self.assertEqual(row["categoria"], "Activo")
 		self.assertEqual(row["estado"], "Moroso")
@@ -102,7 +102,7 @@ class TestSecretariaWorkspacePanelService(MembersTestCase):
 			saldo_deuda=50,
 		)
 		rows = get_socios_morosos_preview(limit=5)
-		match = [r for r in rows if r["identificador"].startswith("SOC-") and "Fútbol" in r["actividad"]]
+		match = [r for r in rows if r["identificador"].isdigit() and "Fútbol" in r["actividad"]]
 		self.assertEqual(len(match), 1)
 
 	def test_get_panel_lists_metricas_sin_cuotas_inline(self) -> None:

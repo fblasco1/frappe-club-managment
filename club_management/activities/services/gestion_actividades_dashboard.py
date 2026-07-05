@@ -23,6 +23,33 @@ SOCIO_DOCTYPE = "Socio"
 APTO_ALERTA_CANTIDAD = 50
 OCUPACION_ALERTA_ROJA = 90.0
 
+OCUPACION_SEGMENT_COLORS = (
+	"#5e64ff",
+	"#29cd42",
+	"#f39c12",
+	"#e74c3c",
+	"#9b59b6",
+	"#1abc9c",
+	"#3498db",
+	"#e67e22",
+	"#8e44ad",
+	"#16a085",
+	"#d35400",
+	"#c0392b",
+	"#2c3e50",
+	"#7f8c8d",
+	"#27ae60",
+	"#2980b9",
+	"#f1c40f",
+	"#e84393",
+	"#00cec9",
+	"#6c5ce7",
+	"#fd79a8",
+	"#00b894",
+	"#636e72",
+	"#a29bfe",
+)
+
 
 def _pct(numerator: float, denominator: float) -> float:
 	if denominator <= 0:
@@ -244,6 +271,10 @@ def get_aptos_vencidos_payload() -> dict[str, Any]:
 	}
 
 
+def _ocupacion_segment_color(index: int) -> str:
+	return OCUPACION_SEGMENT_COLORS[index % len(OCUPACION_SEGMENT_COLORS)]
+
+
 def get_ocupacion_por_deporte_payload(*, actividad: str | None = None) -> dict[str, Any]:
 	rows = _inscripciones_activas_rows(actividad=actividad)
 	by_actividad: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -257,18 +288,69 @@ def get_ocupacion_por_deporte_payload(*, actividad: str | None = None) -> dict[s
 	for segments in by_actividad.values():
 		segmentos_set.update(segments)
 	segmentos = sorted(segmentos_set)
+	color_by_segmento = {
+		segmento: _ocupacion_segment_color(index) for index, segmento in enumerate(segmentos)
+	}
+	titulo_map: dict[str, str] = {}
+	grupo_titulo_map: dict[str, str] = {}
+	if actividades:
+		for row in frappe.get_all(
+			ACTIVIDAD_DOCTYPE,
+			filters={"name": ["in", actividades]},
+			fields=["name", "titulo"],
+		):
+			titulo_map[row["name"]] = row.get("titulo") or row["name"]
+	if segmentos:
+		grupo_ids = [segmento for segmento in segmentos if segmento != frappe._("Sin grupo")]
+		if grupo_ids:
+			for row in frappe.get_all(
+				GRUPO_DOCTYPE,
+				filters={"name": ["in", grupo_ids]},
+				fields=["name", "titulo"],
+			):
+				grupo_titulo_map[row["name"]] = row.get("titulo") or row["name"]
+
+	def _grupo_label(segmento: str) -> str:
+		if segmento == frappe._("Sin grupo"):
+			return segmento
+		return grupo_titulo_map.get(segmento, segmento)
+
+	composicion: dict[str, list[dict[str, Any]]] = {}
+	for act in actividades:
+		segmentos_actividad = []
+		for segmento, cantidad in sorted(by_actividad[act].items()):
+			if cantidad <= 0:
+				continue
+			segmentos_actividad.append(
+				{
+					"grupo": segmento,
+					"grupo_label": _grupo_label(segmento),
+					"inscriptos": cantidad,
+					"color": color_by_segmento[segmento],
+				}
+			)
+		composicion[act] = segmentos_actividad
+
 	datasets = []
 	for segmento in segmentos:
 		datasets.append(
 			{
-				"name": segmento,
+				"name": _grupo_label(segmento),
 				"values": [by_actividad[act].get(segmento, 0) for act in actividades],
+				"color": color_by_segmento[segmento],
 			}
 		)
+
 	return {
 		"disponible": bool(actividades),
 		"labels": actividades,
+		"label_titulos": [titulo_map.get(act, act) for act in actividades],
 		"datasets": datasets,
+		"colors": [color_by_segmento[segmento] for segmento in segmentos],
+		"composicion": composicion,
+		"actividades_filtro": [
+			{"name": act, "titulo": titulo_map.get(act, act)} for act in actividades
+		],
 	}
 
 

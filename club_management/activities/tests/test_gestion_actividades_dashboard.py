@@ -158,6 +158,54 @@ class TestGestionActividadesDashboardKpis(MembersTestCase):
 		self.assertIn(actividad.name, data["labels"])
 		self.assertEqual(len(data["datasets"]), 2)
 
+	def test_ocupacion_por_deporte_colores_y_composicion(self) -> None:
+		actividad = frappe.get_doc(
+			{
+				"doctype": "Actividad",
+				"titulo": "Dash Test Colores Composición",
+				"habilitada": 1,
+				"usa_grupos": 1,
+			}
+		).insert(ignore_permissions=True)
+		rojo = frappe.get_doc(
+			{
+				"doctype": "Grupo Actividad",
+				"actividad": actividad.name,
+				"titulo": "Rojo",
+				"habilitada": 1,
+			}
+		).insert(ignore_permissions=True)
+		verde = frappe.get_doc(
+			{
+				"doctype": "Grupo Actividad",
+				"actividad": actividad.name,
+				"titulo": "Verde",
+				"habilitada": 1,
+			}
+		).insert(ignore_permissions=True)
+		s1 = insert_socio(dni="76010042", email="dash.rojo@example.com", estado="Activo")
+		s2 = insert_socio(dni="76010043", email="dash.verde1@example.com", estado="Activo")
+		s3 = insert_socio(dni="76010044", email="dash.verde2@example.com", estado="Activo")
+		self._inscribir(s1.name, actividad.name, grupo=rojo.name)
+		self._inscribir(s2.name, actividad.name, grupo=verde.name)
+		self._inscribir(s3.name, actividad.name, grupo=verde.name)
+		data = get_ocupacion_por_deporte_payload(actividad=actividad.name)
+		self.assertEqual(len(data["colors"]), 2)
+		self.assertNotEqual(data["colors"][0], data["colors"][1])
+		self.assertNotIn("#000000", [c.lower() for c in data["colors"]])
+		for dataset in data["datasets"]:
+			self.assertIn("color", dataset)
+		composicion = data["composicion"][actividad.name]
+		self.assertEqual(len(composicion), 2)
+		self.assertEqual(sum(row["inscriptos"] for row in composicion), 3)
+		for row in composicion:
+			self.assertIn("grupo_label", row)
+		grupos_label = {row["grupo_label"] for row in composicion}
+		self.assertIn("Rojo", grupos_label)
+		self.assertIn("Verde", grupos_label)
+		self.assertEqual(len(data["actividades_filtro"]), 1)
+		self.assertEqual(data["actividades_filtro"][0]["titulo"], actividad.titulo)
+
 	def test_lista_espera_top_agrupa(self) -> None:
 		actividad = self._actividad_sin_grupos("Dash Test Espera", capacidad=1)
 		s1 = insert_socio(dni="76010050", email="dash.es1@example.com", estado="Activo")

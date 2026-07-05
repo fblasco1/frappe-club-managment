@@ -9,6 +9,7 @@ ITEM_PATIN_INTERMEDIO = "ICDPE-PATIN-INTERMEDIO"
 ITEM_PATIN_MINI = "ICDPE-PATIN-MINI"
 ITEM_PATIN_TEENS = "ICDPE-PATIN-TEENS"
 ITEM_PATIN_DANZA = "ICDPE-PATIN-DANZA"
+ITEM_PATIN_ADULTO = "ICDPE-PATIN-ADULTO"
 
 CC_PATIN = "Deportes - Patin - ICDPE"
 
@@ -18,4 +19,5 @@ PATIN_ITEM_SPECS: tuple[ArancelItemSpec, ...] = (
 	ArancelItemSpec(ITEM_PATIN_MINI, "Arancel mensual patín — mini", 20500.0, CC_PATIN),
 	ArancelItemSpec(ITEM_PATIN_TEENS, "Arancel mensual patín — teens", 20500.0, CC_PATIN),
 	ArancelItemSpec(ITEM_PATIN_DANZA, "Arancel mensual patín — danza", 29500.0, CC_PATIN),
+	ArancelItemSpec(ITEM_PATIN_ADULTO, "Arancel mensual patín — adulto", 26500.0, CC_PATIN),
 )

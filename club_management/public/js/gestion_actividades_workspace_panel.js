@@ -12,6 +12,8 @@
 		_dashboard: null,
 		_dashboard_actividad: "",
 		_chart_ocupacion: null,
+		_ocupacion_raw: null,
+		_ocupacion_actividades_ocultas: null,
 		_selected_actividad: null,
 		_grupo_expandido: null,
 		_filter: "",
@@ -20,6 +22,238 @@
 
 		_storage_key(name) {
 			return `club_actividades_panel_${name}`;
+		},
+
+		_ocupacion_storage_key() {
+			return this._storage_key("ocupacion_ocultas");
+		},
+
+		load_ocupacion_ocultas() {
+			if (this._ocupacion_actividades_ocultas) {
+				return this._ocupacion_actividades_ocultas;
+			}
+			try {
+				const raw = sessionStorage.getItem(this._ocupacion_storage_key());
+				this._ocupacion_actividades_ocultas = raw ? new Set(JSON.parse(raw)) : new Set();
+			} catch (_e) {
+				this._ocupacion_actividades_ocultas = new Set();
+			}
+			return this._ocupacion_actividades_ocultas;
+		},
+
+		persist_ocupacion_ocultas() {
+			try {
+				const ocultas = this.load_ocupacion_ocultas();
+				sessionStorage.setItem(this._ocupacion_storage_key(), JSON.stringify([...ocultas]));
+			} catch (_e) {
+				/* ignore */
+			}
+		},
+
+		prune_ocupacion_ocultas(ocupacion) {
+			const ocultas = this.load_ocupacion_ocultas();
+			const valid = new Set(ocupacion?.labels || []);
+			let changed = false;
+			for (const act of [...ocultas]) {
+				if (!valid.has(act)) {
+					ocultas.delete(act);
+					changed = true;
+				}
+			}
+			if (changed) {
+				this.persist_ocupacion_ocultas();
+			}
+		},
+
+		filter_ocupacion_payload(ocupacion) {
+			if (!ocupacion?.disponible) {
+				return ocupacion;
+			}
+			this.prune_ocupacion_ocultas(ocupacion);
+			const ocultas = this.load_ocupacion_ocultas();
+			const indices = (ocupacion.labels || [])
+				.map((label, index) => (ocultas.has(label) ? -1 : index))
+				.filter((index) => index >= 0);
+			if (indices.length === (ocupacion.labels || []).length) {
+				return ocupacion;
+			}
+			return {
+				...ocupacion,
+				labels: indices.map((index) => ocupacion.labels[index]),
+				label_titulos: indices.map(
+					(index) => (ocupacion.label_titulos || ocupacion.labels)[index]
+				),
+			};
+		},
+
+		render_ocupacion_filtros(ocupacion) {
+			const actividades = ocupacion?.actividades_filtro || [];
+			if (!actividades.length) {
+				return "";
+			}
+			const ocultas = this.load_ocupacion_ocultas();
+			const chips = actividades
+				.map((act) => {
+					const checked = !ocultas.has(act.name);
+					return `
+					<label class="club-actividades-ocupacion-filter">
+						<input type="checkbox" class="club-actividades-ocupacion-filter-item" value="${frappe.utils.escape_html(act.name)}" ${checked ? "checked" : ""}>
+						<span>${frappe.utils.escape_html(act.titulo || act.name)}</span>
+					</label>`;
+				})
+				.join("");
+			return `
+				<div class="club-actividades-ocupacion-filters">
+					<div class="club-actividades-ocupacion-filters-head">
+						<span class="small text-muted">${__("Mostrar actividades")}</span>
+						<div class="club-actividades-ocupacion-filters-actions">
+							<button type="button" class="btn btn-link btn-sm p-0 club-actividades-ocupacion-all">${__("Todas")}</button>
+							<span class="text-muted">·</span>
+							<button type="button" class="btn btn-link btn-sm p-0 club-actividades-ocupacion-none">${__("Ninguna")}</button>
+						</div>
+					</div>
+					<div class="club-actividades-ocupacion-filters-list">${chips}</div>
+				</div>`;
+		},
+
+		destroy_ocupacion_chart() {
+			const parent = this._chart_ocupacion?.parent;
+			if (parent) {
+				parent.innerHTML = "";
+			}
+			if (parent) {
+				$(parent).closest(".club-actividades-chart-ocupacion").find(".club-actividades-ocupacion-tip").remove();
+			}
+			this._chart_ocupacion = null;
+		},
+
+		setup_ocupacion_tooltip(chart, $wrap, ocupacion) {
+			const composicion = ocupacion.composicion || {};
+			const labels = ocupacion.labels || [];
+			const titulos = ocupacion.label_titulos || labels;
+			const $canvas = $wrap.find(".club-actividades-chart-ocupacion-canvas");
+			let $tip = $wrap.find(".club-actividades-ocupacion-tip");
+			if (!$tip.length) {
+				$tip = $('<div class="club-actividades-ocupacion-tip"></div>').appendTo($wrap);
+			}
+			const hideTip = () => {
+				$tip.removeClass("is-visible");
+			};
+			const segmentos_from_chart = (listValues) =>
+				(listValues || [])
+					.filter((row) => (row.value || 0) > 0)
+					.map((row) => ({
+						grupo_label: row.title,
+						inscriptos: row.value,
+						color: row.color || "#636e72",
+					}));
+			chart.tip.setValues = (x, y, title, listValues, index) => {
+				const actividad = labels[index];
+				const segmentos = composicion[actividad]?.length
+					? composicion[actividad]
+					: segmentos_from_chart(listValues);
+				if (!segmentos.length) {
+					hideTip();
+					return;
+				}
+				const total = segmentos.reduce((sum, row) => sum + (row.inscriptos || 0), 0);
+				const rows = segmentos
+					.map(
+						(row) => `
+					<li>
+						<span class="club-actividades-ocupacion-tip-dot" style="background:${row.color};"></span>
+						<span class="club-actividades-ocupacion-tip-label">${frappe.utils.escape_html(row.grupo_label || row.grupo || "")}</span>
+						<strong class="club-actividades-ocupacion-tip-value">${row.inscriptos ?? 0}</strong>
+					</li>`
+					)
+					.join("");
+				$tip.html(`
+					<div class="club-actividades-ocupacion-tip-title">${frappe.utils.escape_html(titulos[index] || title.name || "")}</div>
+					<div class="club-actividades-ocupacion-tip-total">${total} ${__("inscriptos")}</div>
+					<ul class="club-actividades-ocupacion-tip-list">${rows}</ul>
+				`);
+				$tip.addClass("is-visible");
+				const canvasOffset = $canvas.position();
+				const wrapWidth = $wrap.innerWidth();
+				const tipWidth = $tip.outerWidth();
+				let left = canvasOffset.left + x - tipWidth / 2;
+				left = Math.max(8, Math.min(left, wrapWidth - tipWidth - 8));
+				const top = Math.max(8, canvasOffset.top + y - $tip.outerHeight() - 12);
+				$tip.css({ left, top });
+			};
+			chart.tip.showTip = () => {};
+			chart.tip.hideTip = hideTip;
+			$wrap.off("mouseleave.clubOcupacionTip").on("mouseleave.clubOcupacionTip", hideTip);
+		},
+
+		mount_ocupacion_chart($panel, ocupacion) {
+			this.destroy_ocupacion_chart();
+			const filtered = this.filter_ocupacion_payload(ocupacion);
+			const $ocup = $panel.find(".club-actividades-chart-ocupacion");
+			if (!$ocup.length || !filtered?.disponible || !filtered.labels?.length) {
+				if ($ocup.length) {
+					$ocup.empty();
+				}
+				return;
+			}
+			$ocup.html('<div class="club-actividades-chart-ocupacion-canvas"></div>');
+			const $canvas = $ocup.find(".club-actividades-chart-ocupacion-canvas");
+			const visibleIndices = filtered.labels.map((label) => (ocupacion.labels || []).indexOf(label));
+			const colors = filtered.colors || (ocupacion.datasets || []).map((ds) => ds.color).filter(Boolean);
+			this._chart_ocupacion = new frappe.Chart($canvas[0], {
+				type: "bar",
+				height: 260,
+				colors,
+				truncateLegends: 0,
+				data: {
+					labels: filtered.label_titulos || filtered.labels,
+					datasets: (ocupacion.datasets || []).map((ds) => ({
+						name: ds.name,
+						values: visibleIndices.map((index) => (ds.values || [])[index] || 0),
+					})),
+				},
+				barOptions: { stacked: 1, spaceRatio: 0.45 },
+				axisOptions: { shortenYAxisNumbers: 1 },
+			});
+			this.setup_ocupacion_tooltip(this._chart_ocupacion, $ocup, filtered);
+		},
+
+		refresh_ocupacion_chart($panel) {
+			if (!this._ocupacion_raw) {
+				return;
+			}
+			this.mount_ocupacion_chart($panel, this._ocupacion_raw);
+		},
+
+		bind_ocupacion_filtros($panel) {
+			const sync_from_inputs = () => {
+				const ocultas = new Set();
+				$panel.find(".club-actividades-ocupacion-filter-item").each((_i, el) => {
+					if (!el.checked) {
+						ocultas.add(el.value);
+					}
+				});
+				this._ocupacion_actividades_ocultas = ocultas;
+				this.persist_ocupacion_ocultas();
+				this.refresh_ocupacion_chart($panel);
+			};
+			$panel.off(".clubOcupacionFilter");
+			$panel.on("change.clubOcupacionFilter", ".club-actividades-ocupacion-filter-item", sync_from_inputs);
+			$panel.on("click.clubOcupacionFilter", ".club-actividades-ocupacion-all", (e) => {
+				e.preventDefault();
+				this._ocupacion_actividades_ocultas = new Set();
+				this.persist_ocupacion_ocultas();
+				$panel.find(".club-actividades-ocupacion-filter-item").prop("checked", true);
+				this.refresh_ocupacion_chart($panel);
+			});
+			$panel.on("click.clubOcupacionFilter", ".club-actividades-ocupacion-none", (e) => {
+				e.preventDefault();
+				const all = (this._ocupacion_raw?.labels || []).slice();
+				this._ocupacion_actividades_ocultas = new Set(all);
+				this.persist_ocupacion_ocultas();
+				$panel.find(".club-actividades-ocupacion-filter-item").prop("checked", false);
+				this.refresh_ocupacion_chart($panel);
+			});
 		},
 
 		load_persisted_state() {
@@ -299,7 +533,11 @@
 			const infra = data.infraestructura || {};
 			const lista = data.lista_espera || {};
 			const ocupacionHtml = ocupacion.disponible
-				? `<div class="club-actividades-chart-card club-actividades-chart-card--wide"><h6>${__("Ocupación por deporte / categoría")}</h6><div class="club-actividades-chart-ocupacion"></div></div>`
+				? `<div class="club-actividades-chart-card club-actividades-chart-card--wide">
+					<h6>${__("Ocupación por deporte / categoría")}</h6>
+					${this.render_ocupacion_filtros(ocupacion)}
+					<div class="club-actividades-chart-ocupacion"></div>
+				</div>`
 				: "";
 			const listaRows = (lista.filas || [])
 				.map(
@@ -337,25 +575,9 @@
 		},
 
 		mount_dashboard_charts($panel, data) {
-			this._chart_ocupacion = null;
 			const ocupacion = data.ocupacion_por_deporte || {};
-			const $ocup = $panel.find(".club-actividades-chart-ocupacion");
-			if ($ocup.length && ocupacion.disponible && ocupacion.labels?.length) {
-				this._chart_ocupacion = new frappe.Chart($ocup[0], {
-					type: "bar",
-					height: 260,
-					colors: ["#5e64ff", "#29cd42", "#f39c12", "#e74c3c", "#9b59b6"],
-					data: {
-						labels: ocupacion.labels,
-						datasets: (ocupacion.datasets || []).map((ds) => ({
-							name: ds.name,
-							values: ds.values,
-						})),
-					},
-					barOptions: { stacked: 1, spaceRatio: 0.45 },
-					axisOptions: { shortenYAxisNumbers: 1 },
-				});
-			}
+			this._ocupacion_raw = ocupacion.disponible ? ocupacion : null;
+			this.mount_ocupacion_chart($panel, ocupacion);
 		},
 
 		render_dashboard_filters(actividades) {
@@ -390,6 +612,7 @@
 			`);
 			this.mount_dashboard_charts($panel, data);
 			this.bind_dashboard_handlers($panel, data);
+			this.bind_ocupacion_filtros($panel);
 		},
 
 		bind_dashboard_handlers($panel, data) {

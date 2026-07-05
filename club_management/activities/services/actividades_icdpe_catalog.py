@@ -57,6 +57,7 @@ ACTIVIDADES_CON_GRUPOS: frozenset[str] = frozenset(
 		"Boxeo",
 		"Yoga",
 		"Gimnasio Fitness",
+		"Funcional",
 	}
 )
 

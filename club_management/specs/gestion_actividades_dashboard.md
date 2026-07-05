@@ -76,6 +76,35 @@ Then ve un gráfico de barras apiladas con inscriptos por disciplina y segmento 
 
 ---
 
+## Scenario: filtro de actividades en gráfico de ocupación
+
+Given el gráfico de ocupación por deporte / categoría con varias disciplinas
+When Secretaria desmarca una o más actividades en el filtro del gráfico
+Then esas actividades dejan de mostrarse en el gráfico
+And los KPIs y el resto del dashboard no cambian
+And la selección se conserva al recargar el panel en la misma sesión.
+
+---
+
+## Scenario: tooltip con composición por actividad
+
+Given una actividad con inscripciones en uno o más grupos / tiras
+When Secretaria pasa el cursor sobre la barra de esa actividad
+Then el tooltip muestra el título de la actividad y el total de inscriptos
+And lista cada grupo / tira con su cantidad y color del segmento
+And no incluye grupos con cero inscriptos en esa actividad.
+
+---
+
+## Scenario: color distinto por grupo en gráfico de ocupación
+
+Given una actividad con más de un grupo / tira con inscripciones activas
+When Secretaria consulta el gráfico de ocupación
+Then cada segmento (grupo) tiene un color asignado de forma estable
+And ningún segmento usa el color negro por defecto por falta de paleta.
+
+---
+
 ## Scenario: lista de espera top 5
 
 Given `Lista Espera Actividad` con `estado = En espera` en nodos sin cupo disponible
