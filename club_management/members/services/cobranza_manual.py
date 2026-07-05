@@ -219,8 +219,16 @@ def build_invoice_items_for_socio(
 		)
 
 	monto, item_cuota = resolve_cuota_social(socio_name)
+	beca = None
+	try:
+		from club_management.members.services.beca_socio import beca_vigente_socio
+
+		beca = beca_vigente_socio(socio_name, reference_date=ref)
+	except Exception:
+		beca = None
 	if monto > 0 and item_cuota:
-		_append_item(item_cuota, monto, _("Cuota social"))
+		rate_cuota = beca.rate_cuota(monto) if beca else monto
+		_append_item(item_cuota, rate_cuota, _("Cuota social"))
 
 	if incluir_actividades:
 		for ins in frappe.get_all(
@@ -230,7 +238,10 @@ def build_invoice_items_for_socio(
 		):
 			item_code, monto = resolve_monto_arancel_inscripcion(ins)
 			if item_code:
-				_append_item(item_code, monto, _("Arancel actividad"))
+				if beca and beca.exime_arancel:
+					continue
+				rate_arancel = beca.rate_arancel(monto) if beca else monto
+				_append_item(item_code, rate_arancel, _("Arancel actividad"))
 
 	if incluir_cargos_extra:
 		for row in _cargos_extra_items_for_socio(socio_name, reference_date=reference_date):
@@ -339,7 +350,7 @@ def _lineas_factura_pendiente(invoice_name: str) -> list[dict[str, Any]]:
 		"Sales Invoice Item",
 		filters={"parent": invoice_name},
 		fields=["item_code", "description", "amount"],
-		order_by="idx asc",
+		order_by="`tabSales Invoice Item`.idx asc",
 	)
 	lineas: list[dict[str, Any]] = []
 	for row in rows:

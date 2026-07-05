@@ -177,3 +177,11 @@ def list_inscripciones_socio(
 def baja_inscripcion(inscripcion: str, motivo: str | None = None) -> dict[str, Any]:
 	ensure_secretaria_operacion_access()
 	return baja_inscripcion_desk(inscripcion, motivo=motivo)
+
+
+@frappe.whitelist()
+def list_becas_socio(socio: str) -> list[dict[str, Any]]:
+	ensure_secretaria_operacion_access()
+	from club_management.members.services.beca_socio import list_becas_socio_desk
+
+	return list_becas_socio_desk(socio)

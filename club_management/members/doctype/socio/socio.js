@@ -21,6 +21,7 @@ frappe.ui.form.on("Socio", {
 		}
 		club_management_socio_desk.add_operaciones_buttons(frm);
 		club_management_socio_desk.render_inscripciones(frm);
+		club_management_socio_desk.render_becas(frm);
 		club_management_socio_desk.render_deuda_pendiente(frm);
 	},
 });
@@ -115,6 +116,9 @@ club_management_socio_desk.add_operaciones_buttons = function (frm) {
 			() => club_management_socio_desk.prompt_motivo(frm, "dar_baja", { require_motivo: true }),
 			group
 		);
+	}
+	if (estado !== "Baja") {
+		frm.add_custom_button(__("Crear beca"), () => club_management_socio_desk.crear_beca(frm), group);
 	}
 
 	const cobranza = __("Cobranza manual");
@@ -252,6 +256,110 @@ club_management_socio_desk.load_grupos = function (d) {
 club_management_socio_desk.nuevo_cargo_extra = function (frm) {
 	frappe.route_options = { socio: frm.doc.name };
 	frappe.new_doc("Cargo Socio");
+};
+
+club_management_socio_desk.crear_beca = function (frm) {
+	frappe.route_options = { socio: frm.doc.name };
+	frappe.new_doc("Beca Socio");
+};
+
+club_management_socio_desk._vigencia_indicator = function (label) {
+	const map = {
+		Vigente: "green",
+		Pendiente: "blue",
+		Vencida: "grey",
+		Cancelada: "red",
+	};
+	return map[label] || "orange";
+};
+
+club_management_socio_desk.render_becas = function (frm) {
+	if (!frm.fields_dict.actividad || frm.is_new()) {
+		return;
+	}
+
+	const $section = frm.fields_dict.actividad.$wrapper.closest(".form-section");
+	let $panel = $section.find(".club-becas-panel");
+	if (!$panel.length) {
+		$panel = $('<div class="club-becas-panel" style="margin-top: 1rem;"></div>');
+		const $inscripciones = $section.find(".club-inscripciones-panel");
+		if ($inscripciones.length) {
+			$inscripciones.after($panel);
+		} else {
+			frm.fields_dict.actividad.$wrapper.after($panel);
+		}
+	}
+
+	$panel.html(`<p class="text-muted small">${__("Cargando becas…")}</p>`);
+
+	frappe.call({
+		method: "club_management.members.api.socio_operaciones_desk.list_becas_socio",
+		args: { socio: frm.doc.name },
+		callback(r) {
+			if (r.exc) {
+				$panel.empty();
+				return;
+			}
+			const rows = r.message || [];
+			if (!rows.length) {
+				$panel.html(
+					`<div class="text-muted small">${__("Sin becas asignadas.")}</div>`
+				);
+				return;
+			}
+
+			const $title = $(`<h6 class="mb-2">${__("Becas asignadas")}</h6>`);
+			const $table = $(`
+				<table class="table table-bordered table-sm club-becas-table">
+					<thead>
+						<tr>
+							<th>${__("Tipo")}</th>
+							<th>${__("Cuota %")}</th>
+							<th>${__("Arancel %")}</th>
+							<th>${__("Desde")}</th>
+							<th>${__("Hasta")}</th>
+							<th>${__("Estado")}</th>
+							<th>${__("Vigencia")}</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody></tbody>
+				</table>
+			`);
+			const $tbody = $table.find("tbody");
+
+			rows.forEach((row) => {
+				const vigencia = frappe.utils.escape_html(row.vigencia_label || "");
+				const indicator = club_management_socio_desk._vigencia_indicator(row.vigencia_label);
+				const cuota =
+					row.tipo_beca === "Total" || row.tipo_beca === "Parcial Exime Cuota"
+						? "100"
+						: String(row.pct_cuota_social ?? 0);
+				const arancel =
+					row.tipo_beca === "Total" || row.tipo_beca === "Parcial Exime Arancel"
+						? "100"
+						: String(row.pct_arancel ?? 0);
+				const $tr = $(`
+					<tr data-beca="${frappe.utils.escape_html(row.name)}">
+						<td>${frappe.utils.escape_html(row.tipo_beca || "")}</td>
+						<td>${frappe.utils.escape_html(cuota)}</td>
+						<td>${frappe.utils.escape_html(arancel)}</td>
+						<td>${frappe.datetime.str_to_user(row.fecha_desde) || ""}</td>
+						<td>${frappe.datetime.str_to_user(row.fecha_hasta) || ""}</td>
+						<td>${frappe.utils.escape_html(row.estado || "")}</td>
+						<td><span class="indicator-pill ${indicator} filterable">${vigencia}</span></td>
+						<td class="text-right"></td>
+					</tr>
+				`);
+				const $btn = $(`<button type="button" class="btn btn-xs btn-default">${__("Ver")}</button>`);
+				$btn.on("click", () => frappe.set_route("Form", "Beca Socio", row.name));
+				$tr.find("td:last").append($btn);
+				$tbody.append($tr);
+			});
+
+			$panel.empty().append($title, $table);
+		},
+	});
 };
 
 club_management_socio_desk.generar_cargo = function (frm) {
