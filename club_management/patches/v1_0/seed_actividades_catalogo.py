@@ -8,6 +8,6 @@ from club_management.activities.services.actividades_icdpe_catalog import sync_a
 
 
 def execute() -> None:
-	if not frappe.db.table_exists("tabActividad"):
+	if not frappe.db.table_exists("Actividad"):
 		return
 	sync_actividades_catalogo_icdpe(deshabilitar_legacy=True)

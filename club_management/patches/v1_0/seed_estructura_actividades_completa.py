@@ -10,6 +10,6 @@ from club_management.activities.services.estructura_actividades_seed import (
 
 
 def execute() -> None:
-	if not frappe.db.table_exists("tabActividad"):
+	if not frappe.db.table_exists("Actividad"):
 		return
 	seed_estructura_actividades_completa(crear_equipos=True)

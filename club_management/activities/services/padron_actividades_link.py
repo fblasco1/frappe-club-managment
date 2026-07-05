@@ -11,6 +11,12 @@ from typing import Any
 import frappe
 from frappe import _
 
+from club_management.activities.services.basquet_unified_map import (
+	BASQUET_ACTIVIDAD,
+	map_padron_basquet_grupo,
+	normalize_basquet_seleccion,
+	normalize_escuelita_equipo,
+)
 from club_management.activities.services.inscripcion_socio import inscribir_socio_selecciones
 from club_management.activities.services.estructura_actividades_seed import (
 	seed_estructura_actividades_completa,
@@ -52,7 +58,7 @@ _PRESETS: dict[str, dict[str, str]] = {
 	"TABI": {"actividad": "Futbol", "grupo": "TABI A"},
 	"FAFI": {"actividad": "Futbol", "grupo": "FAFI"},
 	"TABI B": {"actividad": "Futbol", "grupo": "TABI B"},
-	"BASQUET ESCUELITA": {"actividad": "Basquet Escuelita", "grupo": "Mixta"},
+	"BASQUET ESCUELITA": {"actividad": BASQUET_ACTIVIDAD, "grupo": "Mixto / Escuela"},
 	"DANZA": {"actividad": "Danza"},
 	"TAEKWONDO": {"actividad": "Taekwondo"},
 	"SHUI LU": {"actividad": "Shui Lu"},
@@ -102,18 +108,21 @@ def parse_actividad_mapeada(label: str) -> dict[str, str]:
 	"""Convierte una etiqueta del CSV en selección para `inscribir_socio_selecciones`."""
 	key = _normalize_key(label)
 	if key in _PRESETS:
-		return dict(_PRESETS[key])
+		return normalize_basquet_seleccion(**_PRESETS[key])
 
 	parts = [_normalize_label(part) for part in label.split("|") if _normalize_label(part)]
 	if not parts:
 		frappe.throw(_("Etiqueta de actividad vacía"))
 
 	if len(parts) >= 3:
-		return {
-			"actividad": _title_actividad(parts[0]),
-			"grupo": _title_grupo(parts[1]),
-			"equipo": parts[2].strip(),
-		}
+		actividad = _title_actividad(parts[0])
+		grupo = map_padron_basquet_grupo(actividad, _title_grupo(parts[1]))
+		equipo = parts[2].strip()
+		if actividad in {BASQUET_ACTIVIDAD, "Basquet Masculino", "Basquet Escuelita", "Basquet Femenino"}:
+			actividad = BASQUET_ACTIVIDAD
+			if grupo == "Mixto / Escuela":
+				equipo = normalize_escuelita_equipo(equipo)
+		return normalize_basquet_seleccion(actividad=actividad, grupo=grupo, equipo=equipo)
 
 	if len(parts) == 2:
 		left, right = parts[0].upper(), parts[1].upper()
@@ -124,7 +133,7 @@ def parse_actividad_mapeada(label: str) -> dict[str, str]:
 			return {
 				"actividad": "Voley Femenino",
 				"grupo": "Tira",
-				"equipo": _title_equipo(parts[1]),
+				"equipo": _title_grupo(parts[1]),
 			}
 		return {
 			"actividad": _title_actividad(parts[0]),
@@ -136,8 +145,10 @@ def parse_actividad_mapeada(label: str) -> dict[str, str]:
 
 def _title_actividad(value: str) -> str:
 	mapping = {
-		"BASQUET MASCULINO": "Basquet Masculino",
-		"BASQUET ESCUELITA": "Basquet Escuelita",
+		"BASQUET MASCULINO": BASQUET_ACTIVIDAD,
+		"BASQUET ESCUELITA": BASQUET_ACTIVIDAD,
+		"BASQUET FEMENINO": BASQUET_ACTIVIDAD,
+		"BASQUET": BASQUET_ACTIVIDAD,
 		"VOLEY": "Voley Femenino",
 		"PATIN ARTISTICO": "Patin Artistico",
 		"PATIN ARTÍSTICO": "Patin Artistico",

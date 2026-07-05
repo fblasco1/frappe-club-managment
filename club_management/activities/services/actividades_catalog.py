@@ -13,7 +13,7 @@ ESTADO_SOCIO_PENDIENTE_INSCRIPCION = "Pendiente de Inscripción"
 
 def list_actividades_portal() -> list[dict[str, str]]:
 	"""Actividades habilitadas para UI pública (`value` = `name` del DocType)."""
-	if frappe.db.table_exists("tabActividad"):
+	if frappe.db.table_exists("Actividad"):
 		rows = frappe.get_all(
 			"Actividad",
 			filters={"habilitada": 1},

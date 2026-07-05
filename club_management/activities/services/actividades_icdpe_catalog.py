@@ -23,9 +23,7 @@ class ActividadCatalogEntry:
 
 # Orden y títulos acordados con Secretaría / plan de cuentas ICDPE.
 ACTIVIDADES_CATALOGO_ICDPE: tuple[ActividadCatalogEntry, ...] = (
-	ActividadCatalogEntry("Basquet Masculino", 10, "ICDPE-ARANCEL-MENSUAL-basquet-masculino"),
-	ActividadCatalogEntry("Basquet Escuelita", 15, "ICDPE-BASQUET-ESCUELITA"),
-	ActividadCatalogEntry("Basquet Femenino", 20, "ICDPE-ARANCEL-MENSUAL-basquet-femenino"),
+	ActividadCatalogEntry("Basquet", 10, "ICDPE-ARANCEL-MENSUAL-basquet-masculino"),
 	ActividadCatalogEntry("Voley Femenino", 30, "ICDPE-ARANCEL-MENSUAL-voley"),
 	ActividadCatalogEntry("Futbol", 40, "ICDPE-ARANCEL-MENSUAL-futbol"),
 	ActividadCatalogEntry("Patin Artistico", 50, "ICDPE-PATIN-MINI"),
@@ -46,9 +44,7 @@ ACTIVIDADES_CATALOGO_ICDPE: tuple[ActividadCatalogEntry, ...] = (
 # Actividades que requieren elegir grupo/tira al inscribir (el arancel va en Grupo Actividad).
 ACTIVIDADES_CON_GRUPOS: frozenset[str] = frozenset(
 	{
-		"Basquet Masculino",
-		"Basquet Escuelita",
-		"Basquet Femenino",
+		"Basquet",
 		"Voley Femenino",
 		"Futbol",
 		"Patin Artistico",
@@ -65,8 +61,8 @@ _TITULOS_OFICIALES = frozenset(e.titulo for e in ACTIVIDADES_CATALOGO_ICDPE)
 
 # Títulos del seed anterior u otras variantes → catálogo ICDPE actual.
 _LEGACY_TITULO_A_OFICIAL: dict[str, str | None] = {
-	"Básquet Masculino": "Basquet Masculino",
-	"Básquet Femenino": "Basquet Femenino",
+	"Básquet Masculino": None,
+	"Básquet Femenino": None,
 	"Fútbol": "Futbol",
 	"Vóley": "Voley Femenino",
 	"Vóley Femenino": "Voley Femenino",
@@ -79,7 +75,7 @@ _LEGACY_TITULO_A_OFICIAL: dict[str, str | None] = {
 
 
 def _relink_inscripciones_actividad(actividad_vieja: str, actividad_nueva: str) -> None:
-	if not frappe.db.table_exists("tabInscripcion Actividad"):
+	if not frappe.db.table_exists("Inscripcion Actividad"):
 		return
 	for row in frappe.get_all(
 		"Inscripcion Actividad",
@@ -93,6 +89,28 @@ def _relink_inscripciones_actividad(actividad_vieja: str, actividad_nueva: str) 
 			actividad_nueva,
 			update_modified=False,
 		)
+
+
+_LEGACY_BASQUET_TITULOS: tuple[str, ...] = (
+	"Basquet Masculino",
+	"Basquet Escuelita",
+	"Basquet Femenino",
+	"Básquet Masculino",
+	"Básquet Femenino",
+)
+
+
+def disable_legacy_basquet_actividades() -> None:
+	"""Deshabilita actividades básquet pre-unificación (inscripciones se migran aparte)."""
+	if not frappe.db.table_exists("Actividad"):
+		return
+	for titulo in _LEGACY_BASQUET_TITULOS:
+		if titulo == "Basquet":
+			continue
+		for name in frappe.get_all("Actividad", filters={"titulo": titulo}, pluck="name"):
+			if name == "Basquet":
+				continue
+			frappe.db.set_value("Actividad", name, "habilitada", 0, update_modified=True)
 
 
 def _migrate_legacy_actividades() -> None:
@@ -177,10 +195,11 @@ def sync_actividades_catalogo_icdpe(*, deshabilitar_legacy: bool = True) -> list
 	for entry in ACTIVIDADES_CATALOGO_ICDPE:
 		names.append(upsert_actividad_catalog_entry(entry))
 
-	if deshabilitar_legacy and frappe.db.table_exists("tabActividad"):
+	if deshabilitar_legacy and frappe.db.table_exists("Actividad"):
 		for row in frappe.get_all("Actividad", fields=["name", "titulo"]):
 			titulo = (row.titulo or row.name or "").strip()
 			if titulo not in _TITULOS_OFICIALES:
 				frappe.db.set_value("Actividad", row.name, "habilitada", 0, update_modified=True)
+		disable_legacy_basquet_actividades()
 
 	return names

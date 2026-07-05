@@ -18,32 +18,30 @@ from club_management.members.test_helpers import MembersTestCase, insert_socio
 
 
 class TestBasquetArancelesIcdpe(MembersTestCase):
-	def test_seed_basquet_masculino_tira_azul_u13_minibasquet(self) -> None:
+	def test_seed_basquet_masculino_azul_u13_minibasquet(self) -> None:
 		seed_estructura_actividades_completa(crear_equipos=True)
-		bm = frappe.db.get_value("Actividad", {"titulo": "Basquet Masculino"}, "name")
-		equipo = f"{bm} / Tira Azul / U13"
+		basquet = frappe.db.get_value("Actividad", {"titulo": "Basquet"}, "name")
+		equipo = f"{basquet} / Masculino / Azul / U13"
 		self.assertTrue(frappe.db.exists("Equipo Actividad", equipo))
 		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), ITEM_MINIBASQUET)
 
-	def test_seed_basquet_masculino_tira_azul_u15_formativas_azul(self) -> None:
+	def test_seed_basquet_masculino_azul_u15_formativas_azul(self) -> None:
 		seed_estructura_actividades_completa(crear_equipos=True)
-		bm = frappe.db.get_value("Actividad", {"titulo": "Basquet Masculino"}, "name")
-		equipo = f"{bm} / Tira Azul / U15"
+		basquet = frappe.db.get_value("Actividad", {"titulo": "Basquet"}, "name")
+		equipo = f"{basquet} / Masculino / Azul / U15"
 		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), ITEM_FORMATIVAS_AZUL)
 
-	def test_seed_basquet_escuelita_mixta_independiente(self) -> None:
+	def test_seed_basquet_mixto_escuela(self) -> None:
 		seed_estructura_actividades_completa(crear_equipos=True)
-		be = frappe.db.get_value("Actividad", {"titulo": "Basquet Escuelita"}, "name")
-		bm = frappe.db.get_value("Actividad", {"titulo": "Basquet Masculino"}, "name")
-		self.assertFalse(frappe.db.exists("Grupo Actividad", f"{bm} / Escuelita"))
-		equipo = f"{be} / Mixta / U7 / U9"
+		basquet = frappe.db.get_value("Actividad", {"titulo": "Basquet"}, "name")
+		equipo = f"{basquet} / Mixto / Escuela / U7 / U9"
 		self.assertTrue(frappe.db.exists("Equipo Actividad", equipo))
 		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), ITEM_ESCUELITA)
 
 	def test_resolve_arancel_desde_equipo(self) -> None:
 		seed_estructura_actividades_completa(crear_equipos=True)
-		be = frappe.db.get_value("Actividad", {"titulo": "Basquet Escuelita"}, "name")
-		grupo = f"{be} / Mixta"
+		basquet = frappe.db.get_value("Actividad", {"titulo": "Basquet"}, "name")
+		grupo = f"{basquet} / Mixto / Escuela"
 		equipo = f"{grupo} / U7 / U9"
 		if not frappe.db.exists("Item", ITEM_ESCUELITA):
 			frappe.get_doc(
@@ -63,7 +61,7 @@ class TestBasquetArancelesIcdpe(MembersTestCase):
 
 		inscribir_socio_selecciones(
 			socio.name,
-			[{"actividad": be, "grupo": grupo, "equipo": equipo}],
+			[{"actividad": basquet, "grupo": grupo, "equipo": equipo}],
 			activar=False,
 		)
 		ins_name = frappe.db.get_value(

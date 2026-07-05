@@ -97,11 +97,11 @@ def _grupo_leaf(grupo_titulo: str, orden: int, item_code: str) -> GrupoSeed:
 	return GrupoSeed(grupo_titulo, orden, equipos=(_eq(grupo_titulo, 10, item_code),))
 
 
-ESTRUCTURA_BASQUET_MASCULINO = ActividadEstructuraSeed(
-	"Basquet Masculino",
+ESTRUCTURA_BASQUET = ActividadEstructuraSeed(
+	"Basquet",
 	(
 		GrupoSeed(
-			"Tira Azul",
+			"Masculino / Azul",
 			10,
 			equipos=(
 				_eq_basquet("U9", 10, ITEM_MINIBASQUET, "PRE MINI"),
@@ -113,7 +113,7 @@ ESTRUCTURA_BASQUET_MASCULINO = ActividadEstructuraSeed(
 			),
 		),
 		GrupoSeed(
-			"Tira Amarilla",
+			"Masculino / Amarillo",
 			20,
 			equipos=(
 				_eq_basquet("U9", 10, ITEM_MINIBASQUET, "PRE MINI"),
@@ -125,7 +125,7 @@ ESTRUCTURA_BASQUET_MASCULINO = ActividadEstructuraSeed(
 			),
 		),
 		GrupoSeed(
-			"Tira Flex",
+			"Masculino / Flex",
 			30,
 			equipos=(
 				_eq_basquet("U15", 10, ITEM_FORMATIVAS_FLEX, "CADETE"),
@@ -133,15 +133,25 @@ ESTRUCTURA_BASQUET_MASCULINO = ActividadEstructuraSeed(
 				_eq_basquet("Superior C", 30, ITEM_FORMATIVAS_FLEX, 'SUPERIOR "C"'),
 			),
 		),
-	),
-)
-
-ESTRUCTURA_BASQUET_ESCUELITA = ActividadEstructuraSeed(
-	"Basquet Escuelita",
-	(
 		GrupoSeed(
-			"Mixta",
-			10,
+			"Femenino / Formativa",
+			40,
+			equipos=(
+				_eq_basquet("U9", 10, ITEM_ESCUELITA),
+				_eq_basquet("U11", 20, ITEM_ESCUELITA),
+				_eq_basquet("U13", 30, ITEM_ESCUELITA),
+				_eq_basquet("U15", 40, ITEM_ESCUELITA),
+				_eq_basquet("U17", 50, ITEM_ESCUELITA),
+			),
+		),
+		GrupoSeed(
+			"Femenino / Superior",
+			50,
+			equipos=(_eq_basquet("Superior Fem", 10, ITEM_FEMENINO_SUP),),
+		),
+		GrupoSeed(
+			"Mixto / Escuela",
+			60,
 			equipos=(
 				_eq_basquet("U7 / U9", 10, ITEM_ESCUELITA),
 				_eq_basquet("U11 / U13", 20, ITEM_ESCUELITA),
@@ -150,23 +160,6 @@ ESTRUCTURA_BASQUET_ESCUELITA = ActividadEstructuraSeed(
 	),
 )
 
-ESTRUCTURA_BASQUET_FEMENINO = ActividadEstructuraSeed(
-	"Basquet Femenino",
-	(
-		GrupoSeed(
-			"Femenino",
-			10,
-			equipos=(
-				_eq_basquet("U9", 10, ITEM_ESCUELITA),
-				_eq_basquet("U11", 20, ITEM_ESCUELITA),
-				_eq_basquet("U13", 30, ITEM_ESCUELITA),
-				_eq_basquet("U15", 40, ITEM_ESCUELITA),
-				_eq_basquet("U17", 50, ITEM_ESCUELITA),
-				_eq_basquet("Superior Fem", 60, ITEM_FEMENINO_SUP),
-			),
-		),
-	),
-)
 
 ESTRUCTURA_VOLEY_FEMENINO = ActividadEstructuraSeed(
 	"Voley Femenino",
@@ -324,9 +317,7 @@ ESTRUCTURA_FUNCIONAL = ActividadEstructuraSeed(
 
 
 ESTRUCTURA_CON_GRUPOS: tuple[ActividadEstructuraSeed, ...] = (
-	ESTRUCTURA_BASQUET_MASCULINO,
-	ESTRUCTURA_BASQUET_ESCUELITA,
-	ESTRUCTURA_BASQUET_FEMENINO,
+	ESTRUCTURA_BASQUET,
 	ESTRUCTURA_VOLEY_FEMENINO,
 	ESTRUCTURA_FUTBOL,
 	ESTRUCTURA_PATIN,

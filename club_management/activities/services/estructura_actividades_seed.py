@@ -12,6 +12,7 @@ from club_management.activities.data.estructura_actividades_club import (
 )
 from club_management.activities.services.actividades_icdpe_catalog import (
 	_resolve_actividad_docname,
+	disable_legacy_basquet_actividades,
 	resolve_item_name,
 	sync_actividades_catalogo_icdpe,
 )
@@ -150,6 +151,7 @@ def seed_estructura_actividades_completa(*, crear_equipos: bool = True) -> dict[
 				frappe.db.set_value("Grupo Actividad", row.name, "habilitada", 0, update_modified=True)
 
 	actividades_habilitadas = frappe.db.count("Actividad", {"habilitada": 1})
+	disable_legacy_basquet_actividades()
 	return {
 		"actividades": actividades_habilitadas,
 		"grupos": grupos_creados,

@@ -28,16 +28,10 @@ VALID_CATEGORIAS = frozenset({"U7", "U9", "U11", "U13", "U15", "U17", "U21", "MA
 VALID_EQUIPOS = frozenset(
 	{"Azul", "Amarillo", "Flex", "Femenino", "Escuelita", "MAYOR"}
 )
-BASQUET_ACTIVIDAD_TITLES = (
-	"Basquet Masculino",
-	"Basquet Femenino",
-	"Basquet Escuelita",
+from club_management.activities.services.basquet_unified_map import (
+	basquet_actividad_docnames,
+	map_roster_basquet_seleccion,
 )
-GRUPO_TIRA_MAP = {
-	"Azul": "Tira Azul",
-	"Amarillo": "Tira Amarilla",
-	"Flex": "Tira Flex",
-}
 
 
 @dataclass
@@ -93,52 +87,10 @@ def map_basquet_seleccion(categoria: str, equipo: str) -> dict[str, str]:
 		eq = "MAYOR"
 	if cat not in VALID_CATEGORIAS:
 		frappe.throw(_("Categoría de básquet no reconocida: {0}").format(categoria))
-
-	if eq == "Femenino":
-		equipo_titulo = "Superior Fem" if cat == "MAYOR" else ("U9" if cat == "U7" else cat)
-		return {
-			"actividad": "Basquet Femenino",
-			"grupo": "Femenino",
-			"equipo": equipo_titulo,
-		}
-
-	if eq == "Escuelita" or (cat in {"U7", "U9"} and eq not in {"Azul", "Amarillo", "Flex", "MAYOR"}):
-		equipo_titulo = "U7 / U9" if cat in {"U7", "U9"} else "U11 / U13"
-		return {
-			"actividad": "Basquet Escuelita",
-			"grupo": "Mixta",
-			"equipo": equipo_titulo,
-		}
-
-	if eq in {"Azul", "Amarillo"}:
-		equipo_titulo = "U21" if cat in {"MAYOR", "U21"} else cat
-		return {
-			"actividad": "Basquet Masculino",
-			"grupo": GRUPO_TIRA_MAP[eq],
-			"equipo": equipo_titulo,
-		}
-
-	if eq == "Flex":
-		if cat == "MAYOR":
-			equipo_titulo = "Superior C"
-		elif cat in {"U17", "U21"}:
-			equipo_titulo = "U19"
-		else:
-			equipo_titulo = "U15"
-		return {
-			"actividad": "Basquet Masculino",
-			"grupo": "Tira Flex",
-			"equipo": equipo_titulo,
-		}
-
-	if eq == "MAYOR" and cat == "MAYOR":
-		return {
-			"actividad": "Basquet Masculino",
-			"grupo": "Tira Flex",
-			"equipo": "Superior C",
-		}
-
-	frappe.throw(_("Equipo de básquet no reconocido para {0} / {1}").format(cat, equipo))
+	try:
+		return map_roster_basquet_seleccion(cat, eq)
+	except ValueError:
+		frappe.throw(_("Equipo de básquet no reconocido para {0} / {1}").format(cat, equipo))
 
 
 def resolve_seleccion_basquet(seleccion: dict[str, str]) -> dict[str, str | None]:
@@ -298,11 +250,7 @@ def _find_socio_by_dni(dni: str) -> str | None:
 def _baja_inscripciones_basquet(socio_name: str) -> None:
 	from club_management.members.services.suscripciones_socio import cancel_arancel_inscripcion
 
-	actividad_names = []
-	for title in BASQUET_ACTIVIDAD_TITLES:
-		name = frappe.db.get_value("Actividad", {"titulo": title}, "name")
-		if name:
-			actividad_names.append(name)
+	actividad_names = basquet_actividad_docnames()
 	if not actividad_names:
 		return
 

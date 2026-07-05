@@ -7,7 +7,7 @@ categoría de edad.
 **Relacionado:** `activities_jerarquia.md`, `basquet_aranceles_icdpe.md`,
 `vinculacion_basquet_roster.md`, `import_socios_actividades_padron.md`
 
-**Estado:** acordado (2026-07-05); pendiente de implementación (seed + migración).
+**Estado:** seed + migración inscripciones implementados (2026-07-05); deploy prod pendiente.
 
 ---
 

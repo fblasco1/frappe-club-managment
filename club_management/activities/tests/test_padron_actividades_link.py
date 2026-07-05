@@ -20,8 +20,8 @@ class TestPadronActividadesLink(MembersTestCase):
 
 	def test_parse_basquet_tira_u9(self) -> None:
 		sel = parse_actividad_mapeada("BASQUET MASCULINO | TIRA AZUL | U9")
-		self.assertEqual(sel["actividad"], "Basquet Masculino")
-		self.assertEqual(sel["grupo"], "Tira Azul")
+		self.assertEqual(sel["actividad"], "Basquet")
+		self.assertEqual(sel["grupo"], "Masculino / Azul")
 		self.assertEqual(sel["equipo"], "U9")
 
 	def test_parse_voley_superior_a(self) -> None:

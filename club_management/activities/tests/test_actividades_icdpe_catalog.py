@@ -15,10 +15,10 @@ from club_management.members.test_helpers import MembersTestCase
 
 
 class TestActividadesIcdpeCatalog(MembersTestCase):
-	def test_catalogo_oficial_tiene_dieciocho_actividades(self) -> None:
-		self.assertEqual(len(ACTIVIDADES_CATALOGO_ICDPE), 18)
+	def test_catalogo_oficial_tiene_dieciseis_actividades(self) -> None:
+		self.assertEqual(len(ACTIVIDADES_CATALOGO_ICDPE), 16)
 		titulos = [e.titulo for e in ACTIVIDADES_CATALOGO_ICDPE]
-		self.assertIn("Basquet Masculino", titulos)
+		self.assertIn("Basquet", titulos)
 		self.assertIn("Boxeo", titulos)
 		self.assertIn("Yoga", titulos)
 		self.assertIn("Taekwondo", titulos)
@@ -28,14 +28,26 @@ class TestActividadesIcdpeCatalog(MembersTestCase):
 
 	def test_sync_crea_actividades_habilitadas(self) -> None:
 		sync_actividades_catalogo_icdpe(deshabilitar_legacy=True)
+		official = {e.titulo for e in ACTIVIDADES_CATALOGO_ICDPE}
+		for legacy in ("Basquet Masculino", "Basquet Escuelita", "Basquet Femenino"):
+			rows = frappe.get_all(
+				"Actividad",
+				filters={"titulo": legacy},
+				fields=["name", "titulo", "habilitada"],
+			)
+			for row in rows:
+				self.assertEqual(
+					row.habilitada,
+					0,
+					msg=f"Legacy básquet sigue habilitada: {row}",
+				)
 		habilitadas = frappe.get_all(
 			"Actividad",
 			filters={"habilitada": 1},
 			pluck="titulo",
 			order_by="orden asc",
 		)
-		self.assertEqual(len(habilitadas), 18)
-		self.assertEqual(set(habilitadas), {e.titulo for e in ACTIVIDADES_CATALOGO_ICDPE})
+		self.assertEqual(set(habilitadas), official)
 		if frappe.db.exists("Actividad", "Natación"):
 			self.assertFalse(frappe.db.get_value("Actividad", "Natación", "habilitada"))
 
