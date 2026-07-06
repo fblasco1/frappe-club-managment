@@ -43,7 +43,7 @@ def _item_default_rows_for_cost_centers(cost_centers: tuple[str, ...]) -> list[d
 			filters={"selling_cost_center": cc},
 			fields=["name", "parent"],
 		):
-			rows.append({"item_code": row.parent, "row_name": row.name})
+			rows.append({"item_code": row["parent"], "row_name": row["name"]})
 	return rows
 
 
