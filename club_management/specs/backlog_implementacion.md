@@ -12,8 +12,8 @@
 
 
 
-**Última revisión MVP producción:** 2026-07-05 (deploy básquet unificado `1aedd3a`)  
-**Última actualización backlog:** 2026-07-05 (sprint chats S0–BL-3)  
+**Última revisión MVP producción:** 2026-07-06 (BL-4/BL-5 + purga básquet legacy en prod, commit `f436d2c`)  
+**Última actualización backlog:** 2026-07-06 (sprint BL-1–BL-5 cerrado)  
 
 **Destino producción:** Hetzner Cloud **CX23** (servidor aparte del devcontainer local)
 
@@ -731,7 +731,7 @@ print(result)  # facturas_creadas, errores, invoice_names
 
 | BL-3 | **Básquet — actividad única** | Media | `basquet_estructura_unificada.md` | **Hecho 2026-07-05** — seed unificado (6 grupos), migración 185 inscripciones activas en prod, roster/padrón actualizados, commit `1aedd3a`. Legacy Masculino/Femenino/Escuelita deshabilitadas. |
 
-| BL-4 | **CC ERPNext básquet** | Baja | `basquet_cost_center_consolidado.md` | **Hecho 2026-07-06** — CC único `Deportes - Basquet - ICDPE`, patch `consolidate_basquet_cost_centers`, ítems y `icdpe_create_service_items` actualizados. |
+| BL-4 | **CC ERPNext básquet** | Baja | `basquet_cost_center_consolidado.md` | **Hecho 2026-07-06** — CC único `Deportes - Basquet - ICDPE`, patch `consolidate_basquet_cost_centers`, script `verify_and_purge_basquet_legacy`; purga prod: 3 actividades, 18 grupos, 44 equipos, 3 CC (`f436d2c`). |
 
 | BL-5 | **Specs legacy básquet** | Baja | `activities_jerarquia.md`, `basquet_aranceles_icdpe.md`, `vinculacion_basquet_roster.md`, `import_socios_actividades_padron.md` | **Hecho 2026-07-06** — escenarios alineados a actividad única **Basquet**. |
 
@@ -769,6 +769,33 @@ print(result)  # facturas_creadas, errores, invoice_names
 | # | Tema | Prioridad | Notas |
 |---|------|-----------|-------|
 | BL-6 | **Portal socio cascada** | Media | UI actividad → grupo → equipo con estructura unificada (`activities_modulo.md`, Fase 3). |
+
+---
+
+## Resumen sesión 2026-07-06 — cierre sprint BL-1–BL-5
+
+### Deploy producción (tarde 2026-07-05 + mañana 2026-07-06)
+
+| Entregable | Detalle |
+|------------|---------|
+| Beca Socio | `2e5a3e9` — DocType, cobranza, panel Desk |
+| Secretaría fixes | `6389d69` — cargo extra, KPIs, login SICLUB, sidebar |
+| BL-4/BL-5 | `f436d2c` — CC unificado, specs legacy, verify/purge |
+| Verificación prod | `verify_and_purge_basquet_legacy` OK → purga legacy ejecutada |
+
+### Sprint backlog — estado final
+
+| Ítem | Estado |
+|------|--------|
+| BL-1 Beca Socio | Hecho + prod |
+| BL-2 Login SICLUB | Hecho + prod |
+| BL-3 Básquet unificado | Hecho + prod |
+| BL-4 CC ERPNext básquet | Hecho + prod + purga |
+| BL-5 Specs legacy | Hecho |
+| BL-6 Portal cascada | **Pendiente** |
+| Grupo familiar | **Pendiente** (sin spec dedicada aún) |
+
+**Retomar desde:** BL-6 o grupo familiar según prioridad Secretaría.
 
 
 
