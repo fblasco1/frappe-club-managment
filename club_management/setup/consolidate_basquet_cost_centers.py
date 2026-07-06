@@ -52,12 +52,12 @@ def _reassign_item_defaults_to_basquet_cc() -> list[str]:
 	for row in _item_default_rows_for_cost_centers(LEGACY_BASQUET_COST_CENTERS):
 		frappe.db.set_value(
 			"Item Default",
-			row.row_name,
+			row["row_name"],
 			"selling_cost_center",
 			BASQUET_COST_CENTER,
 			update_modified=False,
 		)
-		updated.append(row.item_code)
+		updated.append(row["item_code"])
 	return updated
 
 
