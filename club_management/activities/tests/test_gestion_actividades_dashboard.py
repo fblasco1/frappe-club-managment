@@ -124,6 +124,31 @@ class TestGestionActividadesDashboardKpis(MembersTestCase):
 		self.assertIn(actividad, opciones)
 		self.assertEqual(opciones[actividad].get("titulo"), titulo)
 
+	def test_ocupacion_por_deporte_ordena_por_cantidad_desc(self) -> None:
+		basquet = self._actividad_sin_grupos("Dash Test Orden Básquet")
+		futbol = self._actividad_sin_grupos("Dash Test Orden Fútbol")
+		voley = self._actividad_sin_grupos("Dash Test Orden Vóley")
+		for idx in range(3):
+			socio = insert_socio(
+				dni=f"7601007{idx}",
+				email=f"dash.ord.bas{idx}@example.com",
+				estado="Activo",
+			)
+			self._inscribir(socio.name, basquet)
+		for idx in range(2):
+			socio = insert_socio(
+				dni=f"7601008{idx}",
+				email=f"dash.ord.fut{idx}@example.com",
+				estado="Activo",
+			)
+			self._inscribir(socio.name, futbol)
+		socio = insert_socio(dni="76010090", email="dash.ord.vol@example.com", estado="Activo")
+		self._inscribir(socio.name, voley)
+
+		data = get_ocupacion_por_deporte_payload()
+		labels = [label for label in data["labels"] if label in {basquet, futbol, voley}]
+		self.assertEqual(labels, [basquet, futbol, voley])
+
 	def test_ocupacion_por_deporte_segmenta_grupos(self) -> None:
 		actividad = frappe.get_doc(
 			{

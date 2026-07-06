@@ -283,7 +283,10 @@ def get_ocupacion_por_deporte_payload(*, actividad: str | None = None) -> dict[s
 		segmento = row.get("grupo_actividad") or frappe._("Sin grupo")
 		by_actividad[act][segmento] += 1
 
-	actividades = sorted(by_actividad)
+	actividades = sorted(
+		by_actividad,
+		key=lambda act: (-sum(by_actividad[act].values()), act),
+	)
 	segmentos_set: set[str] = set()
 	for segments in by_actividad.values():
 		segmentos_set.update(segments)

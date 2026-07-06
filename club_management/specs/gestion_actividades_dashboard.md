@@ -73,6 +73,7 @@ Then **no** ve card, acción rápida ni enlace de aptos médicos.
 Given inscripciones activas agrupadas por `actividad` y `grupo_actividad` (tira / color)
 When Secretaria consulta el dashboard
 Then ve un gráfico de barras apiladas titulado **Inscripciones por deporte / actividad**
+And las barras están ordenadas de **mayor a menor** cantidad de inscripciones activas
 And el gráfico **no** muestra leyenda de grupos (el detalle por grupo/tira se ve en el tooltip al hover).
 
 ---
