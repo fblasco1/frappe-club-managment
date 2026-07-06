@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from club_management.setup.basquet_cost_center import BASQUET_COST_CENTER
+
 ITEM_MINIBASQUET = "ICDPE-BASQUET-MASCULINO-MINIBASQUET"
 ITEM_FORMATIVAS_AZUL = "ICDPE-BASQUET-MASCULINO-FORMATIVAS-AZUL"
 ITEM_FORMATIVAS_AMARILLA = "ICDPE-BASQUET-MASCULINO-FORMATIVAS-AMARILLA"
@@ -34,36 +36,36 @@ BASQUET_ITEM_SPECS: tuple[BasquetItemSpec, ...] = (
 		ITEM_MINIBASQUET,
 		"Arancel mensual básquet masculino — minibásquet",
 		28500.0,
-		"Deportes - Basquet Masculino - ICDPE",
+		BASQUET_COST_CENTER,
 	),
 	BasquetItemSpec(
 		ITEM_FORMATIVAS_AZUL,
 		"Arancel mensual básquet masculino — formativas tira azul",
 		28500.0,
-		"Deportes - Basquet Masculino - ICDPE",
+		BASQUET_COST_CENTER,
 	),
 	BasquetItemSpec(
 		ITEM_FORMATIVAS_AMARILLA,
 		"Arancel mensual básquet masculino — formativas tira amarilla",
 		26500.0,
-		"Deportes - Basquet Masculino - ICDPE",
+		BASQUET_COST_CENTER,
 	),
 	BasquetItemSpec(
 		ITEM_FORMATIVAS_FLEX,
 		"Arancel mensual básquet masculino — formativas tira flex",
 		26500.0,
-		"Deportes - Basquet Masculino - ICDPE",
+		BASQUET_COST_CENTER,
 	),
 	BasquetItemSpec(
 		ITEM_ESCUELITA,
 		"Arancel mensual básquet escuelita",
 		21000.0,
-		"Deportes - Basquet Escuelita - ICDPE",
+		BASQUET_COST_CENTER,
 	),
 	BasquetItemSpec(
 		ITEM_FEMENINO_SUP,
 		"Arancel mensual básquet femenino — superior",
 		26500.0,
-		"Deportes - Basquet Femenino - ICDPE",
+		BASQUET_COST_CENTER,
 	),
 )

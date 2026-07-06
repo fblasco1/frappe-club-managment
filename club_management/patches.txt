@@ -47,3 +47,4 @@ club_management.patches.v1_0.sync_patin_otras_actividades_aranceles_icdpe
 club_management.patches.v1_0.sync_actividades_workspace_sidebar
 club_management.patches.v1_0.create_cargos_varios_items
 club_management.patches.v1_0.seed_club_settings_recibo_icdpe
+club_management.patches.v1_0.consolidate_basquet_cost_centers

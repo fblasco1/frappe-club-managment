@@ -7,7 +7,7 @@ categoría de edad.
 **Relacionado:** `activities_jerarquia.md`, `basquet_aranceles_icdpe.md`,
 `vinculacion_basquet_roster.md`, `import_socios_actividades_padron.md`
 
-**Estado:** seed + migración inscripciones implementados (2026-07-05); deploy prod pendiente.
+**Estado:** seed + migración inscripciones + CC unificado + deploy prod (2026-07-05/06).
 
 ---
 
@@ -110,9 +110,14 @@ Then `actividad = Basquet`, `grupo = Mixto / Escuela`, equipo U7/U9 o U11/U13 se
 
 ---
 
-## Fuera de alcance (decidir en implementación)
+## Cost Center ERPNext
 
-- Consolidación de Cost Centers ERPNext (3 CC básquet → 1 CC «Deportes - Basquet»).
+Ver `basquet_cost_center_consolidado.md`: un solo CC **Deportes - Basquet - ICDPE** para todos los ítems de básquet.
+
+---
+
+## Fuera de alcance (siguiente iteración)
+
 - UI portal socio (cascada actividad → grupo → equipo).
 - Borrado físico de DocTypes legacy; solo deshabilitar actividades/grupos viejos.
 

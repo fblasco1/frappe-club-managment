@@ -58,9 +58,9 @@ def upsert_basquet_item(spec) -> str:
 
 
 def sync_basquet_icdpe_items() -> list[dict[str, str]]:
-	from club_management.setup.icdpe_company_accounts import ensure_missing_cost_centers
+	from club_management.setup.consolidate_basquet_cost_centers import ensure_basquet_unified_cost_center
 
-	ensure_missing_cost_centers()
+	ensure_basquet_unified_cost_center()
 	_ensure_uom("Servicio")
 	results: list[dict[str, str]] = []
 	for spec in BASQUET_ITEM_SPECS:

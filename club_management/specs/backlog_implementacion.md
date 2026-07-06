@@ -12,8 +12,8 @@
 
 
 
-**Última revisión MVP producción:** 2026-06-16  
-**Última actualización backlog:** 2026-07-05 (sprint chats S0–BL-2)  
+**Última revisión MVP producción:** 2026-07-05 (deploy básquet unificado `1aedd3a`)  
+**Última actualización backlog:** 2026-07-05 (sprint chats S0–BL-3)  
 
 **Destino producción:** Hetzner Cloud **CX23** (servidor aparte del devcontainer local)
 
@@ -226,6 +226,8 @@ Servicios críticos cobranza: **scheduler**, **queue-long**, **queue-short**, **
 | `cuotas_sync_erpnext.md` | [x] | Guardar cuotas → Item Price + Subscription Plan |
 
 | `activities_jerarquia.md` | [x] | DocTypes Actividad / Grupo / Equipo / Inscripción |
+| `basquet_estructura_unificada.md` | [x] | Actividad única **Basquet** + 6 grupos; migración inscripciones prod (2026-07-05, `1aedd3a`) |
+| `basquet_cost_center_consolidado.md` | [x] | CC único **Deportes - Basquet - ICDPE** (BL-4, 2026-07-06) |
 
 | `cuotas_sociales_suscripcion.md` | [x] | Suscripción ERPNext solo cuota social |
 
@@ -484,7 +486,7 @@ docker exec devcontainer-example-frappe-1 bash -c 'cd /workspace/development/fra
 
 - [ ] **Club Settings:** empresa ICDPE, días generación deuda / 1.er y 2.º vencimiento, recargo, cuotas por categoría.
 
-- [ ] Verificar patches de seed: actividades ICDPE, estructura básquet, workspaces Secretaría / Gestión Actividades.
+- [x] Verificar patches de seed: actividades ICDPE, estructura básquet unificada, workspaces Secretaría / Gestión Actividades. **2026-07-05:** patch `migrate_basquet_estructura_unificada` en prod — 185 inscripciones activas bajo `Basquet`, legacy deshabilitadas.
 
 - [ ] Ítems y aranceles revisados con contabilidad (ver `docs/docs/Accounting - ICDPE - Revision Contable.md`).
 
@@ -727,15 +729,46 @@ print(result)  # facturas_creadas, errores, invoice_names
 
 | BL-2 | **Login — estética SICLUB** | Media | `login_siclub_branding.md` | **Hecho 2026-07-05** — `siclub_login.css` + `web_include_css` en hooks. |
 
-| BL-3 | **Básquet — actividad única** | Media | `basquet_estructura_unificada.md` | Unificar en **Basquet** con grupos Masculino/Azul|Amarillo|Flex, **Femenino / Formativa**, **Femenino / Superior**, **Mixto / Escuela**. Nombres confirmados 2026-07-05. Pendiente: seed + migración inscripciones. |
+| BL-3 | **Básquet — actividad única** | Media | `basquet_estructura_unificada.md` | **Hecho 2026-07-05** — seed unificado (6 grupos), migración 185 inscripciones activas en prod, roster/padrón actualizados, commit `1aedd3a`. Legacy Masculino/Femenino/Escuelita deshabilitadas. |
+
+| BL-4 | **CC ERPNext básquet** | Baja | `basquet_cost_center_consolidado.md` | **Hecho 2026-07-06** — CC único `Deportes - Basquet - ICDPE`, patch `consolidate_basquet_cost_centers`, ítems y `icdpe_create_service_items` actualizados. |
+
+| BL-5 | **Specs legacy básquet** | Baja | `activities_jerarquia.md`, `basquet_aranceles_icdpe.md`, `vinculacion_basquet_roster.md`, `import_socios_actividades_padron.md` | **Hecho 2026-07-06** — escenarios alineados a actividad única **Basquet**. |
 
 
 
-**Orden sugerido al retomar:** BL-3 (spec lista) → tests seed/migración → patch prod.
+**Orden sugerido al retomar:** portal socio (BL-6) · grupo familiar.
 
 
 
 ---
+
+## Resumen sesión 2026-07-05 (tarde)
+
+### Dashboard Actividades (mañana / sesión previa)
+
+- Gráfico «Inscripciones por deporte / actividad»: título renombrado, leyenda oculta, tooltip por grupo, filtros y colores. Deploy prod `eb1ebb1`.
+- Import real padrón prod: 481 inscripciones nuevas, 664 activas totales; socio 12063 no encontrado.
+
+### BL-3 — Básquet unificado (tarde)
+
+| Entregable | Detalle |
+|------------|---------|
+| Spec | `basquet_estructura_unificada.md` |
+| Seed | `ESTRUCTURA_BASQUET` — actividad única **Basquet**, 6 grupos, equipos con aranceles ICDPE |
+| Catálogo ICDPE | 16 actividades (antes 18); una entrada `Basquet` |
+| Migración | `migrate_basquet_inscripciones.py` + patch `migrate_basquet_estructura_unificada` |
+| Mapeo compartido | `basquet_unified_map.py` (migración, roster Excel, padrón CSV) |
+| Fix PostgreSQL | `table_exists("Actividad")` en lugar de `"tabActividad"` |
+| Tests | seed, catálogo, migración, roster, padrón, aranceles — OK |
+| Commit | `1aedd3a` en `mvp/secretaria-2026-06` |
+| Prod | Deploy OK; 185 inscripciones activas bajo `Basquet`; 0 en legacy; 6 grupos habilitados |
+
+### Pendientes derivados (no bloquean operación)
+
+| # | Tema | Prioridad | Notas |
+|---|------|-----------|-------|
+| BL-6 | **Portal socio cascada** | Media | UI actividad → grupo → equipo con estructura unificada (`activities_modulo.md`, Fase 3). |
 
 
 

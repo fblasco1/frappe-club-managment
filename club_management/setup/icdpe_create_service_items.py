@@ -31,6 +31,7 @@ import unicodedata
 
 import frappe
 
+from club_management.setup.basquet_cost_center import BASQUET_COST_CENTER
 from club_management.setup.icdpe_company import resolve_icdpe_company
 
 # Raíz estándar ERPNext para Item Group (si no existe, se crea bajo "All Item Groups")
@@ -250,22 +251,21 @@ def _specs() -> list[ServiceItemSpec]:
     ]
 
     # --- Deportes (aranceles mensuales + federativo; sin packs) ---
-    sports_cc = [
-        "Deportes - Futbol - ICDPE",
-        "Deportes - Basquet Masculino - ICDPE",
-        "Deportes - Basquet Escuelita - ICDPE",
-        "Deportes - Basquet Femenino - ICDPE",
-        "Deportes - Voley - ICDPE",
-        "Deportes - Patin - ICDPE",
-        "Deportes - Boxeo - ICDPE",
-        "Deportes - Gimnasia Artistica - ICDPE",
-        "Deportes - Taekwondo - ICDPE",
-        "Deportes - Shui Lu - ICDPE",
+    sports_cc: list[tuple[str, str]] = [
+        ("Deportes - Futbol - ICDPE", "Futbol"),
+        (BASQUET_COST_CENTER, "Basquet Masculino"),
+        (BASQUET_COST_CENTER, "Basquet Escuelita"),
+        (BASQUET_COST_CENTER, "Basquet Femenino"),
+        ("Deportes - Voley - ICDPE", "Voley"),
+        ("Deportes - Patin - ICDPE", "Patin"),
+        ("Deportes - Boxeo - ICDPE", "Boxeo"),
+        ("Deportes - Gimnasia Artistica - ICDPE", "Gimnasia Artistica"),
+        ("Deportes - Taekwondo - ICDPE", "Taekwondo"),
+        ("Deportes - Shui Lu - ICDPE", "Shui Lu"),
     ]
 
     sports_items: list[ServiceItemSpec] = []
-    for cc in sports_cc:
-        label = cc.replace("Deportes - ", "").replace(" - ICDPE", "")
+    for cc, label in sports_cc:
         slug = _slugify_item_code_part(label)
         sports_items += [
             ServiceItemSpec(
