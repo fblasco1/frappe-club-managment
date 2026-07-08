@@ -30,7 +30,7 @@ And Azul/Amarillo masculino apuntan a `Basquet` / `Masculino / Azul|Amarillo` / 
 
 And Flex masculino usa `Masculino / Flex` con equipo según edad (U15, U19 o Superior C)
 
-And Femenino apunta a `Basquet` / `Femenino / Formativa` / `U{n}` (o `Femenino / Superior` / `Superior Fem` si MAYOR)
+And Femenino apunta a `Basquet` / `Femenino / Formativa` / `U{n}` (o `Femenino / Superior` / `Superior Fem` si MAYOR o U21)
 
 And Escuelita apunta a `Basquet` / `Mixto / Escuela` / `U7 / U9` o `U11 / U13`.
 

@@ -36,6 +36,11 @@ class TestBasquetRosterMapping(MembersTestCase):
 		self.assertEqual(sel["grupo"], "Femenino / Formativa")
 		self.assertEqual(sel["equipo"], "U15")
 
+	def test_map_u21_femenino_superior(self) -> None:
+		sel = map_basquet_seleccion("U21", "Femenino")
+		self.assertEqual(sel["grupo"], "Femenino / Superior")
+		self.assertEqual(sel["equipo"], "Superior Fem")
+
 	def test_map_u13_amarillo(self) -> None:
 		sel = map_basquet_seleccion("U13", "Amarillo")
 		self.assertEqual(sel["grupo"], "Masculino / Amarillo")

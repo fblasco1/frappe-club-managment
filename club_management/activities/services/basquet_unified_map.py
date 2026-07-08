@@ -98,7 +98,7 @@ def map_roster_basquet_seleccion(categoria: str, equipo: str) -> dict[str, str]:
 		eq = "MAYOR"
 
 	if eq == "Femenino":
-		if cat == "MAYOR":
+		if cat in {"MAYOR", "U21"}:
 			return {
 				"actividad": BASQUET_ACTIVIDAD,
 				"grupo": "Femenino / Superior",
