@@ -34,6 +34,90 @@ from club_management.activities.services.basquet_unified_map import (
 )
 
 
+LOG_NO_PADRON_SIN_DNI = "JUGADORES QUE NO ESTAN EN EL PADRON y NO TIENEN DNI EN EL CSV.csv"
+LOG_NO_PADRON_CON_DNI = "JUGADORES QUE NO ESTAN EN EL PADRON y TIENEN DNI EN EL CSV.csv"
+LOG_YA_INSCRIPTOS = "JUGADORES QUE YA TENIAN INSCRIPCION CARGADA.csv"
+LOG_ROW_FIELDS = (
+	"numero",
+	"dni",
+	"nombre",
+	"categoria",
+	"equipo",
+	"socio",
+	"inscripcion_existente",
+	"detalle",
+)
+
+
+@dataclass
+class RosterImportJugadoresResult:
+	total_filas: int = 0
+	inscripciones_nuevas: int = 0
+	ya_inscriptos: int = 0
+	no_padron_sin_dni: int = 0
+	no_padron_con_dni: int = 0
+	omitidos_duplicado_csv: int = 0
+	errores: list[str] = field(default_factory=list)
+	log_no_padron_sin_dni: list[dict[str, str]] = field(default_factory=list)
+	log_no_padron_con_dni: list[dict[str, str]] = field(default_factory=list)
+	log_ya_inscriptos: list[dict[str, str]] = field(default_factory=list)
+	log_paths: dict[str, str] = field(default_factory=dict)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"total_filas": self.total_filas,
+			"inscripciones_nuevas": self.inscripciones_nuevas,
+			"ya_inscriptos": self.ya_inscriptos,
+			"no_padron_sin_dni": self.no_padron_sin_dni,
+			"no_padron_con_dni": self.no_padron_con_dni,
+			"omitidos_duplicado_csv": self.omitidos_duplicado_csv,
+			"errores": self.errores,
+			"log_paths": self.log_paths,
+		}
+
+
+LOG_NO_PADRON_SIN_DNI = "JUGADORES QUE NO ESTAN EN EL PADRON y NO TIENEN DNI EN EL CSV.csv"
+LOG_NO_PADRON_CON_DNI = "JUGADORES QUE NO ESTAN EN EL PADRON y TIENEN DNI EN EL CSV.csv"
+LOG_YA_INSCRIPTOS = "JUGADORES QUE YA TENIAN INSCRIPCION CARGADA.csv"
+LOG_ROW_FIELDS = (
+	"numero",
+	"dni",
+	"nombre",
+	"categoria",
+	"equipo",
+	"socio",
+	"inscripcion_existente",
+	"detalle",
+)
+
+
+@dataclass
+class RosterImportJugadoresResult:
+	total_filas: int = 0
+	inscripciones_nuevas: int = 0
+	ya_inscriptos: int = 0
+	no_padron_sin_dni: int = 0
+	no_padron_con_dni: int = 0
+	omitidos_duplicado_csv: int = 0
+	errores: list[str] = field(default_factory=list)
+	log_no_padron_sin_dni: list[dict[str, str]] = field(default_factory=list)
+	log_no_padron_con_dni: list[dict[str, str]] = field(default_factory=list)
+	log_ya_inscriptos: list[dict[str, str]] = field(default_factory=list)
+	log_paths: dict[str, str] = field(default_factory=dict)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"total_filas": self.total_filas,
+			"inscripciones_nuevas": self.inscripciones_nuevas,
+			"ya_inscriptos": self.ya_inscriptos,
+			"no_padron_sin_dni": self.no_padron_sin_dni,
+			"no_padron_con_dni": self.no_padron_con_dni,
+			"omitidos_duplicado_csv": self.omitidos_duplicado_csv,
+			"errores": self.errores,
+			"log_paths": self.log_paths,
+		}
+
+
 @dataclass
 class RosterLinkStats:
 	total_filas: int = 0
@@ -65,6 +149,14 @@ def normalize_roster_dni(raw: str | float | int | None) -> str:
 	if not (7 <= len(digits) <= 8):
 		return ""
 	return digits
+
+
+def normalize_roster_nombre(value: str | None) -> str:
+	return re.sub(r"\s+", " ", (value or "").strip()).upper()
+
+
+def _log_row(**kwargs: str) -> dict[str, str]:
+	return {field: kwargs.get(field, "") for field in LOG_ROW_FIELDS}
 
 
 def _is_person_name(value: str | None) -> bool:
@@ -203,7 +295,8 @@ def parse_jugadores_xlsx(xlsx_path: str) -> list[dict[str, str]]:
 	return players
 
 
-def parse_jugadores_csv(csv_path: str) -> list[dict[str, str]]:
+def parse_jugadores_csv_rows(csv_path: str) -> list[dict[str, str]]:
+	"""Parsea todas las filas válidas del CSV Jugadorxs (DNI opcional)."""
 	path = Path(csv_path)
 	if not path.is_file():
 		frappe.throw(_("Archivo no encontrado: {0}").format(csv_path))
@@ -219,17 +312,23 @@ def parse_jugadores_csv(csv_path: str) -> list[dict[str, str]]:
 			equipo = (row.get("equipo") or row.get("Equipo 2026") or "").strip().title()
 			if equipo == "Mayor":
 				equipo = "MAYOR"
-			if not dni or categoria not in VALID_CATEGORIAS or not equipo:
+			nombre = (row.get("nombre") or row.get("Nombre y Apellido") or "").strip()
+			if categoria not in VALID_CATEGORIAS or not equipo:
 				continue
 			players.append(
 				{
+					"numero": (row.get("Numero") or row.get("numero") or "").strip(),
 					"dni": dni,
-					"nombre": (row.get("nombre") or row.get("Nombre y Apellido") or "").strip(),
+					"nombre": nombre,
 					"categoria": categoria,
 					"equipo": equipo,
 				}
 			)
 	return players
+
+
+def parse_jugadores_csv(csv_path: str) -> list[dict[str, str]]:
+	return [row for row in parse_jugadores_csv_rows(csv_path) if row.get("dni")]
 
 
 def _find_socio_by_dni(dni: str) -> str | None:
@@ -245,6 +344,97 @@ def _find_socio_by_dni(dni: str) -> str | None:
 		if normalize_roster_dni(row.dni) == normalized:
 			return row.name
 	return None
+
+
+def _build_socio_lookup_maps() -> tuple[dict[str, str], dict[str, str]]:
+	dni_map: dict[str, str] = {}
+	nombre_map: dict[str, str] = {}
+	for row in frappe.get_all(
+		"Socio",
+		fields=["name", "dni", "nombre_completo", "apellido", "nombre"],
+	):
+		socio_name = row.name
+		normalized_dni = normalize_roster_dni(row.dni)
+		if normalized_dni:
+			for candidate in {normalized_dni, normalized_dni.lstrip("0")}:
+				dni_map.setdefault(candidate, socio_name)
+		label = (row.nombre_completo or "").strip()
+		if not label:
+			from club_management.members.doctype.socio.socio import format_socio_nombre_completo
+
+			label = format_socio_nombre_completo(row.apellido, row.nombre)
+		nombre_key = normalize_roster_nombre(label)
+		if nombre_key:
+			nombre_map.setdefault(nombre_key, socio_name)
+	return dni_map, nombre_map
+
+
+def _find_socio_by_nombre(
+	nombre: str,
+	*,
+	nombre_map: dict[str, str] | None = None,
+) -> str | None:
+	key = normalize_roster_nombre(nombre)
+	if not key:
+		return None
+	if nombre_map is None:
+		_, nombre_map = _build_socio_lookup_maps()
+	return nombre_map.get(key)
+
+
+def _find_socio_roster(
+	row: dict[str, str],
+	*,
+	dni_map: dict[str, str],
+	nombre_map: dict[str, str],
+) -> str | None:
+	dni = row.get("dni") or ""
+	if dni:
+		for candidate in {dni, dni.lstrip("0")}:
+			if candidate in dni_map:
+				return dni_map[candidate]
+	nombre = row.get("nombre") or ""
+	if nombre:
+		return _find_socio_by_nombre(nombre, nombre_map=nombre_map)
+	return None
+
+
+def _inscripcion_basquet_activa(socio_name: str) -> dict[str, str] | None:
+	actividad_names = basquet_actividad_docnames()
+	if not actividad_names:
+		return None
+	row = frappe.db.get_value(
+		INSCRIPCION_DOCTYPE,
+		{
+			"socio": socio_name,
+			"estado": "Activa",
+			"actividad": ["in", actividad_names],
+		},
+		["name", "actividad", "grupo_actividad", "equipo_actividad"],
+		as_dict=True,
+	)
+	if not row:
+		return None
+	return {
+		"name": row.name,
+		"label": _format_inscripcion_label(
+			{
+				"actividad": row.actividad,
+				"grupo_actividad": row.grupo_actividad,
+				"equipo_actividad": row.equipo_actividad,
+			}
+		),
+	}
+
+
+def _write_roster_log_csv(output_dir: Path, filename: str, rows: list[dict[str, str]]) -> str:
+	output_dir.mkdir(parents=True, exist_ok=True)
+	path = output_dir / filename
+	with path.open("w", encoding="utf-8-sig", newline="") as handle:
+		writer = csv.DictWriter(handle, fieldnames=LOG_ROW_FIELDS, extrasaction="ignore")
+		writer.writeheader()
+		writer.writerows(rows)
+	return str(path)
 
 
 def _baja_inscripciones_basquet(socio_name: str) -> None:
@@ -271,6 +461,7 @@ def vincular_basquet_socio(
 	categoria: str,
 	equipo: str,
 	dry_run: bool = True,
+	reemplazar_inscripciones: bool = True,
 ) -> dict[str, Any]:
 	seleccion = map_basquet_seleccion(categoria, equipo)
 	resolved = resolve_seleccion_basquet(seleccion)
@@ -290,7 +481,8 @@ def vincular_basquet_socio(
 			"label": label,
 		}
 
-	_baja_inscripciones_basquet(socio_name)
+	if reemplazar_inscripciones:
+		_baja_inscripciones_basquet(socio_name)
 	inscribir_socio_selecciones(
 		socio_name,
 		[
@@ -357,6 +549,107 @@ def vincular_roster_basquet(
 	if not dry_run:
 		frappe.db.commit()
 	return stats.to_dict()
+
+
+def _row_dedupe_key(row: dict[str, str]) -> str:
+	dni = row.get("dni") or ""
+	if dni:
+		return f"dni:{dni}"
+	return f"nombre:{normalize_roster_nombre(row.get('nombre'))}|{row.get('categoria')}|{row.get('equipo')}"
+
+
+def import_roster_jugadores(
+	*,
+	source_path: str,
+	dry_run: bool = True,
+	output_dir: str | None = None,
+) -> dict[str, Any]:
+	"""Importa roster CSV Jugadorxs: inscribe solo si no hay básquet activo; genera 3 logs."""
+	rows = parse_jugadores_csv_rows(source_path)
+	result = RosterImportJugadoresResult(total_filas=len(rows))
+	dni_map, nombre_map = _build_socio_lookup_maps()
+	seen_keys: set[str] = set()
+	out_dir = Path(output_dir) if output_dir else Path(source_path).parent
+
+	for row in rows:
+		dedupe = _row_dedupe_key(row)
+		if dedupe in seen_keys:
+			result.omitidos_duplicado_csv += 1
+			continue
+		seen_keys.add(dedupe)
+
+		base = _log_row(
+			numero=row.get("numero", ""),
+			dni=row.get("dni", ""),
+			nombre=row.get("nombre", ""),
+			categoria=row.get("categoria", ""),
+			equipo=row.get("equipo", ""),
+		)
+		socio_name = _find_socio_roster(row, dni_map=dni_map, nombre_map=nombre_map)
+		if not socio_name:
+			if row.get("dni"):
+				result.no_padron_con_dni += 1
+				result.log_no_padron_con_dni.append(base)
+			else:
+				result.no_padron_sin_dni += 1
+				result.log_no_padron_sin_dni.append(base)
+			continue
+
+		existing = _inscripcion_basquet_activa(socio_name)
+		if existing:
+			result.ya_inscriptos += 1
+			result.log_ya_inscriptos.append(
+				{
+					**base,
+					"socio": socio_name,
+					"inscripcion_existente": existing["label"],
+				}
+			)
+			continue
+
+		try:
+			link = vincular_basquet_socio(
+				socio_name,
+				categoria=row["categoria"],
+				equipo=row["equipo"],
+				dry_run=dry_run,
+				reemplazar_inscripciones=False,
+			)
+			if link["status"] in {"ok", "dry_run"}:
+				result.inscripciones_nuevas += 1
+		except Exception as exc:  # noqa: BLE001 — lote continúa
+			result.errores.append(
+				_("{0} ({1}): {2}").format(
+					row.get("nombre") or "—",
+					row.get("dni") or "sin DNI",
+					str(exc)[:200],
+				)
+			)
+
+	if not dry_run:
+		frappe.db.commit()
+
+	result.log_paths = {
+		"no_padron_sin_dni": _write_roster_log_csv(
+			out_dir, LOG_NO_PADRON_SIN_DNI, result.log_no_padron_sin_dni
+		),
+		"no_padron_con_dni": _write_roster_log_csv(
+			out_dir, LOG_NO_PADRON_CON_DNI, result.log_no_padron_con_dni
+		),
+		"ya_inscriptos": _write_roster_log_csv(out_dir, LOG_YA_INSCRIPTOS, result.log_ya_inscriptos),
+	}
+	return result.to_dict()
+
+
+def default_roster_csv_jugadorxs_path() -> str:
+	candidates = [
+		Path("/mnt/c/Users/USUARIO/Desktop/JUGADORES BASQUET - PEDRO ECHAGUE - Jugadorxs.csv"),
+		Path(frappe.get_site_path("private/files/JUGADORES BASQUET - PEDRO ECHAGUE - Jugadorxs.csv")),
+	]
+	for candidate in candidates:
+		if candidate.is_file():
+			return str(candidate)
+	return str(candidates[0])
 
 
 def default_roster_xlsx_path() -> str:

@@ -79,3 +79,132 @@ class TestBasquetRosterLinkSocio(MembersTestCase):
 			)
 		)
 		self.assertIn("Basquet", frappe.db.get_value("Socio", socio.name, "actividad") or "")
+
+
+class TestImportRosterJugadores(MembersTestCase):
+	def test_find_socio_por_nombre_completo(self) -> None:
+		from club_management.activities.services.basquet_roster_link import (
+			_find_socio_by_nombre,
+			normalize_roster_nombre,
+		)
+
+		socio = insert_socio(
+			dni="88100001",
+			apellido="ZZTESTROSTER",
+			nombre="Nombre Busqueda",
+			email="roster.nombre@example.com",
+			estado="Activo",
+		)
+		self.assertEqual(
+			frappe.db.get_value("Socio", socio.name, "nombre_completo"),
+			"ZZTESTROSTER, Nombre Busqueda",
+		)
+		self.assertEqual(normalize_roster_nombre("ZZTESTROSTER, Nombre Busqueda "), "ZZTESTROSTER, NOMBRE BUSQUEDA")
+		self.assertEqual(_find_socio_by_nombre("ZZTESTROSTER, Nombre Busqueda"), socio.name)
+
+	def test_import_clasifica_logs(self) -> None:
+		import csv
+		import tempfile
+		from pathlib import Path
+
+		from club_management.activities.services.basquet_roster_link import import_roster_jugadores
+
+		seed_estructura_actividades_completa(crear_equipos=True)
+		con_dni = insert_socio(
+			dni="88100002",
+			apellido="ZZTESTROSTER",
+			nombre="Con Dni",
+			email="roster.csv1@example.com",
+			estado="Activo",
+		)
+		por_nombre = insert_socio(
+			dni="88100003",
+			apellido="ZZTESTROSTER",
+			nombre="Por Nombre",
+			email="roster.csv2@example.com",
+			estado="Activo",
+		)
+		ya_inscripto = insert_socio(
+			dni="88100004",
+			apellido="ZZTESTROSTER",
+			nombre="Ya Inscripto",
+			email="roster.csv3@example.com",
+			estado="Activo",
+		)
+		inscribir_socio_selecciones(
+			ya_inscripto.name,
+			[{"actividad": "Basquet", "grupo": "Mixto / Escuela", "equipo": "U7 / U9"}],
+			activar=False,
+		)
+
+		with tempfile.TemporaryDirectory() as tmp:
+			csv_path = Path(tmp) / "jugadores.csv"
+			with csv_path.open("w", encoding="utf-8-sig", newline="") as handle:
+				writer = csv.DictWriter(
+					handle,
+					fieldnames=[
+						"Numero",
+						"DNI",
+						"Nombre y Apellido",
+						"Equipo 2026",
+						"Categoria 2026",
+					],
+				)
+				writer.writeheader()
+				writer.writerow(
+					{
+						"Numero": "1",
+						"DNI": "",
+						"Nombre y Apellido": "ZZTESTROSTER, Sin Dni",
+						"Equipo 2026": "Escuelita",
+						"Categoria 2026": "U7",
+					}
+				)
+				writer.writerow(
+					{
+						"Numero": "2",
+						"DNI": "99999999",
+						"Nombre y Apellido": "ZZTESTROSTER, Fantasma",
+						"Equipo 2026": "Escuelita",
+						"Categoria 2026": "U7",
+					}
+				)
+				writer.writerow(
+					{
+						"Numero": "3",
+						"DNI": "",
+						"Nombre y Apellido": "ZZTESTROSTER, Por Nombre",
+						"Equipo 2026": "Escuelita",
+						"Categoria 2026": "U7",
+					}
+				)
+				writer.writerow(
+					{
+						"Numero": "4",
+						"DNI": "88100002",
+						"Nombre y Apellido": "ZZTESTROSTER, Con Dni",
+						"Equipo 2026": "Escuelita",
+						"Categoria 2026": "U7",
+					}
+				)
+				writer.writerow(
+					{
+						"Numero": "5",
+						"DNI": "88100004",
+						"Nombre y Apellido": "ZZTESTROSTER, Ya Inscripto",
+						"Equipo 2026": "Escuelita",
+						"Categoria 2026": "U7",
+					}
+				)
+
+			stats = import_roster_jugadores(
+				source_path=str(csv_path),
+				dry_run=True,
+				output_dir=tmp,
+			)
+
+			self.assertEqual(stats["no_padron_sin_dni"], 1)
+			self.assertEqual(stats["no_padron_con_dni"], 1)
+			self.assertEqual(stats["ya_inscriptos"], 1)
+			self.assertEqual(stats["inscripciones_nuevas"], 2)
+			self.assertTrue(Path(stats["log_paths"]["no_padron_sin_dni"]).is_file())
