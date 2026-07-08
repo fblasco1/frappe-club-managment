@@ -18,6 +18,7 @@ from club_management.members.services.cobranza_manual import (
 	sync_saldo_deuda_socio,
 )
 from club_management.members.services.modos_pago_desk import list_modos_pago_cobranza_payload
+from club_management.members.services.recibo_pago import build_recibo_pago
 from club_management.members.services.socio_operaciones_secretaria import (
 	ensure_secretaria_operacion_access,
 )
