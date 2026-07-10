@@ -138,3 +138,19 @@ Then genera tres CSV de salida:
 2. JUGADORES QUE NO ESTAN EN EL PADRON y TIENEN DNI EN EL CSV
 3. JUGADORES QUE YA TENIAN INSCRIPCION CARGADA
 
+---
+
+## Scenario: informe HTML del import roster Jugadorxs
+
+When finaliza `import_roster_jugadores`
+
+Then genera un archivo HTML `INFORME IMPORT ROSTER BASQUET.html` en el directorio de salida
+
+And el informe resume KPIs, porcentaje de completitud y pendientes
+
+And lista acciones concretas para completar el import (padrón, DNI, mapeo)
+
+And publica una copia en `private/files/roster_import_basquet_latest.html`
+
+And Secretaría puede visualizarlo en `/informe-import-roster-basquet` autenticada.
+

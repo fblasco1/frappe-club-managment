@@ -213,3 +213,7 @@ class TestImportRosterJugadores(MembersTestCase):
 			self.assertEqual(stats["ya_inscriptos"], 1)
 			self.assertEqual(stats["inscripciones_nuevas"], 2)
 			self.assertTrue(Path(stats["log_paths"]["no_padron_sin_dni"]).is_file())
+			self.assertTrue(Path(stats["log_paths"]["reporte_html"]).is_file())
+			html = Path(stats["log_paths"]["reporte_html"]).read_text(encoding="utf-8")
+			self.assertIn("Qué ajustar para completar el import", html)
+			self.assertIn("No están en el padrón y sin DNI", html)

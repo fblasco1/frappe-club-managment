@@ -61,48 +61,7 @@ class RosterImportJugadoresResult:
 	log_no_padron_sin_dni: list[dict[str, str]] = field(default_factory=list)
 	log_no_padron_con_dni: list[dict[str, str]] = field(default_factory=list)
 	log_ya_inscriptos: list[dict[str, str]] = field(default_factory=list)
-	log_paths: dict[str, str] = field(default_factory=dict)
-
-	def to_dict(self) -> dict[str, Any]:
-		return {
-			"total_filas": self.total_filas,
-			"inscripciones_nuevas": self.inscripciones_nuevas,
-			"ya_inscriptos": self.ya_inscriptos,
-			"no_padron_sin_dni": self.no_padron_sin_dni,
-			"no_padron_con_dni": self.no_padron_con_dni,
-			"omitidos_duplicado_csv": self.omitidos_duplicado_csv,
-			"errores": self.errores,
-			"log_paths": self.log_paths,
-		}
-
-
-LOG_NO_PADRON_SIN_DNI = "JUGADORES QUE NO ESTAN EN EL PADRON y NO TIENEN DNI EN EL CSV.csv"
-LOG_NO_PADRON_CON_DNI = "JUGADORES QUE NO ESTAN EN EL PADRON y TIENEN DNI EN EL CSV.csv"
-LOG_YA_INSCRIPTOS = "JUGADORES QUE YA TENIAN INSCRIPCION CARGADA.csv"
-LOG_ROW_FIELDS = (
-	"numero",
-	"dni",
-	"nombre",
-	"categoria",
-	"equipo",
-	"socio",
-	"inscripcion_existente",
-	"detalle",
-)
-
-
-@dataclass
-class RosterImportJugadoresResult:
-	total_filas: int = 0
-	inscripciones_nuevas: int = 0
-	ya_inscriptos: int = 0
-	no_padron_sin_dni: int = 0
-	no_padron_con_dni: int = 0
-	omitidos_duplicado_csv: int = 0
-	errores: list[str] = field(default_factory=list)
-	log_no_padron_sin_dni: list[dict[str, str]] = field(default_factory=list)
-	log_no_padron_con_dni: list[dict[str, str]] = field(default_factory=list)
-	log_ya_inscriptos: list[dict[str, str]] = field(default_factory=list)
+	log_inscripciones_nuevas: list[dict[str, str]] = field(default_factory=list)
 	log_paths: dict[str, str] = field(default_factory=dict)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -617,6 +576,13 @@ def import_roster_jugadores(
 			)
 			if link["status"] in {"ok", "dry_run"}:
 				result.inscripciones_nuevas += 1
+				result.log_inscripciones_nuevas.append(
+					{
+						**base,
+						"socio": socio_name,
+						"destino": link.get("label") or link.get("equipo_actividad") or "",
+					}
+				)
 		except Exception as exc:  # noqa: BLE001 — lote continúa
 			result.errores.append(
 				_("{0} ({1}): {2}").format(
@@ -629,6 +595,10 @@ def import_roster_jugadores(
 	if not dry_run:
 		frappe.db.commit()
 
+	from club_management.activities.services.basquet_roster_import_report import (
+		write_roster_import_report,
+	)
+
 	result.log_paths = {
 		"no_padron_sin_dni": _write_roster_log_csv(
 			out_dir, LOG_NO_PADRON_SIN_DNI, result.log_no_padron_sin_dni
@@ -638,7 +608,21 @@ def import_roster_jugadores(
 		),
 		"ya_inscriptos": _write_roster_log_csv(out_dir, LOG_YA_INSCRIPTOS, result.log_ya_inscriptos),
 	}
-	return result.to_dict()
+	result_dict = result.to_dict()
+	result.log_paths["reporte_html"] = write_roster_import_report(
+		result_dict,
+		source_path=source_path,
+		dry_run=dry_run,
+		output_dir=out_dir,
+		log_rows={
+			"inscripciones_nuevas": result.log_inscripciones_nuevas,
+			"ya_inscriptos": result.log_ya_inscriptos,
+			"no_padron_sin_dni": result.log_no_padron_sin_dni,
+			"no_padron_con_dni": result.log_no_padron_con_dni,
+		},
+	)
+	result_dict["log_paths"] = result.log_paths
+	return result_dict
 
 
 def default_roster_csv_jugadorxs_path() -> str:
