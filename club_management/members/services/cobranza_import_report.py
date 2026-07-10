@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import frappe
-from frappe.utils import escape_html, flt, getdate, today
+from frappe.utils import escape_html, flt, getdate, now_datetime, today
 
 from club_management.members.services.cobranza_manual import (
 	SALES_INVOICE_DOCTYPE,
@@ -15,9 +15,23 @@ from club_management.members.services.cobranza_manual import (
 	_campo_socio_en,
 	format_periodo_cobro,
 )
+from club_management.members.services.informe_html_common import (
+	badge,
+	desk_form_link,
+	desk_socio_link,
+	render_collapsible_section,
+	render_nav_bar,
+	render_table,
+	report_page_shell,
+)
 
 COBRANZA_HTML_FILENAME = "INFORME COBRANZA IMPORT.html"
 LATEST_COBRANZA_HTML_SITE_PATH = "private/files/cobranza_import_latest.html"
+INFORME_COBRANZA_URL = "/informe-import-cobranza-basquet"
+INFORME_ROSTER_URL = "/informe-import-roster-basquet"
+
+MOTIVO_YA_COBRADA = "Factura ya cobrada"
+MOTIVO_SIN_FACTURA = "Sin factura pendiente coincidente"
 
 
 def find_latest_cobranza_import_log() -> str | None:
@@ -93,6 +107,80 @@ def get_socio_facturas_periodo(socio_name: str, periodo_cobro: str) -> list[dict
 	return result
 
 
+def classify_omitido_row(row: dict[str, Any]) -> dict[str, str]:
+	"""Distingue ya cobrada vs sin factura vs sin coincidencia (no son lo mismo)."""
+	motivo = str(row.get("motivo") or "").strip()
+	socio = str(row.get("socio") or "").strip()
+	periodo = str(row.get("periodo") or "").strip()
+
+	if motivo == MOTIVO_YA_COBRADA:
+		return {
+			"estado": "cobrada",
+			"estado_label": "Ya cobrada",
+			"estado_detalle": "El Excel tenía un cobro pero la factura ya estaba saldada.",
+		}
+
+	if not socio or not frappe.db.exists("Socio", socio):
+		return {
+			"estado": "sin_factura",
+			"estado_label": "Sin factura",
+			"estado_detalle": motivo or "Socio no encontrado; no se puede verificar facturación.",
+		}
+
+	facturas = get_socio_facturas_periodo(socio, periodo) if periodo else []
+	if not facturas:
+		return {
+			"estado": "sin_factura",
+			"estado_label": "Sin factura",
+			"estado_detalle": f"No tiene facturas emitidas para el período {periodo or '—'}.",
+		}
+
+	pending = [f for f in facturas if f["outstanding"] > 0]
+	if not pending:
+		return {
+			"estado": "cobrada",
+			"estado_label": "Ya cobrada",
+			"estado_detalle": "Tiene facturas del período pero todas están saldadas.",
+		}
+
+	return {
+		"estado": "sin_coincidencia",
+		"estado_label": "Sin coincidencia",
+		"estado_detalle": (
+			f"Tiene {len(pending)} factura(s) pendiente(s) que no coinciden con importe/concepto del Excel."
+		),
+	}
+
+
+def enrich_omitidos_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+	enriched: list[dict[str, Any]] = []
+	for row in rows:
+		cls = classify_omitido_row(row)
+		enriched.append({**row, **cls})
+	return enriched
+
+
+def split_omitidos_by_estado(
+	rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+	"""Separa omitidos en ya cobrada, sin factura y sin coincidencia."""
+	enriched = enrich_omitidos_rows(rows)
+	ya_cobrada = [r for r in enriched if r["estado"] == "cobrada"]
+	sin_factura = [r for r in enriched if r["estado"] == "sin_factura"]
+	sin_coincidencia = [r for r in enriched if r["estado"] == "sin_coincidencia"]
+	return ya_cobrada, sin_factura, sin_coincidencia
+
+
+def _estado_factura_cell(factura: dict[str, Any] | None) -> str:
+	if not factura:
+		return badge("sin_factura", "Sin factura")
+	if factura["outstanding"] <= 0:
+		link = desk_form_link("sales-invoice", factura["name"])
+		return f"{badge('cobrada', 'Cobrada')} {link}"
+	link = desk_form_link("sales-invoice", factura["name"])
+	return f"{badge('pendiente', f'Pendiente ${factura['outstanding']}')} {link}"
+
+
 def _summarize_cobranza_log_rows(rows: dict[str, list[dict[str, Any]]]) -> str:
 	parts: list[str] = []
 	if rows.get("ok"):
@@ -102,7 +190,8 @@ def _summarize_cobranza_log_rows(rows: dict[str, list[dict[str, Any]]]) -> str:
 			f"(${last.get('importe')}) → {last.get('sales_invoice') or '—'}"
 		)
 	for row in rows.get("omitidos") or []:
-		parts.append(f"Omitido Excel: {row.get('motivo') or '—'} ({row.get('concepto') or '—'})")
+		cls = classify_omitido_row(row)
+		parts.append(f"Omitido Excel ({cls['estado_label']}): {row.get('concepto') or '—'}")
 	for row in rows.get("errores") or []:
 		parts.append(f"Error Excel: {row.get('error') or '—'}")
 	return " · ".join(parts) if parts else "Sin movimientos en import Excel"
@@ -138,10 +227,10 @@ def build_cobranza_followup_rows(
 	*,
 	periodo_cobro: str,
 	cobranza_log: dict[str, Any] | None = None,
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
 	"""Filas socio a socio para Secretaría (inscripción + facturas + import Excel)."""
 	by_socio = index_cobranza_log_by_socio(cobranza_log) if cobranza_log else {}
-	rows: list[dict[str, str]] = []
+	rows: list[dict[str, Any]] = []
 	for entry in inscripciones_nuevas:
 		socio_name = entry.get("socio") or ""
 		if not socio_name:
@@ -162,10 +251,8 @@ def build_cobranza_followup_rows(
 				"dni": entry.get("dni") or socio_row.get("dni") or "",
 				"nombre": entry.get("nombre") or socio_row.get("nombre_completo") or "",
 				"destino": entry.get("destino") or "",
-				"factura_aranceles": arancel["name"] if arancel else "",
-				"saldo_aranceles": str(arancel["outstanding"]) if arancel else "",
-				"factura_cuota": cuota["name"] if cuota else "",
-				"saldo_cuota": str(cuota["outstanding"]) if cuota else "",
+				"_arancel": arancel,
+				"_cuota": cuota,
 				"saldo_deuda_socio": str(flt(socio_row.get("saldo_deuda"))),
 				"import_excel": _summarize_cobranza_log_rows(cobranza),
 				"accion": _suggest_cobranza_action(
@@ -178,42 +265,73 @@ def build_cobranza_followup_rows(
 	return rows
 
 
-def _render_cobranza_log_table(rows: list[dict[str, Any]], columns: list[tuple[str, str]]) -> str:
-	if not rows:
-		return '<p class="empty">Sin registros.</p>'
-	head = "".join(f"<th>{escape_html(label)}</th>" for _, label in columns)
-	body: list[str] = []
-	for row in rows:
-		cells = "".join(
-			f"<td>{escape_html(str(row.get(key) or ''))}</td>" for key, _ in columns
-		)
-		body.append(f"<tr>{cells}</tr>")
-	return (
-		'<div class="table-wrap"><table><thead><tr>'
-		+ head
-		+ "</tr></thead><tbody>"
-		+ "".join(body)
-		+ "</tbody></table></div>"
-	)
+def _socio_renderer(row: dict[str, Any]) -> str:
+	return desk_socio_link(row.get("socio"), row.get("nombre") or row.get("socio"))
 
 
-def render_cobranza_import_sections_html(
+def _estado_renderer(row: dict[str, Any]) -> str:
+	detalle = row.get("estado_detalle") or ""
+	return f"{badge(row.get('estado', ''), row.get('estado_label', ''))}<br><small>{escape_html(detalle)}</small>"
+
+
+def _invoice_link_renderer(key: str) -> Any:
+	def _render(row: dict[str, Any]) -> str:
+		return desk_form_link("sales-invoice", row.get(key))
+
+	return _render
+
+
+def _payment_link_renderer(row: dict[str, Any]) -> str:
+	return desk_form_link("payment-entry", row.get("payment_entry"))
+
+
+def _aranceles_estado_renderer(row: dict[str, Any]) -> str:
+	return _estado_factura_cell(row.get("_arancel"))
+
+
+def _cuota_estado_renderer(row: dict[str, Any]) -> str:
+	return _estado_factura_cell(row.get("_cuota"))
+
+
+def render_cobranza_import_report_html(
 	log: dict[str, Any] | None,
 	*,
 	periodo_cobro: str,
-	followup_rows: list[dict[str, str]] | None = None,
+	followup_rows: list[dict[str, Any]] | None = None,
 ) -> str:
-	"""HTML de secciones de cobranza para incrustar en informes."""
+	"""Página HTML completa e independiente del informe de cobranza."""
 	followup_rows = followup_rows or []
 	if not log and not followup_rows:
-		return ""
+		return report_page_shell(
+			title="Informe cobranza",
+			header_html="<header><h1>Informe cobranza</h1><p>Sin datos disponibles.</p></header>",
+			body_html="<p class='empty'>Ejecutá el import de cobranza o el import roster para generar este informe.</p>",
+			nav_html=render_nav_bar(
+				sibling_href=INFORME_ROSTER_URL,
+				sibling_label="Informe import roster básquet",
+				toc=[],
+			),
+		)
 
 	resumen = (log or {}).get("resumen") or {}
+	omitidos_raw = (log or {}).get("omitidos_detalle") or []
+	ya_cobrada, sin_factura, sin_coincidencia = split_omitidos_by_estado(omitidos_raw)
+
 	action_items: list[str] = []
-	if resumen.get("omitidos"):
+	if sin_factura:
 		action_items.append(
-			f"<li><strong>{resumen['omitidos']}</strong> filas del Excel omitidas: "
-			"revisar factura pendiente, importe o concepto; registrar cobro manual en Socio.</li>"
+			f"<li><strong>{len(sin_factura)}</strong> filas sin factura emitida: "
+			"emitir aranceles/cuota del período antes de registrar cobro.</li>"
+		)
+	if sin_coincidencia:
+		action_items.append(
+			f"<li><strong>{len(sin_coincidencia)}</strong> filas sin coincidencia: "
+			"revisar importe/concepto en Excel vs factura pendiente en Desk.</li>"
+		)
+	if ya_cobrada:
+		action_items.append(
+			f"<li><strong>{len(ya_cobrada)}</strong> filas ya cobradas: "
+			"no requieren acción (el Excel repite un cobro existente).</li>"
 		)
 	if resumen.get("errores"):
 		action_items.append(
@@ -229,185 +347,219 @@ def render_cobranza_import_sections_html(
 
 	if action_items:
 		action_block = (
-			'<div class="action-pending cobranza-block"><h2>Cobranza — qué corregir a mano</h2><ol>'
+			'<div class="action-pending"><h2>Qué corregir a mano</h2><ol>'
 			+ "".join(action_items)
 			+ "</ol></div>"
 		)
 	else:
 		action_block = (
-			'<div class="action-ok cobranza-block"><p>Cobranza julio sin pendientes detectados en este informe.</p></div>'
+			'<div class="action-ok"><p>Cobranza del período sin pendientes detectados en este informe.</p></div>'
 		)
 
-	kpis = []
+	kpis: list[tuple[str, int]] = []
 	if log:
 		kpis = [
-			("Cobros registrados", resumen.get("procesados", 0)),
-			("Omitidos Excel", resumen.get("omitidos", 0)),
-			("Errores Excel", resumen.get("errores", 0)),
+			("Cobros registrados", int(resumen.get("procesados") or 0)),
+			("Omitidos — ya cobrada", len(ya_cobrada)),
+			("Omitidos — sin factura", len(sin_factura)),
+			("Omitidos — sin coincidencia", len(sin_coincidencia)),
+			("Errores Excel", int(resumen.get("errores") or 0)),
 		]
 	if followup_rows:
 		kpis.append(("Inscrip. nuevas a revisar", len(followup_rows)))
 
-	kpi_html = ""
-	if kpis:
-		kpi_html = '<div class="kpis cobranza-kpis">' + "".join(
-			f'<div class="kpi"><span class="kpi-label">{escape_html(l)}</span>'
-			f'<span class="kpi-value">{v}</span></div>'
-			for l, v in kpis
-		) + "</div>"
+	kpi_html = '<div class="kpis">' + "".join(
+		f'<div class="kpi"><span class="kpi-label">{escape_html(label)}</span>'
+		f'<span class="kpi-value">{value}</span></div>'
+		for label, value in kpis
+	) + "</div>"
 
-	followup_cols = [
-		("socio", "Socio"),
-		("dni", "DNI"),
-		("nombre", "Nombre"),
-		("destino", "Inscripción"),
-		("factura_aranceles", "Factura aranceles"),
-		("saldo_aranceles", "Saldo aranceles"),
-		("factura_cuota", "Factura cuota"),
-		("saldo_cuota", "Saldo cuota"),
-		("saldo_deuda_socio", "Saldo deuda socio"),
-		("import_excel", "Import Excel"),
-		("accion", "Acción sugerida"),
-	]
+	toc: list[tuple[str, str]] = []
+	sections: list[str] = []
 
-	excel_ok_cols = [
-		("fecha", "Fecha"),
-		("socio", "Socio"),
-		("nombre", "Nombre"),
-		("concepto", "Concepto"),
-		("importe", "Importe"),
-		("sales_invoice", "Factura"),
-		("payment_entry", "Payment Entry"),
-		("mode_of_payment", "Medio"),
-	]
-	excel_omit_cols = [
-		("fecha", "Fecha"),
-		("socio", "Socio"),
-		("nombre", "Nombre"),
-		("concepto", "Concepto"),
-		("importe", "Importe"),
-		("periodo", "Período"),
-		("motivo", "Motivo"),
-	]
-	excel_err_cols = [
-		("fecha", "Fecha"),
-		("socio", "Socio"),
-		("nombre", "Nombre"),
-		("concepto", "Concepto"),
-		("importe", "Importe"),
-		("error", "Error"),
-	]
-
-	sections: list[tuple[str, str, str, str, bool]] = []
 	if followup_rows:
+		toc.append(("seguimiento-inscripciones", "Inscripciones nuevas"))
 		sections.append(
-			(
-				"cobranza-inscripciones-nuevas",
-				f"Seguimiento cobranza — inscripciones nuevas ({len(followup_rows)})",
+			render_collapsible_section(
+				"seguimiento-inscripciones",
+				f"Seguimiento — inscripciones nuevas ({len(followup_rows)})",
 				f"Estado facturas {periodo_cobro} y resultado del import Excel, socio a socio.",
-				_render_cobranza_log_table(followup_rows, followup_cols),
-				True,
+				render_table(
+					followup_rows,
+					[
+						("socio", "Socio"),
+						("dni", "DNI"),
+						("destino", "Inscripción"),
+						("_arancel", "Aranceles"),
+						("_cuota", "Cuota social"),
+						("saldo_deuda_socio", "Saldo deuda"),
+						("import_excel", "Import Excel"),
+						("accion", "Acción sugerida"),
+					],
+					renderers={
+						"socio": _socio_renderer,
+						"_arancel": _aranceles_estado_renderer,
+						"_cuota": _cuota_estado_renderer,
+					},
+				),
+				open_default=True,
 			)
 		)
+
 	if log:
+		toc.append(("excel-registrados", "Excel registrados"))
 		sections.append(
-			(
-				"cobranza-excel-ok",
-				f"Excel cobranza — registrados ({resumen.get('procesados', 0)})",
+			render_collapsible_section(
+				"excel-registrados",
+				f"Excel — registrados ({resumen.get('procesados', 0)})",
 				"Payment Entry creados desde el Excel.",
-				_render_cobranza_log_table(log.get("ok") or [], excel_ok_cols),
-				False,
+				render_table(
+					log.get("ok") or [],
+					[
+						("fecha", "Fecha"),
+						("socio", "Socio"),
+						("concepto", "Concepto"),
+						("importe", "Importe"),
+						("sales_invoice", "Factura"),
+						("payment_entry", "Payment Entry"),
+						("mode_of_payment", "Medio"),
+					],
+					renderers={
+						"socio": _socio_renderer,
+						"sales_invoice": _invoice_link_renderer("sales_invoice"),
+						"payment_entry": _payment_link_renderer,
+					},
+				),
 			)
 		)
-		sections.append(
-			(
-				"cobranza-excel-omitidos",
-				f"Excel cobranza — omitidos ({resumen.get('omitidos', 0)})",
-				"Filas sin factura coincidente o ya cobradas; Secretaría debe revisar y cargar a mano.",
-				_render_cobranza_log_table(log.get("omitidos_detalle") or [], excel_omit_cols),
-				bool(resumen.get("omitidos")),
+
+		omit_cols = [
+			("fecha", "Fecha"),
+			("socio", "Socio"),
+			("concepto", "Concepto"),
+			("importe", "Importe"),
+			("periodo", "Período"),
+			("estado", "Estado"),
+			("motivo", "Motivo Excel"),
+		]
+		omit_renderers = {"socio": _socio_renderer, "estado": _estado_renderer}
+
+		if ya_cobrada:
+			toc.append(("excel-ya-cobrada", "Ya cobrada"))
+			sections.append(
+				render_collapsible_section(
+					"excel-ya-cobrada",
+					f"Excel omitidos — ya cobrada ({len(ya_cobrada)})",
+					"El Excel repite un cobro que ya estaba registrado; no requiere acción.",
+					render_table(ya_cobrada, omit_cols, renderers=omit_renderers),
+				)
 			)
-		)
+		if sin_factura:
+			toc.append(("excel-sin-factura", "Sin factura"))
+			sections.append(
+				render_collapsible_section(
+					"excel-sin-factura",
+					f"Excel omitidos — sin factura ({len(sin_factura)})",
+					"No hay factura emitida para el período; emitir deuda antes de cobrar.",
+					render_table(sin_factura, omit_cols, renderers=omit_renderers),
+					open_default=True,
+				)
+			)
+		if sin_coincidencia:
+			toc.append(("excel-sin-coincidencia", "Sin coincidencia"))
+			sections.append(
+				render_collapsible_section(
+					"excel-sin-coincidencia",
+					f"Excel omitidos — sin coincidencia ({len(sin_coincidencia)})",
+					"Hay factura pendiente pero importe/concepto no coincide con el Excel.",
+					render_table(sin_coincidencia, omit_cols, renderers=omit_renderers),
+					open_default=True,
+				)
+			)
+
+		toc.append(("excel-errores", "Errores"))
 		sections.append(
-			(
-				"cobranza-excel-errores",
-				f"Excel cobranza — errores ({resumen.get('errores', 0)})",
+			render_collapsible_section(
+				"excel-errores",
+				f"Excel — errores ({resumen.get('errores', 0)})",
 				"Socios o datos que fallaron al importar.",
-				_render_cobranza_log_table(log.get("errores_detalle") or [], excel_err_cols),
-				bool(resumen.get("errores")),
+				render_table(
+					log.get("errores_detalle") or [],
+					[
+						("fecha", "Fecha"),
+						("socio", "Socio"),
+						("concepto", "Concepto"),
+						("importe", "Importe"),
+						("error", "Error"),
+					],
+					renderers={"socio": _socio_renderer},
+				),
+				open_default=bool(resumen.get("errores")),
 			)
 		)
+
+	generated_at = now_datetime()
+	timestamp = generated_at.strftime("%d/%m/%Y %H:%M") if hasattr(generated_at, "strftime") else str(generated_at)
 
 	meta = ""
 	if log:
 		meta = (
-			f"<p class='cobranza-meta'>Período: {escape_html(periodo_cobro)} · "
+			f"<p>Período: {escape_html(periodo_cobro)} · "
 			f"Excel: {escape_html(str(log.get('file_path') or '—'))} · "
 			f"Rango: {escape_html(str(log.get('fecha_desde') or '—'))} → "
 			f"{escape_html(str(log.get('fecha_hasta') or '—'))}</p>"
 		)
 
-	section_html = ""
-	for section_id, title, hint, content, open_default in sections:
-		open_attr = " open" if open_default else ""
-		section_html += (
-			f'<details class="section cobranza-section" id="{section_id}"{open_attr}>'
-			f"<summary><span class='section-title'>{escape_html(title)}</span>"
-			f"<span class='section-hint'>{escape_html(hint)}</span></summary>"
-			f"<div class='section-body'>{content}</div></details>"
-		)
+	header = f"""
+<header>
+  <h1>Informe cobranza — detalle socio a socio</h1>
+  {meta}
+  <p>Generado: {escape_html(timestamp)}</p>
+</header>"""
 
-	return f"""
-<h2 class="report-part-title">Cobranza y cargos — detalle socio a socio</h2>
-{meta}
-{action_block}
-{kpi_html}
-{section_html}
-"""
+	nav = render_nav_bar(
+		sibling_href=INFORME_ROSTER_URL,
+		sibling_label="Informe import roster básquet",
+		toc=toc,
+	)
+
+	body = action_block + kpi_html + "".join(sections)
+
+	return report_page_shell(
+		title="Informe cobranza",
+		header_html=header,
+		body_html=body,
+		nav_html=nav,
+	)
 
 
 def write_cobranza_import_report_html(
-	log: dict[str, Any],
+	log: dict[str, Any] | None,
 	*,
 	output_dir: str | Path | None = None,
 	publish_latest: bool = True,
-	followup_rows: list[dict[str, str]] | None = None,
+	followup_rows: list[dict[str, Any]] | None = None,
 	periodo_cobro: str | None = None,
 ) -> str:
-	periodo = periodo_cobro or log.get("fecha_desde") or format_periodo_cobro(today())
+	periodo = periodo_cobro or (log or {}).get("fecha_desde") or format_periodo_cobro(today())
 	if isinstance(periodo, str) and len(periodo) == 10:
 		periodo = format_periodo_cobro(getdate(periodo))
-	body = render_cobranza_import_sections_html(
+	html = render_cobranza_import_report_html(
 		log,
 		periodo_cobro=str(periodo),
 		followup_rows=followup_rows,
 	)
-	html = f"""<!DOCTYPE html>
-<html lang="es"><head><meta charset="utf-8"><title>Informe cobranza</title>
-<style>
-body {{ font-family: system-ui, sans-serif; margin: 24px; background: #f4f6f8; }}
-.report-part-title {{ margin-top: 32px; }}
-.cobranza-meta {{ color: #61727a; }}
-.action-pending, .action-ok {{ background: #fff; border-radius: 8px; padding: 16px; margin: 16px 0; }}
-.action-pending {{ border-left: 4px solid #b45309; }}
-.kpis {{ display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0; }}
-.kpi {{ background: #fff; padding: 12px; border-radius: 8px; min-width: 120px; }}
-.section {{ background: #fff; margin-bottom: 12px; border-radius: 8px; }}
-.section summary {{ padding: 12px 16px; cursor: pointer; }}
-.table-wrap {{ overflow-x: auto; }}
-table {{ width: 100%; border-collapse: collapse; font-size: .9rem; }}
-th, td {{ border-bottom: 1px solid #e2e8f0; padding: 8px; text-align: left; }}
-</style></head><body>{body}</body></html>"""
+	written_path = ""
 	if output_dir:
 		out = Path(output_dir)
 		out.mkdir(parents=True, exist_ok=True)
 		path = out / COBRANZA_HTML_FILENAME
 		path.write_text(html, encoding="utf-8")
 		written_path = str(path)
-	else:
-		written_path = ""
 	if publish_latest:
 		latest = Path(frappe.get_site_path(LATEST_COBRANZA_HTML_SITE_PATH))
 		latest.parent.mkdir(parents=True, exist_ok=True)
 		latest.write_text(html, encoding="utf-8")
-	return written_path or str(latest) if publish_latest else written_path
+		if not written_path:
+			written_path = str(latest)
+	return written_path

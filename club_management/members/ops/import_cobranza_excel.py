@@ -320,7 +320,12 @@ def run(
 
 	frappe.msgprint(
 		frappe.as_json(
-			{"resumen": result["resumen"], "log_path": written, "reporte_html": "publicado"},
+			{
+				"resumen": result["resumen"],
+				"log_path": written,
+				"reporte_html": "publicado",
+				"url_informe": "/informe-import-cobranza-basquet",
+			},
 			indent=2,
 		)
 	)

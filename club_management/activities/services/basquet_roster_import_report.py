@@ -10,9 +10,18 @@ import frappe
 from frappe.utils import escape_html, now_datetime, today
 
 from club_management.members.services.cobranza_manual import format_periodo_cobro
+from club_management.members.services.informe_html_common import (
+	desk_socio_link,
+	render_collapsible_section,
+	render_nav_bar,
+	render_table,
+	report_page_shell,
+)
 
 REPORT_FILENAME = "INFORME IMPORT ROSTER BASQUET.html"
 LATEST_REPORT_SITE_PATH = "private/files/roster_import_basquet_latest.html"
+INFORME_ROSTER_URL = "/informe-import-roster-basquet"
+INFORME_COBRANZA_URL = "/informe-import-cobranza-basquet"
 
 
 def _pending_count(stats: dict[str, Any]) -> int:
@@ -31,30 +40,15 @@ def _completion_pct(stats: dict[str, Any]) -> float:
 	return round(min(100.0, (done / total) * 100), 1)
 
 
-def _render_table(rows: list[dict[str, str]], columns: list[tuple[str, str]]) -> str:
-	if not rows:
-		return '<p class="empty">Sin registros.</p>'
-	head = "".join(f"<th>{escape_html(label)}</th>" for _, label in columns)
-	body_rows: list[str] = []
-	for row in rows:
-		cells = "".join(
-			f"<td>{escape_html(str(row.get(key) or ''))}</td>" for key, _ in columns
-		)
-		body_rows.append(f"<tr>{cells}</tr>")
-	return (
-		'<div class="table-wrap"><table><thead><tr>'
-		+ head
-		+ "</tr></thead><tbody>"
-		+ "".join(body_rows)
-		+ "</tbody></table></div>"
-	)
-
-
 def _render_errors(errors: list[str]) -> str:
 	if not errors:
 		return '<p class="empty">Sin errores.</p>'
 	items = "".join(f"<li>{escape_html(err)}</li>" for err in errors)
 	return f"<ul class='error-list'>{items}</ul>"
+
+
+def _socio_renderer(row: dict[str, Any]) -> str:
+	return desk_socio_link(row.get("socio"), row.get("nombre") or row.get("socio"))
 
 
 def render_roster_import_report_html(
@@ -63,9 +57,8 @@ def render_roster_import_report_html(
 	source_path: str,
 	dry_run: bool,
 	log_rows: dict[str, list[dict[str, str]]] | None = None,
-	cobranza_html: str = "",
 ) -> str:
-	"""Genera HTML autocontenido con resumen y guía de ajustes."""
+	"""Genera HTML autocontenido con resumen y guía de ajustes (solo inscripciones)."""
 	log_rows = log_rows or {}
 	pending = _pending_count(stats)
 	completion = _completion_pct(stats)
@@ -117,11 +110,11 @@ def render_roster_import_report_html(
 		("Errores", len(stats.get("errores") or [])),
 		("Pendientes", pending),
 	]
-	kpi_html = "".join(
+	kpi_html = '<div class="kpis">' + "".join(
 		f'<div class="kpi"><span class="kpi-label">{escape_html(label)}</span>'
 		f'<span class="kpi-value">{value}</span></div>'
 		for label, value in kpis
-	)
+	) + "</div>"
 
 	base_columns = [
 		("numero", "Nº"),
@@ -138,53 +131,60 @@ def render_roster_import_report_html(
 		("socio", "Socio"),
 		("destino", "Destino"),
 	]
+	socio_renderer = {"socio": _socio_renderer}
+
+	toc: list[tuple[str, str]] = [
+		("inscripciones-nuevas", "Inscripciones nuevas"),
+		("ya-inscriptos", "Ya inscriptos"),
+		("no-padron-sin-dni", "Sin DNI"),
+		("no-padron-con-dni", "DNI sin padrón"),
+		("errores", "Errores"),
+	]
 
 	sections = [
-		(
+		render_collapsible_section(
 			"inscripciones-nuevas",
 			f"Inscripciones nuevas ({stats.get('inscripciones_nuevas', 0)})",
-			"Filas que se inscribieron correctamente en esta ejecución.",
-			_render_table(log_rows.get("inscripciones_nuevas") or [], nuevas_columns),
-			stats.get("inscripciones_nuevas", 0) > 0,
+			"Filas que se inscribieron correctamente en esta ejecución. Clic en socio abre la ficha en Desk.",
+			render_table(
+				log_rows.get("inscripciones_nuevas") or [],
+				nuevas_columns,
+				renderers=socio_renderer,
+			),
+			open_default=stats.get("inscripciones_nuevas", 0) > 0,
 		),
-		(
+		render_collapsible_section(
 			"ya-inscriptos",
 			f"Ya tenían inscripción ({stats.get('ya_inscriptos', 0)})",
 			"No requieren acción: ya tenían básquet activo.",
-			_render_table(log_rows.get("ya_inscriptos") or [], ya_columns),
-			False,
+			render_table(
+				log_rows.get("ya_inscriptos") or [],
+				ya_columns,
+				renderers=socio_renderer,
+			),
 		),
-		(
+		render_collapsible_section(
 			"no-padron-sin-dni",
 			f"No están en el padrón y sin DNI ({stats.get('no_padron_sin_dni', 0)})",
 			"Prioridad: corregir nombre o agregar DNI para vincular con un socio existente.",
-			_render_table(log_rows.get("no_padron_sin_dni") or [], base_columns),
-			stats.get("no_padron_sin_dni", 0) > 0,
+			render_table(log_rows.get("no_padron_sin_dni") or [], base_columns),
+			open_default=stats.get("no_padron_sin_dni", 0) > 0,
 		),
-		(
+		render_collapsible_section(
 			"no-padron-con-dni",
 			f"No están en el padrón pero tienen DNI ({stats.get('no_padron_con_dni', 0)})",
 			"Prioridad: alta de socio en padrón o corrección del DNI en el CSV.",
-			_render_table(log_rows.get("no_padron_con_dni") or [], base_columns),
-			stats.get("no_padron_con_dni", 0) > 0,
+			render_table(log_rows.get("no_padron_con_dni") or [], base_columns),
+			open_default=stats.get("no_padron_con_dni", 0) > 0,
 		),
-		(
+		render_collapsible_section(
 			"errores",
 			f"Errores ({len(stats.get('errores') or [])})",
 			"Fallos de mapeo o estructura; revisar categoría/equipo y seed de actividades.",
 			_render_errors(stats.get("errores") or []),
-			len(stats.get("errores") or []) > 0,
+			open_default=len(stats.get("errores") or []) > 0,
 		),
 	]
-	section_html = ""
-	for section_id, title, hint, content, open_default in sections:
-		open_attr = " open" if open_default else ""
-		section_html += (
-			f'<details class="section" id="{section_id}"{open_attr}>'
-			f"<summary><span class='section-title'>{escape_html(title)}</span>"
-			f"<span class='section-hint'>{escape_html(hint)}</span></summary>"
-			f"<div class='section-body'>{content}</div></details>"
-		)
 
 	csv_links = stats.get("log_paths") or {}
 	csv_list = "".join(
@@ -192,150 +192,36 @@ def render_roster_import_report_html(
 		for key, path in csv_links.items()
 		if key != "reporte_html"
 	)
+	files_block = f"""
+<div class="files">
+  <strong>Archivos CSV de log</strong>
+  <ul>{csv_list or "<li>Sin CSV generados.</li>"}</ul>
+</div>"""
 
-	return f"""<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Informe import roster básquet</title>
-<style>
-:root {{
-  --bg: #f4f6f8;
-  --card: #fff;
-  --text: #1f2933;
-  --muted: #61727a;
-  --ok: #0f7b3c;
-  --warn: #b45309;
-  --err: #b42318;
-  --accent: #1d4ed8;
-  --border: #d9e2ec;
-}}
-* {{ box-sizing: border-box; }}
-body {{
-  margin: 0;
-  font-family: "Segoe UI", system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.45;
-}}
-.wrap {{ max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }}
-header {{
-  background: linear-gradient(135deg, #0f172a, #1e3a8a);
-  color: #fff;
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 20px;
-}}
-header h1 {{ margin: 0 0 8px; font-size: 1.6rem; }}
-header p {{ margin: 4px 0; color: #dbeafe; }}
-.progress {{
-  margin-top: 16px;
-  background: rgba(255,255,255,.2);
-  border-radius: 999px;
-  height: 10px;
-  overflow: hidden;
-}}
-.progress-bar {{
-  height: 100%;
-  background: #4ade80;
-  width: {completion}%;
-}}
-.progress-label {{ margin-top: 8px; font-size: .95rem; }}
-.kpis {{
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
-  margin-bottom: 20px;
-}}
-.kpi {{
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
-}}
-.kpi-label {{ display: block; color: var(--muted); font-size: .82rem; }}
-.kpi-value {{ display: block; font-size: 1.5rem; font-weight: 700; margin-top: 4px; }}
-.action-pending, .action-ok {{
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px 20px;
-  margin-bottom: 20px;
-}}
-.action-pending {{ border-left: 4px solid var(--warn); }}
-.action-ok {{ border-left: 4px solid var(--ok); }}
-.action-pending h2 {{ margin-top: 0; font-size: 1.1rem; }}
-.section {{
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  margin-bottom: 12px;
-  overflow: hidden;
-}}
-.section summary {{
-  cursor: pointer;
-  list-style: none;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}}
-.section summary::-webkit-details-marker {{ display: none; }}
-.section-title {{ font-weight: 700; }}
-.section-hint {{ color: var(--muted); font-size: .9rem; }}
-.section-body {{ padding: 0 16px 16px; }}
-.table-wrap {{ overflow-x: auto; }}
-table {{
-  width: 100%;
-  border-collapse: collapse;
-  font-size: .9rem;
-}}
-th, td {{
-  border-bottom: 1px solid var(--border);
-  padding: 8px 10px;
-  text-align: left;
-  vertical-align: top;
-}}
-th {{ background: #f8fafc; }}
-.empty {{ color: var(--muted); margin: 0; }}
-.error-list {{ margin: 0; padding-left: 20px; color: var(--err); }}
-.files {{
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px 20px;
-  margin-top: 20px;
-  font-size: .9rem;
-}}
-code {{ background: #eef2ff; padding: 2px 6px; border-radius: 4px; }}
-.report-part-title {{ margin: 28px 0 12px; font-size: 1.25rem; }}
-.cobranza-meta {{ color: var(--muted); font-size: .9rem; margin-bottom: 12px; }}
-.cobranza-kpis {{ margin-bottom: 16px; }}
-.cobranza-block {{ margin-bottom: 16px; }}
-</style>
-</head>
-<body>
-<div class="wrap">
+	header = f"""
 <header>
   <h1>Informe import roster básquet</h1>
   <p>Modo: {escape_html(mode)}</p>
   <p>Archivo: {escape_html(source_path)}</p>
   <p>Generado: {escape_html(timestamp)}</p>
-  <div class="progress"><div class="progress-bar"></div></div>
+  <div class="progress"><div class="progress-bar" style="width:{completion}%"></div></div>
   <p class="progress-label">Completitud: {completion}% — pendientes: {pending}</p>
-</header>
-<div class="kpis">{kpi_html}</div>
-{action_block}
-{section_html}
-{cobranza_html}
-<div class="files">
-  <strong>Archivos CSV de log</strong>
-  <ul>{csv_list or "<li>Sin CSV generados.</li>"}</ul>
-</div>
-</div>
-</body>
-</html>"""
+</header>"""
+
+	nav = render_nav_bar(
+		sibling_href=INFORME_COBRANZA_URL,
+		sibling_label="Informe cobranza (facturas y Excel)",
+		toc=toc,
+	)
+
+	body = action_block + kpi_html + "".join(sections) + files_block
+
+	return report_page_shell(
+		title="Informe import roster básquet",
+		header_html=header,
+		body_html=body,
+		nav_html=nav,
+	)
 
 
 def write_roster_import_report(
@@ -348,37 +234,16 @@ def write_roster_import_report(
 	publish_latest: bool = True,
 	cobranza_periodo: str | None = None,
 	cobranza_log_path: str | None = None,
-	include_cobranza: bool = True,
+	write_cobranza_page: bool = True,
 ) -> str:
-	"""Escribe informe HTML en output_dir y opcionalmente publica copia en el sitio."""
+	"""Escribe informe HTML de roster y, por separado, el de cobranza."""
 	out_dir = Path(output_dir)
 	out_dir.mkdir(parents=True, exist_ok=True)
-	periodo = cobranza_periodo or format_periodo_cobro(today())
-	cobranza_html = ""
-	if include_cobranza:
-		from club_management.members.services.cobranza_import_report import (
-			build_cobranza_followup_rows,
-			load_cobranza_import_log,
-			render_cobranza_import_sections_html,
-		)
-
-		cobranza_log = load_cobranza_import_log(cobranza_log_path)
-		followup_rows = build_cobranza_followup_rows(
-			(log_rows or {}).get("inscripciones_nuevas") or [],
-			periodo_cobro=periodo,
-			cobranza_log=cobranza_log,
-		)
-		cobranza_html = render_cobranza_import_sections_html(
-			cobranza_log,
-			periodo_cobro=periodo,
-			followup_rows=followup_rows,
-		)
 	html = render_roster_import_report_html(
 		stats,
 		source_path=source_path,
 		dry_run=dry_run,
 		log_rows=log_rows,
-		cobranza_html=cobranza_html,
 	)
 	path = out_dir / REPORT_FILENAME
 	path.write_text(html, encoding="utf-8")
@@ -386,4 +251,27 @@ def write_roster_import_report(
 		latest = Path(frappe.get_site_path(LATEST_REPORT_SITE_PATH))
 		latest.parent.mkdir(parents=True, exist_ok=True)
 		latest.write_text(html, encoding="utf-8")
+
+	if write_cobranza_page and not dry_run:
+		from club_management.members.services.cobranza_import_report import (
+			build_cobranza_followup_rows,
+			load_cobranza_import_log,
+			write_cobranza_import_report_html,
+		)
+
+		periodo = cobranza_periodo or format_periodo_cobro(today())
+		cobranza_log = load_cobranza_import_log(cobranza_log_path)
+		followup_rows = build_cobranza_followup_rows(
+			(log_rows or {}).get("inscripciones_nuevas") or [],
+			periodo_cobro=periodo,
+			cobranza_log=cobranza_log,
+		)
+		cobranza_path = write_cobranza_import_report_html(
+			cobranza_log,
+			output_dir=out_dir,
+			followup_rows=followup_rows,
+			periodo_cobro=periodo,
+		)
+		stats.setdefault("log_paths", {})["reporte_cobranza_html"] = cobranza_path
+
 	return str(path)

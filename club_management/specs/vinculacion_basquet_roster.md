@@ -156,13 +156,47 @@ And Secretaría puede visualizarlo en `/informe-import-roster-basquet` autentica
 
 ---
 
-## Scenario: informe HTML incluye cobranza socio a socio
+## Scenario: informe HTML de cobranza en página separada
 
 When finaliza `import_roster_jugadores` (no dry_run)
 
-Then el informe HTML agrega sección **Cobranza y cargos — detalle socio a socio**
+Then genera un segundo archivo HTML `INFORME COBRANZA IMPORT.html` en el directorio de salida
 
-And lista por cada inscripción nueva: facturas julio, saldos, resultado del import Excel y acción sugerida
+And publica copia en `private/files/cobranza_import_latest.html`
 
-And si existe log de `import_cobranza_excel`, incluye tablas de registrados, omitidos y errores del Excel.
+And Secretaría lo visualiza en `/informe-import-cobranza-basquet` autenticada
+
+And el informe roster enlaza a la página de cobranza y viceversa.
+
+---
+
+## Scenario: informes navegables con secciones colapsables
+
+Given un informe roster o cobranza generado
+
+Then cada bloque principal es una sección `<details>` colapsable
+
+And hay índice de navegación con anclas y botones expandir/colapsar todo
+
+And los socios con ficha en el sistema son hipervínculos a `/app/socio/{name}` en Desk
+
+And las facturas y Payment Entry del Excel enlazan a sus formularios en Desk.
+
+---
+
+## Scenario: omitidos Excel distinguen ya cobrada vs sin factura
+
+Given filas omitidas del import Excel de cobranza
+
+When el motivo es `Factura ya cobrada`
+
+Then el informe las clasifica como **Ya cobrada** (no requiere acción)
+
+When el motivo es `Sin factura pendiente coincidente` y el socio no tiene facturas del período
+
+Then el informe las clasifica como **Sin factura** (emitir deuda antes de cobrar)
+
+When hay facturas pendientes pero no coinciden importe/concepto
+
+Then el informe las clasifica como **Sin coincidencia** (revisar manualmente).
 

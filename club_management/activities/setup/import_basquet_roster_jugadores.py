@@ -67,8 +67,10 @@ def _print_resumen(stats: dict[str, Any], *, dry_run: bool, source_path: str) ->
 		print(f"  {label}: {path}")
 	if stats.get("log_paths", {}).get("reporte_html"):
 		print("-" * 72)
-		print(" Informe HTML (Desk autenticado):")
+		print(" Informes HTML (Desk autenticado):")
 		print("  /informe-import-roster-basquet")
+		if stats.get("log_paths", {}).get("reporte_cobranza_html"):
+			print("  /informe-import-cobranza-basquet")
 	if stats.get("errores"):
 		print("-" * 72)
 		print(" Errores (primeros 15):")
