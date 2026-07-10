@@ -118,7 +118,7 @@ Ver `basquet_cost_center_consolidado.md`: un solo CC **Deportes - Basquet - ICDP
 
 ## Fuera de alcance (siguiente iteración)
 
-- UI portal socio (cascada actividad → grupo → equipo).
+- UI portal socio en **Vercel** (sitio del club): socio elige solo actividad «Basquet»; tira/equipo los asigna Secretaría (`portal_socio_inscripcion.md`).
 - Borrado físico de DocTypes legacy; solo deshabilitar actividades/grupos viejos.
 
 ---

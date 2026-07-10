@@ -13,7 +13,7 @@
 
 
 **Última revisión MVP producción:** 2026-07-10 (cobranza/recibo + número socio manual, commit `b53ed5b`)  
-**Última actualización backlog:** 2026-07-10 (BL-7–BL-9 cerrados; sesión cobranza Secretaría)  
+**Última actualización backlog:** 2026-07-10 (BL-6 redefinido: portal Vercel + reglas inscripción)  
 
 **Destino producción:** Hetzner Cloud **CX23** (servidor aparte del devcontainer local)
 
@@ -240,6 +240,10 @@ Servicios críticos cobranza: **scheduler**, **queue-long**, **queue-short**, **
 | `cobranza_recargo_segundo_vencimiento.md` | [x] | Recargo fin de mes + segunda exigibilidad |
 
 | `moroso_automatico.md` | [x] | Job moroso post-2.º vencimiento |
+
+| `recibo_pago_escpos.md` | [x] | Recibo térmico ESC/POS tras registrar cobro Desk (2026-07-08, `e58bfbc`) |
+
+| `registrar_cobro_fecha.md` | [x] | Fecha de cobro en diálogo Secretaría + validación (2026-07-08 `8aed9ef`, tests `b53ed5b`) |
 
 | `liquidacion_equipo_deuda_rango.md` | [x] | Reporte deuda por equipo + liquidación manual en rango |
 
@@ -741,6 +745,8 @@ print(result)  # facturas_creadas, errores, invoice_names
 
 | BL-9 | **Número de socio manual en alta** | Media | `socio_alta_edicion_secretaria.md` | **Hecho 2026-07-10** — `numero_socio` opcional en JSON/alta guiada/API; validación duplicado (`b53ed5b`). |
 
+| BL-6 | **Portal socio inscripción (Vercel + API)** | Media | `portal_socio_inscripcion.md` | **Pendiente** — frontend en sitio del club (Vercel); Frappe API. Deportes: socio solo actividad; Secretaría asigna tira/equipo al validar alta. Variantes (Funcional, escuelita): socio elige actividad + grupo. |
+
 
 
 **Orden sugerido al retomar:** portal socio (BL-6) · grupo familiar · complementar aranceles período (ops Excel julio).
@@ -774,7 +780,7 @@ print(result)  # facturas_creadas, errores, invoice_names
 
 | # | Tema | Prioridad | Notas |
 |---|------|-----------|-------|
-| BL-6 | **Portal socio cascada** | Media | UI actividad → grupo → equipo con estructura unificada (`activities_modulo.md`, Fase 3). |
+| BL-6 | **Portal socio inscripción (Vercel + API)** | Media | `portal_socio_inscripcion.md` | **Pendiente** — ver spec: deportes = solo actividad; variantes = actividad + grupo; tira/equipo deportivo = Secretaría al validar alta. |
 
 ---
 
@@ -798,7 +804,7 @@ print(result)  # facturas_creadas, errores, invoice_names
 | BL-3 Básquet unificado | Hecho + prod |
 | BL-4 CC ERPNext básquet | Hecho + prod + purga |
 | BL-5 Specs legacy | Hecho |
-| BL-6 Portal cascada | **Pendiente** |
+| BL-6 Portal socio (Vercel + API) | **Pendiente** |
 | BL-7 Recibo cobro Desk | Hecho + prod (`e58bfbc`) |
 | BL-8 Fecha de cobro | Hecho + prod (`8aed9ef` / tests `b53ed5b`) |
 | BL-9 Número socio manual | Hecho + prod (`b53ed5b`) |
@@ -848,7 +854,7 @@ Error en producción al **Registrar cobro** desde formulario Socio: `NameError: 
 
 | # | Tema | Prioridad | Notas |
 |---|------|-----------|-------|
-| BL-6 | **Portal socio cascada** | Media | UI actividad → grupo → equipo (`activities_modulo.md`, Fase 3). |
+| BL-6 | **Portal socio inscripción (Vercel + API)** | Media | `portal_socio_inscripcion.md` — deportes: solo actividad; variantes: actividad + grupo; tira/equipo: Secretaría. |
 | — | **Grupo familiar** | Media | Sin spec dedicada aún. |
 | — | **Ops cobranza Excel julio** | Baja | Scripts `members/ops/import_cobranza_excel.py` en prod; validar carga masiva con Secretaría. |
 
@@ -866,5 +872,41 @@ Error en producción al **Registrar cobro** desde formulario Socio: `NameError: 
 | B1 | **Cancelación de Sales Invoice falla en PostgreSQL** | ~~Alta~~ **Resuelto 2026-07-01** | `delink_original_entry` asignaba `delinked=true` (boolean) a columna `smallint`. Parche en `payment_ledger_postgres.py` + spec `sales_invoice_cancel_postgres.md` + test `test_sales_invoice_cancel_postgres.py`. Desplegar y reiniciar workers para activar. |
 | B2 | **`get_negative_outstanding_invoices` en Payment Entry (PostgreSQL)** | ~~Media~~ **Resuelto 2026-07-05** | Parche en `payment_ledger_postgres.py`. `test_moroso_automatico`: 6/6 OK. |
 | B3 | **`NameError: build_recibo_pago` en registrar cobro Desk** | ~~Alta~~ **Resuelto 2026-07-08** | Faltaba import en `cobranza_desk.py`. Fix `e58bfbc`; tests `test_recibo_pago` + UI Socio 11479 OK. |
+
+
+
+---
+
+
+
+## Módulo Gestión Financiera (GF)
+
+
+
+**Decisión:** egresos vía **Purchase Invoice** + Payment Entry. Ingresos eventuales vía Sales Invoice + Payment Entry. Cuotas/aranceles siguen cobranza existente.
+
+
+
+| Ítem | Spec | Estado | Notas |
+
+|------|------|--------|-------|
+
+| GF-0 Specs | `rol_tesoreria_permisos.md`, `carga_rapida_ingreso_egreso.md`, `proyeccion_flujo_fondos.md`, `items_finance_cost_center.md` | [x] | 2026-07-10 |
+
+| GF-1 Rol Tesorería + permisos | `rol_tesoreria_permisos.md` | [x] | Rol `Tesoreria`; workspace Tesorería sin Secretaría |
+
+| GF-2 Carga rápida ingreso/egreso | `carga_rapida_ingreso_egreso.md` | [x] | SI / PI / PE; `club_concepto`; APIs Desk |
+
+| GF-3 Proyección flujo de fondos | `proyeccion_flujo_fondos.md` | [x] | Script Report + API; ventana 5 días |
+
+| GF-4 Ítems + Cost Center | `items_finance_cost_center.md` | [x] | Catálogo `ICDPE-FIN-*` |
+
+| GF-HRMS | — | [ ] | **Fase posterior:** app HRMS / liquidación nativa de sueldos. Esta fase usa Purchase Invoice de provisión (Sueldos / AFIP 931 / ART / UTEDYC). **No implementar HRMS aquí.** |
+
+
+
+**Fuera de alcance GF (esta fase):** conciliación bancaria automática, gateway Cobros Plus en prod, Payment Log SIRO, modificar plan de cuentas importado.
+
+
 
 

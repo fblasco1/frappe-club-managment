@@ -9,10 +9,11 @@
   Funcional, Crossfit, Zumba (contable: Ritmos Latinos).
 - **`Inscripcion Actividad`**: vínculo Socio ↔ Actividad (una fila por par).
 - Tras confirmar el **pago stub**, el socio pasa a **`Pendiente de Inscripción`** y debe
-  elegir una o más actividades (o continuar sin ninguna) en una página pública firmada
-  con el mismo `pago_token`.
+  elegir una o más actividades (o continuar sin ninguna) en el **portal del club en Vercel**
+  (conectado por API). La página Frappe `/inscripcion-actividades` es provisional para QA.
 - Al confirmar la inscripción, el socio pasa a **`Activo`** y el campo resumen
   `Socio.actividad` refleja los nombres separados por coma.
+- Reglas portal: ver **`portal_socio_inscripcion.md`** (deportes = solo actividad; variantes = actividad + grupo; tira/equipo = Secretaría).
 - El formulario público de solicitud y el panel Secretaría consumen el mismo catálogo.
 
 ## Scenario: catálogo de actividades habilitadas
@@ -28,7 +29,7 @@ Given una `Solicitud Asociacion` en `Validada` con `socio_generado`
 And un `pago_token` válido para esa solicitud
 When se ejecuta `confirmar_pago_stub` con ese token
 Then el `Socio` queda con `estado = "Pendiente de Inscripción"`
-And la respuesta incluye `inscripcion_url` hacia `/inscripcion-actividades?token=…`
+And la respuesta incluye `inscripcion_url` hacia el **sitio del club en Vercel** con `?token=…` (configurable; legacy Frappe: `/inscripcion-actividades`)
 And **no** queda `Activo` todavía.
 
 ## Scenario: inscripción pública tras el pago
@@ -74,3 +75,4 @@ Then `actividad` muestra `"Natación, Gimnasio"` (o fallback a solicitud si no h
 - Cuotas por actividad, Cost Center, ERPNext `Item` obligatorio.
 - Portal autenticado del socio para cambiar inscripciones.
 - SIRO / Supervielle real (Sprint 4).
+- **Implementación frontend Vercel** (BL-6): ver `portal_socio_inscripcion.md`; Frappe expone API, el sitio del club consume.
