@@ -53,7 +53,8 @@ Given un `Socio` existente abierto por Secretaría
 And faltan datos críticos (contacto, domicilio, adjuntos o tutor si `categoria = Menor`)
 When Secretaría guarda otros cambios en el formulario
 Then el guardado **no** se bloquea por esos faltantes (ni modal «Campos Faltantes» del cliente)
-And el cliente usa guardado forzado (`force`) y el servidor `ignore_mandatory` en edición
+And el cliente omite `check_mandatory` en edición Secretaría (`frm._club_skip_mandatory`)
+And el servidor aplica `ignore_mandatory` en `Socio.before_save`
 And el cliente muestra advertencia con la lista de campos críticos pendientes
 And el formulario sigue mostrando el indicador de incompletitud al reabrir
 And las invariantes duras se mantienen (DNI único, `estado` read-only, edad del tutor si está cargado).

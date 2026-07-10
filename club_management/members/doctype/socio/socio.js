@@ -117,25 +117,41 @@ club_management_socio_desk.relax_validacion_edicion_secretaria = function (frm) 
 };
 
 /**
- * Frappe valida mandatory en el cliente antes del POST; con force se delega al servidor
- * (Socio.before_save → ignore_mandatory para Secretaría).
+ * Frappe v16 valida mandatory en `frappe.ui.form.check_mandatory` (incluye
+ * `mandatory_depends_on`, p. ej. tutor si Menor). No hay `save(force)`.
  */
 club_management_socio_desk.habilitar_guardado_parcial_secretaria = function (frm) {
+	if (!frappe.ui.form._club_socio_check_mandatory_patched) {
+		frappe.ui.form._club_socio_check_mandatory_patched = true;
+		const original_check = frappe.ui.form.check_mandatory;
+		frappe.ui.form.check_mandatory = function (form) {
+			if (form?.doctype === "Socio" && form._club_skip_mandatory) {
+				return true;
+			}
+			return original_check(form);
+		};
+	}
+
 	if (frm._club_guardado_parcial_secretaria) {
 		return;
 	}
 	frm._club_guardado_parcial_secretaria = true;
+
 	const original_save = frm.save.bind(frm);
-	frm.save = async function (save_action, callback, btn, on_error, resolve, force) {
+	frm.save = function (save_action, callback, btn, on_error) {
 		const es_secretaria =
 			frappe.user.has_role("Secretaria") || frappe.user.has_role("System Manager");
-		if (es_secretaria && !frm.is_new()) {
-			await club_management_socio_desk.advertir_datos_criticos_faltantes(frm, {
-				al_guardar: true,
-			});
-			force = true;
+		if (!es_secretaria || frm.is_new()) {
+			return original_save(save_action, callback, btn, on_error);
 		}
-		return original_save(save_action, callback, btn, on_error, resolve, force);
+
+		frm._club_skip_mandatory = true;
+		return club_management_socio_desk
+			.advertir_datos_criticos_faltantes(frm, { al_guardar: true })
+			.then(() => original_save(save_action, callback, btn, on_error))
+			.finally(() => {
+				frm._club_skip_mandatory = false;
+			});
 	};
 };
 
