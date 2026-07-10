@@ -185,3 +185,98 @@ def generar_deuda_mensual_socios(
 	}
 	frappe.logger("club_management.cobranza").info("generar_deuda_mensual_socios %s", result)
 	return result
+
+
+def complementar_aranceles_periodo_socio(
+	socio_name: str,
+	*,
+	reference_date: str | date | None = None,
+) -> str | None:
+	"""Emite factura solo con aranceles faltantes del período (cuota ya emitida)."""
+	if not erpnext_cobranza_disponible():
+		frappe.throw(_("ERPNext no está disponible para cobranza."), frappe.ValidationError)
+
+	ref = getdate(reference_date or today())
+	periodo = format_periodo_cobro(ref)
+	invoice_items = build_invoice_items_for_socio(
+		socio_name,
+		incluir_actividades=True,
+		incluir_cargos_extra=False,
+		solo_aranceles=True,
+		reference_date=str(ref),
+		periodo_cobro=periodo,
+	)
+	if not invoice_items:
+		return None
+
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	if not campo_socio:
+		frappe.throw(_("Falta el campo Socio en Sales Invoice (ejecute migrate)."), frappe.ValidationError)
+
+	customer = ensure_customer_for_socio(socio_name, skip_permission_check=True)
+	posting, due = resolve_fechas_factura_mensual(
+		ref,
+		int(get_club_settings().dia_primer_vencimiento or 10),
+	)
+
+	payload: dict[str, Any] = {
+		"doctype": SALES_INVOICE_DOCTYPE,
+		"customer": customer,
+		"company": _default_company(),
+		"posting_date": posting,
+		"due_date": due,
+		campo_socio: socio_name,
+		"remarks": _("Aranceles período {0}").format(periodo),
+		"items": invoice_items,
+	}
+	campo_periodo = _campo_periodo_cobro()
+	if campo_periodo:
+		payload[campo_periodo] = periodo
+
+	invoice = frappe.get_doc(payload)
+	from club_management.integrations.payment_ledger_postgres import apply_patch
+
+	apply_patch()
+	invoice.insert(ignore_permissions=True)
+	invoice.submit()
+	sync_saldo_deuda_socio(socio_name)
+	return invoice.name
+
+
+def complementar_aranceles_periodo_socios(
+	*,
+	reference_date: str | date | None = None,
+) -> dict[str, Any]:
+	"""Complementa aranceles del período para todos los socios elegibles."""
+	ref = getdate(reference_date or today())
+	periodo = format_periodo_cobro(ref)
+	creadas: list[str] = []
+	omitidas: list[str] = []
+	errores: list[dict[str, str]] = []
+
+	for socio_name in socios_elegibles_deuda_mensual():
+		try:
+			invoice_name = complementar_aranceles_periodo_socio(socio_name, reference_date=ref)
+			if invoice_name:
+				creadas.append(invoice_name)
+			else:
+				omitidas.append(socio_name)
+		except Exception as exc:
+			errores.append({"socio": socio_name, "error": str(exc)})
+			frappe.log_error(
+				title=_("Aranceles período — error en socio {0}").format(socio_name),
+				message=frappe.get_traceback(),
+			)
+
+	result = {
+		"periodo": periodo,
+		"reference_date": str(ref),
+		"facturas_creadas": len(creadas),
+		"socios_omitidos": len(omitidas),
+		"errores": len(errores),
+		"invoice_names": creadas,
+		"detalle_errores": errores,
+	}
+	frappe.logger("club_management.cobranza").info("complementar_aranceles_periodo_socios %s", result)
+	return result
+

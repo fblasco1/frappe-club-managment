@@ -189,6 +189,7 @@ def build_invoice_items_for_socio(
 	*,
 	incluir_actividades: bool = True,
 	incluir_cargos_extra: bool = False,
+	solo_aranceles: bool = False,
 	reference_date: str | None = None,
 	periodo_cobro: str | None = None,
 	excluir_ya_facturados: bool = True,
@@ -218,7 +219,6 @@ def build_invoice_items_for_socio(
 			}
 		)
 
-	monto, item_cuota = resolve_cuota_social(socio_name)
 	beca = None
 	try:
 		from club_management.members.services.beca_socio import beca_vigente_socio
@@ -226,9 +226,11 @@ def build_invoice_items_for_socio(
 		beca = beca_vigente_socio(socio_name, reference_date=ref)
 	except Exception:
 		beca = None
-	if monto > 0 and item_cuota:
-		rate_cuota = beca.rate_cuota(monto) if beca else monto
-		_append_item(item_cuota, rate_cuota, _("Cuota social"))
+	if not solo_aranceles:
+		monto, item_cuota = resolve_cuota_social(socio_name)
+		if monto > 0 and item_cuota:
+			rate_cuota = beca.rate_cuota(monto) if beca else monto
+			_append_item(item_cuota, rate_cuota, _("Cuota social"))
 
 	if incluir_actividades:
 		for ins in frappe.get_all(
@@ -439,6 +441,7 @@ def registrar_cobro_manual(
 	sales_invoice_name: str,
 	*,
 	mode_of_payment: str | None = None,
+	posting_date: str | date | None = None,
 ) -> str:
 	"""Registra un `Payment Entry` contra la factura y actualiza deuda/estado."""
 	from club_management.integrations.payment_ledger_postgres import apply_patch
@@ -462,12 +465,16 @@ def registrar_cobro_manual(
 	except ImportError as exc:
 		raise frappe.ValidationError(_("ERPNext no está disponible para cobranza.")) from exc
 
+	fecha_cobro = getdate(posting_date or today())
+	if fecha_cobro > getdate(today()):
+		frappe.throw(_("La fecha de cobro no puede ser posterior a hoy."), frappe.ValidationError)
+
 	pe = get_payment_entry(SALES_INVOICE_DOCTYPE, sales_invoice_name)
 	pe.mode_of_payment = validar_modo_pago_desk(mode_of_payment)
+	pe.posting_date = fecha_cobro
 	if not pe.reference_no:
 		pe.reference_no = sales_invoice_name
-	if not pe.reference_date:
-		pe.reference_date = today()
+	pe.reference_date = fecha_cobro
 	pe.insert(ignore_permissions=True)
 	pe.submit()
 

@@ -63,12 +63,14 @@ def registrar_cobro(
 	socio: str,
 	sales_invoice: str,
 	mode_of_payment: str | None = None,
+	posting_date: str | None = None,
 ) -> dict[str, str]:
 	ensure_secretaria_operacion_access()
 	payment_entry = registrar_cobro_manual(
 		socio,
 		sales_invoice,
 		mode_of_payment=mode_of_payment,
+		posting_date=posting_date,
 	)
 	saldo = sync_saldo_deuda_socio(socio)
 	estado = frappe.db.get_value("Socio", socio, "estado")

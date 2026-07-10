@@ -47,11 +47,49 @@ And no se modifica `estado` ni `fecha_alta` sin servicio de transición.
 
 ---
 
+## Scenario: advertencia de datos críticos incompletos al editar (sin bloquear)
+
+Given un `Socio` existente abierto por Secretaría
+And faltan datos críticos (contacto, domicilio, adjuntos o tutor si `categoria = Menor`)
+When Secretaría guarda otros cambios en el formulario
+Then el guardado **no** se bloquea por esos faltantes
+And el cliente muestra advertencia con la lista de campos críticos pendientes
+And el formulario sigue mostrando el indicador de incompletitud al reabrir
+And las invariantes duras se mantienen (DNI único, `estado` read-only, edad del tutor si está cargado).
+
+---
+
 ## Scenario: bloqueo DNI duplicado en alta manual
 
 Given ya existe `Socio` con `dni = 30123456`
 When Secretaría intenta `crear_socio_desk` con el mismo DNI
 Then recibe error de validación y no se crea el documento.
+
+---
+
+## Scenario: Secretaría asigna número de socio en alta manual
+
+Given no existe un `Socio` con `name` = `"1500"` (ni `numero_socio` = 1500)
+When Secretaría crea un socio desde **Alta guiada** o `crear_socio_desk` con `numero_socio = 1500`
+Then el documento se persiste con `name` = `"1500"` y `numero_socio` = 1500
+And el número queda inmutable en ediciones posteriores.
+
+---
+
+## Scenario: número de socio duplicado en alta manual
+
+Given ya existe un `Socio` con `numero_socio` = 1500 (`name` = `"1500"`)
+When Secretaría intenta crear otro socio con `numero_socio` = 1500
+Then recibe `frappe.ValidationError` con mensaje claro (número ya asignado)
+And no se crea el documento.
+
+---
+
+## Scenario: número de socio vacío en alta manual
+
+Given Secretaría crea un socio sin indicar `numero_socio`
+When se ejecuta el alta
+Then el controller asigna `MAX(numero_socio) + 1` (misma regla que `socio_minimo.md`).
 
 ---
 
@@ -114,6 +152,7 @@ Then abre el mismo asistente de alta guiada.
 | Artefacto | Ubicación sugerida |
 |-----------|-------------------|
 | Servicio | `members/services/socio_alta_secretaria.py` |
+| Datos críticos | `members/services/datos_criticos_socio.py` |
 | API whitelist | `members/api/socio_operaciones_desk.py` |
 | Client script | `members/doctype/socio/socio.js` |
-| Tests | `members/tests/test_socio_alta_secretaria.py` |
+| Tests | `members/tests/test_socio_alta_secretaria.py`, `members/tests/test_datos_criticos_socio.py` |

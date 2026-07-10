@@ -21,6 +21,7 @@ from club_management.members.services.socio_alta_secretaria import (
 	crear_socio_desk as crear_socio_desk_service,
 	sugerir_categoria_por_fecha_nacimiento,
 )
+from club_management.members.services.datos_criticos_socio import get_datos_criticos_faltantes_socio
 from club_management.members.services.socio_operaciones_secretaria import (
 	activar_socio_manual,
 	dar_baja_socio,
@@ -68,6 +69,20 @@ def _parse_selecciones(raw: Any) -> list[dict[str, Any]]:
 				}
 			)
 	return result
+
+
+@frappe.whitelist()
+def list_datos_criticos_faltantes_desk(doc: Any = None, socio: str | None = None) -> list[dict[str, str]]:
+	"""Devuelve campos críticos vacíos para advertencia en formulario Socio."""
+	ensure_secretaria_operacion_access()
+	if doc:
+		payload = frappe.parse_json(doc) if isinstance(doc, str) else doc
+		if not isinstance(payload, dict):
+			frappe.throw(frappe._("Documento inválido."), frappe.ValidationError)
+		return get_datos_criticos_faltantes_socio(payload)
+	if socio:
+		return get_datos_criticos_faltantes_socio(frappe.get_doc("Socio", socio))
+	frappe.throw(frappe._("Indique el socio o el documento."), frappe.ValidationError)
 
 
 @frappe.whitelist()

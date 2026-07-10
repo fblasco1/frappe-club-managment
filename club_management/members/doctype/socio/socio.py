@@ -79,11 +79,31 @@ class Socio(Document):
 		return max(max_numero, max_name) + 1
 
 	def validate(self) -> None:
+		self._validate_numero_socio_disponible()
 		self._sync_nombre_completo()
 		self._validate_estado_solo_via_servicio()
 		self._set_fecha_alta_si_corresponde()
 		if self.categoria == "Menor":
 			self._validate_menor()
+
+	def before_save(self) -> None:
+		from club_management.members.services.datos_criticos_socio import aplicar_edicion_parcial_secretaria
+
+		aplicar_edicion_parcial_secretaria(self)
+
+	def _validate_numero_socio_disponible(self) -> None:
+		if not self.is_new() or not self.numero_socio:
+			return
+
+		numero = int(self.numero_socio)
+		if numero <= 0:
+			frappe.throw(_("El número de socio debe ser un entero positivo."))
+
+		if frappe.db.exists("Socio", str(numero)):
+			frappe.throw(
+				_("El número de socio {0} ya está asignado a otro socio.").format(numero),
+				frappe.ValidationError,
+			)
 
 	def _sync_nombre_completo(self) -> None:
 		self.nombre_completo = format_socio_nombre_completo(self.apellido, self.nombre)
@@ -115,9 +135,13 @@ class Socio(Document):
 			self.fecha_alta = today()
 
 	def _validate_menor(self) -> None:
+		from club_management.members.services.datos_criticos_socio import usuario_puede_edicion_parcial_secretaria
+
 		faltantes = [
 			campo for campo in ("tipo_tutor", "tutor") if not self.get(campo)
 		]
+		if faltantes and not self.is_new() and usuario_puede_edicion_parcial_secretaria():
+			return
 		if faltantes:
 			frappe.throw(
 				_("Socio menor requiere tutor responsable (faltan: {0})").format(

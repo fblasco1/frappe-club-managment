@@ -11,6 +11,18 @@ frappe.ui.form.on("Socio", {
 		frm.set_df_property("grupo_familiar", "hidden", 1);
 		frm.set_df_property("solicitud_origen", "hidden", 1);
 		if (frm.is_new()) {
+			frm.set_df_property("numero_socio", "read_only", 0);
+			frm.set_df_property(
+				"numero_socio",
+				"description",
+				__(
+					"Opcional. Si se deja vacío se asigna el siguiente número disponible. Debe ser único."
+				)
+			);
+		} else {
+			frm.set_df_property("numero_socio", "read_only", 1);
+		}
+		if (frm.is_new()) {
 			club_management_socio_desk.relax_adjuntos_alta_manual(frm);
 			club_management_socio_desk.add_alta_guiada_button(frm);
 			if (!frm._alta_guiada_opened) {
@@ -19,16 +31,27 @@ frappe.ui.form.on("Socio", {
 			}
 			return;
 		}
+		club_management_socio_desk.relax_adjuntos_edicion_secretaria(frm);
 		club_management_socio_desk.add_operaciones_buttons(frm);
+		club_management_socio_desk.render_datos_criticos_alert(frm);
 		club_management_socio_desk.render_inscripciones(frm);
 		club_management_socio_desk.render_becas(frm);
 		club_management_socio_desk.render_deuda_pendiente(frm);
+	},
+	async before_save(frm) {
+		const es_secretaria =
+			frappe.user.has_role("Secretaria") || frappe.user.has_role("System Manager");
+		if (frm.is_new() || !es_secretaria) {
+			return;
+		}
+		await club_management_socio_desk.advertir_datos_criticos_faltantes(frm, { al_guardar: true });
 	},
 });
 
 frappe.provide("club_management_socio_desk");
 
 club_management_socio_desk._CAMPOS_ALTA_MANUAL = [
+	"numero_socio",
 	"nombre",
 	"apellido",
 	"dni",
@@ -62,6 +85,62 @@ club_management_socio_desk.relax_adjuntos_alta_manual = function (frm) {
 		frm.set_df_property(fieldname, "hidden", 1);
 	}
 	frm.set_df_property("documentos_section", "hidden", 1);
+};
+
+club_management_socio_desk.relax_adjuntos_edicion_secretaria = function (frm) {
+	const adjuntos = ["foto_perfil", "dni_frente", "dni_dorso", "ficha_medica"];
+	for (const fieldname of adjuntos) {
+		frm.set_df_property(fieldname, "reqd", 0);
+		frm.set_df_property(fieldname, "hidden", 0);
+	}
+	frm.set_df_property("documentos_section", "hidden", 0);
+};
+
+club_management_socio_desk.fetch_datos_criticos_faltantes = function (frm) {
+	return frappe
+		.xcall("club_management.members.api.socio_operaciones_desk.list_datos_criticos_faltantes_desk", {
+			doc: frm.doc,
+		})
+		.then((rows) => rows || []);
+};
+
+club_management_socio_desk.advertir_datos_criticos_faltantes = async function (frm, opts = {}) {
+	const faltantes = await club_management_socio_desk.fetch_datos_criticos_faltantes(frm);
+	if (!faltantes.length) {
+		return [];
+	}
+	const labels = faltantes.map((row) => row.label).join(", ");
+	const mensaje = opts.al_guardar
+		? __("Se guardará el socio, pero aún faltan datos críticos: {0}", [labels])
+		: __("Faltan datos críticos: {0}", [labels]);
+	if (opts.al_guardar) {
+		frappe.show_alert({ message: mensaje, indicator: "orange" }, 7);
+	} else {
+		frappe.msgprint({
+			title: __("Datos críticos incompletos"),
+			message: mensaje,
+			indicator: "orange",
+		});
+	}
+	return faltantes;
+};
+
+club_management_socio_desk.render_datos_criticos_alert = function (frm) {
+	const $host = frm.layout.wrapper.find(".club-datos-criticos-alert");
+	$host.remove();
+	club_management_socio_desk.fetch_datos_criticos_faltantes(frm).then((faltantes) => {
+		if (!faltantes.length) {
+			return;
+		}
+		const labels = faltantes.map((row) => row.label).join(", ");
+		const $alert = $(`
+			<div class="club-datos-criticos-alert alert alert-warning" role="status" style="margin: 0.75rem 0;">
+				<strong>${__("Datos críticos incompletos")}</strong>
+				<div class="small">${frappe.utils.escape_html(labels)}</div>
+			</div>
+		`);
+		frm.layout.wrapper.prepend($alert);
+	});
 };
 
 club_management_socio_desk.add_alta_guiada_button = function (frm) {
@@ -451,10 +530,22 @@ club_management_socio_desk.prompt_modo_y_registrar_cobro = function (frm, invoic
 						default: modos[0]?.label,
 						reqd: 1,
 					},
+					{
+						fieldname: "posting_date",
+						fieldtype: "Date",
+						label: __("Fecha de cobro"),
+						default: frappe.datetime.get_today(),
+						reqd: 1,
+					},
 				],
 				(values) => {
 					const mode = labelToValue[values.mode_of_payment] || "Cash";
-					club_management_socio_desk.ejecutar_registrar_cobro(frm, invoice_row, mode);
+					club_management_socio_desk.ejecutar_registrar_cobro(
+						frm,
+						invoice_row,
+						mode,
+						values.posting_date
+					);
 				},
 				__("Registrar cobro de {0} — {1}", [invoice_row.name, saldo_label]),
 				__("Confirmar")
@@ -463,13 +554,19 @@ club_management_socio_desk.prompt_modo_y_registrar_cobro = function (frm, invoic
 	});
 };
 
-club_management_socio_desk.ejecutar_registrar_cobro = function (frm, invoice_row, mode_of_payment) {
+club_management_socio_desk.ejecutar_registrar_cobro = function (
+	frm,
+	invoice_row,
+	mode_of_payment,
+	posting_date
+) {
 	frappe.call({
 		method: "club_management.members.api.cobranza_desk.registrar_cobro",
 		args: {
 			socio: frm.doc.name,
 			sales_invoice: invoice_row.name,
 			mode_of_payment,
+			posting_date,
 		},
 		freeze: true,
 		callback(res) {
