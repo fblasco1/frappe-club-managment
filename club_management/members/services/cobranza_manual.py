@@ -343,7 +343,7 @@ def sync_saldo_deuda_socio(socio_name: str) -> float:
 		fields=["outstanding_amount"],
 	)
 	total = sum(flt(row.outstanding_amount) for row in rows)
-	frappe.db.set_value(SOCIO_DOCTYPE, socio_name, "saldo_deuda", total, update_modified=True)
+	frappe.db.set_value(SOCIO_DOCTYPE, socio_name, "saldo_deuda", total, update_modified=False)
 	return total
 
 

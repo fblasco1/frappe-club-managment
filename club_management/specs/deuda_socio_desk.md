@@ -12,6 +12,16 @@ Given un `Socio` con facturas ERPNext impagas y/o cargos extra pendientes
 When Secretaría abre el formulario `Socio`
 Then ve una sección **Deuda pendiente** con el total (`saldo_deuda`)
 And una tabla con conceptos: facturas submitteadas con saldo (líneas) y cargos `Cargo Socio` pendientes sin facturar.
+And la sincronización de `saldo_deuda` **no** actualiza `Socio.modified` (evita conflicto al guardar otros campos).
+
+---
+
+## Scenario: cargar panel de deuda no invalida el formulario
+
+Given Secretaría abrió el formulario `Socio` y editó campos (p. ej. nombre)
+When el panel **Deuda pendiente** sincroniza el saldo en segundo plano
+And Secretaría guarda el socio
+Then el guardado **no** falla por «modified after you have opened it».
 
 ---
 

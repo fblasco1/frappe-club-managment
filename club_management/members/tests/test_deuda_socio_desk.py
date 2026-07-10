@@ -121,3 +121,31 @@ class TestDeudaSocioDesk(MembersTestCase):
 		self.assertEqual(detalle["facturas"][0]["lineas"][0]["concepto"], "Multa test")
 		self.assertEqual(detalle["cargos_pendientes"], [])
 		self.assertEqual(api_detalle["saldo_deuda"], detalle["saldo_deuda"])
+
+	def test_sync_saldo_no_actualiza_modified(self) -> None:
+		socio = self._socio_activo(dni="75001003", email="deuda.mod@example.com")
+		frappe.get_doc(
+			{
+				"doctype": "Cargo Socio",
+				"socio": socio.name,
+				"titulo": "Multa modified",
+				"tipo_cargo": "Multa",
+				"modo_cobro": "Unico",
+				"item": self._item,
+				"monto": 3_000,
+				"fecha_desde": "2026-06-01",
+				"estado": "Pendiente",
+			}
+		).insert(ignore_permissions=True)
+
+		modified_antes = frappe.db.get_value("Socio", socio.name, "modified")
+		frappe.db.set_value("Socio", socio.name, "nombre", "Nombre Test", update_modified=False)
+
+		frappe.set_user(self._secretaria)
+		try:
+			get_detalle_deuda_socio(socio.name)
+		finally:
+			frappe.set_user("Administrator")
+
+		modified_despues = frappe.db.get_value("Socio", socio.name, "modified")
+		self.assertEqual(str(modified_antes), str(modified_despues))
