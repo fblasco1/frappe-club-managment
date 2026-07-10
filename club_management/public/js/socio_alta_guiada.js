@@ -15,6 +15,15 @@ club_management_socio_alta_guiada.open = function (frm) {
 		fields: [
 			{ fieldtype: "Section Break", label: __("Datos personales") },
 			{
+				fieldname: "numero_socio",
+				fieldtype: "Int",
+				label: __("Número de socio"),
+				description: __(
+					"Opcional. Si se deja vacío se asigna el siguiente disponible. Debe ser único."
+				),
+				default: prefill.numero_socio,
+			},
+			{
 				fieldname: "nombre",
 				fieldtype: "Data",
 				label: __("Nombre"),
@@ -218,6 +227,7 @@ club_management_socio_alta_guiada.open = function (frm) {
 
 club_management_socio_alta_guiada._collect_from_frm = function (frm) {
 	const campos = [
+		"numero_socio",
 		"nombre",
 		"apellido",
 		"dni",
@@ -303,6 +313,9 @@ club_management_socio_alta_guiada._build_datos = function (values) {
 		codigo_postal: values.codigo_postal,
 		categoria: values.categoria,
 	};
+	if (values.numero_socio) {
+		datos.numero_socio = values.numero_socio;
+	}
 	if (values.categoria === "Menor") {
 		datos.tipo_tutor = values.tipo_tutor;
 		datos.tutor =

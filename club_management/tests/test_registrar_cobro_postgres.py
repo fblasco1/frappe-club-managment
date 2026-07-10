@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import frappe
-from frappe.utils import flt
+from frappe.utils import add_days, flt, getdate, today
 
 from club_management.integrations.payment_ledger_postgres import apply_patch
 from club_management.members.services.cobranza_manual import (
@@ -74,3 +74,41 @@ class TestRegistrarCobroPostgres(MembersTestCase):
             frappe.db.get_value("Payment Entry", pe_name, "mode_of_payment"),
             "Wire Transfer",
         )
+
+    def test_registrar_cobro_manual_respeta_fecha_cobro(self) -> None:
+        socio = insert_socio(dni="99003003", email="cobro.fecha@example.com")
+        cambiar_estado(socio.name, "Activo", motivo="Test fecha cobro")
+        invoice_name = generar_deuda_mensual_socio(socio.name, reference_date=self._GEN)
+        self.assertTrue(invoice_name)
+        fecha = "2026-06-05"
+
+        frappe.set_user(self._secretaria)
+        try:
+            pe_name = registrar_cobro_manual(
+                socio.name,
+                invoice_name,
+                posting_date=fecha,
+            )
+        finally:
+            frappe.set_user("Administrator")
+
+        self.assertEqual(str(frappe.db.get_value("Payment Entry", pe_name, "posting_date")), fecha)
+        self.assertEqual(str(frappe.db.get_value("Payment Entry", pe_name, "reference_date")), fecha)
+
+    def test_registrar_cobro_manual_rechaza_fecha_futura(self) -> None:
+        socio = insert_socio(dni="99003004", email="cobro.futuro@example.com")
+        cambiar_estado(socio.name, "Activo", motivo="Test fecha futura")
+        invoice_name = generar_deuda_mensual_socio(socio.name, reference_date=self._GEN)
+        self.assertTrue(invoice_name)
+        futuro = add_days(today(), 1)
+
+        frappe.set_user(self._secretaria)
+        try:
+            with self.assertRaises(frappe.ValidationError):
+                registrar_cobro_manual(
+                    socio.name,
+                    invoice_name,
+                    posting_date=futuro,
+                )
+        finally:
+            frappe.set_user("Administrator")

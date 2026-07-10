@@ -284,6 +284,39 @@ class TestSocioAltaSecretaria(MembersTestCase):
 			"Pendiente de Inscripción",
 		)
 
+	def test_alta_con_numero_socio_manual(self) -> None:
+		frappe.set_user(self._secretaria)
+		try:
+			socio_name = crear_socio_desk(
+				_datos_alta_adulto(
+					dni="30990088",
+					email="numero.manual@example.com",
+					numero_socio=1500,
+				)
+			)
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(socio_name, "1500")
+		socio = frappe.get_doc("Socio", socio_name)
+		self.assertEqual(int(socio.numero_socio), 1500)
+
+	def test_numero_socio_duplicado_falla(self) -> None:
+		insert_socio(dni="30880011", email="existente.num@example.com", numero_socio=1500)
+
+		frappe.set_user(self._secretaria)
+		try:
+			with self.assertRaises(frappe.ValidationError):
+				crear_socio_desk(
+					_datos_alta_adulto(
+						dni="30880022",
+						email="duplicado.num@example.com",
+						numero_socio=1500,
+					)
+				)
+		finally:
+			frappe.set_user("Administrator")
+
 	def test_api_crear_socio_desk_requiere_secretaria(self) -> None:
 		datos = _datos_alta_adulto(dni="30994433", email="api@example.com")
 		datos["fecha_nacimiento"] = str(datos["fecha_nacimiento"])

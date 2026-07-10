@@ -26,6 +26,7 @@ ESTADO_ALTA_MANUAL = "Pendiente de Pago"
 MSG_DNI_YA_SOCIO = _("DNI ya registrado como Socio")
 
 _CAMPOS_ALTA = (
+	"numero_socio",
 	"nombre",
 	"apellido",
 	"dni",
@@ -144,6 +145,17 @@ def _normalizar_datos_alta(datos: dict[str, Any]) -> dict[str, Any]:
 					_("Menor: complete el tutor responsable."),
 					frappe.ValidationError,
 				)
+
+	if payload.get("numero_socio") is not None and payload.get("numero_socio") != "":
+		try:
+			numero = int(payload["numero_socio"])
+		except (TypeError, ValueError):
+			frappe.throw(_("Número de socio inválido."), frappe.ValidationError)
+		if numero <= 0:
+			frappe.throw(_("El número de socio debe ser un entero positivo."), frappe.ValidationError)
+		payload["numero_socio"] = numero
+	else:
+		payload.pop("numero_socio", None)
 
 	assert_contacto_alta_socio(payload)
 	return payload

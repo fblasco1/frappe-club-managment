@@ -141,6 +141,12 @@ class TestSocioNumeroSocioNaming(MembersTestCase):
         self.assertEqual(meta.autoname, "field:numero_socio")
         self.assertFalse(meta.allow_rename)
 
+    def test_numero_socio_duplicado_falla_en_insert(self) -> None:
+        insert_socio(dni="40000010", email="dup1@example.com", numero_socio=8800)
+        payload = make_socio_payload(dni="40000011", email="dup2@example.com", numero_socio=8800)
+        with self.assertRaises(frappe.ValidationError):
+            frappe.get_doc(payload).insert(ignore_permissions=True)
+
     def test_fecha_ingreso_default_hoy(self) -> None:
         socio = insert_socio(dni="40000007", email="naming7@example.com")
         self.assertEqual(getdate(socio.fecha_ingreso), datetime.date.today())
