@@ -31,20 +31,21 @@ frappe.ui.form.on("Socio", {
 			}
 			return;
 		}
-		club_management_socio_desk.relax_adjuntos_edicion_secretaria(frm);
+		club_management_socio_desk.relax_validacion_edicion_secretaria(frm);
+		club_management_socio_desk.habilitar_guardado_parcial_secretaria(frm);
 		club_management_socio_desk.add_operaciones_buttons(frm);
 		club_management_socio_desk.render_datos_criticos_alert(frm);
 		club_management_socio_desk.render_inscripciones(frm);
 		club_management_socio_desk.render_becas(frm);
 		club_management_socio_desk.render_deuda_pendiente(frm);
 	},
-	async before_save(frm) {
-		const es_secretaria =
-			frappe.user.has_role("Secretaria") || frappe.user.has_role("System Manager");
-		if (frm.is_new() || !es_secretaria) {
-			return;
+	categoria(frm) {
+		if (
+			!frm.is_new() &&
+			(frappe.user.has_role("Secretaria") || frappe.user.has_role("System Manager"))
+		) {
+			club_management_socio_desk.relax_validacion_edicion_secretaria(frm);
 		}
-		await club_management_socio_desk.advertir_datos_criticos_faltantes(frm, { al_guardar: true });
 	},
 });
 
@@ -94,6 +95,48 @@ club_management_socio_desk.relax_adjuntos_edicion_secretaria = function (frm) {
 		frm.set_df_property(fieldname, "hidden", 0);
 	}
 	frm.set_df_property("documentos_section", "hidden", 0);
+};
+
+/** Quita obligatoriedad Desk de campos críticos pero no bloqueantes en edición. */
+club_management_socio_desk.relax_validacion_edicion_secretaria = function (frm) {
+	club_management_socio_desk.relax_adjuntos_edicion_secretaria(frm);
+	const opcionales_en_edicion = [
+		"email",
+		"telefono_movil",
+		"calle",
+		"ciudad",
+		"provincia",
+		"localidad_barrio",
+		"codigo_postal",
+		"tipo_tutor",
+		"tutor",
+	];
+	for (const fieldname of opcionales_en_edicion) {
+		frm.set_df_property(fieldname, "reqd", 0);
+	}
+};
+
+/**
+ * Frappe valida mandatory en el cliente antes del POST; con force se delega al servidor
+ * (Socio.before_save → ignore_mandatory para Secretaría).
+ */
+club_management_socio_desk.habilitar_guardado_parcial_secretaria = function (frm) {
+	if (frm._club_guardado_parcial_secretaria) {
+		return;
+	}
+	frm._club_guardado_parcial_secretaria = true;
+	const original_save = frm.save.bind(frm);
+	frm.save = async function (save_action, callback, btn, on_error, resolve, force) {
+		const es_secretaria =
+			frappe.user.has_role("Secretaria") || frappe.user.has_role("System Manager");
+		if (es_secretaria && !frm.is_new()) {
+			await club_management_socio_desk.advertir_datos_criticos_faltantes(frm, {
+				al_guardar: true,
+			});
+			force = true;
+		}
+		return original_save(save_action, callback, btn, on_error, resolve, force);
+	};
 };
 
 club_management_socio_desk.fetch_datos_criticos_faltantes = function (frm) {
