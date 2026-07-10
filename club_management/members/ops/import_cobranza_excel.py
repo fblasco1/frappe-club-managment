@@ -304,5 +304,24 @@ def run(
 	result["log_path"] = log_path
 	written = _write_log(log_path, result)
 	frappe.logger("club_management.cobranza").info("import_cobranza_excel %s", result["resumen"])
-	frappe.msgprint(frappe.as_json({"resumen": result["resumen"], "log_path": written}, indent=2))
+
+	from club_management.members.services.cobranza_import_report import (
+		write_cobranza_import_report_html,
+	)
+
+	periodo = format_periodo_cobro(getdate(fecha_desde or today()))
+	cobranza_html_path = write_cobranza_import_report_html(
+		result,
+		output_dir=Path(log_path).parent,
+		publish_latest=True,
+		periodo_cobro=periodo,
+	)
+	result["reporte_html"] = cobranza_html_path
+
+	frappe.msgprint(
+		frappe.as_json(
+			{"resumen": result["resumen"], "log_path": written, "reporte_html": "publicado"},
+			indent=2,
+		)
+	)
 	return result

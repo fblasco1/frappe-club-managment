@@ -217,3 +217,4 @@ class TestImportRosterJugadores(MembersTestCase):
 			html = Path(stats["log_paths"]["reporte_html"]).read_text(encoding="utf-8")
 			self.assertIn("Qué ajustar para completar el import", html)
 			self.assertIn("No están en el padrón y sin DNI", html)
+			self.assertIn("Cobranza y cargos", html)

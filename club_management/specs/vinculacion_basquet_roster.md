@@ -154,3 +154,15 @@ And publica una copia en `private/files/roster_import_basquet_latest.html`
 
 And Secretaría puede visualizarlo en `/informe-import-roster-basquet` autenticada.
 
+---
+
+## Scenario: informe HTML incluye cobranza socio a socio
+
+When finaliza `import_roster_jugadores` (no dry_run)
+
+Then el informe HTML agrega sección **Cobranza y cargos — detalle socio a socio**
+
+And lista por cada inscripción nueva: facturas julio, saldos, resultado del import Excel y acción sugerida
+
+And si existe log de `import_cobranza_excel`, incluye tablas de registrados, omitidos y errores del Excel.
+

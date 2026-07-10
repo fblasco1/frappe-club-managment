@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Any
 
 import frappe
-from frappe.utils import escape_html, now_datetime
+from frappe.utils import escape_html, now_datetime, today
+
+from club_management.members.services.cobranza_manual import format_periodo_cobro
 
 REPORT_FILENAME = "INFORME IMPORT ROSTER BASQUET.html"
 LATEST_REPORT_SITE_PATH = "private/files/roster_import_basquet_latest.html"
@@ -61,6 +63,7 @@ def render_roster_import_report_html(
 	source_path: str,
 	dry_run: bool,
 	log_rows: dict[str, list[dict[str, str]]] | None = None,
+	cobranza_html: str = "",
 ) -> str:
 	"""Genera HTML autocontenido con resumen y guía de ajustes."""
 	log_rows = log_rows or {}
@@ -306,6 +309,10 @@ th {{ background: #f8fafc; }}
   font-size: .9rem;
 }}
 code {{ background: #eef2ff; padding: 2px 6px; border-radius: 4px; }}
+.report-part-title {{ margin: 28px 0 12px; font-size: 1.25rem; }}
+.cobranza-meta {{ color: var(--muted); font-size: .9rem; margin-bottom: 12px; }}
+.cobranza-kpis {{ margin-bottom: 16px; }}
+.cobranza-block {{ margin-bottom: 16px; }}
 </style>
 </head>
 <body>
@@ -321,6 +328,7 @@ code {{ background: #eef2ff; padding: 2px 6px; border-radius: 4px; }}
 <div class="kpis">{kpi_html}</div>
 {action_block}
 {section_html}
+{cobranza_html}
 <div class="files">
   <strong>Archivos CSV de log</strong>
   <ul>{csv_list or "<li>Sin CSV generados.</li>"}</ul>
@@ -338,15 +346,39 @@ def write_roster_import_report(
 	output_dir: str | Path,
 	log_rows: dict[str, list[dict[str, str]]] | None = None,
 	publish_latest: bool = True,
+	cobranza_periodo: str | None = None,
+	cobranza_log_path: str | None = None,
+	include_cobranza: bool = True,
 ) -> str:
 	"""Escribe informe HTML en output_dir y opcionalmente publica copia en el sitio."""
 	out_dir = Path(output_dir)
 	out_dir.mkdir(parents=True, exist_ok=True)
+	periodo = cobranza_periodo or format_periodo_cobro(today())
+	cobranza_html = ""
+	if include_cobranza:
+		from club_management.members.services.cobranza_import_report import (
+			build_cobranza_followup_rows,
+			load_cobranza_import_log,
+			render_cobranza_import_sections_html,
+		)
+
+		cobranza_log = load_cobranza_import_log(cobranza_log_path)
+		followup_rows = build_cobranza_followup_rows(
+			(log_rows or {}).get("inscripciones_nuevas") or [],
+			periodo_cobro=periodo,
+			cobranza_log=cobranza_log,
+		)
+		cobranza_html = render_cobranza_import_sections_html(
+			cobranza_log,
+			periodo_cobro=periodo,
+			followup_rows=followup_rows,
+		)
 	html = render_roster_import_report_html(
 		stats,
 		source_path=source_path,
 		dry_run=dry_run,
 		log_rows=log_rows,
+		cobranza_html=cobranza_html,
 	)
 	path = out_dir / REPORT_FILENAME
 	path.write_text(html, encoding="utf-8")
