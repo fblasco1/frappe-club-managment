@@ -219,6 +219,28 @@ class TestInscripcionGestionDesk(MembersTestCase):
 			0,
 		)
 
+	def test_inscribir_desk_requiere_grupo_si_usa_grupos(self) -> None:
+		actividad = "Basquet Inscripcion Req Grupo"
+		if not frappe.db.exists("Actividad", actividad):
+			frappe.get_doc(
+				{
+					"doctype": "Actividad",
+					"name": actividad,
+					"titulo": actividad,
+					"habilitada": 1,
+					"usa_grupos": 1,
+				}
+			).insert(ignore_permissions=True)
+		socio = insert_socio(dni="72001006", email="req.grupo.insc@example.com")
+		cambiar_estado(socio.name, "Activo", motivo="Test")
+
+		frappe.set_user(self._secretaria)
+		try:
+			with self.assertRaises(frappe.ValidationError):
+				inscribir_actividades_desk(socio.name, [{"actividad": actividad}])
+		finally:
+			frappe.set_user("Administrator")
+
 	def test_usuario_sin_rol_no_puede_listar_ni_dar_baja(self) -> None:
 		socio = insert_socio(dni="72001005", email="perm.insc@example.com")
 		ins_name = self._inscribir_zumba(socio.name)

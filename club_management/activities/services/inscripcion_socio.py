@@ -323,6 +323,23 @@ def inscribir_socio_actividades(
 	return inscribir_socio_selecciones(socio_name, selecciones, activar=activar)
 
 
+def _validate_seleccion_inscripcion_desk(sel: dict[str, Any]) -> None:
+	"""Valida una selección antes de crear la inscripción (Desk)."""
+	actividad_key = (sel.get("actividad") or "").strip()
+	if not actividad_key:
+		frappe.throw(_("Seleccione una actividad."), frappe.ValidationError)
+	actividad_name = ensure_actividad_exists(actividad_key)
+	if not actividad_name:
+		frappe.throw(_("Actividad no encontrada: {0}").format(actividad_key), frappe.ValidationError)
+	usa_grupos = frappe.db.get_value("Actividad", actividad_name, "usa_grupos")
+	grupo_key = (sel.get("grupo") or sel.get("grupo_actividad") or "").strip()
+	if usa_grupos and not grupo_key:
+		frappe.throw(
+			_("La actividad {0} requiere elegir un grupo / tira.").format(actividad_name),
+			frappe.ValidationError,
+		)
+
+
 def inscribir_actividades_desk(
 	socio_name: str,
 	selecciones: list[dict[str, Any]],
@@ -335,6 +352,9 @@ def inscribir_actividades_desk(
 	ensure_secretaria_operacion_access()
 	if not selecciones:
 		frappe.throw(_("Seleccione al menos una actividad."), frappe.ValidationError)
+
+	for sel in selecciones:
+		_validate_seleccion_inscripcion_desk(sel)
 
 	estado = frappe.db.get_value(SOCIO_DOCTYPE, socio_name, "estado")
 	activar = estado == ESTADO_SOCIO_PENDIENTE_INSCRIPCION

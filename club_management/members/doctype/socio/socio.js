@@ -329,54 +329,40 @@ club_management_socio_desk.dialog_inscripcion = function (frm) {
 				label: __("Equipo / categoría"),
 				options: "Equipo Actividad",
 			},
-			{ fieldname: "selecciones_json", fieldtype: "Small Text", label: __("Selecciones"), read_only: 1 },
+			{
+				fieldname: "selecciones_json",
+				fieldtype: "Small Text",
+				label: __("Actividades en cola"),
+				read_only: 1,
+				hidden: 1,
+			},
 		],
-		primary_action_label: __("Agregar"),
+		primary_action_label: __("Confirmar inscripción"),
 		primary_action() {
-			const vals = d.get_values();
-			if (!vals.actividad) return;
-			let rows = [];
-			try {
-				rows = vals.selecciones_json ? JSON.parse(vals.selecciones_json) : [];
-			} catch (e) {
-				rows = [];
-			}
-			rows.push({
-				actividad: vals.actividad,
-				grupo: vals.grupo || null,
-				equipo: vals.equipo || null,
-			});
-			d.set_value("selecciones_json", JSON.stringify(rows, null, 2));
-			d.set_value("actividad", "");
-			d.set_value("grupo", "");
-			d.set_value("equipo", "");
+			club_management.inscripcion_cascada
+				.collect_selecciones_dialog(d)
+				.then((selecciones) => {
+					frappe.call({
+						method: "club_management.members.api.socio_operaciones_desk.inscribir_actividades",
+						args: { socio: frm.doc.name, selecciones: JSON.stringify(selecciones) },
+						freeze: true,
+						callback(r) {
+							if (!r.exc) {
+								d.hide();
+								frm.reload_doc();
+								frappe.show_alert({
+									message: __("Inscripción registrada"),
+									indicator: "green",
+								});
+							}
+						},
+					});
+				})
+				.catch(() => {});
 		},
-		secondary_action_label: __("Confirmar inscripción"),
+		secondary_action_label: __("Agregar otra actividad"),
 		secondary_action() {
-			const vals = d.get_values();
-			let selecciones = [];
-			try {
-				selecciones = vals.selecciones_json ? JSON.parse(vals.selecciones_json) : [];
-			} catch (e) {
-				frappe.msgprint(__("Selecciones inválidas"));
-				return;
-			}
-			if (!selecciones.length) {
-				frappe.msgprint(__("Agregue al menos una actividad"));
-				return;
-			}
-			frappe.call({
-				method: "club_management.members.api.socio_operaciones_desk.inscribir_actividades",
-				args: { socio: frm.doc.name, selecciones: JSON.stringify(selecciones) },
-				freeze: true,
-				callback(r) {
-					if (!r.exc) {
-						d.hide();
-						frm.reload_doc();
-						frappe.show_alert({ message: __("Inscripción registrada"), indicator: "green" });
-					}
-				},
-			});
+			club_management.inscripcion_cascada.push_selection_dialog(d).catch(() => {});
 		},
 	});
 	d.show();

@@ -73,6 +73,25 @@ Then el autocompletado de equipo solo ofrece `Equipo Actividad` de ese grupo hab
 
 ---
 
+## Scenario: confirmar inscripción con selección pendiente en el diálogo
+
+Given Secretaría eligió actividad (y grupo/equipo si aplica) en el diálogo «Inscribir en actividades»
+And no pulsó «Agregar otra actividad»
+When pulsa **Confirmar inscripción**
+Then la selección pendiente se incluye y se registra la inscripción
+And no se exige un paso previo de «Agregar» para una sola actividad.
+
+---
+
+## Scenario: actividad con grupos exige grupo antes de confirmar
+
+Given una `Actividad` con `usa_grupos = 1`
+When Secretaría confirma sin elegir grupo / tira
+Then el cliente muestra error claro antes de llamar al servidor
+And el servidor rechaza la selección si faltara el grupo.
+
+---
+
 ## UI Desk
 
 Given formulario `Socio` con pestaña o sección **Inscripciones**
