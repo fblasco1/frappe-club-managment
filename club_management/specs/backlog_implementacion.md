@@ -12,8 +12,8 @@
 
 
 
-**Última revisión MVP producción:** 2026-07-06 (BL-4/BL-5 + purga básquet legacy en prod, commit `f436d2c`)  
-**Última actualización backlog:** 2026-07-06 (sprint BL-1–BL-5 cerrado)  
+**Última revisión MVP producción:** 2026-07-10 (cobranza/recibo + número socio manual, commit `b53ed5b`)  
+**Última actualización backlog:** 2026-07-10 (BL-7–BL-9 cerrados; sesión cobranza Secretaría)  
 
 **Destino producción:** Hetzner Cloud **CX23** (servidor aparte del devcontainer local)
 
@@ -217,7 +217,7 @@ Servicios críticos cobranza: **scheduler**, **queue-long**, **queue-short**, **
 
 | `gestion_actividades_edicion_panel.md` | [x] | Editar / deshabilitar nodos en panel actividades |
 
-| `socio_alta_edicion_secretaria.md` | [x] | Alta manual + edición Desk |
+| `socio_alta_edicion_secretaria.md` | [x] | Alta manual + edición Desk; **número de socio opcional** en alta guiada (2026-07-10, `b53ed5b`) |
 
 | `inscripcion_gestion_desk.md` | [x] | Baja/listado inscripciones; cascada actividad→grupo→equipo en diálogos |
 
@@ -735,9 +735,15 @@ print(result)  # facturas_creadas, errores, invoice_names
 
 | BL-5 | **Specs legacy básquet** | Baja | `activities_jerarquia.md`, `basquet_aranceles_icdpe.md`, `vinculacion_basquet_roster.md`, `import_socios_actividades_padron.md` | **Hecho 2026-07-06** — escenarios alineados a actividad única **Basquet**. |
 
+| BL-7 | **Recibo térmico en cobro Desk** | Alta | `recibo_pago_escpos.md` | **Hecho 2026-07-08** — fix import `build_recibo_pago` en `cobranza_desk.registrar_cobro` (`e58bfbc`); 8 tests `test_recibo_pago` OK; probado UI Socio 11479. |
+
+| BL-8 | **Fecha de cobro manual** | Media | `registrar_cobro_fecha.md` | **Hecho 2026-07-08** — campo en diálogo Desk, `posting_date` en PE (`8aed9ef`); tests fecha pasada/futura (`b53ed5b`). |
+
+| BL-9 | **Número de socio manual en alta** | Media | `socio_alta_edicion_secretaria.md` | **Hecho 2026-07-10** — `numero_socio` opcional en JSON/alta guiada/API; validación duplicado (`b53ed5b`). |
 
 
-**Orden sugerido al retomar:** portal socio (BL-6) · grupo familiar.
+
+**Orden sugerido al retomar:** portal socio (BL-6) · grupo familiar · complementar aranceles período (ops Excel julio).
 
 
 
@@ -793,9 +799,59 @@ print(result)  # facturas_creadas, errores, invoice_names
 | BL-4 CC ERPNext básquet | Hecho + prod + purga |
 | BL-5 Specs legacy | Hecho |
 | BL-6 Portal cascada | **Pendiente** |
+| BL-7 Recibo cobro Desk | Hecho + prod (`e58bfbc`) |
+| BL-8 Fecha de cobro | Hecho + prod (`8aed9ef` / tests `b53ed5b`) |
+| BL-9 Número socio manual | Hecho + prod (`b53ed5b`) |
 | Grupo familiar | **Pendiente** (sin spec dedicada aún) |
 
 **Retomar desde:** BL-6 o grupo familiar según prioridad Secretaría.
+
+
+
+## Resumen sesión 2026-07-08 / 2026-07-10 — cobranza Secretaría
+
+### Contexto
+
+Error en producción al **Registrar cobro** desde formulario Socio: `NameError: build_recibo_pago is not defined` en `cobranza_desk.registrar_cobro` (ruta `Form/Socio/11479`, factura `ACC-SINV-2026-00380`).
+
+### Entregables
+
+| Tema | Commit | Detalle |
+|------|--------|---------|
+| Fix recibo en cobro | `e58bfbc` | Import `build_recibo_pago` en `cobranza_desk.py` |
+| Cobranza julio + datos críticos | `8aed9ef` | Advertencia datos críticos, complementar aranceles, ops import Excel, fecha de cobro en Desk |
+| Guardar Socio incompleto | `cdeb0d8`–`4a2bcea` | Secretaría puede guardar Socio sin mandatory completos |
+| Sync saldo sin tocar modified | `a904e36` | `sync_saldo_deuda_socio` no altera `modified` del Socio |
+| Número socio manual + tests fecha | `b53ed5b` | Alta guiada/API, JSON opcional, tests duplicado y `posting_date` |
+
+### Validación local (`dev.localhost`)
+
+| Módulo | Tests | Resultado |
+|--------|-------|-----------|
+| `test_socio` | `test_numero_socio_duplicado_falla_en_insert` | OK |
+| `test_socio_alta_secretaria` | alta manual + duplicado | OK (2) |
+| `test_registrar_cobro_postgres` | fecha pasada / futura | OK (2) |
+| `test_recibo_pago` | formato + integración cobro | OK (8) |
+
+### Validación UI
+
+- Local: Socio **11479**, cobro `ACC-SINV-2026-00380`, Efectivo → PE `ACC-PAY-2026-00009`, saldo $0, recibo generado.
+- Prod: Desk carga Socio 11479 con menú cobranza; `get_recibo_pago` OK.
+
+### Deploy producción
+
+- Script: `scripts/prod/deploy-club-management.sh`
+- Commit en Hetzner: **`b53ed5b`** (2026-07-10)
+- URL: https://gestion.icdpedroechague.com.ar
+
+### Pendientes derivados (no bloquean operación)
+
+| # | Tema | Prioridad | Notas |
+|---|------|-----------|-------|
+| BL-6 | **Portal socio cascada** | Media | UI actividad → grupo → equipo (`activities_modulo.md`, Fase 3). |
+| — | **Grupo familiar** | Media | Sin spec dedicada aún. |
+| — | **Ops cobranza Excel julio** | Baja | Scripts `members/ops/import_cobranza_excel.py` en prod; validar carga masiva con Secretaría. |
+
 
 
 
@@ -809,5 +865,6 @@ print(result)  # facturas_creadas, errores, invoice_names
 
 | B1 | **Cancelación de Sales Invoice falla en PostgreSQL** | ~~Alta~~ **Resuelto 2026-07-01** | `delink_original_entry` asignaba `delinked=true` (boolean) a columna `smallint`. Parche en `payment_ledger_postgres.py` + spec `sales_invoice_cancel_postgres.md` + test `test_sales_invoice_cancel_postgres.py`. Desplegar y reiniciar workers para activar. |
 | B2 | **`get_negative_outstanding_invoices` en Payment Entry (PostgreSQL)** | ~~Media~~ **Resuelto 2026-07-05** | Parche en `payment_ledger_postgres.py`. `test_moroso_automatico`: 6/6 OK. |
+| B3 | **`NameError: build_recibo_pago` en registrar cobro Desk** | ~~Alta~~ **Resuelto 2026-07-08** | Faltaba import en `cobranza_desk.py`. Fix `e58bfbc`; tests `test_recibo_pago` + UI Socio 11479 OK. |
 
 
