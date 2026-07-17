@@ -431,6 +431,47 @@
 			`;
 		},
 
+		render_recordatorio_sueldos(recordatorio) {
+			const data = recordatorio || {};
+			if (!data.mostrar) {
+				return "";
+			}
+			const pendientes = data.conceptos_pendientes || [];
+			const lista =
+				pendientes.length > 0
+					? `<ul class="club-secretaria-sueldos-list mb-2">
+					${pendientes
+						.map(
+							(row) => `
+						<li>
+							<strong>${frappe.utils.escape_html(row.label)}</strong>
+							<span class="text-muted small d-block">
+								${__("Proveedor")}: ${frappe.utils.escape_html(row.supplier_label || row.supplier || "")}
+								· ${__("Ítem")}: ${frappe.utils.escape_html(row.item_code || "")}
+							</span>
+						</li>`
+						)
+						.join("")}
+				</ul>`
+					: `<p class="mb-2 text-success">${__("Todos los conceptos de provisión ya tienen factura este mes.")}</p>`;
+
+			const btn =
+				pendientes.length > 0
+					? `<button type="button" class="btn btn-sm btn-primary club-secretaria-nueva-pi">
+						${__("Nueva factura de compra")}
+					</button>`
+					: "";
+
+			return `
+				<div class="club-secretaria-sueldos-banner alert alert-warning" role="status">
+					<h6 class="alert-heading mb-2">${__("Provisión de sueldos — último día hábil")}</h6>
+					<p class="mb-2">${frappe.utils.escape_html(data.mensaje || "")}</p>
+					${lista}
+					${btn}
+				</div>
+			`;
+		},
+
 		render_quick_actions() {
 			return `
 				<div class="club-secretaria-quick-actions">
@@ -455,6 +496,7 @@
 			this._$panel = $panel;
 
 			$panel.html(`
+				${this.render_recordatorio_sueldos(data.recordatorio_sueldos)}
 				${this.render_quick_actions()}
 				${this.render_kpi_cards(metricas)}
 				${this.render_charts(metricas)}
@@ -519,6 +561,10 @@
 			$panel.find(".club-secretaria-cobranza").on("click", () => {
 				frappe.route_options = { saldo_deuda: [">", 0] };
 				frappe.set_route("List", "Socio");
+			});
+
+			$panel.find(".club-secretaria-nueva-pi").on("click", () => {
+				frappe.set_route("Form", "Purchase Invoice", "new");
 			});
 
 			$panel.find(".club-secretaria-solicitud-row").on("click", (e) => {

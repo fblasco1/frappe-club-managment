@@ -822,7 +822,7 @@
 					<div class="club-node-actions">
 						<button type="button" class="btn btn-default btn-xs club-open-desk"
 							data-doctype="Actividad" data-name="${frappe.utils.escape_html(act.name)}">
-							${__("Abrir en Desk")}
+							${__("Abrir ficha")}
 						</button>
 						<button type="button" class="btn btn-default btn-xs club-edit-actividad"
 							data-name="${frappe.utils.escape_html(act.name)}">
@@ -863,7 +863,7 @@
 						<div class="club-node-actions club-node-actions--compact">
 							<button type="button" class="btn btn-default btn-xs club-open-desk"
 								data-doctype="Equipo Actividad" data-name="${frappe.utils.escape_html(eq.name)}"
-								title="${__("Abrir en Desk")}">↗</button>
+								title="${__("Abrir ficha")}">↗</button>
 							<button type="button" class="btn btn-default btn-xs club-edit-equipo"
 								data-name="${frappe.utils.escape_html(eq.name)}"
 								data-titulo="${frappe.utils.escape_html(eq.titulo || "")}"
@@ -892,7 +892,7 @@
 						<div class="club-node-actions">
 							<button type="button" class="btn btn-default btn-xs club-open-desk"
 								data-doctype="Grupo Actividad" data-name="${frappe.utils.escape_html(grupo.name)}">
-								${__("Abrir en Desk")}
+								${__("Abrir ficha")}
 							</button>
 							<button type="button" class="btn btn-default btn-xs club-edit-grupo"
 								data-name="${frappe.utils.escape_html(grupo.name)}"
@@ -928,7 +928,7 @@
 							${__("Buscar")}
 						</button>
 						<button type="button" class="btn btn-default btn-sm club-create-arancel-item"
-							title="${__("Crear ítem ERP")}" aria-label="${__("Crear ítem ERP")}">
+							title="${__("Crear ítem de arancel")}" aria-label="${__("Crear ítem de arancel")}">
 							+
 						</button>
 					</div>
@@ -1018,7 +1018,7 @@
 						},
 					});
 				},
-				__("Crear ítem ERP"),
+				__("Crear ítem de arancel"),
 				__("Crear y aplicar")
 			);
 		},

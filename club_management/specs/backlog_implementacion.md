@@ -245,6 +245,8 @@ Servicios críticos cobranza: **scheduler**, **queue-long**, **queue-short**, **
 
 | `registrar_cobro_fecha.md` | [x] | Fecha de cobro en diálogo Secretaría + validación (2026-07-08 `8aed9ef`, tests `b53ed5b`) |
 
+| `portal_socio_inscripcion.md` | [ ] | BL-6 — inscripción post-pago en Vercel + API; reglas deporte vs variante |
+
 | `liquidacion_equipo_deuda_rango.md` | [x] | Reporte deuda por equipo + liquidación manual en rango |
 
 | `socios_categoria_validacion.md` | [ ] | Validación categoría, job Vitalicio — futuro |
@@ -901,11 +903,22 @@ Error en producción al **Registrar cobro** desde formulario Socio: `NameError: 
 
 | GF-4 Ítems + Cost Center | `items_finance_cost_center.md` | [x] | Catálogo `ICDPE-FIN-*` |
 
+| GF-5 Recordatorio provisión sueldos | `recordatorio_provision_sueldos_secretaria.md` | [x] | Banner último día hábil en panel Secretaría; E2E `e2e/finanza-flujo.spec.ts` |
+
+| GF-6 Revisión UX recordatorio Secretaría | `recordatorio_provision_sueldos_secretaria.md` | [ ] | **Backlog:** revisar qué le figura a Secretaría el último día hábil del mes (textos, lista de conceptos, acción hacia factura de compra, feriados AR). Validar con usuario real de Secretaría. |
+
+| GF-7 Español en UI (sin inglés) | `ui_espanol_sin_ingles.md` | [x] | **2026-07-17.** Labels workspace Tesorería en ES; `translations/es.csv` (Factura de compra/venta, Pago/cobro, Cuenta contable, Centro de costo); botón banner «Nueva factura de compra»; patch `sync_tesoreria_workspace_es`. Tests `tests/test_ui_espanol.py` (4). Verificado en navegador: lista Purchase Invoice → «Factura de compra». `link_to`/rutas conservan identificador técnico. |
+| GF-7b i18n global (barrido) | `ui_espanol_sin_ingles.md` | [x] | **2026-07-17.** `app_title`→«SICLUB» (hooks + apps screen); módulos vía `es.csv` (Finance→Finanzas, Members→Socios, Activities→Actividades, Club Management→SICLUB); panel Actividades «Abrir ficha» y «Crear ítem de arancel». Tests `tests/test_ui_espanol.py` (7). Verificado en navegador: encabezados «Finanzas/SICLUB» y «Gestión de Actividades/SICLUB». |
+
 | GF-HRMS | — | [ ] | **Fase posterior:** app HRMS / liquidación nativa de sueldos. Esta fase usa Purchase Invoice de provisión (Sueldos / AFIP 931 / ART / UTEDYC). **No implementar HRMS aquí.** |
 
 
 
 **Fuera de alcance GF (esta fase):** conciliación bancaria automática, gateway Cobros Plus en prod, Payment Log SIRO, modificar plan de cuentas importado.
+
+**Cierre desarrollo GF (2026-07-10):** hitos GF-0…GF-5 implementados y con tests. Pendientes explícitos en backlog: **GF-6** (revisión UX recordatorio Secretaría) y **GF-7** (español en UI, cero inglés visible).
+
+**Update 2026-07-17:** **GF-7 y GF-7b cerrados** (español en Finanzas + branding SICLUB + módulos + panel Actividades; mecanismo `translations/es.csv` reutilizable). Queda **GF-6** (UX recordatorio + feriados AR). Pendiente de infra: `bench run-tests` falla por precarga de test records de ERPNext (`ORDER BY idx is ambiguous` en PostgreSQL); los tests estáticos de i18n corren con `python -m unittest`.
 
 
 

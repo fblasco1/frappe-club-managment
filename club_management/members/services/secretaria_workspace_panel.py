@@ -8,6 +8,9 @@ import frappe
 from frappe.utils import fmt_money, formatdate
 
 from club_management.members.services.secretaria_panel_kpis import get_panel_metricas_payload
+from club_management.finance.services.recordatorio_sueldos import (
+	get_recordatorio_provision_sueldos_payload,
+)
 
 LIST_LIMIT = 5
 
@@ -130,6 +133,9 @@ def get_panel_lists_payload(
 			tendencia_reference_date=tendencia_reference_date,
 		),
 		"solicitudes_pendientes": get_solicitudes_pendientes_preview(),
+		"recordatorio_sueldos": get_recordatorio_provision_sueldos_payload(
+			reference_date=reference_date
+		),
 	}
 
 

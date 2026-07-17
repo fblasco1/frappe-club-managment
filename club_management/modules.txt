@@ -1,3 +1,4 @@
 Club Management
 Members
 Activities
+Finance

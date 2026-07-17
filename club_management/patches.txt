@@ -48,3 +48,10 @@ club_management.patches.v1_0.sync_actividades_workspace_sidebar
 club_management.patches.v1_0.create_cargos_varios_items
 club_management.patches.v1_0.seed_club_settings_recibo_icdpe
 club_management.patches.v1_0.consolidate_basquet_cost_centers
+club_management.patches.v1_0.ensure_finance_module
+club_management.patches.v1_0.ensure_role_tesoreria
+club_management.patches.v1_0.add_finance_custom_fields
+club_management.patches.v1_0.seed_finance_masters
+club_management.patches.v1_0.sync_tesoreria_workspace
+club_management.patches.v1_0.add_tesoreria_accounting_permissions
+club_management.patches.v1_0.sync_tesoreria_workspace_es

@@ -1,5 +1,5 @@
 app_name = "club_management"
-app_title = "Club Management"
+app_title = "SICLUB"
 app_publisher = "fblasco1"
 app_description = "ERP for Sports Clubs"
 app_email = "francisco.o.blasco@gmail.com"
@@ -15,7 +15,7 @@ add_to_apps_screen = [
 	{
 		"name": "club_management",
 		"logo": "/assets/frappe/images/frappe-framework-logo.svg",
-		"title": "Club Management",
+		"title": "SICLUB",
 		"route": "/desk",
 		"has_permission": "club_management.members.permissions_app.has_app_permission",
 	}

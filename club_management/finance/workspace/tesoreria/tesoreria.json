@@ -1,0 +1,107 @@
+{
+ "app": "club_management",
+ "charts": [],
+ "content": "[]",
+ "creation": "2026-07-10 12:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "currency-exchange",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "Tesorería",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Proyección Flujo de Fondos",
+   "link_count": 0,
+   "link_to": "Proyeccion Flujo de Fondos",
+   "link_type": "Report",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Facturas de compra",
+   "link_count": 0,
+   "link_to": "Purchase Invoice",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Facturas de venta",
+   "link_count": 0,
+   "link_to": "Sales Invoice",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Pagos y cobros",
+   "link_count": 0,
+   "link_to": "Payment Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Plan de cuentas",
+   "link_count": 0,
+   "link_to": "Account",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Centros de costo",
+   "link_count": 0,
+   "link_to": "Cost Center",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-07-10 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Finance",
+ "name": "Tesorería",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": "",
+ "roles": [
+  {
+   "role": "Tesoreria"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 0.5,
+ "shortcuts": [
+  {
+   "color": "Blue",
+   "doc_view": "",
+   "label": "Flujo de Fondos",
+   "link_to": "Proyeccion Flujo de Fondos",
+   "stats_filter": "",
+   "type": "Report"
+  }
+ ],
+ "title": "Tesorería"
+}

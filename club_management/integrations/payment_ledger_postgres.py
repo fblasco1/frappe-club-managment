@@ -26,6 +26,7 @@ def apply_patch() -> None:
 	_patch_validate_against_pcv()
 	_patch_delink_original_entry()
 	_patch_payment_entry_sql()
+	_patch_held_invoices()
 
 
 def _pg_amount_expr(rounded_field: str, grand_field: str) -> str:
@@ -126,6 +127,34 @@ def _delink_original_entry_postgres(pl_entry, partial_cancel: bool = False) -> N
 		query = query.set(ple.delinked, 1)
 
 	query.run()
+
+
+def _patch_held_invoices() -> None:
+	"""ERPNext usa CURDATE() (MariaDB); en PostgreSQL es CURRENT_DATE."""
+	try:
+		import erpnext.accounts.utils as accounts_utils
+	except ImportError:
+		return
+
+	if getattr(accounts_utils, "_club_held_invoices_pg_patch", False):
+		return
+
+	accounts_utils.get_held_invoices = _get_held_invoices_postgres
+	accounts_utils._club_held_invoices_pg_patch = True
+
+
+def _get_held_invoices_postgres(party_type, party):
+	held_invoices = None
+	if party_type == "Supplier":
+		held_invoices = frappe.db.sql(
+			"""
+			select name from "tabPurchase Invoice"
+			where on_hold = 1 and release_date IS NOT NULL and release_date > CURRENT_DATE
+			""",
+			as_dict=1,
+		)
+		held_invoices = set(d["name"] for d in held_invoices)
+	return held_invoices
 
 
 def _get_negative_outstanding_invoices_postgres(
