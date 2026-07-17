@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -55,18 +56,78 @@ PROVISION_SUELDOS: tuple[ProvisionSueldoSpec, ...] = (
 )
 
 
-def get_ultimo_dia_habil_mes(reference_date: str | date) -> date:
-	"""Último día lun–vie del mes de `reference_date` (sin feriados en MVP)."""
+def _normalizar_feriados(feriados: Iterable[str | date] | None) -> set[date]:
+	"""Convierte una colección de fechas (str o date) en un set de `date`."""
+	if not feriados:
+		return set()
+	return {getdate(f) for f in feriados}
+
+
+def get_feriados_del_mes(
+	reference_date: str | date,
+	holiday_list: str | None = None,
+) -> set[date]:
+	"""Feriados del mes de `reference_date` según la Holiday List de la empresa.
+
+	Usa la lista indicada o el `default_holiday_list` de la empresa por defecto.
+	Si no hay lista configurada o el DocType no existe, devuelve un set vacío
+	(el cálculo cae a considerar solo fines de semana).
+	"""
 	ref = getdate(reference_date)
+	lista = holiday_list or _get_default_holiday_list()
+	if not lista or not frappe.db.exists("DocType", "Holiday"):
+		return set()
+
+	mes_inicio = getdate(get_first_day(ref))
+	mes_fin = getdate(get_last_day(ref))
+	rows = frappe.get_all(
+		"Holiday",
+		filters={
+			"parent": lista,
+			"holiday_date": ["between", [mes_inicio, mes_fin]],
+		},
+		pluck="holiday_date",
+	)
+	return {getdate(r) for r in rows}
+
+
+def _get_default_holiday_list() -> str | None:
+	"""`default_holiday_list` de la empresa por defecto (o None)."""
+	if not frappe.db.exists("DocType", "Company"):
+		return None
+	company = frappe.defaults.get_global_default("company")
+	if not company:
+		return None
+	return frappe.db.get_value("Company", company, "default_holiday_list")
+
+
+def get_ultimo_dia_habil_mes(
+	reference_date: str | date,
+	holidays: Iterable[str | date] | None = None,
+) -> date:
+	"""Último día hábil (lun–vie y sin feriados) del mes de `reference_date`.
+
+	`holidays` permite inyectar feriados (para tests puros). Si es `None`, se
+	resuelven desde la Holiday List de la empresa (`get_feriados_del_mes`).
+	"""
+	ref = getdate(reference_date)
+	feriados = (
+		_normalizar_feriados(holidays)
+		if holidays is not None
+		else get_feriados_del_mes(ref)
+	)
 	ultimo = getdate(get_last_day(ref))
-	while ultimo.weekday() >= 5:
+	while ultimo.weekday() >= 5 or ultimo in feriados:
 		ultimo = getdate(add_days(ultimo, -1))
 	return ultimo
 
 
-def is_ultimo_dia_habil(reference_date: str | date | None = None) -> bool:
+def is_ultimo_dia_habil(
+	reference_date: str | date | None = None,
+	holidays: Iterable[str | date] | None = None,
+) -> bool:
 	ref = getdate(reference_date or today())
-	return ref == get_ultimo_dia_habil_mes(ref)
+	return ref == get_ultimo_dia_habil_mes(ref, holidays=holidays)
 
 
 def _resolve_supplier_name(supplier_name: str) -> str | None:
@@ -140,7 +201,7 @@ def get_recordatorio_provision_sueldos_payload(
 	pendientes = get_conceptos_pendientes_provision(ref)
 	if pendientes:
 		mensaje = _(
-			"Hoy es el último día hábil del mes: cargá la Purchase Invoice de provisión para cada concepto pendiente."
+			"Hoy es el último día hábil del mes: cargá la factura de compra de provisión para cada concepto pendiente."
 		)
 	else:
 		mensaje = _("Provisión de sueldos del mes completa. No hay conceptos pendientes.")

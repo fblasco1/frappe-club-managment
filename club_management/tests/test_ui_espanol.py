@@ -125,3 +125,17 @@ class TestUiEspanol(unittest.TestCase):
 			js,
 			"Falta el botón 'Nueva factura de compra' en español",
 		)
+
+	def test_mensaje_recordatorio_sueldos_en_espanol(self) -> None:
+		# GF-6: el mensaje visible del banner no debe decir "Purchase Invoice".
+		src = _app_path("finance", "services", "recordatorio_sueldos.py").read_text(encoding="utf-8")
+		self.assertNotIn(
+			"cargá la Purchase Invoice",
+			src,
+			"El mensaje del recordatorio usa un término en inglés",
+		)
+		self.assertIn(
+			"cargá la factura de compra",
+			src,
+			"Falta el copy en español 'cargá la factura de compra'",
+		)
