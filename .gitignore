@@ -43,6 +43,9 @@ blob-report/
 .pw-channel.env
 .pw-browser-ready
 
+# Byproduct de re-export de Workspace en modo desarrollador (fuente canónica: tesoreria/)
+club_management/finance/workspace/tesorería/
+
 # IDEs and editors
 .vscode/
 .vs/

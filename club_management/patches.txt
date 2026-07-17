@@ -56,3 +56,4 @@ club_management.patches.v1_0.sync_tesoreria_workspace
 club_management.patches.v1_0.add_tesoreria_accounting_permissions
 club_management.patches.v1_0.sync_tesoreria_workspace_es
 club_management.patches.v1_0.seed_holiday_list_ar_2026
+club_management.patches.v1_0.add_secretaria_finance_operative_permissions

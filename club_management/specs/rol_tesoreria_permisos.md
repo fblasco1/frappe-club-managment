@@ -1,6 +1,6 @@
 # Spec: Rol Tesorería y permisos contables
 
-El club necesita un rol **Tesoreria** con lectura contable y acceso al flujo de fondos, separado de **Secretaria** (carga operativa sin P&L).
+El club necesita un rol **Tesoreria** con lectura contable y acceso al flujo de fondos, separado de **Secretaria**. Secretaría tiene **acceso operativo** a Finanzas (crear/leer facturas de compra, pagos y proveedores, para cargar la provisión de sueldos y egresos) pero **sin** flujo de fondos ni reportes P&L (GF-6).
 
 **Relacionado:** `carga_rapida_ingreso_egreso.md`, `proyeccion_flujo_fondos.md`
 
@@ -32,12 +32,29 @@ Then recibe `PermissionError`.
 
 ---
 
-## Scenario: Secretaria no ve reportes P&L en workspace Tesorería
+## Scenario: Secretaría accede al workspace de Finanzas (operativo) — GF-6
 
 Given el workspace `Tesorería`
 When se listan sus roles permitidos
-Then incluye `Tesoreria` y `System Manager`
-And **no** incluye `Secretaria`.
+Then incluye `Tesoreria`, `Secretaria` y `System Manager`.
+
+---
+
+## Scenario: Secretaría ve solo accesos operativos (sin flujo/P&L) — GF-6
+
+Given un usuario con rol `Secretaria` (sin `Tesoreria`)
+When abre el workspace de Finanzas
+Then ve los accesos a **Facturas de compra** y **Pagos y cobros**
+And **no** ve el reporte **Proyección de Flujo de Fondos** (el link se filtra por permiso, ya que el reporte requiere rol `Tesoreria`).
+
+---
+
+## Scenario: Secretaría puede crear una factura de compra — GF-6
+
+Given un usuario con rol `Secretaria`
+When abre el formulario de `Purchase Invoice`
+Then puede crear y guardar (tiene `create`/`write`/`submit` operativo)
+And tiene lectura sobre los masters necesarios (Item, Account, Cost Center, Company, Mode of Payment, Supplier).
 
 ---
 
@@ -55,5 +72,7 @@ Then retorna True.
 |-----------|-----------|
 | Constantes / gates | `finance/permissions.py` |
 | Patch rol | `patches/v1_0/ensure_role_tesoreria.py` |
+| Permisos operativos Secretaría | `finance/setup/secretaria_finance_permissions.py` |
+| Patch permisos + workspace Secretaría | `patches/v1_0/add_secretaria_finance_operative_permissions.py` |
 | App permission | `members/permissions_app.py` |
-| Tests | `tests/test_rol_tesoreria.py` |
+| Tests | `tests/test_rol_tesoreria.py`, `tests/test_secretaria_finance_permissions.py` |

@@ -100,7 +100,8 @@ class TestRolTesoreria(MembersTestCase):
 		finally:
 			frappe.set_user("Administrator")
 
-	def test_workspace_tesoreria_sin_secretaria(self) -> None:
+	def test_workspace_tesoreria_incluye_secretaria(self) -> None:
+		# GF-6: Secretaría tiene acceso operativo al workspace de Finanzas.
 		from club_management.patches.v1_0.sync_tesoreria_workspace import execute as sync_ws
 
 		sync_ws()
@@ -110,7 +111,7 @@ class TestRolTesoreria(MembersTestCase):
 		roles = {r.role for r in (ws.roles or [])}
 		self.assertIn(ROLE_TESORERIA, roles)
 		self.assertIn("System Manager", roles)
-		self.assertNotIn("Secretaria", roles)
+		self.assertIn("Secretaria", roles)
 
 	def test_has_app_permission_tesoreria(self) -> None:
 		user = make_tesoreria_user("tesoreria.app@example.com")
