@@ -58,6 +58,23 @@ And tiene lectura sobre los masters necesarios (Item, Account, Cost Center, Comp
 
 ---
 
+## Scenario: el módulo Finanzas es visible para los roles financieros — GF-6
+
+Given que Frappe solo muestra un workspace si su **módulo** está en los módulos permitidos del usuario
+And que los módulos permitidos se derivan de los DocTypes que el usuario puede leer
+When el módulo `Finance` no contiene ningún DocType propio
+Then ni `Tesoreria` ni `Secretaria` verían el workspace (bug: solo Administrator lo veía).
+
+## Scenario: DocType `Finance Settings` habilita el módulo — GF-6
+
+Given el DocType Single `Finance Settings` en el módulo `Finance`
+And permisos de lectura para `Tesoreria` y `Secretaria`
+When un usuario con esos roles abre el Desk
+Then `Finance` está en sus módulos permitidos
+And el workspace de Tesorería/Finanzas se muestra.
+
+---
+
 ## Scenario: Tesoreria tiene acceso a la app Desk
 
 Given un usuario con solo rol `Tesoreria`

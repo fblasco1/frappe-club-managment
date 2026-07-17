@@ -92,7 +92,11 @@ def get_feriados_del_mes(
 
 
 def _get_default_holiday_list() -> str | None:
-	"""`default_holiday_list` de la empresa por defecto (o None)."""
+	"""Lista de feriados a usar: Finance Settings > `default_holiday_list` de la empresa."""
+	if frappe.db.exists("DocType", "Finance Settings"):
+		configurada = frappe.db.get_single_value("Finance Settings", "holiday_list")
+		if configurada:
+			return configurada
 	if not frappe.db.exists("DocType", "Company"):
 		return None
 	company = frappe.defaults.get_global_default("company")
