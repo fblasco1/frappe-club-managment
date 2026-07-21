@@ -266,6 +266,11 @@ club_management_socio_desk.add_operaciones_buttons = function (frm) {
 		cobranza
 	);
 	frm.add_custom_button(__("Generar cargo"), () => club_management_socio_desk.generar_cargo(frm), cobranza);
+	frm.add_custom_button(
+		__("Cancelar factura impaga"),
+		() => club_management_socio_desk.dialog_cancelar_factura_impaga(frm),
+		cobranza
+	);
 	if (flt(frm.doc.saldo_deuda) > 0) {
 		frm.add_custom_button(
 			__("Registrar cobro"),
@@ -499,6 +504,73 @@ club_management_socio_desk.generar_cargo = function (frm) {
 						frappe.format(r.message.saldo_deuda, { fieldtype: "Currency" }),
 					])
 				);
+				frm.reload_doc();
+			}
+		},
+	});
+};
+
+club_management_socio_desk.dialog_cancelar_factura_impaga = function (frm) {
+	frappe.call({
+		method: "club_management.members.api.cobranza_desk.list_facturas_impagas_cancelables",
+		args: { socio: frm.doc.name },
+		freeze: true,
+		callback(r) {
+			if (r.exc) return;
+			const rows = r.message || [];
+			if (!rows.length) {
+				frappe.msgprint(__("No hay facturas totalmente impagas para cancelar."));
+				return;
+			}
+			const labels = rows.map((row) => {
+				const monto = frappe.format(row.grand_total, { fieldtype: "Currency" });
+				return `${row.name} — ${monto}`;
+			});
+			const pick_and_confirm = (invoice_name) => {
+				frappe.confirm(
+					__(
+						"¿Cancelar la factura {0}? Luego podrá Generar cargo de nuevo con los datos corregidos.",
+						[invoice_name]
+					),
+					() => club_management_socio_desk.ejecutar_cancelar_factura_impaga(frm, invoice_name)
+				);
+			};
+			if (rows.length === 1) {
+				pick_and_confirm(rows[0].name);
+				return;
+			}
+			frappe.prompt(
+				[
+					{
+						fieldname: "sales_invoice",
+						fieldtype: "Select",
+						label: __("Factura impaga"),
+						options: labels.join("\n"),
+						reqd: 1,
+					},
+				],
+				(values) => {
+					const invoice = (values.sales_invoice || "").split(" — ")[0].trim();
+					pick_and_confirm(invoice);
+				},
+				__("Cancelar factura impaga"),
+				__("Continuar")
+			);
+		},
+	});
+};
+
+club_management_socio_desk.ejecutar_cancelar_factura_impaga = function (frm, sales_invoice) {
+	frappe.call({
+		method: "club_management.members.api.cobranza_desk.cancelar_factura_venta",
+		args: { socio: frm.doc.name, sales_invoice },
+		freeze: true,
+		callback(r) {
+			if (!r.exc && r.message) {
+				frappe.show_alert({
+					message: __("Factura cancelada: {0}", [sales_invoice]),
+					indicator: "green",
+				});
 				frm.reload_doc();
 			}
 		},

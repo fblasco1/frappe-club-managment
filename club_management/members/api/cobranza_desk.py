@@ -10,9 +10,11 @@ from club_management.members.services.cargo_socio import (
 	facturar_cargo_socio as _facturar_cargo_socio,
 )
 from club_management.members.services.cobranza_manual import (
+	cancelar_factura_venta_impaga,
 	ensure_customer_for_socio,
 	generar_cargo_socio,
 	get_detalle_deuda_socio,
+	list_facturas_impagas_cancelables_socio,
 	list_facturas_pendientes_socio,
 	registrar_cobro_manual,
 	sync_saldo_deuda_socio,
@@ -45,6 +47,18 @@ def list_facturas_pendientes(socio: str) -> list[dict]:
 	ensure_secretaria_operacion_access()
 	return list_facturas_pendientes_socio(socio)
 
+
+@frappe.whitelist()
+def list_facturas_impagas_cancelables(socio: str) -> list[dict]:
+	ensure_secretaria_operacion_access()
+	return list_facturas_impagas_cancelables_socio(socio)
+
+
+@frappe.whitelist()
+def cancelar_factura_venta(socio: str, sales_invoice: str) -> dict[str, str | float]:
+	apply_patch()
+	ensure_secretaria_operacion_access()
+	return cancelar_factura_venta_impaga(socio, sales_invoice)
 
 @frappe.whitelist()
 def list_detalle_deuda(socio: str) -> dict:

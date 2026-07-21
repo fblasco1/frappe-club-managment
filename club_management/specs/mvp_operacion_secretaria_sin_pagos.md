@@ -72,6 +72,22 @@ And `Socio.saldo_deuda` refleja el saldo pendiente ERPNext.
 
 ---
 
+## Scenario: cancelar factura de venta impaga
+
+Given una `Sales Invoice` submitted del socio totalmente impaga (`outstanding_amount` = `grand_total`)
+When Secretaría ejecuta **Cancelar factura impaga** en Desk
+Then la factura queda cancelada (`docstatus` = 2)
+And `Socio.saldo_deuda` se sincroniza
+And Secretaría puede corregir la inscripción/arancel y volver a **Generar cargo**.
+
+Given una `Sales Invoice` con cobros parciales o totales (`outstanding_amount` < `grand_total`)
+When Secretaría intenta cancelarla por el flujo Desk
+Then la operación falla (solo facturas totalmente impagas).
+
+Ver spec detallada: `cancelar_factura_venta_impaga.md`.
+
+---
+
 ## Scenario: registrar cobro manual
 
 Given una `Sales Invoice` pendiente vinculada al socio
