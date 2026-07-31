@@ -105,27 +105,60 @@ def get_recibo_config() -> dict[str, Any]:
 
 
 def _lineas_desde_payment_entry(payment_entry_name: str) -> list[dict[str, Any]]:
+	from club_management.members.services.cobranza_manual import _campo_periodo_cobro
+	from club_management.members.services.mora_al_cobro import (
+		_periodo_sort_key,
+		periodo_es_ajuste_mora,
+	)
+
+	campo_periodo = _campo_periodo_cobro()
 	refs = frappe.get_all(
 		"Payment Entry Reference",
 		filters={
 			"parent": payment_entry_name,
 			"reference_doctype": SALES_INVOICE_DOCTYPE,
 		},
-		fields=["reference_name"],
-		order_by="`tabSales Invoice Item`.idx asc",
+		fields=["reference_name", "allocated_amount"],
+		order_by="idx asc",
 	)
 	lineas: list[dict[str, Any]] = []
 	for ref in refs:
+		periodo = ""
+		if campo_periodo:
+			periodo = (frappe.db.get_value(SALES_INVOICE_DOCTYPE, ref.reference_name, campo_periodo) or "").strip()
 		items = frappe.get_all(
 			"Sales Invoice Item",
 			filters={"parent": ref.reference_name},
 			fields=["description", "item_code", "amount"],
-			order_by="`tabSales Invoice Item`.idx asc",
+			order_by="idx asc",
 		)
 		for item in items:
 			concepto = (item.description or item.item_code or _("Concepto")).strip()
-			lineas.append({"concepto": concepto, "monto": flt(item.amount)})
+			# Prefijo de período en conceptos que aún no lo traen (mora ya lo incluye).
+			if periodo and periodo not in concepto and not periodo_es_ajuste_mora(periodo):
+				concepto = f"{_periodo_base_display(periodo)} · {concepto}"
+			elif periodo and periodo_es_ajuste_mora(periodo) and not concepto.upper().startswith("MORA"):
+				concepto = f"Mora {_periodo_base_display(periodo)}: {concepto}"
+			lineas.append(
+				{
+					"concepto": concepto,
+					"monto": flt(item.amount),
+					"periodo_cobro": periodo,
+					"sales_invoice": ref.reference_name,
+				}
+			)
+	lineas.sort(key=lambda r: (_periodo_sort_key(r.get("periodo_cobro")), r.get("concepto") or ""))
 	return lineas
+
+
+def _periodo_base_display(periodo: str) -> str:
+	from club_management.members.services.mora_al_cobro import MORA_SUFFIX, RECARGO_SUFFIX
+
+	raw = (periodo or "").strip()
+	for suffix in (MORA_SUFFIX, RECARGO_SUFFIX):
+		if raw.endswith(suffix):
+			return raw[: -len(suffix)]
+	return raw
 
 
 def _fecha_hora_cobro(payment_entry_name: str) -> tuple[str, str]:

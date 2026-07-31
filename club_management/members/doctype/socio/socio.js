@@ -24,6 +24,7 @@ frappe.ui.form.on("Socio", {
 		}
 		if (frm.is_new()) {
 			club_management_socio_desk.relax_adjuntos_alta_manual(frm);
+			club_management_socio_desk.relax_tutor_alta_manual(frm);
 			club_management_socio_desk.add_alta_guiada_button(frm);
 			if (!frm._alta_guiada_opened) {
 				frm._alta_guiada_opened = true;
@@ -37,14 +38,17 @@ frappe.ui.form.on("Socio", {
 		club_management_socio_desk.render_inscripciones(frm);
 		club_management_socio_desk.render_becas(frm);
 		club_management_socio_desk.render_deuda_pendiente(frm);
+		club_management_socio_desk.render_historial_pagos(frm);
 	},
 	categoria(frm) {
-		if (
-			!frm.is_new() &&
-			(frappe.user.has_role("Secretaria") || frappe.user.has_role("System Manager"))
-		) {
-			club_management_socio_desk.relax_validacion_edicion_secretaria(frm);
+		if (!(frappe.user.has_role("Secretaria") || frappe.user.has_role("System Manager"))) {
+			return;
 		}
+		if (frm.is_new()) {
+			club_management_socio_desk.relax_tutor_alta_manual(frm);
+			return;
+		}
+		club_management_socio_desk.relax_validacion_edicion_secretaria(frm);
 	},
 });
 
@@ -125,6 +129,14 @@ club_management_socio_desk.relax_adjuntos_alta_manual = function (frm) {
 		frm.set_df_property(fieldname, "hidden", 1);
 	}
 	frm.set_df_property("documentos_section", "hidden", 1);
+};
+
+/** Tutor opcional en alta Desk (queda como dato crítico si falta en Menor). */
+club_management_socio_desk.relax_tutor_alta_manual = function (frm) {
+	for (const fieldname of ["tipo_tutor", "tutor"]) {
+		frm.set_df_property(fieldname, "reqd", 0);
+		frm.set_df_property(fieldname, "mandatory_depends_on", "");
+	}
 };
 
 club_management_socio_desk.relax_adjuntos_edicion_secretaria = function (frm) {
@@ -257,6 +269,11 @@ club_management_socio_desk.add_operaciones_buttons = function (frm) {
 	}
 	if (estado !== "Baja") {
 		frm.add_custom_button(__("Crear beca"), () => club_management_socio_desk.crear_beca(frm), group);
+		frm.add_custom_button(
+			__("Corregir número de socio"),
+			() => club_management_socio_desk.dialog_corregir_numero(frm),
+			group
+		);
 	}
 
 	const cobranza = __("Cobranza manual");
@@ -282,6 +299,48 @@ club_management_socio_desk.add_operaciones_buttons = function (frm) {
 		__("Actualizar saldo deuda"),
 		() => club_management_socio_desk.actualizar_saldo(frm),
 		cobranza
+	);
+};
+
+club_management_socio_desk.dialog_corregir_numero = function (frm) {
+	frappe.prompt(
+		[
+			{
+				fieldname: "nuevo_numero",
+				fieldtype: "Int",
+				label: __("Nuevo número de socio"),
+				reqd: 1,
+				description: __(
+					"Usar cuando el número actual es provisional. Actualiza el identificador y todos los vínculos."
+				),
+			},
+		],
+		(values) => {
+			frappe.confirm(
+				__(
+					"¿Cambiar el número de socio de {0} a {1}? Esta acción renombra el documento.",
+					[frm.doc.name, values.nuevo_numero]
+				),
+				() => {
+					frappe.call({
+						method: "club_management.members.api.socio_operaciones_desk.corregir_numero_socio",
+						args: { socio: frm.doc.name, nuevo_numero: values.nuevo_numero },
+						freeze: true,
+						callback(r) {
+							if (!r.exc && r.message && r.message.socio) {
+								frappe.show_alert({
+									message: __("Número actualizado: {0}", [r.message.socio]),
+									indicator: "green",
+								});
+								frappe.set_route("Form", "Socio", r.message.socio);
+							}
+						},
+					});
+				}
+			);
+		},
+		__("Corregir número de socio"),
+		__("Confirmar")
 	);
 };
 
@@ -492,18 +551,111 @@ club_management_socio_desk.render_becas = function (frm) {
 };
 
 club_management_socio_desk.generar_cargo = function (frm) {
+	const first_of_month = frappe.datetime.month_start(frappe.datetime.get_today());
+	const d = new frappe.ui.Dialog({
+		title: __("Generar cargo"),
+		fields: [
+			{
+				fieldname: "reference_date",
+				fieldtype: "Date",
+				label: __("Período (día 1 del mes)"),
+				default: first_of_month,
+				reqd: 1,
+				description: __(
+					"Elegí el mes a facturar (deuda histórica o mes corriente). Usa precios vigentes al emitir."
+				),
+			},
+		],
+		primary_action_label: __("Generar"),
+		primary_action(values) {
+			d.hide();
+			frappe.call({
+				method: "club_management.members.api.cobranza_desk.generar_cargo",
+				args: {
+					socio: frm.doc.name,
+					incluir_actividades: 1,
+					reference_date: values.reference_date,
+				},
+				freeze: true,
+				callback(r) {
+					if (!r.exc && r.message) {
+						const invoices = r.message.sales_invoices || [r.message.sales_invoice];
+						frappe.msgprint(
+							__("Facturas {0} — saldo {1}", [
+								(invoices || []).filter(Boolean).join(", "),
+								frappe.format(r.message.saldo_deuda, { fieldtype: "Currency" }),
+							])
+						);
+						frm.reload_doc();
+					}
+				},
+			});
+		},
+	});
+	d.show();
+};
+
+club_management_socio_desk.dialog_cancelar_factura_impaga = function (frm) {
 	frappe.call({
-		method: "club_management.members.api.cobranza_desk.generar_cargo",
-		args: { socio: frm.doc.name, incluir_actividades: 1 },
+		method: "club_management.members.api.cobranza_desk.list_facturas_impagas_cancelables",
+		args: { socio: frm.doc.name },
+		freeze: true,
+		callback(r) {
+			if (r.exc) return;
+			const rows = r.message || [];
+			if (!rows.length) {
+				frappe.msgprint(__("No hay facturas totalmente impagas para cancelar."));
+				return;
+			}
+			const labels = rows.map((row) => {
+				const monto = frappe.format(row.grand_total, { fieldtype: "Currency" });
+				return `${row.name} — ${monto}`;
+			});
+			const pick_and_confirm = (invoice_name) => {
+				frappe.confirm(
+					__(
+						"¿Cancelar la factura {0}? Luego podrá Generar cargo de nuevo con los datos corregidos.",
+						[invoice_name]
+					),
+					() => club_management_socio_desk.ejecutar_cancelar_factura_impaga(frm, invoice_name)
+				);
+			};
+			if (rows.length === 1) {
+				pick_and_confirm(rows[0].name);
+				return;
+			}
+			frappe.prompt(
+				[
+					{
+						fieldname: "sales_invoice",
+						fieldtype: "Select",
+						label: __("Factura impaga"),
+						options: labels.join("\n"),
+						reqd: 1,
+					},
+				],
+				(values) => {
+					const invoice = (values.sales_invoice || "").split(" — ")[0].trim();
+					pick_and_confirm(invoice);
+				},
+				__("Cancelar factura impaga"),
+				__("Continuar")
+			);
+		},
+	});
+};
+
+club_management_socio_desk.ejecutar_cancelar_factura_impaga = function (frm, sales_invoice) {
+	frappe.call({
+		method: "club_management.members.api.cobranza_desk.cancelar_factura_venta",
+		args: { socio: frm.doc.name, sales_invoice },
 		freeze: true,
 		callback(r) {
 			if (!r.exc && r.message) {
-				frappe.msgprint(
-					__("Factura {0} — saldo {1}", [
-						r.message.sales_invoice,
-						frappe.format(r.message.saldo_deuda, { fieldtype: "Currency" }),
-					])
-				);
+				frappe.show_alert({
+					message: __("Factura cancelada: {0}", [sales_invoice]),
+					indicator: "green",
+				});
 				frm.reload_doc();
 			}
 		},
@@ -589,63 +741,91 @@ club_management_socio_desk.dialog_registrar_cobro = function (frm) {
 				frappe.msgprint(__("No hay facturas pendientes para este socio."));
 				return;
 			}
-			if (rows.length === 1) {
-				club_management_socio_desk.prompt_modo_y_registrar_cobro(frm, rows[0]);
-				return;
-			}
-			const labels = rows.map((row) => {
-				const saldo = frappe.format(row.outstanding_amount, { fieldtype: "Currency" });
-				return `${row.name} — ${saldo}`;
-			});
-			frappe.prompt(
-				[
-					{
-						fieldname: "sales_invoice",
-						fieldtype: "Select",
-						label: __("Factura pendiente"),
-						options: labels.join("\n"),
-						reqd: 1,
-					},
-				],
-				(values) => {
-					const invoice = (values.sales_invoice || "").split(" — ")[0].trim();
-					const row = rows.find((item) => item.name === invoice);
-					club_management_socio_desk.prompt_modo_y_registrar_cobro(frm, row || { name: invoice });
-				},
-				__("Registrar cobro"),
-				__("Continuar")
-			);
+			club_management_socio_desk.prompt_cobro_multi_factura(frm, rows);
 		},
 	});
 };
 
-club_management_socio_desk.prompt_modo_y_registrar_cobro = function (frm, invoice_row) {
+club_management_socio_desk._fmt_money = function (valor) {
+	const n = flt(valor);
+	if (typeof format_currency === "function") {
+		return format_currency(n);
+	}
+	return String(n);
+};
+
+club_management_socio_desk.prompt_cobro_multi_factura = function (frm, rows) {
 	frappe.call({
 		method: "club_management.members.api.cobranza_desk.list_modos_pago_cobranza",
 		callback(r) {
-			if (r.exc) {
-				return;
-			}
+			if (r.exc) return;
 			const modos = r.message || [];
 			const labelToValue = {};
-			const options = modos
+			const mode_options = modos
 				.map((row) => {
 					labelToValue[row.label] = row.value;
 					return row.label;
 				})
 				.join("\n");
-			const saldo_label = frappe.format(invoice_row.outstanding_amount, {
-				fieldtype: "Currency",
+			const rowsByName = {};
+			rows.forEach((row) => {
+				rowsByName[row.name] = row;
 			});
-			frappe.prompt(
-				[
+			const total = rows.reduce((acc, row) => acc + flt(row.outstanding_amount), 0);
+			const invoice_options = rows.map((row) => {
+				const saldo = frappe.format(row.outstanding_amount, { fieldtype: "Currency" });
+				const concepto = row.concepto || row.name;
+				const periodo = row.periodo_cobro ? `${row.periodo_cobro} · ` : "";
+				return {
+					label: `${periodo}${concepto} — ${row.name} — ${saldo}`,
+					value: row.name,
+					checked: true,
+				};
+			});
+			const d = new frappe.ui.Dialog({
+				title: __("Registrar cobro"),
+				fields: [
 					{
-						fieldname: "mode_of_payment",
+						fieldname: "sales_invoices",
+						fieldtype: "MultiCheck",
+						label: __("Facturas a cobrar"),
+						options: invoice_options,
+						sort_options: false,
+						select_all: true,
+						reqd: 1,
+					},
+					{
+						fieldname: "mora_resumen",
+						fieldtype: "HTML",
+						options: `<p class="text-muted small">${__("Calculando total con mora…")}</p>`,
+					},
+					{
+						fieldname: "mode_1",
 						fieldtype: "Select",
 						label: __("Medio de pago"),
-						options,
+						options: mode_options,
 						default: modos[0]?.label,
 						reqd: 1,
+					},
+					{
+						fieldname: "amount_1",
+						fieldtype: "Currency",
+						label: __("Monto medio 1"),
+						default: total,
+						reqd: 1,
+					},
+					{
+						fieldname: "mode_2",
+						fieldtype: "Select",
+						label: __("Segundo medio (opcional)"),
+						options: "\n" + mode_options,
+						description: __("Para pago mixto (efectivo + transferencia, etc.)"),
+					},
+					{
+						fieldname: "amount_2",
+						fieldtype: "Currency",
+						label: __("Monto medio 2"),
+						default: 0,
 					},
 					{
 						fieldname: "posting_date",
@@ -655,20 +835,240 @@ club_management_socio_desk.prompt_modo_y_registrar_cobro = function (frm, invoic
 						reqd: 1,
 					},
 				],
-				(values) => {
-					const mode = labelToValue[values.mode_of_payment] || "Cash";
-					club_management_socio_desk.ejecutar_registrar_cobro(
-						frm,
-						invoice_row,
-						mode,
-						values.posting_date
-					);
+				primary_action_label: __("Confirmar"),
+				primary_action(values) {
+					const selected = values.sales_invoices || [];
+					if (!selected.length) {
+						frappe.msgprint(__("Seleccioná al menos una factura."));
+						return;
+					}
+					frappe.call({
+						method: "club_management.members.api.cobranza_desk.preview_mora_al_cobro",
+						args: {
+							socio: frm.doc.name,
+							sales_invoices: selected,
+							posting_date: values.posting_date,
+						},
+						freeze: true,
+						callback(preview_res) {
+							if (preview_res.exc || !preview_res.message) {
+								return;
+							}
+							const total_sel = flt(preview_res.message.total_exigido);
+							club_management_socio_desk._aplicar_preview_mora(d, preview_res.message, rowsByName);
+
+							const m1 = labelToValue[values.mode_1] || "Cash";
+							let a2 = flt(values.amount_2);
+							let a1 = flt(values.amount_1);
+							// Un solo medio: forzar monto = total con mora (evita desfasaje por preview viejo).
+							if (a2 <= 0) {
+								a1 = total_sel;
+								d.set_value("amount_1", a1);
+							}
+
+							const medios = [];
+							if (a1 > 0) {
+								medios.push({ mode_of_payment: m1, amount: a1 });
+							}
+							if (a2 > 0) {
+								const m2 = labelToValue[values.mode_2];
+								if (!m2) {
+									frappe.msgprint(__("Elegí el segundo medio de pago."));
+									return;
+								}
+								medios.push({ mode_of_payment: m2, amount: a2 });
+							}
+							if (!medios.length) {
+								frappe.msgprint(__("Indicá al menos un medio con monto."));
+								return;
+							}
+							const sum_medios = medios.reduce((acc, row) => acc + flt(row.amount), 0);
+							if (Math.abs(sum_medios - total_sel) > 0.005) {
+								frappe.msgprint(
+									__(
+										"La suma de medios ({0}) debe coincidir con el total a cobrar con mora ({1}).",
+										[format_currency(sum_medios), format_currency(total_sel)]
+									)
+								);
+								d.set_value("amount_1", Math.max(0, total_sel - a2));
+								return;
+							}
+							d.hide();
+							club_management_socio_desk.ejecutar_registrar_cobro_compuesto(
+								frm,
+								selected,
+								medios,
+								values.posting_date
+							);
+						},
+					});
 				},
-				__("Registrar cobro de {0} — {1}", [invoice_row.name, saldo_label]),
-				__("Confirmar")
-			);
+			});
+
+			let refresh_timer = null;
+			const refresh_mora = () => {
+				if (refresh_timer) {
+					clearTimeout(refresh_timer);
+				}
+				refresh_timer = setTimeout(() => {
+					const selected = d.get_value("sales_invoices") || [];
+					if (!selected.length) {
+						if (d.fields_dict.mora_resumen) {
+							d.fields_dict.mora_resumen.$wrapper.html(
+								`<p class="text-muted small">${__("Seleccioná al menos una factura.")}</p>`
+							);
+						}
+						d.set_value("amount_1", 0);
+						d.set_value("amount_2", 0);
+						return;
+					}
+					frappe.call({
+						method: "club_management.members.api.cobranza_desk.preview_mora_al_cobro",
+						args: {
+							socio: frm.doc.name,
+							sales_invoices: selected,
+							posting_date: d.get_value("posting_date"),
+						},
+						callback(preview_res) {
+							if (preview_res.exc || !preview_res.message) {
+								return;
+							}
+							club_management_socio_desk._aplicar_preview_mora(
+								d,
+								preview_res.message,
+								rowsByName
+							);
+						},
+					});
+				}, 150);
+			};
+
+			// MultiCheck usa df.on_change (no onchange).
+			d.fields_dict.sales_invoices.df.on_change = refresh_mora;
+			d.fields_dict.posting_date.df.onchange = refresh_mora;
+			d.fields_dict.amount_2.df.onchange = () => {
+				const preview_total = flt(d._last_total_exigido);
+				if (preview_total <= 0) {
+					return;
+				}
+				const a2 = flt(d.get_value("amount_2"));
+				d.set_value("amount_1", Math.max(0, flt(preview_total - a2, 2)));
+			};
+			d.show();
+			refresh_mora();
 		},
 	});
+};
+
+club_management_socio_desk._aplicar_preview_mora = function (dialog, preview, rowsByName) {
+	club_management_socio_desk._pintar_resumen_mora(dialog, preview);
+	club_management_socio_desk._actualizar_labels_facturas_mora(dialog, preview, rowsByName || {});
+	const total = flt(preview.total_exigido);
+	dialog._last_total_exigido = total;
+	const a2 = flt(dialog.get_value("amount_2"));
+	dialog.set_value("amount_1", Math.max(0, flt(total - a2, 2)));
+	if (a2 > total) {
+		dialog.set_value("amount_2", 0);
+		dialog.set_value("amount_1", total);
+	}
+};
+
+club_management_socio_desk._actualizar_labels_facturas_mora = function (dialog, preview, rowsByName) {
+	const control = dialog.fields_dict.sales_invoices;
+	if (!control || !control.options) {
+		return;
+	}
+	const by_invoice = {};
+	(preview.detalle || []).forEach((row) => {
+		by_invoice[row.invoice] = row;
+	});
+	control.options.forEach((opt) => {
+		const base = rowsByName[opt.value] || {};
+		const info = by_invoice[opt.value];
+		const concepto = (info && info.concepto) || base.concepto || opt.value;
+		const periodo = (info && info.periodo) || base.periodo_cobro || "";
+		const monto = info ? flt(info.monto_exigido) : flt(base.outstanding_amount);
+		const monto_txt = club_management_socio_desk._fmt_money(monto);
+		const mora_txt =
+			info && info.aplica_mora
+				? ` · ${__("con mora")} (+${club_management_socio_desk._fmt_money(info.monto_ajuste)})`
+				: "";
+		const periodo_txt = periodo ? `${periodo} · ` : "";
+		opt.label = `${periodo_txt}${concepto} — ${opt.value} — ${monto_txt}${mora_txt}`;
+		if (opt.$checkbox) {
+			opt.$checkbox.find(".label-area").text(opt.label);
+		}
+	});
+};
+
+club_management_socio_desk._pintar_resumen_mora = function (dialog, preview) {
+	const detalle = preview.detalle || [];
+	const total = flt(preview.total_exigido);
+	const ajustes = flt(preview.total_ajustes);
+	let html = `<div class="small" style="margin: 0.5rem 0;">`;
+	html += `<p style="margin-bottom:0.4rem;"><b>${__("Total a cobrar")}:</b> ${frappe.utils.escape_html(
+		club_management_socio_desk._fmt_money(total)
+	)}`;
+	if (ajustes > 0) {
+		html += ` <span class="text-danger" style="white-space:nowrap;">(+${frappe.utils.escape_html(
+			club_management_socio_desk._fmt_money(ajustes)
+		)} ${__("mora")})</span>`;
+	}
+	html += `</p><ul style="margin:0;padding-left:1.2rem;">`;
+	detalle.forEach((row) => {
+		const periodo = frappe.utils.escape_html(row.periodo || "—");
+		const concepto = frappe.utils.escape_html(row.concepto || row.invoice || "");
+		const exigido = frappe.utils.escape_html(club_management_socio_desk._fmt_money(row.monto_exigido));
+		if (row.aplica_mora && row.composicion) {
+			html += `<li><b>${periodo}</b> ${concepto}: ${exigido}<br/><span class="text-muted">${frappe.utils.escape_html(
+				row.composicion
+			)}</span></li>`;
+		} else {
+			html += `<li><b>${periodo}</b> ${concepto}: ${exigido}</li>`;
+		}
+	});
+	html += `</ul></div>`;
+	if (dialog.fields_dict.mora_resumen) {
+		dialog.fields_dict.mora_resumen.$wrapper.html(html);
+	}
+};
+
+club_management_socio_desk.ejecutar_registrar_cobro_compuesto = function (
+	frm,
+	sales_invoices,
+	medios,
+	posting_date
+) {
+	frappe.call({
+		method: "club_management.members.api.cobranza_desk.registrar_cobro_compuesto",
+		args: {
+			socio: frm.doc.name,
+			sales_invoices,
+			medios,
+			posting_date,
+		},
+		freeze: true,
+		callback(res) {
+			if (!res.exc && res.message) {
+				const pes = res.message.payment_entries || [res.message.payment_entry];
+				frappe.show_alert({
+					message: __("Cobro registrado: {0}", [(pes || []).filter(Boolean).join(", ")]),
+					indicator: "green",
+				});
+				const recibos = res.message.recibos || (res.message.recibo ? [res.message.recibo] : []);
+				(recibos || []).forEach((recibo) => {
+					if (recibo && club_management_recibo_pago?.imprimir_despues_cobro) {
+						club_management_recibo_pago.imprimir_despues_cobro(recibo);
+					}
+				});
+				frm.reload_doc();
+			}
+		},
+	});
+};
+
+club_management_socio_desk.prompt_modo_y_registrar_cobro = function (frm, invoice_row) {
+	club_management_socio_desk.prompt_cobro_multi_factura(frm, [invoice_row]);
 };
 
 club_management_socio_desk.ejecutar_registrar_cobro = function (
@@ -677,28 +1077,12 @@ club_management_socio_desk.ejecutar_registrar_cobro = function (
 	mode_of_payment,
 	posting_date
 ) {
-	frappe.call({
-		method: "club_management.members.api.cobranza_desk.registrar_cobro",
-		args: {
-			socio: frm.doc.name,
-			sales_invoice: invoice_row.name,
-			mode_of_payment,
-			posting_date,
-		},
-		freeze: true,
-		callback(res) {
-			if (!res.exc && res.message) {
-				frappe.show_alert({
-					message: __("Cobro {0} registrado", [res.message.payment_entry]),
-					indicator: "green",
-				});
-				if (res.message.recibo && club_management_recibo_pago?.imprimir_despues_cobro) {
-					club_management_recibo_pago.imprimir_despues_cobro(res.message.recibo);
-				}
-				frm.reload_doc();
-			}
-		},
-	});
+	club_management_socio_desk.ejecutar_registrar_cobro_compuesto(
+		frm,
+		[invoice_row.name],
+		[{ mode_of_payment, amount: flt(invoice_row.outstanding_amount) }],
+		posting_date
+	);
 };
 
 club_management_socio_desk.confirmar_registrar_cobro = function (frm, invoice_row) {
@@ -881,6 +1265,7 @@ club_management_socio_desk.render_deuda_pendiente = function (frm) {
 					<thead>
 						<tr>
 							<th>${__("Concepto")}</th>
+							<th>${__("Período")}</th>
 							<th>${__("Tipo")}</th>
 							<th>${__("Monto")}</th>
 						</tr>
@@ -892,11 +1277,13 @@ club_management_socio_desk.render_deuda_pendiente = function (frm) {
 
 			facturas.forEach((factura) => {
 				const lineas = factura.lineas || [];
+				const periodo = frappe.utils.escape_html(factura.periodo_cobro || "—");
 				if (!lineas.length) {
 					const monto = frappe.format(factura.outstanding_amount, { fieldtype: "Currency" });
 					$tbody.append(`
 						<tr>
 							<td>${frappe.utils.escape_html(factura.name)}</td>
+							<td>${periodo}</td>
 							<td>${__("Factura")}</td>
 							<td>${monto}</td>
 						</tr>
@@ -912,6 +1299,7 @@ club_management_socio_desk.render_deuda_pendiente = function (frm) {
 					$tbody.append(`
 						<tr>
 							<td>${concepto}</td>
+							<td>${idx === 0 ? periodo : ""}</td>
 							<td>${__("Factura")}</td>
 							<td>${monto}</td>
 						</tr>
@@ -928,6 +1316,7 @@ club_management_socio_desk.render_deuda_pendiente = function (frm) {
 				$tbody.append(`
 					<tr>
 						<td>${frappe.utils.escape_html(cargo.titulo || cargo.name)}</td>
+						<td>—</td>
 						<td>${tipo}</td>
 						<td>${monto}</td>
 					</tr>
@@ -935,6 +1324,101 @@ club_management_socio_desk.render_deuda_pendiente = function (frm) {
 			});
 
 			$panel.empty().append($title, $table);
+		},
+	});
+};
+
+club_management_socio_desk.render_historial_pagos = function (frm) {
+	if (!frm.fields_dict.saldo_deuda || frm.is_new()) {
+		return;
+	}
+
+	let $panel = frm.fields_dict.saldo_deuda.$wrapper
+		.closest(".form-section")
+		.find(".club-historial-pagos-panel");
+	if (!$panel.length) {
+		$panel = $(
+			'<div class="club-historial-pagos-panel" style="margin: 1rem 0; clear: both;"></div>'
+		);
+		const $deuda = frm.fields_dict.saldo_deuda.$wrapper
+			.closest(".form-section")
+			.find(".club-deuda-pendiente-panel");
+		if ($deuda.length) {
+			$deuda.after($panel);
+		} else {
+			frm.fields_dict.saldo_deuda.$wrapper.after($panel);
+		}
+	}
+
+	$panel.html(`<p class="text-muted small">${__("Cargando historial de pagos…")}</p>`);
+
+	frappe.call({
+		method: "club_management.members.api.cobranza_desk.list_historial_pagos",
+		args: { socio: frm.doc.name, limit: 20 },
+		callback(r) {
+			if (r.exc) {
+				$panel.html(
+					`<div class="text-danger small">${__("No se pudo cargar el historial de pagos.")}</div>`
+				);
+				return;
+			}
+			const rows = r.message || [];
+			if (!rows.length) {
+				$panel.html(
+					`<div class="text-muted small">${__("Sin pagos registrados.")}</div>`
+				);
+				return;
+			}
+
+			const $title = $(`<h6 class="mb-2">${__("Historial de pagos")}</h6>`);
+			const $btn = $(
+				`<button type="button" class="btn btn-xs btn-default mb-2">${__(
+					"Copiar resumen"
+				)}</button>`
+			);
+			const resumen = rows
+				.map((row) => {
+					const monto = frappe.format(row.paid_amount, { fieldtype: "Currency" });
+					const facturas = (row.sales_invoices || []).join(", ");
+					return `${row.posting_date} | ${row.mode_of_payment || "-"} | ${monto} | ${facturas} | ${row.payment_entry}`;
+				})
+				.join("\n");
+			$btn.on("click", () => {
+				frappe.utils.copy_to_clipboard(resumen);
+				frappe.show_alert({ message: __("Resumen copiado"), indicator: "green" });
+			});
+
+			const $table = $(`
+				<table class="table table-bordered table-sm club-historial-pagos-table">
+					<thead>
+						<tr>
+							<th>${__("Fecha")}</th>
+							<th>${__("Medio")}</th>
+							<th>${__("Monto")}</th>
+							<th>${__("Facturas")}</th>
+							<th>${__("Pago")}</th>
+						</tr>
+					</thead>
+					<tbody></tbody>
+				</table>
+			`);
+			const $tbody = $table.find("tbody");
+			rows.forEach((row) => {
+				const monto = frappe.format(row.paid_amount, { fieldtype: "Currency" });
+				const facturas = frappe.utils.escape_html((row.sales_invoices || []).join(", "));
+				$tbody.append(`
+					<tr>
+						<td>${frappe.utils.escape_html(String(row.posting_date || ""))}</td>
+						<td>${frappe.utils.escape_html(row.mode_of_payment || "")}</td>
+						<td>${monto}</td>
+						<td>${facturas}</td>
+						<td><a href="/app/payment-entry/${encodeURIComponent(row.payment_entry)}">${frappe.utils.escape_html(
+							row.payment_entry
+						)}</a></td>
+					</tr>
+				`);
+			});
+			$panel.empty().append($title, $btn, $table);
 		},
 	});
 };

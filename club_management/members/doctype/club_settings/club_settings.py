@@ -27,6 +27,10 @@ class ClubSettings(Document):
 			self.dia_segundo_vencimiento = "Ultimo dia del mes"
 		if self.recargo_segundo_vencimiento_pct is None:
 			self.recargo_segundo_vencimiento_pct = 10
+		if self.recargo_mes_vencido_pct is None:
+			self.recargo_mes_vencido_pct = 5
+		if self.recargo_post_vencimiento_pct is None:
+			self.recargo_post_vencimiento_pct = 10
 		if self.incluir_aranceles_en_deuda_mensual is None:
 			self.incluir_aranceles_en_deuda_mensual = 1
 		if self.incluir_cargos_extra_en_deuda_mensual is None:
@@ -58,6 +62,10 @@ class ClubSettings(Document):
 		if segundo not in _SEGUNDO_VENCIMIENTO_OPCIONES:
 			frappe.throw(_("Segundo vencimiento inválido."))
 
-		recargo = float(self.recargo_segundo_vencimiento_pct or 0)
-		if recargo < 0 or recargo > 100:
-			frappe.throw(_("El recargo debe estar entre 0% y 100%."))
+		for label, value in (
+			(_("Recargo 2.º vencimiento (%) — legado"), float(self.recargo_segundo_vencimiento_pct or 0)),
+			(_("Recargo extra post 2.º vencimiento (%)"), float(self.recargo_mes_vencido_pct or 0)),
+			(_("Recargo post 1.er vencimiento (%)"), float(self.recargo_post_vencimiento_pct or 0)),
+		):
+			if value < 0 or value > 100:
+				frappe.throw(_("{0} debe estar entre 0% y 100%.").format(label))

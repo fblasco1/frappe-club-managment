@@ -121,7 +121,7 @@ class TestReciboPagoIntegracion(MembersTestCase):
 
 		frappe.set_user(self._secretaria)
 		try:
-			result = registrar_cobro(socio.name, invoice_name)
+			result = registrar_cobro(socio.name, invoice_name, mode_of_payment="Cash")
 		finally:
 			frappe.set_user("Administrator")
 
@@ -141,7 +141,7 @@ class TestReciboPagoIntegracion(MembersTestCase):
 
 		frappe.set_user(self._secretaria)
 		try:
-			result = registrar_cobro(socio.name, invoice_name)
+			result = registrar_cobro(socio.name, invoice_name, mode_of_payment="Cash")
 			recibo = get_recibo_pago(result["payment_entry"])
 		finally:
 			frappe.set_user("Administrator")
@@ -155,7 +155,7 @@ class TestReciboPagoIntegracion(MembersTestCase):
 
 		frappe.set_user(self._secretaria)
 		try:
-			result = registrar_cobro(socio.name, invoice_name)
+			result = registrar_cobro(socio.name, invoice_name, mode_of_payment="Cash")
 		finally:
 			frappe.set_user("Administrator")
 
@@ -184,10 +184,82 @@ class TestReciboPagoIntegracion(MembersTestCase):
 
 		frappe.set_user(self._secretaria)
 		try:
-			result = registrar_cobro(socio.name, invoice_name)
+			result = registrar_cobro(socio.name, invoice_name, mode_of_payment="Cash")
 			recibo = build_recibo_pago(result["payment_entry"])
 		finally:
 			frappe.set_user("Administrator")
 
 		self.assertEqual(recibo["ancho_papel_mm"], 58)
 		self.assertIn("INSTITUCION CULTURAL", recibo["texto"])
+
+	def test_recibo_incluye_periodo_en_concepto(self) -> None:
+		socio = insert_socio(dni="99004005", email="recibo.periodo@example.com")
+		cambiar_estado(socio.name, "Activo", motivo="Test recibo periodo")
+		invoice_name = generar_deuda_mensual_socio(socio.name, reference_date=self._GEN)
+		self.assertTrue(invoice_name)
+
+		frappe.set_user(self._secretaria)
+		try:
+			result = registrar_cobro(socio.name, invoice_name, mode_of_payment="Cash")
+			recibo = build_recibo_pago(result["payment_entry"])
+		finally:
+			frappe.set_user("Administrator")
+
+		conceptos = " | ".join(row["concepto"] for row in recibo["lineas"])
+		self.assertIn("06/2026", conceptos)
+
+	def test_recibo_mora_incluye_composicion(self) -> None:
+		from club_management.members.services.mora_al_cobro import preparar_facturas_cobro_con_mora
+
+		settings = frappe.get_single("Club Settings")
+		settings.dia_primer_vencimiento = 10
+		settings.recargo_mes_vencido_pct = 5
+		settings.recargo_post_vencimiento_pct = 10
+		item_code = "TEST-ITEM-MORA-RECIBO"
+		if not frappe.db.exists("Item", item_code):
+			item_group = frappe.db.get_value("Item Group", {}, "name") or "All Item Groups"
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": item_code,
+					"item_name": "Mora recibo test",
+					"item_group": item_group,
+					"is_stock_item": 0,
+					"is_sales_item": 1,
+					"standard_rate": 0,
+				}
+			).insert(ignore_permissions=True)
+		settings.item_recargo_mora = item_code
+		for row in settings.cuotas_categoria or []:
+			if row.categoria == "Activo":
+				row.monto = 10000
+		settings.save(ignore_permissions=True)
+
+		socio = insert_socio(dni="99004006", email="recibo.mora@example.com")
+		cambiar_estado(socio.name, "Activo", motivo="Test recibo mora")
+		invoice_name = generar_deuda_mensual_socio(socio.name, reference_date="2026-03-01")
+		settings = frappe.get_single("Club Settings")
+		for row in settings.cuotas_categoria or []:
+			if row.categoria == "Activo":
+				row.monto = 12000
+		settings.save(ignore_permissions=True)
+
+		frappe.set_user(self._secretaria)
+		try:
+			preparar_facturas_cobro_con_mora(
+				socio.name, [invoice_name], posting_date="2026-04-15"
+			)
+			result = registrar_cobro(socio.name, invoice_name, mode_of_payment="Cash", posting_date="2026-04-15")
+			recibo = build_recibo_pago(result["payment_entry"])
+		finally:
+			frappe.set_user("Administrator")
+
+		conceptos = " | ".join(row["concepto"] for row in recibo["lineas"])
+		self.assertIn("03/2026", conceptos)
+		self.assertTrue(
+			any(
+				"5%" in (row["concepto"] or "") or "MORA" in (row["concepto"] or "").upper()
+				for row in recibo["lineas"]
+			),
+			msg=conceptos,
+		)

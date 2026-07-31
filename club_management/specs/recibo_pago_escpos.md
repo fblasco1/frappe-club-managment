@@ -36,6 +36,16 @@ Then incluye un objeto `recibo` con:
 
 ---
 
+## Scenario: líneas del recibo con período y mora
+
+Given un cobro que saldó una cuota de período `03/2026` y su SI de ajuste de mora
+When se genera el recibo
+Then cada línea de concepto incluye el **período** (p. ej. prefijo `03/2026 · …`)
+And la línea de mora muestra la **composición** del recargo (valor × factores)
+And el orden de líneas sigue el período calendario (más antiguo primero).
+
+---
+
 ## Scenario: formato del texto del recibo
 
 Given Club Settings con encabezado ICDPE configurado

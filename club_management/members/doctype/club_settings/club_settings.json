@@ -13,6 +13,8 @@
   "dia_primer_vencimiento",
   "dia_segundo_vencimiento",
   "recargo_segundo_vencimiento_pct",
+  "recargo_post_vencimiento_pct",
+  "recargo_mes_vencido_pct",
   "item_recargo_mora",
   "column_break_cobranza",
   "incluir_aranceles_en_deuda_mensual",
@@ -85,14 +87,29 @@
    "default": "10",
    "fieldname": "recargo_segundo_vencimiento_pct",
    "fieldtype": "Percent",
-   "label": "Recargo 2.º vencimiento (%)"
+   "label": "Recargo 2.º vencimiento (%) — legado",
+   "description": "Solo job histórico fin de mes. La mora vigente se calcula al cobrar (campos siguientes)."
+  },
+  {
+   "default": "10",
+   "fieldname": "recargo_post_vencimiento_pct",
+   "fieldtype": "Percent",
+   "label": "Recargo post 1.er vencimiento (%)",
+   "description": "Después del día 10 del mes del período y hasta el 2.º vencimiento: +10 %."
+  },
+  {
+   "default": "5",
+   "fieldname": "recargo_mes_vencido_pct",
+   "fieldtype": "Percent",
+   "label": "Recargo extra post 2.º vencimiento (%)",
+   "description": "Después del último día del mes del período: +5 % adicional (total 15 % = 10 %+5 %). Base = valor del mes de pago."
   },
   {
    "fieldname": "item_recargo_mora",
    "fieldtype": "Link",
    "label": "Ítem recargo mora",
    "options": "Item",
-   "description": "Servicio ERPNext para la línea de recargo por mora."
+   "description": "Servicio ERPNext para la línea de recargo / ajuste por mora. Obligatorio para cobrar con mora."
   },
   {
    "fieldname": "column_break_cobranza",

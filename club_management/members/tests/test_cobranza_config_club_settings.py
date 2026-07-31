@@ -21,6 +21,8 @@ class TestCobranzaConfigClubSettings(MembersTestCase):
 		settings.dia_primer_vencimiento = None
 		settings.dia_segundo_vencimiento = ""
 		settings.recargo_segundo_vencimiento_pct = None
+		settings.recargo_mes_vencido_pct = None
+		settings.recargo_post_vencimiento_pct = None
 		settings.incluir_aranceles_en_deuda_mensual = None
 		settings.incluir_cargos_extra_en_deuda_mensual = None
 		settings.save()
@@ -29,6 +31,8 @@ class TestCobranzaConfigClubSettings(MembersTestCase):
 		self.assertEqual(settings.dia_primer_vencimiento, 10)
 		self.assertEqual(settings.dia_segundo_vencimiento, "Ultimo dia del mes")
 		self.assertEqual(settings.recargo_segundo_vencimiento_pct, 10)
+		self.assertEqual(settings.recargo_mes_vencido_pct, 5)
+		self.assertEqual(settings.recargo_post_vencimiento_pct, 10)
 		self.assertTrue(settings.incluir_aranceles_en_deuda_mensual)
 		self.assertTrue(settings.incluir_cargos_extra_en_deuda_mensual)
 
