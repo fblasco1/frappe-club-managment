@@ -33,6 +33,11 @@ import frappe
 
 from club_management.setup.basquet_cost_center import BASQUET_COST_CENTER
 from club_management.setup.icdpe_company import resolve_icdpe_company
+from club_management.finance.setup.icdpe_income_item_groups import (
+	INGRESO_ACTIVIDADES,
+	INGRESO_COMERCIALES,
+	INGRESO_SOCIOS,
+)
 
 # Raíz estándar ERPNext para Item Group (si no existe, se crea bajo "All Item Groups")
 DEFAULT_ITEM_GROUP_ROOT = "All Item Groups"
@@ -237,14 +242,14 @@ def _specs() -> list[ServiceItemSpec]:
         ServiceItemSpec(
             item_code="ICDPE-CUOTA-SOCIAL",
             item_name="Cuota social",
-            item_group="ICDPE / Cuotas y membresías",
+            item_group=INGRESO_SOCIOS,
             income_account_number="411001",
             cost_center_name="Administración - ICDPE",
         ),
         ServiceItemSpec(
             item_code="ICDPE-INSCRIPCION",
             item_name="Inscripción / matrícula",
-            item_group="ICDPE / Cuotas y membresías",
+            item_group=INGRESO_SOCIOS,
             income_account_number="411002",
             cost_center_name="Administración - ICDPE",
         ),
@@ -271,14 +276,14 @@ def _specs() -> list[ServiceItemSpec]:
             ServiceItemSpec(
                 item_code=f"ICDPE-ARANCEL-MENSUAL-{slug}",
                 item_name=f"Arancel mensual actividad — {label}",
-                item_group="ICDPE / Aranceles deportes",
+                item_group=INGRESO_ACTIVIDADES,
                 income_account_number="412001",
                 cost_center_name=cc,
             ),
             ServiceItemSpec(
                 item_code=f"ICDPE-CUOTA-FEDERATIVA-{slug}",
                 item_name=f"Cuota federativa — {label}",
-                item_group="ICDPE / Federaciones deportes",
+                item_group=INGRESO_ACTIVIDADES,
                 income_account_number="413001",
                 cost_center_name=cc,
             ),
@@ -302,7 +307,7 @@ def _specs() -> list[ServiceItemSpec]:
             ServiceItemSpec(
                 item_code=f"ICDPE-ARANCEL-MENSUAL-ACT-{slug}",
                 item_name=f"Arancel mensual actividad — {label}",
-                item_group="ICDPE / Aranceles actividades",
+                item_group=INGRESO_ACTIVIDADES,
                 income_account_number="412001",
                 cost_center_name=cc,
             ),
@@ -313,7 +318,7 @@ def _specs() -> list[ServiceItemSpec]:
         ServiceItemSpec(
             item_code="ICDPE-ARANCEL-MENSUAL-FITNESS-MUSC",
             item_name="Arancel mensual actividad — Gimnasio de musculación",
-            item_group="ICDPE / Aranceles fitness",
+            item_group=INGRESO_ACTIVIDADES,
             income_account_number="412001",
             cost_center_name="Fitness - Gimnasio de Musculacion - ICDPE",
         ),
@@ -324,21 +329,21 @@ def _specs() -> list[ServiceItemSpec]:
         ServiceItemSpec(
             item_code="ICDPE-POS-BUFFET",
             item_name="Venta mostrador (POS) — Buffet",
-            item_group="ICDPE / Gastronomía POS",
+            item_group=INGRESO_COMERCIALES,
             income_account_number="441001",
             cost_center_name="Gastronomía - Buffet - ICDPE",
         ),
         ServiceItemSpec(
             item_code="ICDPE-POS-PENA-ROCK",
             item_name="Venta mostrador (POS) — Peña de Rock",
-            item_group="ICDPE / Gastronomía POS",
+            item_group=INGRESO_COMERCIALES,
             income_account_number="441001",
             cost_center_name="Gastronomía - Peña de Rock - ICDPE",
         ),
         ServiceItemSpec(
             item_code="ICDPE-POS-RESTAURANTE",
             item_name="Venta mostrador (POS) — Restaurante",
-            item_group="ICDPE / Gastronomía POS",
+            item_group=INGRESO_COMERCIALES,
             income_account_number="441001",
             cost_center_name="Gastronomía - Restaurante - ICDPE",
         ),
@@ -349,28 +354,28 @@ def _specs() -> list[ServiceItemSpec]:
         ServiceItemSpec(
             item_code="ICDPE-ALQ-ARS-TEMP",
             item_name="Alquiler canchas / espacios (ARS) — Temporal",
-            item_group="ICDPE / Alquileres",
+            item_group=INGRESO_COMERCIALES,
             income_account_number="421001",
             cost_center_name="Alquileres - Temporal - ICDPE",
         ),
         ServiceItemSpec(
             item_code="ICDPE-ALQ-ARS-REC",
             item_name="Alquiler canchas / espacios (ARS) — Recurrente",
-            item_group="ICDPE / Alquileres",
+            item_group=INGRESO_COMERCIALES,
             income_account_number="421001",
             cost_center_name="Alquileres - Recurrente - ICDPE",
         ),
         ServiceItemSpec(
             item_code="ICDPE-ALQ-USD-TEMP",
             item_name="Alquiler canchas / espacios (USD) — Temporal",
-            item_group="ICDPE / Alquileres",
+            item_group=INGRESO_COMERCIALES,
             income_account_number="421002",
             cost_center_name="Alquileres - Temporal - ICDPE",
         ),
         ServiceItemSpec(
             item_code="ICDPE-ALQ-USD-REC",
             item_name="Alquiler canchas / espacios (USD) — Recurrente",
-            item_group="ICDPE / Alquileres",
+            item_group=INGRESO_COMERCIALES,
             income_account_number="421002",
             cost_center_name="Alquileres - Recurrente - ICDPE",
         ),
@@ -381,28 +386,28 @@ def _specs() -> list[ServiceItemSpec]:
         ServiceItemSpec(
             item_code="ICDPE-SPONSOR-PUB",
             item_name="Sponsors / Publicidad",
-            item_group="ICDPE / Comercial",
+            item_group=INGRESO_COMERCIALES,
             income_account_number="451001",
             cost_center_name="Administración - ICDPE",
         ),
         ServiceItemSpec(
             item_code="ICDPE-VENTA-INDUMENTARIA",
             item_name="Venta indumentaria",
-            item_group="ICDPE / Comercial",
+            item_group=INGRESO_COMERCIALES,
             income_account_number="451002",
             cost_center_name="Administración - ICDPE",
         ),
         ServiceItemSpec(
             item_code="ICDPE-COLONIAS",
             item_name="Colonias",
-            item_group="ICDPE / Actividades puntuales",
+            item_group=INGRESO_ACTIVIDADES,
             income_account_number="431002",
             cost_center_name="Actividades - Iniciacion Deportiva - ICDPE",
         ),
         ServiceItemSpec(
             item_code="ICDPE-EVENTOS",
             item_name="Eventos",
-            item_group="ICDPE / Actividades puntuales",
+            item_group=INGRESO_ACTIVIDADES,
             income_account_number="431003",
             cost_center_name="Actividades - Danza - ICDPE",
         ),
@@ -413,14 +418,14 @@ def _specs() -> list[ServiceItemSpec]:
         ServiceItemSpec(
             item_code="ICDPE-MULTA",
             item_name="Multa",
-            item_group="ICDPE / Cargos varios",
+            item_group=INGRESO_SOCIOS,
             income_account_number=OTROS_CARGOS_ACCOUNT_NUMBER,
             cost_center_name="Administración - ICDPE",
         ),
         ServiceItemSpec(
             item_code="ICDPE-CARGO-VARIOS",
             item_name="Cargo varios",
-            item_group="ICDPE / Cargos varios",
+            item_group=INGRESO_SOCIOS,
             income_account_number=OTROS_CARGOS_ACCOUNT_NUMBER,
             cost_center_name="Administración - ICDPE",
         ),
@@ -473,7 +478,7 @@ def ensure_cargos_varios_items() -> dict[str, object]:
 
     results: list[dict[str, str]] = []
     for spec in _specs():
-        if spec.item_group != "ICDPE / Cargos varios":
+        if spec.item_group != INGRESO_SOCIOS:
             continue
         results.append({"item_code": spec.item_code, "action": upsert_service_item(spec)})
     return {"company": company, "items": results}

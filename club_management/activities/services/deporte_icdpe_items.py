@@ -6,6 +6,7 @@ import frappe
 from frappe.utils import flt
 
 from club_management.activities.data.arancel_item_spec import ArancelItemSpec
+from club_management.finance.setup.icdpe_income_item_groups import INGRESO_ACTIVIDADES
 from club_management.setup.icdpe_company import resolve_icdpe_company
 from club_management.setup.icdpe_create_service_items import (
 	_ensure_item_group,
@@ -18,7 +19,7 @@ from club_management.setup.icdpe_create_service_items import (
 
 def upsert_arancel_item(spec: ArancelItemSpec) -> str:
 	company = resolve_icdpe_company()
-	_ensure_item_group("ICDPE / Aranceles deportes")
+	_ensure_item_group(INGRESO_ACTIVIDADES)
 	_resolve_cost_center(company, spec.cost_center)
 	income_account = _resolve_income_account(company, "412001")
 
@@ -28,8 +29,8 @@ def upsert_arancel_item(spec: ArancelItemSpec) -> str:
 		if item.item_name != spec.item_name:
 			item.item_name = spec.item_name
 			changed = True
-		if item.item_group != "ICDPE / Aranceles deportes":
-			item.item_group = "ICDPE / Aranceles deportes"
+		if item.item_group != INGRESO_ACTIVIDADES:
+			item.item_group = INGRESO_ACTIVIDADES
 			changed = True
 		if int(item.disabled or 0):
 			item.disabled = 0
@@ -43,7 +44,7 @@ def upsert_arancel_item(spec: ArancelItemSpec) -> str:
 				"doctype": "Item",
 				"item_code": spec.item_code,
 				"item_name": spec.item_name,
-				"item_group": "ICDPE / Aranceles deportes",
+				"item_group": INGRESO_ACTIVIDADES,
 				"is_stock_item": 0,
 				"is_sales_item": 1,
 				"stock_uom": "Servicio",

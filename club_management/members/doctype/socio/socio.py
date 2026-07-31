@@ -135,18 +135,17 @@ class Socio(Document):
 			self.fecha_alta = today()
 
 	def _validate_menor(self) -> None:
-		from club_management.members.services.datos_criticos_socio import usuario_puede_edicion_parcial_secretaria
-
-		faltantes = [
-			campo for campo in ("tipo_tutor", "tutor") if not self.get(campo)
-		]
-		if faltantes and not self.is_new() and usuario_puede_edicion_parcial_secretaria():
+		tiene_tipo = bool(self.get("tipo_tutor"))
+		tiene_tutor = bool(self.get("tutor"))
+		if not tiene_tipo and not tiene_tutor:
+			# Tutor opcional en alta/edición Desk; queda como dato crítico.
 			return
-		if faltantes:
+		if not tiene_tipo or not tiene_tutor:
+			faltantes = [
+				campo for campo in ("tipo_tutor", "tutor") if not self.get(campo)
+			]
 			frappe.throw(
-				_("Socio menor requiere tutor responsable (faltan: {0})").format(
-					", ".join(faltantes)
-				)
+				_("Vínculo de tutor incompleto (faltan: {0})").format(", ".join(faltantes))
 			)
 
 		tutor_doctype = self.tipo_tutor

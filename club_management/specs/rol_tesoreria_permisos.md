@@ -49,12 +49,22 @@ And **no** ve el reporte **Proyección de Flujo de Fondos** (el link se filtra p
 
 ---
 
-## Scenario: Secretaría puede crear una factura de compra — GF-6
+## Scenario: Secretaría puede crear una factura de compra en borrador — GF-6
 
 Given un usuario con rol `Secretaria`
 When abre el formulario de `Purchase Invoice`
-Then puede crear y guardar (tiene `create`/`write`/`submit` operativo)
+Then puede crear y guardar en **Borrador** (tiene `create`/`write`, **sin** `submit` ni `cancel`)
 And tiene lectura sobre los masters necesarios (Item, Account, Cost Center, Company, Mode of Payment, Supplier).
+
+Ver flujo completo en `flujo_egresos_borrador_aprobacion.md`.
+
+---
+
+## Scenario: Tesorería aprueba/cancela facturas de compra — GF-6
+
+Given un usuario con rol `Tesoreria`
+When abre una `Purchase Invoice`
+Then tiene permisos totales (`read`/`write`/`create`/`submit`/`cancel`/`delete`) para aprobar o rechazar.
 
 ---
 
@@ -83,6 +93,25 @@ Then retorna True.
 
 ---
 
+## Scenario: workspace de Tesorería con botones navegadores + info debajo — GF-6
+
+Given el workspace `Tesorería`
+When se abre en el Desk
+Then **no** muestra un bloque de título/header (se eliminó "Tesorería" del contenido)
+And arriba muestra **botones navegadores** (shortcuts): Facturas de compra, Pagos y cobros, Plan de cuentas (y Flujo de Fondos solo para `Tesoreria`)
+And debajo de los botones carga la información con **quick lists**: "Últimas facturas de compra" (Purchase Invoice) y "Últimos pagos" (Payment Entry).
+
+---
+
+## Scenario: acceso a Tesorería desde la pestaña del sidebar — GF-6
+
+Given la navegación del club (`club_desk_navigation`)
+When se renderizan las pestañas
+Then aparece la pestaña **"Tesorería"** con el emoji del banco (🏦)
+And al hacer clic navega al workspace `Tesorería`.
+
+---
+
 ## Artefactos
 
 | Artefacto | Ubicación |
@@ -91,5 +120,8 @@ Then retorna True.
 | Patch rol | `patches/v1_0/ensure_role_tesoreria.py` |
 | Permisos operativos Secretaría | `finance/setup/secretaria_finance_permissions.py` |
 | Patch permisos + workspace Secretaría | `patches/v1_0/add_secretaria_finance_operative_permissions.py` |
+| Workspace Tesorería (botones + quick lists) | `finance/workspace/tesoreria/tesoreria.json` |
+| Patch re-sync layout | `patches/v1_0/sync_tesoreria_workspace_botones.py` |
+| Botón "Ir a Tesorería" (Secretaría) | `public/js/secretaria_workspace_panel.js` |
 | App permission | `members/permissions_app.py` |
 | Tests | `tests/test_rol_tesoreria.py`, `tests/test_secretaria_finance_permissions.py` |

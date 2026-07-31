@@ -78,8 +78,8 @@ Quedan **fuera** de Sprint 0 (cubiertos por `socios_categoria_validacion.md`):
 | ------------------ | ------------------------------------------ | ------- | --------------- | ----------------------------------------------------------- |
 | `user`             | Link → `User`                              | no      | no              | `unique` cuando está presente. **Opcional**: ver "Política de User" abajo |
 | `grupo_familiar`   | Link → `Grupo Familiar`                    | depende | no              | **Obligatorio si `categoria = "Menor"`**. Ver `grupo_familiar_minimo.md` |
-| `tipo_tutor`       | Select                                     | depende | no              | **Obligatorio si `categoria = "Menor"`**. Valores: `"Socio"` / `"Tutor No Socio"` |
-| `tutor`            | Dynamic Link (`options = tipo_tutor`)      | depende | no              | **Obligatorio si `categoria = "Menor"`**. Apunta a `Socio` o `Tutor No Socio` según `tipo_tutor`; debe ser mayor de 18 y figurar como **titular activo** (principal o cotitular) en `grupo_familiar.titulares` |
+| `tipo_tutor`       | Select                                     | no      | no              | Opcional (dato crítico si `categoria = "Menor"`). Valores: `"Socio"` / `"Tutor No Socio"` |
+| `tutor`            | Dynamic Link (`options = tipo_tutor`)      | no      | no              | Opcional (dato crítico si Menor). Si está cargado: mayor de 18; si hay `grupo_familiar`, debe ser titular activo |
 | `solicitud_origen` | Link → `Solicitud de Asociación`           | no      | **sí**          | Trazabilidad del origen                                     |
 
 ### Documentos adjuntos

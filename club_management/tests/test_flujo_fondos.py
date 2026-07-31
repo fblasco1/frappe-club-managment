@@ -39,8 +39,10 @@ class TestFlujoFondos(MembersTestCase):
 			self.skipTest(f"Supplier {name} ausente")
 		return found
 
-	def test_proyeccion_incluye_pi_en_ventana(self) -> None:
-		if not frappe.db.exists("Item", "ICDPE-FIN-SUELDOS"):
+	def test_proyeccion_incluye_borrador_en_ventana(self) -> None:
+		# registrar_egreso crea la PI en Borrador → aparece como gasto proyectado
+		# pendiente de aprobación, no como pago comprometido (deuda firme).
+		if not frappe.db.exists("Item", "ICDPE-FIN-SUELDO-ADMIN"):
 			self.skipTest("Ítem sueldos ausente")
 		as_of = getdate(today())
 		due = add_days(as_of, 2)
@@ -48,9 +50,9 @@ class TestFlujoFondos(MembersTestCase):
 
 		frappe.set_user(self.secretaria)
 		try:
-			registrar_egreso(
+			res = registrar_egreso(
 				supplier=supplier,
-				item_code="ICDPE-FIN-SUELDOS",
+				item_code="ICDPE-FIN-SUELDO-ADMIN",
 				amount=8000,
 				due_date=due,
 				club_concepto="Personal",
@@ -59,14 +61,17 @@ class TestFlujoFondos(MembersTestCase):
 		finally:
 			frappe.set_user("Administrator")
 
+		self.assertEqual(
+			frappe.db.get_value("Purchase Invoice", res["purchase_invoice"], "docstatus"), 0
+		)
+
 		frappe.set_user(self.tesoreria)
 		try:
 			proy = calcular_proyeccion_flujo_fondos(as_of_date=as_of, ventana_dias=5)
 		finally:
 			frappe.set_user("Administrator")
 
-		self.assertGreaterEqual(proy["pagos_comprometidos"], 8000)
-		self.assertGreaterEqual(proy["obligaciones_criticas"], 8000)
+		self.assertGreaterEqual(proy["gastos_proyectados_pendientes"], 8000)
 		self.assertIn("saldo_caja_bancos", proy)
 
 	def test_cobros_plus_dia_10_fuera_de_ventana_5(self) -> None:

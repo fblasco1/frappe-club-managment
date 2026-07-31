@@ -18,6 +18,10 @@
 			report_type: "Script Report",
 			ref_doctype: "Actividad",
 		},
+		"Pagos del dia": {
+			report_type: "Script Report",
+			ref_doctype: "Payment Entry",
+		},
 	};
 
 	const SIDEBAR_ITEMS = [
@@ -69,6 +73,14 @@
 			type: "Link",
 			link_type: "Report",
 			link_to: "Deuda por actividad",
+			icon: "table",
+			child: 1,
+		},
+		{
+			label: __("Pagos del dia"),
+			type: "Link",
+			link_type: "Report",
+			link_to: "Pagos del dia",
 			icon: "table",
 			child: 1,
 		},

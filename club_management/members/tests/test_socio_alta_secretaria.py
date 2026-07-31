@@ -103,16 +103,36 @@ class TestSocioAltaSecretaria(MembersTestCase):
 		finally:
 			frappe.set_user("Administrator")
 
-	def test_menor_sin_tutor_falla(self) -> None:
+	def test_menor_sin_tutor_se_crea(self) -> None:
+		frappe.set_user(self._secretaria)
+		try:
+			socio_name = crear_socio_desk(
+				_datos_alta_adulto(
+					dni="55112233",
+					email="menor@example.com",
+					fecha_nacimiento=minor_birthdate(12),
+					categoria="Menor",
+				)
+			)
+		finally:
+			frappe.set_user("Administrator")
+
+		socio = frappe.get_doc("Socio", socio_name)
+		self.assertEqual(socio.categoria, "Menor")
+		self.assertFalse(socio.tipo_tutor)
+		self.assertFalse(socio.tutor)
+
+	def test_menor_con_tutor_incompleto_falla(self) -> None:
 		frappe.set_user(self._secretaria)
 		try:
 			with self.assertRaises(frappe.ValidationError):
 				crear_socio_desk(
 					_datos_alta_adulto(
-						dni="55112233",
-						email="menor@example.com",
+						dni="55112234",
+						email="menor.incompleto@example.com",
 						fecha_nacimiento=minor_birthdate(12),
 						categoria="Menor",
+						tipo_tutor="Tutor No Socio",
 					)
 				)
 		finally:

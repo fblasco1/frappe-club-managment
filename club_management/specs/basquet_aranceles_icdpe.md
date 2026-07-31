@@ -57,4 +57,4 @@ Then devuelve `ICDPE-BASQUET-ESCUELITA` con tarifa 21.000.
 Given actividad **Basquet** con grupo `Femenino / Formativa`
 Then equipos U9–U17 usan `ICDPE-BASQUET-ESCUELITA`
 And grupo `Femenino / Superior` con equipo `Superior Fem` usa `ICDPE-BASQUET-FEMENINO-SUP`.
-
+

@@ -481,6 +481,9 @@
 					<button type="button" class="btn btn-secondary club-secretaria-cobranza">
 						${__("Emitir cupón / Registrar cobro")}
 					</button>
+					<button type="button" class="btn btn-secondary club-secretaria-nuevo-gasto">
+						${__("Registrar Nuevo Gasto / Comprobante")}
+					</button>
 					<button type="button" class="btn btn-default" disabled title="${__("Próximamente")}">
 						${__("Enviar recordatorio de deuda masivo")}
 					</button>
@@ -565,6 +568,10 @@
 
 			$panel.find(".club-secretaria-nueva-pi").on("click", () => {
 				frappe.set_route("Form", "Purchase Invoice", "new");
+			});
+
+			$panel.find(".club-secretaria-nuevo-gasto").on("click", () => {
+				frappe.new_doc("Purchase Invoice");
 			});
 
 			$panel.find(".club-secretaria-solicitud-row").on("click", (e) => {

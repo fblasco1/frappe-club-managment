@@ -96,6 +96,60 @@ def get_pagos_comprometidos(
 	}
 
 
+def get_gastos_proyectados_pendientes(
+	company: str,
+	*,
+	as_of_date: date,
+	ventana_dias: int,
+) -> dict[str, Any]:
+	"""Facturas de compra en Borrador (docstatus=0) con due_date en la ventana.
+
+	Son «Gastos proyectados / Pendientes de aprobación»: aún no generan deuda contable
+	firme, pero Tesorería debe verlos para tener visibilidad total de compromisos.
+	"""
+	hasta = add_days(as_of_date, ventana_dias)
+	has_concepto = frappe.get_meta("Purchase Invoice").has_field("club_concepto")
+	fields = ["name", "supplier", "due_date", "grand_total"]
+	if has_concepto:
+		fields.append("club_concepto")
+
+	invoices = frappe.get_all(
+		"Purchase Invoice",
+		filters={
+			"company": company,
+			"docstatus": 0,
+			"due_date": ["between", [as_of_date, hasta]],
+		},
+		fields=fields,
+		order_by="due_date asc",
+	)
+
+	por_concepto: dict[str, float] = {}
+	total = 0.0
+	detalle: list[dict[str, Any]] = []
+	for inv in invoices:
+		monto = flt(inv.grand_total)
+		total += monto
+		concepto = (inv.get("club_concepto") or "Sin categoría") if has_concepto else "Sin categoría"
+		por_concepto[concepto] = por_concepto.get(concepto, 0.0) + monto
+		detalle.append(
+			{
+				"name": inv.name,
+				"supplier": inv.supplier,
+				"due_date": str(inv.due_date),
+				"grand_total": monto,
+				"club_concepto": concepto,
+			}
+		)
+
+	return {
+		"total": total,
+		"por_concepto": por_concepto,
+		"detalle": detalle,
+		"hasta": str(hasta),
+	}
+
+
 def get_cobros_proyectados(
 	company: str,
 	*,
@@ -176,6 +230,7 @@ def calcular_proyeccion_flujo_fondos(
 	comp = company or resolve_icdpe_company()
 	saldo = get_saldo_caja_bancos(comp, as_of)
 	pagos = get_pagos_comprometidos(comp, as_of_date=as_of, ventana_dias=ventana)
+	proyectados = get_gastos_proyectados_pendientes(comp, as_of_date=as_of, ventana_dias=ventana)
 	cobros = get_cobros_proyectados(comp, as_of_date=as_of, ventana_dias=ventana)
 
 	liquidez = saldo + cobros["cobros_proyectados_ventana"] - pagos["total"]
@@ -191,6 +246,9 @@ def calcular_proyeccion_flujo_fondos(
 		"obligaciones_criticas": criticas,
 		"pagos_por_concepto": pagos["por_concepto"],
 		"pagos_detalle": pagos["detalle"],
+		"gastos_proyectados_pendientes": proyectados["total"],
+		"gastos_proyectados_por_concepto": proyectados["por_concepto"],
+		"gastos_proyectados_detalle": proyectados["detalle"],
 		"cobros_proyectados_ventana": cobros["cobros_proyectados_ventana"],
 		"cobros_proyectados_mes": cobros["cobros_proyectados_mes"],
 		"due_cobros_plus": cobros["due_cobros_plus"],

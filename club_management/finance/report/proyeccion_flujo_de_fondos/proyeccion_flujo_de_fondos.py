@@ -49,6 +49,11 @@ def execute(
 			"detalle": "",
 		},
 		{
+			"concepto": _("Gastos proyectados (pendientes de aprobación)"),
+			"monto": proyeccion.get("gastos_proyectados_pendientes", 0),
+			"detalle": _("Facturas en borrador"),
+		},
+		{
 			"concepto": _("Obligaciones críticas (Personal+Estructura)"),
 			"monto": proyeccion["obligaciones_criticas"],
 			"detalle": "",
@@ -72,6 +77,17 @@ def execute(
 			{
 				"concepto": _("PI {0} — {1}").format(inv["name"], inv.get("club_concepto") or ""),
 				"monto": inv["outstanding_amount"],
+				"detalle": inv["due_date"],
+			}
+		)
+
+	for inv in proyeccion.get("gastos_proyectados_detalle") or []:
+		data.append(
+			{
+				"concepto": _("Borrador PI {0} — {1}").format(
+					inv["name"], inv.get("club_concepto") or ""
+				),
+				"monto": inv["grand_total"],
 				"detalle": inv["due_date"],
 			}
 		)

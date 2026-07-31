@@ -4,6 +4,7 @@ import "./secretaria_sidebar_boot.js";
 import "./inscripcion_cascada_desk.js";
 import "./socio_alta_guiada.js";
 import "./secretaria_workspace_panel.js";
+import "./tesoreria_workspace_panel.js";
 import "./actividades_sidebar_boot.js";
 import "./gestion_actividades_workspace_panel.js";
 import "./valores_cuota_social_page.js";

@@ -12,10 +12,12 @@
 
 
 
-**Última revisión MVP producción:** 2026-07-10 (cobranza/recibo + número socio manual, commit `b53ed5b`)  
-**Última actualización backlog:** 2026-07-10 (BL-6 redefinido: portal Vercel + reglas inscripción)  
+**Última revisión MVP producción:** 2026-07-19 — commit en Hetzner: **`35eb00c`** (informes Desk).  
+**Última actualización backlog:** 2026-07-19 (sesión GF local + flujo egresos borrador/aprobación; gap prod documentado)  
 
-**Destino producción:** Hetzner Cloud **CX23** (servidor aparte del devcontainer local)
+**Destino producción:** Hetzner Cloud **CX23** — https://gestion.icdpedroechague.com.ar  
+
+**Gap local → prod (crítico):** en local hay **4 commits** de Gestión Financiera (`60795d0`…`d12f313`) **sin push/deploy**, más un **working tree sin commit** (panel Tesorería, flujo egresos PI, centros de costo). Ver sección «Gap producción» abajo.
 
 
 
@@ -751,7 +753,7 @@ print(result)  # facturas_creadas, errores, invoice_names
 
 
 
-**Orden sugerido al retomar:** portal socio (BL-6) · grupo familiar · complementar aranceles período (ops Excel julio).
+**Orden sugerido al retomar:** **1)** commit + deploy GF (local → prod) · **2)** portal socio (BL-6) · **3)** grupo familiar · ops Excel.
 
 
 
@@ -811,8 +813,9 @@ print(result)  # facturas_creadas, errores, invoice_names
 | BL-8 Fecha de cobro | Hecho + prod (`8aed9ef` / tests `b53ed5b`) |
 | BL-9 Número socio manual | Hecho + prod (`b53ed5b`) |
 | Grupo familiar | **Pendiente** (sin spec dedicada aún) |
+| GF-0…GF-9 Gestión Financiera | **Hecho en local** — **falta commit parcial + deploy prod** (ver Gap producción 2026-07-19) |
 
-**Retomar desde:** BL-6 o grupo familiar según prioridad Secretaría.
+**Retomar desde:** deploy GF a prod → luego BL-6 o grupo familiar.
 
 
 
@@ -893,32 +896,106 @@ Error en producción al **Registrar cobro** desde formulario Socio: `NameError: 
 
 |------|------|--------|-------|
 
-| GF-0 Specs | `rol_tesoreria_permisos.md`, `carga_rapida_ingreso_egreso.md`, `proyeccion_flujo_fondos.md`, `items_finance_cost_center.md` | [x] | 2026-07-10 |
+| GF-0 Specs | `rol_tesoreria_permisos.md`, `carga_rapida_ingreso_egreso.md`, `proyeccion_flujo_fondos.md`, `items_finance_cost_center.md` | [x] | 2026-07-10 · **solo local** |
 
-| GF-1 Rol Tesorería + permisos | `rol_tesoreria_permisos.md` | [x] | Rol `Tesoreria`; workspace Tesorería sin Secretaría |
+| GF-1 Rol Tesorería + permisos | `rol_tesoreria_permisos.md` | [x] | Rol `Tesoreria`; workspace Tesorería · **solo local** |
 
-| GF-2 Carga rápida ingreso/egreso | `carga_rapida_ingreso_egreso.md` | [x] | SI / PI / PE; `club_concepto`; APIs Desk |
+| GF-2 Carga rápida ingreso/egreso | `carga_rapida_ingreso_egreso.md` | [x] | SI / PI / PE; `club_concepto` · **solo local** (egreso ahora = Borrador, ver GF-8) |
 
-| GF-3 Proyección flujo de fondos | `proyeccion_flujo_fondos.md` | [x] | Script Report + API; ventana 5 días |
+| GF-3 Proyección flujo de fondos | `proyeccion_flujo_fondos.md` | [x] | Script Report + API; ventana 5 días · **solo local** (+ borradores en GF-8) |
 
-| GF-4 Ítems + Cost Center | `items_finance_cost_center.md` | [x] | Catálogo `ICDPE-FIN-*` |
+| GF-4 Ítems + Cost Center | `items_finance_cost_center.md` | [x] | Catálogo `ICDPE-FIN-*` · **solo local** |
 
-| GF-5 Recordatorio provisión sueldos | `recordatorio_provision_sueldos_secretaria.md` | [x] | Banner último día hábil en panel Secretaría; E2E `e2e/finanza-flujo.spec.ts` |
+| GF-5 Recordatorio provisión sueldos | `recordatorio_provision_sueldos_secretaria.md` | [x] | Banner último día hábil · **solo local** |
 
-| GF-6 Revisión UX recordatorio Secretaría | `recordatorio_provision_sueldos_secretaria.md` | [x] | **2026-07-17.** Último día hábil considera **feriados** además de fines de semana; se resuelven desde la `Holiday List` de la empresa (`get_feriados_del_mes`), con fallback a solo fines de semana si no hay lista. Core `get_ultimo_dia_habil_mes(reference_date, holidays=...)` con feriados inyectables. Copy corregido: banner dice «factura de compra». Feriados AR seedeados: `finance/setup/feriados_argentina.py` (Ley 27.399 + Res. 164/2025, 19 fechas 2026, sin colectividades) + patch `seed_holiday_list_ar_2026` que crea «Feriados Argentina 2026» y la asigna como `default_holiday_list`. Tests puros: `tests/test_recordatorio_feriados.py` (5) y `tests/test_feriados_argentina.py` (7) + copy en `tests/test_ui_espanol.py`. Verificado en DB via `bench` (Company toma la lista; feriados julio 09+10). **Acceso operativo Secretaría a Finanzas:** rol `Secretaria` agregado al workspace Tesorería + permisos operativos (crear/leer Facturas de compra, Pagos, proveedores; read en masters) vía `finance/setup/secretaria_finance_permissions.py` y patch `add_secretaria_finance_operative_permissions`. Flujo de fondos/P&L siguen protegidos (link se oculta por `allowed_reports`). Tests `tests/test_secretaria_finance_permissions.py` (6). **Pendiente (no código):** validar copy/conceptos/CTA con usuario real de Secretaría; mantener lista de feriados anual. |
+| GF-6 Feriados + acceso operativo Secretaría | `recordatorio_provision_sueldos_secretaria.md`, `rol_tesoreria_permisos.md` | [x] | **2026-07-17 · solo local.** Feriados AR en último día hábil (`Holiday List` + seed 2026); acceso operativo Secretaría a Finanzas (PI/PE/Supplier; sin flujo/P&L). Commits `6779ce2`, `d7c9117`, `d12f313`. |
 
-| GF-7 Español en UI (sin inglés) | `ui_espanol_sin_ingles.md` | [x] | **2026-07-17.** Labels workspace Tesorería en ES; `translations/es.csv` (Factura de compra/venta, Pago/cobro, Cuenta contable, Centro de costo); botón banner «Nueva factura de compra»; patch `sync_tesoreria_workspace_es`. Tests `tests/test_ui_espanol.py` (4). Verificado en navegador: lista Purchase Invoice → «Factura de compra». `link_to`/rutas conservan identificador técnico. |
-| GF-7b i18n global (barrido) | `ui_espanol_sin_ingles.md` | [x] | **2026-07-17.** `app_title`→«SICLUB» (hooks + apps screen); módulos vía `es.csv` (Finance→Finanzas, Members→Socios, Activities→Actividades, Club Management→SICLUB); panel Actividades «Abrir ficha» y «Crear ítem de arancel». Tests `tests/test_ui_espanol.py` (7). Verificado en navegador: encabezados «Finanzas/SICLUB» y «Gestión de Actividades/SICLUB». |
+| GF-7 Español en UI | `ui_espanol_sin_ingles.md` | [x] | **2026-07-17 · solo local.** Labels Tesorería + `es.csv`. Incluido en `60795d0`. |
 
-| GF-HRMS | — | [ ] | **Fase posterior:** app HRMS / liquidación nativa de sueldos. Esta fase usa Purchase Invoice de provisión (Sueldos / AFIP 931 / ART / UTEDYC). **No implementar HRMS aquí.** |
+| GF-7b i18n global | `ui_espanol_sin_ingles.md` | [x] | **2026-07-17 · solo local.** `app_title` SICLUB; módulos ES; panel Actividades. |
+
+| GF-8 Flujo egresos Borrador → Aprobación | `flujo_egresos_borrador_aprobacion.md`, `tesoreria_panel_operaciones.md` | [x] | **2026-07-17/19 · solo local, sin commit.** Elimina Purchase Order del club. Secretaría carga PI en Borrador (sin submit); Tesorería aprueba (Submit) / rechaza. Validación `due_date` + `cost_center`. Panel Tesorería custom (PAGOS PENDIENTES = borradores). Flujo de fondos: fila «Gastos proyectados (pendientes de aprobación)». Botón Secretaría «Registrar Nuevo Gasto / Comprobante». Tests `test_purchase_invoice_flujo` (10) + suites relacionadas OK. |
+
+| GF-9 Centros de costo cobranza | `centro_costo_arancel_actividad.md` | [x] | **2026-07-17 · solo local, sin commit.** Aranceles → CC de la actividad (Item Default); Cuota Social → CC dedicado **Cuotas Sociales**; backfill histórico + repost GL. |
+
+| GF-HRMS | — | [ ] | **Fase posterior:** app HRMS / liquidación nativa de sueldos. **No implementar aquí.** |
 
 
 
 **Fuera de alcance GF (esta fase):** conciliación bancaria automática, gateway Cobros Plus en prod, Payment Log SIRO, modificar plan de cuentas importado.
 
-**Cierre desarrollo GF (2026-07-10):** hitos GF-0…GF-5 implementados y con tests. Pendientes explícitos en backlog: **GF-6** (revisión UX recordatorio Secretaría) y **GF-7** (español en UI, cero inglés visible).
+**Update 2026-07-19:** GF-0…GF-9 cerrados en **código local**. **Ninguno** está en producción (prod = `35eb00c`). Pendiente: **commit** del working tree (GF-8/GF-9 + panel), **push**, **deploy** Hetzner + migrate/build. Pendiente UX: validar con Secretaría/Tesorería reales. **Fix render Query Report Flujo de Fondos:** `frappe.router.slug()` sin argumento en `club_desk_navigation.js` / `inicio_workspace.js` (error `toLowerCase`) — corregido y verificado en Desk local.
 
-**Update 2026-07-17:** **GF-6, GF-7 y GF-7b cerrados** (código). GF-7/7b: español en Finanzas + branding SICLUB + módulos + panel Actividades (mecanismo `translations/es.csv` reutilizable). GF-6: feriados AR en último día hábil (vía `Holiday List`, con fallback) + copy «factura de compra». Pendiente de **config** en GF-6: cargar la Holiday List AR y asignarla como `default_holiday_list`; validar UX con Secretaría. Pendiente de infra: `bench run-tests` falla por precarga de test records de ERPNext (`ORDER BY idx is ambiguous` en PostgreSQL); los tests puros/estáticos corren con `python -m unittest` (host o `env/bin/python` en el contenedor).
+
+
+---
+
+
+
+## Gap producción (2026-07-19)
+
+
+
+| Entorno | Commit HEAD | Notas |
+|---------|-------------|-------|
+| **Producción** Hetzner | `35eb00c` | Informes Desk (páginas separadas / colapsables). Sin módulo Finanzas. |
+| **Local** (rama `mvp/secretaria-2026-06`) | `d12f313` + **working tree dirty** | 4 commits ahead de `origin`; cambios GF-8/GF-9 y panel **sin commit**. |
+
+### En producción hoy (ya desplegado)
+
+- MVP Secretaría (socios, inscripciones, cobranza, KPIs, informes).
+- BL-1…BL-5, BL-7…BL-9 (beca, login SICLUB, básquet unificado, recibo, fecha cobro, nº socio).
+- Informes Desk ampliados hasta `35eb00c`.
+
+### Implementado en local — **falta deploy a prod**
+
+| Bloque | Commits / estado | Qué incluye |
+|--------|------------------|-------------|
+| GF-0…GF-5 + GF-7/7b | `60795d0` (committed, no en prod) | Módulo Finanzas, rol Tesorería, carga rápida, flujo de fondos, ítems FIN-*, recordatorio sueldos, UI ES / SICLUB |
+| GF-6 | `6779ce2`, `d7c9117`, `d12f313` | Feriados AR + Holiday List; Secretaría operativa en Finanzas; módulo visible |
+| GF-8 + panel Tesorería | **sin commit** | Flujo PI Borrador→Aprobación; quitar PO; panel custom; permisos PI; validación; flujo fondos con proyectados |
+| GF-9 | **sin commit** | CC arancel = actividad; CC Cuotas Sociales + backfill |
+
+### Pendiente de implementar (producto / backlog)
+
+| # | Tema | Prioridad | Spec / notas |
+|---|------|-----------|--------------|
+| BL-6 | Portal socio inscripción (Vercel + API) | Media | `portal_socio_inscripcion.md` |
+| — | Grupo familiar | Media | Sin spec dedicada |
+| GF-HRMS | Liquidación sueldos nativa | Baja | Fuera de fase GF actual |
+| — | Cancelar SI impaga + regenerar cargo | Alta | Spec `cancelar_factura_venta_impaga.md` — implementado local (Desk Socio) |
+| — | Ops cobranza Excel / validar con Secretaría | Baja | Scripts ops |
+| — | Job Vitalicio | Media | `socios_categoria_validacion.md` |
+
+
+
+---
+
+
+
+## Resumen sesión 2026-07-17 / 2026-07-19 — Gestión Financiera (local)
+
+
+
+### Features cerradas en local
+
+1. **GF-6** — Feriados argentinos en recordatorio de provisión de sueldos + acceso operativo de Secretaría a Finanzas (sin P&L / flujo).
+2. **GF-7 / GF-7b** — UI en español (Finanzas) + branding SICLUB + traducción de módulos.
+3. **Panel Tesorería custom** — workspace full-width, sidebar 🏦, botones + listas PAGOS PENDIENTES / PAGOS REALIZADOS / COBRANZA.
+4. **GF-8** — Flujo único de egresos: `Purchase Invoice` Borrador (Secretaría) → Presentar (Tesorería); sin `Purchase Order`.
+5. **GF-9** — Imputación correcta de centros de costo (aranceles → actividad; cuota social → «Cuotas Sociales») + backfill.
+
+### Verificación
+
+- Suites: `test_purchase_invoice_flujo`, `test_tesoreria_panel`, `test_flujo_fondos`, `test_carga_rapida`, `test_secretaria_finance_permissions` — OK en `dev.localhost`.
+- Navegador local: panel Tesorería y formulario PI OK; reporte Flujo de Fondos con bug de render (datos OK vía `bench execute`).
+
+### Próximo paso operativo
+
+1. Commit del working tree (GF-8, GF-9, panel, patches).
+2. Push a `origin/mvp/secretaria-2026-06` (incluye los 4 commits GF ya locales).
+3. Deploy: `./scripts/prod/deploy-club-management.sh` + smoke Desk (Secretaría + Tesorería).
+4. Post-migrate: confirmar Holiday List AR, permisos PI, CC Cuotas Sociales.
 
 
 

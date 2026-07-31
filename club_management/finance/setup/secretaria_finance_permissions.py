@@ -38,16 +38,9 @@ DOCTYPES_EN_MODO_CUSTOM: frozenset[str] = frozenset(
 )
 
 # Permisos operativos a asegurar para Secretaría (permlevel 0).
+# NOTA: `Purchase Invoice` se gestiona en `purchase_invoice_permissions.py`
+# (draft-only: sin submit para Secretaría). No declararlo aquí.
 OPERATIVE_PERMS: dict[str, dict[str, int]] = {
-	"Purchase Invoice": {
-		"read": 1,
-		"write": 1,
-		"create": 1,
-		"submit": 1,
-		"print": 1,
-		"report": 1,
-		"export": 1,
-	},
 	"Payment Entry": {
 		"read": 1,
 		"write": 1,

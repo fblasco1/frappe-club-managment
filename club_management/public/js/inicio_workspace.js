@@ -3,10 +3,12 @@ frappe.provide("club_management.inicio_workspace");
 
 club_management.inicio_workspace.is_inicio = function () {
 	const page = frappe.workspace?.page;
+	const route = frappe.get_route() || [];
+	const route_slug = route[0] ? frappe.router.slug(route[0]) : "";
 	return (
 		page?.name === "Inicio" ||
-		frappe.router?.slug?.() === "inicio" ||
-		frappe.router?.slug?.() === "inicio-club"
+		route_slug === "inicio" ||
+		route_slug === "inicio-club"
 	);
 };
 

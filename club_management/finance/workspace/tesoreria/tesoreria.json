@@ -1,7 +1,7 @@
 {
  "app": "club_management",
  "charts": [],
- "content": "[{\"id\":\"tes_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Tesorería</b></span>\",\"col\":12}},{\"id\":\"tes_sc_flujo\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Flujo de Fondos\",\"col\":3}},{\"id\":\"tes_card_analisis\",\"type\":\"card\",\"data\":{\"card_name\":\"Análisis\",\"col\":4}},{\"id\":\"tes_card_ops\",\"type\":\"card\",\"data\":{\"card_name\":\"Operaciones\",\"col\":4}}]",
+ "content": "[]",
  "creation": "2026-07-10 12:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -12,97 +12,8 @@
  "idx": 0,
  "is_hidden": 0,
  "label": "Tesorería",
- "links": [
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Análisis",
-   "link_count": 1,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Proyección Flujo de Fondos",
-   "link_count": 0,
-   "link_to": "Proyeccion Flujo de Fondos",
-   "link_type": "Report",
-   "onboard": 1,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Operaciones",
-   "link_count": 6,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Facturas de compra",
-   "link_count": 0,
-   "link_to": "Purchase Invoice",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Facturas de venta",
-   "link_count": 0,
-   "link_to": "Sales Invoice",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Pagos y cobros",
-   "link_count": 0,
-   "link_to": "Payment Entry",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Plan de cuentas",
-   "link_count": 0,
-   "link_to": "Account",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Centros de costo",
-   "link_count": 0,
-   "link_to": "Cost Center",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Configuración de Finanzas",
-   "link_count": 0,
-   "link_to": "Finance Settings",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  }
- ],
- "modified": "2026-07-17 12:00:00.000000",
+ "links": [],
+ "modified": "2026-07-17 17:00:00.000000",
  "modified_by": "Administrator",
  "module": "Finance",
  "name": "Tesorería",
@@ -124,16 +35,6 @@
   }
  ],
  "sequence_id": 0.5,
- "shortcuts": [
-  {
-   "color": "Blue",
-   "doc_view": "",
-   "label": "Flujo de Fondos",
-   "link_to": "Proyeccion Flujo de Fondos",
-   "report_ref_doctype": "Purchase Invoice",
-   "stats_filter": "",
-   "type": "Report"
-  }
- ],
+ "shortcuts": [],
  "title": "Tesorería"
 }

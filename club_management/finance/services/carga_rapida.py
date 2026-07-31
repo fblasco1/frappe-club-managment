@@ -311,16 +311,9 @@ def registrar_egreso(
 		}
 	)
 	_set_club_concepto(invoice, concepto)
+	# Flujo Borrador → Aprobación: la factura queda en Borrador (docstatus=0).
+	# La aprobación (Submit) y el pago los realiza Tesorería.
+	# Ver `specs/flujo_egresos_borrador_aprobacion.md`.
 	invoice.insert(ignore_permissions=True)
-	invoice.submit()
 
-	pe_name: str | None = None
-	if pagado_ahora:
-		pe_name = _submit_payment_against(
-			PURCHASE_INVOICE_DOCTYPE,
-			invoice.name,
-			mode_of_payment=mode_of_payment,
-			posting_date=fecha,
-		)
-
-	return {"purchase_invoice": invoice.name, "payment_entry": pe_name}
+	return {"purchase_invoice": invoice.name, "payment_entry": None}

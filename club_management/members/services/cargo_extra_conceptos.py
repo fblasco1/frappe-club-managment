@@ -14,15 +14,13 @@ import frappe
 from club_management.activities.services.inscripcion_socio import (
 	resolve_item_arancel_inscripcion,
 )
+from club_management.finance.setup.icdpe_income_item_groups import INGRESO_SOCIOS
 from club_management.members.services.cobranza_manual import _default_company
 
 INSCRIPCION_DOCTYPE = "Inscripcion Actividad"
 
 # Grupos de ítems "generales" (no atados a una actividad puntual).
-GRUPOS_CONCEPTOS_GENERALES: tuple[str, ...] = (
-	"ICDPE / Cargos varios",
-	"ICDPE / Actividades puntuales",
-)
+GRUPOS_CONCEPTOS_GENERALES: tuple[str, ...] = (INGRESO_SOCIOS,)
 
 # Códigos de ítems generales conocidos que deben ofrecerse si existen.
 CODIGOS_CONCEPTOS_GENERALES: tuple[str, ...] = (
@@ -31,6 +29,14 @@ CODIGOS_CONCEPTOS_GENERALES: tuple[str, ...] = (
 	"ICDPE-COLONIAS",
 	"ICDPE-EVENTOS",
 	"ICDPE-VENTA-INDUMENTARIA",
+)
+
+# No ofrecer cuota social / inscripción como "cargo extra" genérico.
+CODIGOS_EXCLUIR_CONCEPTOS_GENERALES: frozenset[str] = frozenset(
+	{
+		"ICDPE-CUOTA-SOCIAL",
+		"ICDPE-INSCRIPCION",
+	}
 )
 
 
@@ -79,6 +85,8 @@ def _item_es_arancel_actividad(item_code: str) -> bool:
 
 
 def _item_es_concepto_general(item_code: str) -> bool:
+	if item_code in CODIGOS_EXCLUIR_CONCEPTOS_GENERALES:
+		return False
 	if item_code in CODIGOS_CONCEPTOS_GENERALES:
 		return True
 	group = frappe.db.get_value("Item", item_code, "item_group")
@@ -149,6 +157,8 @@ def _conceptos_generales() -> list[str]:
 			pluck="name",
 		):
 			if code in seen or _item_es_arancel_actividad(code):
+				continue
+			if code in CODIGOS_EXCLUIR_CONCEPTOS_GENERALES:
 				continue
 			seen.add(code)
 			codes.append(code)

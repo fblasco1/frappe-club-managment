@@ -16,7 +16,7 @@ add_to_apps_screen = [
 		"name": "club_management",
 		"logo": "/assets/frappe/images/frappe-framework-logo.svg",
 		"title": "SICLUB",
-		"route": "/desk",
+		"route": "/desk/secretaria",
 		"has_permission": "club_management.members.permissions_app.has_app_permission",
 	}
 ]
@@ -143,6 +143,9 @@ doc_events = {
 	"Inscripcion Actividad": {
 		"after_insert": "club_management.members.services.suscripciones_socio.sync_suscripcion_tras_inscripcion",
 		"on_update": "club_management.members.services.suscripciones_socio.sync_suscripcion_tras_inscripcion",
+	},
+	"Purchase Invoice": {
+		"validate": "club_management.finance.services.purchase_invoice_validation.validate_egreso",
 	},
 }
 

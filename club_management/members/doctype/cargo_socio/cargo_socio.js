@@ -60,6 +60,12 @@ frappe.ui.form.on("Cargo Socio", {
 			});
 		}
 
+		if (frm.doc.estado === "Pendiente" && frm.doc.modo_cobro === "Recurrente") {
+			frm.add_custom_button(__("Prepagar / cancelación total"), () => {
+				club_management_cargo_extra.dialog_prepago(frm);
+			});
+		}
+
 		if (frm.doc.estado === "Pendiente") {
 			frm.add_custom_button(__("Cancelar cargo"), () => {
 				frappe.confirm(__("¿Cancelar este cargo?"), () => {
@@ -86,3 +92,71 @@ frappe.ui.form.on("Cargo Socio", {
 		club_management_cargo_extra.aplicar_filtro_conceptos(frm);
 	},
 });
+
+club_management_cargo_extra.dialog_prepago = function (frm) {
+	frappe.call({
+		method: "club_management.members.api.cargo_extra_desk.list_meses_prepago",
+		args: { cargo: frm.doc.name },
+		freeze: true,
+		callback(r) {
+			if (r.exc) return;
+			const rows = (r.message || []).filter((row) => !row.ya_facturado);
+			if (!rows.length) {
+				frappe.msgprint(__("No hay meses pendientes de prepago para este cargo."));
+				return;
+			}
+			const options = rows.map((row) => {
+				const monto = frappe.format(row.monto, { fieldtype: "Currency" });
+				return {
+					label: `${row.periodo} — ${monto}`,
+					value: row.periodo,
+					checked: true,
+				};
+			});
+			const total = rows.reduce((acc, row) => acc + flt(row.monto), 0);
+			const d = new frappe.ui.Dialog({
+				title: __("Prepagar / cancelación total"),
+				fields: [
+					{
+						fieldname: "periodos",
+						fieldtype: "MultiCheck",
+						label: __("Meses a facturar"),
+						options: options,
+						reqd: 1,
+					},
+					{
+						fieldname: "total_info",
+						fieldtype: "HTML",
+						options: `<p>${__("Total estimado")}: <b>${frappe.format(total, {
+							fieldtype: "Currency",
+						})}</b></p>`,
+					},
+				],
+				primary_action_label: __("Facturar meses"),
+				primary_action(values) {
+					const selected = values.periodos || [];
+					if (!selected.length) {
+						frappe.msgprint(__("Seleccioná al menos un mes."));
+						return;
+					}
+					d.hide();
+					frappe.call({
+						method: "club_management.members.api.cargo_extra_desk.prepagar_cargo",
+						args: { cargo: frm.doc.name, periodos: selected },
+						freeze: true,
+						callback(res) {
+							if (!res.exc && res.message) {
+								const invs = res.message.sales_invoices || [];
+								frappe.msgprint(
+									__("Facturas creadas: {0}", [invs.join(", ") || __("(ninguna nueva)")])
+								);
+								frm.reload_doc();
+							}
+						},
+					});
+				},
+			});
+			d.show();
+		},
+	});
+};

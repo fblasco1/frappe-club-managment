@@ -155,6 +155,18 @@ def dar_baja(socio: str, motivo: str) -> dict[str, str]:
 
 
 @frappe.whitelist()
+def corregir_numero_socio(socio: str, nuevo_numero: int | str) -> dict[str, str]:
+	"""Reasigna el número de socio (PK) de un documento provisional al definitivo."""
+	from club_management.members.services.corregir_numero_socio import (
+		corregir_numero_socio as corregir_numero_socio_service,
+	)
+
+	ensure_secretaria_operacion_access()
+	nuevo = corregir_numero_socio_service(socio, nuevo_numero)
+	return {"status": "ok", "socio": nuevo}
+
+
+@frappe.whitelist()
 def list_actividades_inscripcion_desk() -> list[dict[str, str]]:
 	ensure_secretaria_operacion_access()
 	return list_actividades_portal()

@@ -51,7 +51,7 @@ class TestCancelarFacturaVentaImpaga(MembersTestCase):
 		from club_management.members.services.cobranza_manual import cancelar_factura_venta_impaga
 
 		socio = self._socio_activo(dni="99003001", email="cancel.impaga.ok@example.com")
-		invoice_name = generar_cargo_socio(socio.name, reference_date=self._REFERENCE)
+		invoice_name = generar_cargo_socio(socio.name, reference_date=self._REFERENCE)[0]
 		saldo_antes = sync_saldo_deuda_socio(socio.name)
 		self.assertGreater(saldo_antes, 0)
 
@@ -69,7 +69,7 @@ class TestCancelarFacturaVentaImpaga(MembersTestCase):
 		from club_management.members.services.cobranza_manual import cancelar_factura_venta_impaga
 
 		socio = self._socio_activo(dni="99003002", email="cancel.impaga.paid@example.com")
-		invoice_name = generar_cargo_socio(socio.name, reference_date=self._REFERENCE)
+		invoice_name = generar_cargo_socio(socio.name, reference_date=self._REFERENCE)[0]
 		registrar_cobro_manual(socio.name, invoice_name)
 
 		frappe.set_user(self._secretaria)
@@ -86,7 +86,7 @@ class TestCancelarFacturaVentaImpaga(MembersTestCase):
 
 		socio_a = self._socio_activo(dni="99003003", email="cancel.impaga.a@example.com")
 		socio_b = self._socio_activo(dni="99003004", email="cancel.impaga.b@example.com")
-		invoice_name = generar_cargo_socio(socio_a.name, reference_date=self._REFERENCE)
+		invoice_name = generar_cargo_socio(socio_a.name, reference_date=self._REFERENCE)[0]
 
 		frappe.set_user(self._secretaria)
 		try:
@@ -101,7 +101,7 @@ class TestCancelarFacturaVentaImpaga(MembersTestCase):
 		from club_management.members.services.cobranza_manual import cancelar_factura_venta_impaga
 
 		socio = self._socio_activo(dni="99003005", email="cancel.impaga.regen@example.com")
-		primera = generar_cargo_socio(socio.name, reference_date=self._REFERENCE)
+		primera = generar_cargo_socio(socio.name, reference_date=self._REFERENCE)[0]
 		periodo = format_periodo_cobro(self._REFERENCE)
 		campo_periodo = _campo_periodo_cobro()
 		if campo_periodo:
@@ -110,7 +110,7 @@ class TestCancelarFacturaVentaImpaga(MembersTestCase):
 		frappe.set_user(self._secretaria)
 		try:
 			cancelar_factura_venta_impaga(socio.name, primera)
-			segunda = generar_cargo_socio(socio.name, reference_date=self._REFERENCE)
+			segunda = generar_cargo_socio(socio.name, reference_date=self._REFERENCE)[0]
 		finally:
 			frappe.set_user("Administrator")
 
