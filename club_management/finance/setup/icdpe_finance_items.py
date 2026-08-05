@@ -13,18 +13,25 @@ import frappe
 
 from club_management.setup.icdpe_company import resolve_icdpe_company
 from club_management.finance.setup.icdpe_income_item_groups import (
-	INGRESO_COMERCIALES,
-	INGRESO_INSTITUCIONALES,
+	INGRESO_LEAF_GROUPS,
 	INGRESO_PILLARS,
+	LEAF_ALQUILERES,
+	LEAF_DONACIONES,
+	LEAF_ENTRADAS,
+	LEAF_GASTRONOMIA,
+	LEAF_RECAUDACION,
+	LEAF_SPONSORS,
+	LEAF_SUBSIDIOS,
+	ensure_ingresos_item_group_tree,
 )
 
 DEFAULT_ITEM_GROUP_ROOT = "All Item Groups"
 
 ADMIN_CC = "Administración - ICDPE"
-BUFFET_CC = "Gastronomía - Buffet - ICDPE"
-RESTAURANTE_CC = "Gastronomía - Restaurante - ICDPE"
-ALQUILER_TEMP_CC = "Alquileres - Temporal - ICDPE"
-BASQUET_CC = "Deportes - Basquet - ICDPE"
+BUFFET_CC = "Buffet - ICDPE"
+RESTAURANTE_CC = "Restaurante - ICDPE"
+ALQUILER_TEMP_CC = "Temporal - ICDPE"
+BASQUET_CC = "Basquet - ICDPE"
 
 # --- 4 pilares centrales (is_group = 1) ---
 CENTRAL_ESTRUCTURA = "Gastos de Estructura y Servicios"
@@ -98,70 +105,70 @@ INCOME_SPECS: tuple[FinanceItemSpec, ...] = (
 	FinanceItemSpec(
 		"ICDPE-FIN-ENTRADAS",
 		"Entradas partidos / eventos",
-		INGRESO_COMERCIALES,
+		LEAF_ENTRADAS,
 		"431003",
 		ADMIN_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-INDUMENTARIA",
 		"Venta indumentaria",
-		INGRESO_COMERCIALES,
+		LEAF_SPONSORS,
 		"451002",
 		ADMIN_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-BUFFET",
 		"Ventas buffet",
-		INGRESO_COMERCIALES,
+		LEAF_GASTRONOMIA,
 		"441001",
 		BUFFET_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-RESTAURANTE",
 		"Ventas restaurante",
-		INGRESO_COMERCIALES,
+		LEAF_GASTRONOMIA,
 		"441001",
 		RESTAURANTE_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-CANON-CONCESION",
 		"Canon concesión buffet/restaurante",
-		INGRESO_COMERCIALES,
+		LEAF_GASTRONOMIA,
 		"441001",
 		BUFFET_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-SPONSOR",
 		"Sponsoreo y publicidad",
-		INGRESO_COMERCIALES,
+		LEAF_SPONSORS,
 		"451001",
 		ADMIN_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-ALQUILER-TEMP",
 		"Alquiler temporal instalaciones",
-		INGRESO_COMERCIALES,
+		LEAF_ALQUILERES,
 		"421001",
 		ALQUILER_TEMP_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-SUBSIDIO",
 		"Subsidios gubernamentales",
-		INGRESO_INSTITUCIONALES,
+		LEAF_SUBSIDIOS,
 		"491001",
 		ADMIN_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-DONACION",
 		"Donaciones",
-		INGRESO_INSTITUCIONALES,
+		LEAF_DONACIONES,
 		"491001",
 		ADMIN_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-EVENTO-RECAUDACION",
 		"Eventos de recaudación (rifas, cenas)",
-		INGRESO_INSTITUCIONALES,
+		LEAF_RECAUDACION,
 		"431003",
 		ADMIN_CC,
 	),
@@ -541,11 +548,8 @@ def ensure_egresos_item_group_tree() -> None:
 		for leaf in leaves:
 			_ensure_item_group(leaf, parent=central, is_group=0)
 
-	# Grupo plano residual de egresos (legacy).
-	_ensure_item_group("ICDPE / Finanzas egresos", parent=DEFAULT_ITEM_GROUP_ROOT, is_group=0)
-	# Pilares de ingreso (idempotente; evita recrear ICDPE / Finanzas ingresos).
-	for pillar in INGRESO_PILLARS:
-		_ensure_item_group(pillar, parent=DEFAULT_ITEM_GROUP_ROOT, is_group=0)
+	# Árbol de ingresos (pilares nodos + hojas).
+	ensure_ingresos_item_group_tree()
 
 
 def _resolve_account(company: str, account_number: str) -> str | None:
@@ -603,8 +607,8 @@ def _upsert_item_defaults(
 def upsert_finance_item(spec: FinanceItemSpec) -> str:
 	"""Crea o actualiza un Item financiero. Devuelve created|updated|skipped."""
 	_ensure_uom("Servicio")
-	if spec.item_group in EGRESO_LEAF_GROUPS or spec.item_group in INGRESO_PILLARS or spec.item_group in (
-		"ICDPE / Finanzas egresos",
+	if spec.item_group in EGRESO_LEAF_GROUPS or spec.item_group in INGRESO_LEAF_GROUPS or spec.item_group in (
+		*INGRESO_PILLARS,
 	):
 		# Árboles de egreso/ingreso ya asegurados por el seed.
 		if not frappe.db.exists("Item Group", spec.item_group):
@@ -689,4 +693,11 @@ def run_finance_items_seed() -> dict[str, int]:
 		result = upsert_finance_item(spec)
 		counts[result] = counts.get(result, 0) + 1
 	counts["disabled_legacy"] = disable_legacy_expense_items()
+	from club_management.finance.setup.cleanup_residual_item_groups import (
+		run_cleanup_residual_item_groups,
+	)
+	from club_management.finance.setup.fix_sponsors_y_ventas import run_fix_sponsors_y_ventas
+
+	run_cleanup_residual_item_groups()
+	run_fix_sponsors_y_ventas()
 	return counts

@@ -6,7 +6,7 @@
 - El arancel se resuelve: `Equipo Actividad.item` → `Grupo Actividad.item` → `Actividad.item`.
 - Cada categoría (U9, U11, …) puede tener un ítem distinto aunque compartan tira.
 - Actividad operativa única: **Basquet** (`basquet_estructura_unificada.md`).
-- Centro de costo ERPNext único: **Deportes - Basquet - ICDPE** (`basquet_cost_center_consolidado.md`).
+- Centro de costo ERPNext único: **Basquet - ICDPE** (`basquet_cost_center_consolidado.md`).
 
 ## Ítems ERPNext (cuenta 412001)
 
@@ -25,7 +25,7 @@ Given `Basquet` / `Masculino / Azul` / equipo `U13`
 And el equipo tiene `item = ICDPE-BASQUET-MASCULINO-MINIBASQUET`
 When se resuelve el arancel de una inscripción a ese equipo
 Then devuelve `ICDPE-BASQUET-MASCULINO-MINIBASQUET` con tarifa 28.500
-And el `Item Default.selling_cost_center` es `Deportes - Basquet - ICDPE`.
+And el `Item Default.selling_cost_center` es `Basquet - ICDPE`.
 
 ## Scenario: Masculino / Azul U15 usa formativas azul
 

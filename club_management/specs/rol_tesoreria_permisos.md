@@ -54,9 +54,21 @@ And **no** ve el reporte **Proyección de Flujo de Fondos** (el link se filtra p
 Given un usuario con rol `Secretaria`
 When abre el formulario de `Purchase Invoice`
 Then puede crear y guardar en **Borrador** (tiene `create`/`write`, **sin** `submit` ni `cancel`)
-And tiene lectura sobre los masters necesarios (Item, Account, Cost Center, Company, Mode of Payment, Supplier).
+And tiene lectura/selección sobre los masters necesarios (Account, Cost Center, Company, Mode of Payment, Supplier)
+And sobre **Item** tiene `read`/`select`/`create`/`write` (alta y vínculo en formularios; sin `delete`).
 
 Ver flujo completo en `flujo_egresos_borrador_aprobacion.md`.
+
+---
+
+## Scenario: Secretaría puede seleccionar y crear Items — catálogo operativo
+
+Given un usuario con rol `Secretaria`
+When busca un `Item` en un campo Link (factura, grupo/actividad, Club Settings, etc.)
+Then el buscador lista ítems (permiso `select`/`read`)
+When crea un `Item` nuevo desde Desk
+Then puede insertarlo y editarlo (`create`/`write`)
+And **no** tiene `delete` sobre Item.
 
 ---
 

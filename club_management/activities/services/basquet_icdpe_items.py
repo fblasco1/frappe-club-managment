@@ -6,10 +6,12 @@ import frappe
 from frappe.utils import flt
 
 from club_management.activities.data.basquet_aranceles_icdpe import BASQUET_ITEM_SPECS
-from club_management.finance.setup.icdpe_income_item_groups import INGRESO_ACTIVIDADES
+from club_management.finance.setup.icdpe_income_item_groups import (
+	ensure_ingresos_item_group_tree,
+	resolve_ingreso_leaf_for_item,
+)
 from club_management.setup.icdpe_company import resolve_icdpe_company
 from club_management.setup.icdpe_create_service_items import (
-	_ensure_item_group,
 	_ensure_uom,
 	_resolve_cost_center,
 	_resolve_income_account,
@@ -19,7 +21,8 @@ from club_management.setup.icdpe_create_service_items import (
 
 def upsert_basquet_item(spec) -> str:
 	company = resolve_icdpe_company()
-	_ensure_item_group(INGRESO_ACTIVIDADES)
+	ensure_ingresos_item_group_tree()
+	leaf = resolve_ingreso_leaf_for_item(spec.item_code)
 	_resolve_cost_center(company, spec.cost_center)
 	income_account = _resolve_income_account(company, "412001")
 
@@ -29,8 +32,8 @@ def upsert_basquet_item(spec) -> str:
 		if item.item_name != spec.item_name:
 			item.item_name = spec.item_name
 			changed = True
-		if item.item_group != INGRESO_ACTIVIDADES:
-			item.item_group = INGRESO_ACTIVIDADES
+		if item.item_group != leaf:
+			item.item_group = leaf
 			changed = True
 		if int(item.disabled or 0):
 			item.disabled = 0
@@ -44,7 +47,7 @@ def upsert_basquet_item(spec) -> str:
 				"doctype": "Item",
 				"item_code": spec.item_code,
 				"item_name": spec.item_name,
-				"item_group": INGRESO_ACTIVIDADES,
+				"item_group": leaf,
 				"is_stock_item": 0,
 				"is_sales_item": 1,
 				"stock_uom": "Servicio",

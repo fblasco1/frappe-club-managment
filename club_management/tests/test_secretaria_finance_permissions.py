@@ -50,12 +50,18 @@ class TestSecretariaFinancePerms(unittest.TestCase):
 		for flag in ("read", "create", "write", "submit"):
 			self.assertEqual(pe.get(flag), 1, f"Falta permiso {flag} en Payment Entry")
 
-	def test_masters_solo_lectura(self) -> None:
-		for master in ("Item", "Account", "Cost Center", "Company", "Mode of Payment"):
+	def test_masters_lectura_y_item_creable(self) -> None:
+		for master in ("Account", "Cost Center", "Company", "Mode of Payment"):
 			perms = OPERATIVE_PERMS[master]
 			self.assertEqual(perms.get("read"), 1, f"{master} debe ser legible")
+			self.assertEqual(perms.get("select"), 1, f"{master} debe ser seleccionable en Links")
 			self.assertNotEqual(perms.get("create"), 1, f"{master} no debe ser creable por Secretaría")
 			self.assertNotEqual(perms.get("write"), 1, f"{master} no debe ser editable por Secretaría")
+
+		item = OPERATIVE_PERMS["Item"]
+		for flag in ("read", "select", "create", "write"):
+			self.assertEqual(item.get(flag), 1, f"Item debe tener {flag} para Secretaría")
+		self.assertNotEqual(item.get("delete"), 1, "Secretaría no debe poder borrar Items")
 
 	def test_no_incluye_flujo_ni_reportes_pyl(self) -> None:
 		# Secretaría no recibe permiso operativo sobre reportes/flujo (siguen por rol).

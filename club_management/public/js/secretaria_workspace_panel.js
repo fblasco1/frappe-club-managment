@@ -221,18 +221,22 @@
 			return (s.total || 0) > 0;
 		},
 
+		has_medios_chart(medios) {
+			return Boolean(medios?.disponible);
+		},
+
+		has_medios_montos(medios) {
+			const m = medios || {};
+			return Boolean(m.efectivo || m.tarjeta || m.transferencia || m.otro);
+		},
+
 		render_charts(metricas) {
 			const socios = metricas.socios || {};
 			const tendencia = metricas.tendencia_recaudacion || {};
 			const medios = metricas.medios_pago || {};
 			const showTrend = tendencia.disponible && (tendencia.dias || []).length;
 			const showSegmentos = this.has_segmentos_chart(socios.segmentos);
-			const showMedios =
-				medios.disponible &&
-				(medios.efectivo ||
-					medios.tarjeta ||
-					medios.transferencia ||
-					medios.otro);
+			const showMedios = this.has_medios_chart(medios);
 			if (!showTrend && !showSegmentos && !showMedios) {
 				return "";
 			}
@@ -287,7 +291,15 @@
 		},
 
 		mount_medios_chart($container, medios) {
-			if (!$container?.length || !medios?.disponible) {
+			if (!$container?.length || !this.has_medios_chart(medios)) {
+				return;
+			}
+			$container.empty();
+			if (!this.has_medios_montos(medios)) {
+				$container.html(
+					`<p class="text-muted mb-0">${__("Sin cobros del mes")}</p>`
+				);
+				this._chart_medios = null;
 				return;
 			}
 			this._chart_medios = new frappe.Chart($container[0], {

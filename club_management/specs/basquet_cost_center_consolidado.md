@@ -13,7 +13,7 @@ alineado con la actividad única **Basquet** (`basquet_estructura_unificada.md`)
 
 | Antes (legacy) | Después |
 |----------------|---------|
-| `Deportes - Basquet Masculino - ICDPE` | `Deportes - Basquet - ICDPE` |
+| `Deportes - Basquet Masculino - ICDPE` | `Basquet - ICDPE` |
 | `Deportes - Basquet Escuelita - ICDPE` | *(mismo)* |
 | `Deportes - Basquet Femenino - ICDPE` | *(mismo)* |
 
@@ -27,7 +27,7 @@ Los **ítems** de arancel (`ICDPE-BASQUET-*`, `ICDPE-ARANCEL-MENSUAL-basquet-*`,
 
 Given la Company ICDPE y el CC padre `Deportes - ICDPE`
 When corre `ensure_basquet_unified_cost_center`
-Then existe `Deportes - Basquet - ICDPE` con `parent_cost_center = Deportes - ICDPE`
+Then existe `Basquet - ICDPE` con `parent_cost_center = Deportes - ICDPE`
 And `is_group = 0`.
 
 ---
@@ -36,7 +36,7 @@ And `is_group = 0`.
 
 Given ítems con `Item Default.selling_cost_center` en uno de los tres CC legacy
 When corre `consolidate_basquet_cost_centers`
-Then cada fila `Item Default` ICDPE de esos ítems usa `Deportes - Basquet - ICDPE`
+Then cada fila `Item Default` ICDPE de esos ítems usa `Basquet - ICDPE`
 And `BASQUET_ITEM_SPECS` en código referencia solo el CC unificado.
 
 ---
@@ -54,7 +54,7 @@ And el CC unificado permanece habilitado.
 
 Given patch `sync_basquet_aranceles_icdpe`
 When crea o actualiza ítems `ICDPE-BASQUET-*`
-Then todos usan `Deportes - Basquet - ICDPE` como centro de costo de venta.
+Then todos usan `Basquet - ICDPE` como centro de costo de venta.
 
 ---
 
@@ -66,7 +66,7 @@ Then no hay `Inscripcion Actividad` (activas ni dadas de baja) en actividades le
 And no hay `Sales Invoice` con saldo pendiente vinculada a ítems/CC legacy de básquet
 And no hay `Item Default` con `selling_cost_center` en los tres CC legacy
 And los CC legacy están deshabilitados y las actividades legacy deshabilitadas
-And existe el CC unificado `Deportes - Basquet - ICDPE`.
+And existe el CC unificado `Basquet - ICDPE`.
 
 ---
 

@@ -10,7 +10,9 @@ from club_management.members.services.cargo_extra_conceptos import (
 from club_management.members.services.socio_transitions import cambiar_estado
 from club_management.members.test_helpers import MembersTestCase, insert_socio
 
-GRUPO_GENERAL = "Ingresos de Socios y Membresías"
+from club_management.finance.setup.icdpe_income_item_groups import LEAF_CARGOS
+
+GRUPO_GENERAL = LEAF_CARGOS
 GRUPO_TEST_ITEMS = "Test Cargo Extra Items"
 
 

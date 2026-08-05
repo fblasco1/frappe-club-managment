@@ -61,6 +61,7 @@ Given ítems legacy fuera del catálogo vigente
 When corre el seed
 Then esos códigos quedan `disabled = 1`
 And no se borran (integridad referencial de Purchase Invoice históricas)
+And se reasignan a hojas del árbol de egresos (no quedan en `ICDPE / Finanzas egresos`)
 
 ---
 

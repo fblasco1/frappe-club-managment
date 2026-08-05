@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from club_management.activities.data.arancel_item_spec import format_arancel_mensual_item_name
 from club_management.setup.basquet_cost_center import BASQUET_COST_CENTER
 
 ITEM_MINIBASQUET = "ICDPE-BASQUET-MASCULINO-MINIBASQUET"
@@ -34,37 +35,37 @@ class BasquetItemSpec:
 BASQUET_ITEM_SPECS: tuple[BasquetItemSpec, ...] = (
 	BasquetItemSpec(
 		ITEM_MINIBASQUET,
-		"Arancel mensual básquet masculino — minibásquet",
+		format_arancel_mensual_item_name("BASQUET", "MASCULINO", "MINIBASQUET"),
 		28500.0,
 		BASQUET_COST_CENTER,
 	),
 	BasquetItemSpec(
 		ITEM_FORMATIVAS_AZUL,
-		"Arancel mensual básquet masculino — formativas tira azul",
+		format_arancel_mensual_item_name("BASQUET", "MASCULINO", "FORMATIVAS", "AZUL"),
 		28500.0,
 		BASQUET_COST_CENTER,
 	),
 	BasquetItemSpec(
 		ITEM_FORMATIVAS_AMARILLA,
-		"Arancel mensual básquet masculino — formativas tira amarilla",
+		format_arancel_mensual_item_name("BASQUET", "MASCULINO", "FORMATIVAS", "AMARILLA"),
 		26500.0,
 		BASQUET_COST_CENTER,
 	),
 	BasquetItemSpec(
 		ITEM_FORMATIVAS_FLEX,
-		"Arancel mensual básquet masculino — formativas tira flex",
+		format_arancel_mensual_item_name("BASQUET", "MASCULINO", "FORMATIVAS", "FLEX"),
 		26500.0,
 		BASQUET_COST_CENTER,
 	),
 	BasquetItemSpec(
 		ITEM_ESCUELITA,
-		"Arancel mensual básquet escuelita",
+		format_arancel_mensual_item_name("BASQUET", "MIXTO", "ESCUELITA"),
 		21000.0,
 		BASQUET_COST_CENTER,
 	),
 	BasquetItemSpec(
 		ITEM_FEMENINO_SUP,
-		"Arancel mensual básquet femenino — superior",
+		format_arancel_mensual_item_name("BASQUET", "FEMENINO", "SUPERIOR"),
 		26500.0,
 		BASQUET_COST_CENTER,
 	),

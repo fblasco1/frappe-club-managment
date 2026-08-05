@@ -1,11 +1,14 @@
-# Spec: Catálogo de ingresos — 4 pilares Item Group
+# Spec: Catálogo de ingresos — jerarquía unificada (espejo egresos)
 
-Refactoriza los grupos fragmentados `ICDPE / *` de ingresos a **4 pilares**
-bajo `All Item Groups`. Los Items se reasignan; los grupos viejos se eliminan
-si quedan vacíos (o se archivan bajo un nodo legacy si hay vínculos).
+Los **4 pilares de ingreso** pasan a nodos (`is_group = 1`) con subgrupos hoja
+que reciben Items — misma forma que egresos (`catalogo_egresos_item_groups.md`).
+Bajo Actividades Deportivas hay un nivel intermedio (Deportes / Fitness).
 
 **Relacionado:** `catalogo_egresos_item_groups.md`, `items_finance_cost_center.md`,
-`cargo_extra_conceptos_y_facturacion.md`
+`cargo_extra_conceptos_y_facturacion.md`, `cuotas_sociales_suscripcion.md`
+
+**Decisión:** un solo ítem `ICDPE-CUOTA-SOCIAL` + Item Prices por categoría;
+el subgrupo «Cuotas sociales» organiza el árbol (no se parten N ítems por categoría).
 
 ---
 
@@ -13,59 +16,58 @@ si quedan vacíos (o se archivan bajo un nodo legacy si hay vínculos).
 
 ```
 All Item Groups
- ├── Ingresos de Socios y Membresías
- ├── Ingresos por Actividades Deportivas
- ├── Ingresos Comerciales y Alquileres
- └── Ingresos Institucionales
+├── Ingresos de Socios y Membresías          (is_group=1)
+│   ├── Cuotas sociales                      (hoja)
+│   └── Cargos extras y mora                 (hoja)
+├── Ingresos por Actividades Deportivas      (is_group=1)
+│   ├── Deportes                             (is_group=1)
+│   │   ├── Básquet / Fútbol / Vóley / Patín / Boxeo / …
+│   ├── Fitness y actividades                (is_group=1)
+│   │   ├── Gimnasio / Funcional y CrossFit / Yoga / Danza / …
+│   ├── Cuotas federativas                   (hoja)
+│   └── Actividades puntuales                (hoja)
+├── Ingresos Comerciales y Alquileres        (is_group=1)
+│   ├── Alquileres / Gastronomía / Sponsors y ventas / Entradas y eventos
+└── Ingresos Institucionales                 (is_group=1)
+    ├── Subsidios / Donaciones / Recaudación institucional
 ```
 
-Los 4 pilares son hoja (`is_group = 0`) y reciben los Items directamente.
+Items solo en hojas (`is_group = 0`).
 
 ---
 
-## Mapeo de migración
+## Scenario: pilares de ingreso son nodos
 
-| Origen | Destino |
-|--------|---------|
-| `ICDPE / Cuotas y membresías`, `ICDPE / Cargos varios` | Ingresos de Socios y Membresías |
-| `ICDPE / Aranceles deportes`, `… fitness`, `… actividades`, `ICDPE / Federaciones deportes`, `ICDPE / Actividades puntuales` | Ingresos por Actividades Deportivas |
-| `ICDPE / Alquileres`, `ICDPE / Comercial`, `ICDPE / Gastronomía POS` | Ingresos Comerciales y Alquileres |
-| `ICDPE-FIN-ENTRADAS`, `…-ALQUILER-TEMP`, `…-BUFFET`, `…-RESTAURANTE`, `…-CANON-CONCESION`, `…-SPONSOR`, `…-INDUMENTARIA` | Ingresos Comerciales y Alquileres |
-| `ICDPE-FIN-SUBSIDIO`, `…-DONACION`, `…-EVENTO-RECAUDACION` | Ingresos Institucionales |
+Given `All Item Groups` y la migración jerárquica
+When corre el seed
+Then los 4 pilares tienen `is_group = 1` y padre `All Item Groups`
+And no tienen Items directos (`item_group` del pilar vacío)
 
 ---
 
-## Scenario: seed crea 4 pilares de ingreso
+## Scenario: ítems de socio en hojas correctas
 
-Given `All Item Groups`
-When corre el seed/migración de ingresos
-Then existen los 4 pilares con padre `All Item Groups` y `is_group = 0`
-
----
-
-## Scenario: ítems se reasignan a pilares
-
-Given ítems en grupos `ICDPE / *` de ingreso
+Given `ICDPE-CUOTA-SOCIAL` y cargos (`ICDPE-MULTA`, `RECARGO-MORA`, …)
 When corre la migración
-Then cada ítem mapeado tiene el `item_group` del pilar correspondiente
-And los ítems `ICDPE-FIN-*` de Tesorería quedan en Comercial o Institucional según la tabla
+Then la cuota queda en `Cuotas sociales`
+And multa / cargo / mora quedan en `Cargos extras y mora`
 
 ---
 
-## Scenario: limpieza de grupos viejos
+## Scenario: aranceles por deporte / fitness
 
-Given grupos `ICDPE /` de ingreso sin ítems tras el move
-When corre el cleanup
-Then se intenta `delete_doc` del Item Group
-And si falla por vínculos, el grupo se mueve bajo `ICDPE / Legacy ingresos`
+Given ítems `ICDPE-BASQUET-*`, `ICDPE-FUTBOL-*`, `ICDPE-GYM-*`, etc.
+When corre la migración
+Then cada uno queda en la hoja de su deporte o actividad fitness
+And el padre de esas hojas es `Deportes` o `Fitness y actividades`
 
 ---
 
-## Scenario: idempotente
+## Scenario: seed idempotente
 
-Given migración ya aplicada
+Given jerarquía ya aplicada
 When se vuelve a ejecutar
-Then no hay error y el estado permanece correcto
+Then no hay error de llave duplicada y el mapeo se mantiene
 
 ---
 
@@ -73,6 +75,8 @@ Then no hay error y el estado permanece correcto
 
 | Artefacto | Ubicación |
 |-----------|-----------|
-| Catálogo + migración | `finance/setup/icdpe_income_item_groups.py` |
-| Patch | `patches/v1_0/migrate_ingresos_item_groups.py` |
+| Árbol + migración | `finance/setup/icdpe_income_item_groups.py` |
+| Patch (idempotente) | `patches/v1_0/migrate_ingresos_item_groups.py` + `_jerarquia.py` |
 | Tests | `tests/test_catalogo_ingresos_item_groups.py` |
+| Matriz item→hoja | `specs/catalogo_ingresos_matriz_mapeo.md` |
+| Matriz | `specs/catalogo_ingresos_matriz_mapeo.md` |

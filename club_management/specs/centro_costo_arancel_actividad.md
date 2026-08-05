@@ -1,7 +1,7 @@
 # Spec: Centro de costo del arancel de actividad
 
 Los ingresos por **arancel de actividad** deben imputarse al **centro de costo de la actividad**
-(p. ej. `Deportes - Basquet - ICDPE`), no al centro de costo por defecto de la empresa
+(p. ej. `Basquet - ICDPE`), no al centro de costo por defecto de la empresa
 (`Administración - ICDPE`). Esto vale tanto para la **línea de la factura** (`Sales Invoice Item`)
 como para el **asiento contable** (`GL Entry`) del ingreso.
 
@@ -21,11 +21,11 @@ en el estado de resultados el ingreso social del gasto de estructura (`Administr
 
 ## Scenario: la factura mensual imputa el arancel al centro de costo de la actividad
 
-Given un ítem de arancel con `Item Default.selling_cost_center = "Deportes - Basquet - ICDPE"`
+Given un ítem de arancel con `Item Default.selling_cost_center = "Basquet - ICDPE"`
 And un socio activo inscripto en esa actividad
 When se genera la factura mensual (cuota + arancel)
-Then la línea del arancel tiene `cost_center = "Deportes - Basquet - ICDPE"`
-And el `GL Entry` del ingreso del arancel tiene `cost_center = "Deportes - Basquet - ICDPE"`
+Then la línea del arancel tiene `cost_center = "Basquet - ICDPE"`
+And el `GL Entry` del ingreso del arancel tiene `cost_center = "Basquet - ICDPE"`
 And la línea de la cuota social imputa al centro de costo «Cuotas Sociales».
 
 ---

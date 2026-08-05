@@ -19,12 +19,14 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate, nowdate
 
+from club_management.finance.setup.icdpe_income_item_groups import LEAF_CUOTAS
+
 # ---------------------------------------------------------------------------
 # Constantes operativas del club
 # ---------------------------------------------------------------------------
 
 ITEM_GROUP_ROOT = "All Item Groups"
-ITEM_GROUP_NAME = "Cuotas Sociales"
+ITEM_GROUP_NAME = LEAF_CUOTAS
 PRICE_LIST_NAME = "Standard Selling"
 STOCK_UOM = "Nos"
 
@@ -123,27 +125,15 @@ def _ensure_uom(uom_name: str = STOCK_UOM) -> None:
 
 
 def ensure_item_group_cuotas_y_aranceles() -> str:
-	"""
-	Crea el Item Group «Cuotas Sociales» si no existe.
+	"""Asegura la hoja canónica «Cuotas sociales» del árbol de ingresos."""
+	from club_management.finance.setup.icdpe_income_item_groups import (
+		ensure_ingresos_item_group_tree,
+	)
 
-	Los ítems hijos se crean con `is_stock_item = 0`; el grupo agrupa servicios
-	sin manejo de inventario.
-	"""
+	ensure_ingresos_item_group_tree()
 	if frappe.db.exists("Item Group", ITEM_GROUP_NAME):
 		return ITEM_GROUP_NAME
-
-	if not frappe.db.exists("Item Group", ITEM_GROUP_ROOT):
-		frappe.throw(_("No existe el Item Group raíz '{0}'.").format(ITEM_GROUP_ROOT))
-
-	frappe.get_doc(
-		{
-			"doctype": "Item Group",
-			"item_group_name": ITEM_GROUP_NAME,
-			"parent_item_group": ITEM_GROUP_ROOT,
-			"is_group": 0,
-		}
-	).insert(ignore_permissions=True)
-	return ITEM_GROUP_NAME
+	frappe.throw(_("No existe el Item Group '{0}' tras asegurar el árbol de ingresos.").format(ITEM_GROUP_NAME))
 
 
 def _upsert_item_default(item_name: str, company: str, income_account: str, cost_center: str) -> None:

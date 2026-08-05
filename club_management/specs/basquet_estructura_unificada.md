@@ -112,7 +112,7 @@ Then `actividad = Basquet`, `grupo = Mixto / Escuela`, equipo U7/U9 o U11/U13 se
 
 ## Cost Center ERPNext
 
-Ver `basquet_cost_center_consolidado.md`: un solo CC **Deportes - Basquet - ICDPE** para todos los ítems de básquet.
+Ver `basquet_cost_center_consolidado.md`: un solo CC **Basquet - ICDPE** para todos los ítems de básquet.
 
 ---
 
