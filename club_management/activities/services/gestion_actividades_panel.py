@@ -37,19 +37,28 @@ def get_catalog_payload() -> dict[str, Any]:
 
 	grupos_by_actividad: dict[str, list[dict[str, Any]]] = {}
 	for grupo in grupos:
-		grupos_by_actividad.setdefault(grupo["actividad"], []).append(_format_grupo_row(grupo))
+		grupos_by_actividad.setdefault(grupo["actividad"], []).append(grupo)
 
 	equipos_by_grupo: dict[str, list[dict[str, Any]]] = {}
 	for equipo in equipos:
-		equipos_by_grupo.setdefault(equipo["grupo_actividad"], []).append(_format_equipo_row(equipo))
+		equipos_by_grupo.setdefault(equipo["grupo_actividad"], []).append(equipo)
 
 	catalog = []
 	for actividad in actividades:
 		act_row = _format_actividad_row(actividad)
 		act_row["grupos"] = []
+		actividad_item = actividad.get("item") or ""
 		for grupo in grupos_by_actividad.get(actividad["name"], []):
-			grupo_row = dict(grupo)
-			grupo_row["equipos"] = equipos_by_grupo.get(grupo["name"], [])
+			grupo_row = _format_grupo_row(grupo)
+			grupo_item = grupo.get("item") or ""
+			grupo_row["equipos"] = [
+				_format_equipo_row(
+					equipo,
+					grupo_item=grupo_item,
+					actividad_item=actividad_item,
+				)
+				for equipo in equipos_by_grupo.get(grupo["name"], [])
+			]
 			act_row["grupos"].append(grupo_row)
 		catalog.append(act_row)
 
@@ -395,15 +404,89 @@ def _format_grupo_row(row: dict[str, Any]) -> dict[str, Any]:
 	}
 
 
-def _format_equipo_row(row: dict[str, Any]) -> dict[str, Any]:
+def _format_equipo_row(
+	row: dict[str, Any],
+	*,
+	grupo_item: str = "",
+	actividad_item: str = "",
+) -> dict[str, Any]:
 	item = row.get("item") or ""
+	arancel = resolve_arancel_efectivo_from_chain(
+		equipo_item=item,
+		grupo_item=grupo_item,
+		actividad_item=actividad_item,
+	)
 	return {
 		"name": row["name"],
 		"titulo": row.get("titulo") or row["name"],
 		"grupo_actividad": row.get("grupo_actividad"),
 		"item": item,
 		"rate": _resolve_item_rate(item),
+		"arancel": arancel,
 	}
+
+
+def _arancel_payload(item_code: str, origen: str) -> dict[str, Any]:
+	code = (item_code or "").strip()
+	if not code:
+		return {"item": "", "item_name": "", "rate": 0.0, "origen": "Sin arancel"}
+	item_name = frappe.db.get_value("Item", code, "item_name") or code
+	return {
+		"item": code,
+		"item_name": item_name,
+		"rate": _resolve_item_rate(code),
+		"origen": origen,
+	}
+
+
+def resolve_arancel_efectivo_from_chain(
+	*,
+	equipo_item: str | None = None,
+	grupo_item: str | None = None,
+	actividad_item: str | None = None,
+) -> dict[str, Any]:
+	"""Cascada de cobro: equipo → grupo → actividad."""
+	if (equipo_item or "").strip():
+		return _arancel_payload(equipo_item or "", "Equipo")
+	if (grupo_item or "").strip():
+		return _arancel_payload(grupo_item or "", "Grupo")
+	if (actividad_item or "").strip():
+		return _arancel_payload(actividad_item or "", "Actividad")
+	return {"item": "", "item_name": "", "rate": 0.0, "origen": "Sin arancel"}
+
+
+def resolve_arancel_efectivo_equipo(equipo_name: str) -> dict[str, Any]:
+	"""Arancel efectivo de cobro para un Equipo Actividad (cascada)."""
+	name = (equipo_name or "").strip()
+	if not name or not frappe.db.exists(EQUIPO_DOCTYPE, name):
+		frappe.throw(frappe._("Equipo no encontrado."), frappe.DoesNotExistError)
+
+	equipo = frappe.db.get_value(
+		EQUIPO_DOCTYPE,
+		name,
+		["item", "grupo_actividad"],
+		as_dict=True,
+	)
+	grupo_item = ""
+	actividad_item = ""
+	grupo_name = (equipo.grupo_actividad or "").strip() if equipo else ""
+	if grupo_name and frappe.db.exists(GRUPO_DOCTYPE, grupo_name):
+		grupo = frappe.db.get_value(
+			GRUPO_DOCTYPE,
+			grupo_name,
+			["item", "actividad"],
+			as_dict=True,
+		)
+		grupo_item = (grupo.item or "") if grupo else ""
+		actividad_name = (grupo.actividad or "").strip() if grupo else ""
+		if actividad_name and frappe.db.exists(ACTIVIDAD_DOCTYPE, actividad_name):
+			actividad_item = frappe.db.get_value(ACTIVIDAD_DOCTYPE, actividad_name, "item") or ""
+
+	return resolve_arancel_efectivo_from_chain(
+		equipo_item=(equipo.item or "") if equipo else "",
+		grupo_item=grupo_item,
+		actividad_item=actividad_item,
+	)
 
 
 def _resolve_item_rate(item_code: str) -> float:

@@ -853,6 +853,7 @@
 				? `<div class="club-equipos-table">
 					<div class="club-equipos-table-head">
 						<span>${__("Equipo / categoría")}</span>
+						<span>${__("Arancel")}</span>
 						<span>${__("Acciones")}</span>
 					</div>
 					${equipos
@@ -860,6 +861,9 @@
 							(eq) => `
 					<div class="club-equipo-row">
 						<span class="club-equipo-title">${frappe.utils.escape_html(eq.titulo)}</span>
+						<span class="club-equipo-arancel text-muted small">${frappe.utils.escape_html(
+							this.format_arancel_efectivo(eq.arancel)
+						)}</span>
 						<div class="club-node-actions club-node-actions--compact">
 							<button type="button" class="btn btn-default btn-xs club-open-desk"
 								data-doctype="Equipo Actividad" data-name="${frappe.utils.escape_html(eq.name)}"
@@ -914,6 +918,17 @@
 				</div>
 			</div>
 		`;
+		},
+
+		format_arancel_efectivo(arancel) {
+			const data = arancel || {};
+			const origen = data.origen || "Sin arancel";
+			if (!data.item) {
+				return __("Sin arancel");
+			}
+			const label = data.item_name || data.item;
+			const rate = Number(data.rate || 0).toLocaleString();
+			return `${label} · $${rate} (${origen})`;
 		},
 
 		render_arancel_inputs(doctype, name, item, rate) {

@@ -146,3 +146,36 @@ class TestEquipoActividad(MembersTestCase):
 			frappe.set_user("Administrator")
 		self.assertEqual(len(rows), 1)
 		self.assertEqual(rows[0]["socio"], socio.name)
+
+	def test_api_arancel_resumen_efectivo(self) -> None:
+		from club_management.activities.api.equipo_actividad_desk import get_arancel_resumen
+		from club_management.activities.services.gestion_actividades_panel import set_arancel
+
+		actividad, grupo, equipo = self._ensure_estructura_basquet()
+		item_group = frappe.db.get_value("Item Group", {}, "name") or "All Item Groups"
+		item_code = "TEST-EQ-RESUMEN-AR"
+		if not frappe.db.exists("Item", item_code):
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": item_code,
+					"item_name": "Arancel resumen test",
+					"item_group": item_group,
+					"is_stock_item": 0,
+					"standard_rate": 3200,
+				}
+			).insert(ignore_permissions=True)
+		else:
+			frappe.db.set_value("Item", item_code, "standard_rate", 3200)
+		set_arancel(doctype="Grupo Actividad", name=grupo, item=item_code, rate=3200)
+
+		frappe.set_user(self._secretaria)
+		try:
+			resumen = get_arancel_resumen(equipo)
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(resumen["item"], item_code)
+		self.assertEqual(resumen["origen"], "Grupo")
+		self.assertEqual(resumen["rate"], 3200.0)
+		self.assertTrue(resumen.get("item_name"))

@@ -38,11 +38,21 @@ Then `PermissionError`.
 
 ---
 
+## Scenario: resumen de arancel efectivo en el formulario
+
+Given un `Equipo Actividad` guardado
+When Secretaría abre el formulario
+Then ve un resumen del arancel **efectivo** (ítem, nombre, monto y origen: Equipo / Grupo / Actividad / Sin arancel)
+And puede usar la acción **Volver al catálogo** para ir a `catalogo-actividades`.
+
+---
+
 ## Artefactos
 
 | Artefacto | Ubicación |
 |-----------|-----------|
 | Servicio | `activities/services/inscripcion_actividad_roster.py` |
+| Arancel efectivo | `activities/services/gestion_actividades_panel.py` |
 | API | `activities/api/equipo_actividad_desk.py` |
 | Layout JSON | `activities/doctype/equipo_actividad/equipo_actividad.json` |
 | UI | `activities/doctype/equipo_actividad/equipo_actividad.js` |

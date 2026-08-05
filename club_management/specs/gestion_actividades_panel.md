@@ -98,5 +98,16 @@ When usa la barra **Administración** del panel
 Then puede abrir la lista Desk de **Actividad**, **Grupo Actividad** y **Equipo Actividad**
 And si hay una actividad seleccionada, la lista de grupos se abre filtrada por esa actividad
 And si hay un grupo expandido, la lista de equipos se abre filtrada por ese grupo
+
+---
+
+## Scenario: arancel efectivo visible en fila de equipo del catálogo
+
+Given un `Equipo Actividad` sin `item` propio
+And su `Grupo Actividad` (o `Actividad` si el grupo tampoco tiene) con ítem y tarifa
+When Secretaria carga `get_catalog`
+Then cada fila de equipo incluye el arancel **efectivo** de cobro (`item`, `item_name`, `rate`, `origen`)
+And `origen` es `Equipo`, `Grupo`, `Actividad` o `Sin arancel` según la cascada equipo → grupo → actividad
+And el catálogo Desk muestra ese resumen junto al título del equipo
 And en el formulario Desk de una **Actividad** aparece el dashboard con sus **Grupos / tiras**
 And en el formulario Desk de un **Grupo Actividad** aparece el dashboard con sus **Equipos / categorías**.

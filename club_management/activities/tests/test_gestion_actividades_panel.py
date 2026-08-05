@@ -116,6 +116,47 @@ class TestGestionActividadesPanelService(MembersTestCase):
 		self.assertEqual(match["grupos"][0]["name"], grupo["name"])
 		self.assertEqual(match["grupos"][0]["equipos"][0]["name"], equipo["name"])
 
+	def test_equipo_catalog_arancel_efectivo_hereda_grupo(self) -> None:
+		from club_management.activities.services.gestion_actividades_panel import (
+			resolve_arancel_efectivo_equipo,
+		)
+
+		item_grupo = self._ensure_item("TEST-EQ-HEREDA-GRUPO", 4100)
+		actividad = self._ensure_actividad("Panel Hereda Grupo Act", usa_grupos=1)
+		grupo = create_grupo(actividad=actividad, titulo="Tira Hereda")["name"]
+		set_arancel(doctype="Grupo Actividad", name=grupo, item=item_grupo, rate=4100)
+		equipo = create_equipo(grupo_actividad=grupo, titulo="Cat Sin Item")["name"]
+
+		resumen = resolve_arancel_efectivo_equipo(equipo)
+		self.assertEqual(resumen["item"], item_grupo)
+		self.assertEqual(resumen["rate"], 4100.0)
+		self.assertEqual(resumen["origen"], "Grupo")
+
+		data = get_catalog_payload()
+		act = next(a for a in data["actividades"] if a["name"] == actividad)
+		eq = act["grupos"][0]["equipos"][0]
+		self.assertEqual(eq["arancel"]["item"], item_grupo)
+		self.assertEqual(eq["arancel"]["origen"], "Grupo")
+		self.assertEqual(eq["arancel"]["rate"], 4100.0)
+
+	def test_equipo_catalog_arancel_efectivo_propio(self) -> None:
+		from club_management.activities.services.gestion_actividades_panel import (
+			resolve_arancel_efectivo_equipo,
+		)
+
+		item_grupo = self._ensure_item("TEST-EQ-GRUPO-OWN", 2000)
+		item_eq = self._ensure_item("TEST-EQ-OWN", 5500)
+		actividad = self._ensure_actividad("Panel Equipo Own Act", usa_grupos=1)
+		grupo = create_grupo(actividad=actividad, titulo="Tira Own")["name"]
+		set_arancel(doctype="Grupo Actividad", name=grupo, item=item_grupo, rate=2000)
+		equipo = create_equipo(grupo_actividad=grupo, titulo="Cat Own Item")["name"]
+		set_arancel(doctype="Equipo Actividad", name=equipo, item=item_eq, rate=5500)
+
+		resumen = resolve_arancel_efectivo_equipo(equipo)
+		self.assertEqual(resumen["item"], item_eq)
+		self.assertEqual(resumen["origen"], "Equipo")
+		self.assertEqual(resumen["rate"], 5500.0)
+
 	def test_set_arancel_actualiza_item_y_rate(self) -> None:
 		actividad = self._ensure_actividad("Panel Arancel Act")
 		item_a = self._ensure_item("TEST-AR-A", 800)
