@@ -128,6 +128,20 @@
 
 
 
+	club_management.club_desk_navigation.CLUB_ACTIVIDADES_DOCTYPES = new Set([
+
+		"Actividad",
+
+		"Grupo Actividad",
+
+		"Equipo Actividad",
+
+		"Inscripcion Actividad",
+
+	]);
+
+
+
 	club_management.club_desk_navigation.SLUG_ALIASES = {
 
 		secretaria: "Secretaría",
@@ -268,6 +282,16 @@
 
 
 
+	club_management.club_desk_navigation.is_club_actividad_page = function () {
+
+		const doctype = this.get_active_doctype();
+
+		return doctype ? this.CLUB_ACTIVIDADES_DOCTYPES.has(doctype) : false;
+
+	};
+
+
+
 	club_management.club_desk_navigation.is_club_workspace = function (workspace_name) {
 
 		const active = workspace_name || this.get_club_workspace_name();
@@ -306,6 +330,8 @@
 
 			this.is_club_socio_page() ||
 
+			this.is_club_actividad_page() ||
+
 			this.is_club_page()
 
 		);
@@ -327,6 +353,12 @@
 		if (this.is_club_socio_page()) {
 
 			return this.TABS.find((tab) => tab.workspace === "Secretaría") || null;
+
+		}
+
+		if (this.is_club_actividad_page()) {
+
+			return this.TABS.find((tab) => tab.tab === "actividades") || null;
 
 		}
 
@@ -760,11 +792,27 @@
 
 		}
 
+		if (this.is_club_actividad_page()) {
+
+			club_management.actividades_sidebar?.refresh?.();
+
+			return;
+
+		}
+
 		const page = this.get_active_page();
 
 		if (page && this.CLUB_PAGES_SOCIOS?.has(page)) {
 
 			club_management.secretaria_sidebar?.refresh?.();
+
+			return;
+
+		}
+
+		if (page && this.CLUB_PAGES_ACTIVIDADES?.has(page)) {
+
+			club_management.actividades_sidebar?.refresh?.();
 
 			return;
 
