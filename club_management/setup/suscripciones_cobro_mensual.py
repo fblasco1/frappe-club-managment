@@ -172,6 +172,7 @@ def ensure_service_item(
 	payload = {
 		"item_name": spec.item_name,
 		"item_group": item_group,
+		"disabled": 0,
 		"is_stock_item": 0,
 		"is_sales_item": 1,
 		"stock_uom": STOCK_UOM,
