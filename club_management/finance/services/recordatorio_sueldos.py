@@ -25,33 +25,33 @@ class ProvisionSueldoSpec:
 PROVISION_SUELDOS: tuple[ProvisionSueldoSpec, ...] = (
 	ProvisionSueldoSpec(
 		"sueldos",
-		"Sueldos del personal",
+		"Sueldo Personal Administrativo",
 		"ICDPE-Sueldos Personal",
-		"ICDPE-FIN-SUELDOS",
+		"ICDPE-FIN-SUELDO-ADMIN",
 	),
 	ProvisionSueldoSpec(
 		"cargas_931",
-		"Formulario 931 / cargas sociales",
+		"Formulario 931 ARCA",
 		"ICDPE-AFIP 931",
 		"ICDPE-FIN-CARGAS-931",
 	),
 	ProvisionSueldoSpec(
 		"art",
-		"ART",
+		"ART (Aseguradora de Riesgos del Trabajo)",
 		"ICDPE-ART",
 		"ICDPE-FIN-ART",
 	),
 	ProvisionSueldoSpec(
 		"utedyc",
-		"Aportes UTEDYC",
+		"Cuota Sindical UTEDYC y CCT",
 		"ICDPE-UTEDYC",
 		"ICDPE-FIN-UTEDYC",
 	),
 	ProvisionSueldoSpec(
 		"entrenadores",
-		"Honorarios entrenadores / profesores",
+		"Honorario Entrenador / Director Técnico",
 		"ICDPE-Sueldos Personal",
-		"ICDPE-FIN-ENTRENADORES",
+		"ICDPE-FIN-HON-ENTRENADOR",
 	),
 )
 

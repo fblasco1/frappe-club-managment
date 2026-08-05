@@ -61,11 +61,11 @@ And el mensaje indica que la provisión del mes está completa.
 
 | Etiqueta | Proveedor | Ítem |
 |----------|-----------|------|
-| Sueldos del personal | ICDPE-Sueldos Personal | ICDPE-FIN-SUELDOS |
-| Formulario 931 / cargas sociales | ICDPE-AFIP 931 | ICDPE-FIN-CARGAS-931 |
-| ART | ICDPE-ART | ICDPE-FIN-ART |
-| Aportes UTEDYC | ICDPE-UTEDYC | ICDPE-FIN-UTEDYC |
-| Honorarios entrenadores | ICDPE-Sueldos Personal | ICDPE-FIN-ENTRENADORES |
+| Sueldo Personal Administrativo | ICDPE-Sueldos Personal | ICDPE-FIN-SUELDO-ADMIN |
+| Formulario 931 ARCA | ICDPE-AFIP 931 | ICDPE-FIN-CARGAS-931 |
+| ART (Aseguradora de Riesgos del Trabajo) | ICDPE-ART | ICDPE-FIN-ART |
+| Cuota Sindical UTEDYC y CCT | ICDPE-UTEDYC | ICDPE-FIN-UTEDYC |
+| Honorario Entrenador / Director Técnico | ICDPE-Sueldos Personal | ICDPE-FIN-HON-ENTRENADOR |
 
 ---
 

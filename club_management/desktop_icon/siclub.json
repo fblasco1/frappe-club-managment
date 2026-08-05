@@ -1,0 +1,21 @@
+{
+ "app": "club_management",
+ "bg_color": "gray",
+ "creation": "2026-07-28 19:39:00.962803",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon_type": "App",
+ "idx": 0,
+ "label": "SICLUB",
+ "link": "/desk/secretaria",
+ "link_type": "External",
+ "logo_url": "/assets/frappe/images/frappe-framework-logo.svg",
+ "modified": "2026-07-28 19:39:04.375743",
+ "modified_by": "Administrator",
+ "name": "SICLUB",
+ "owner": "Administrator",
+ "restrict_removal": 1,
+ "roles": [],
+ "standard": 1
+}

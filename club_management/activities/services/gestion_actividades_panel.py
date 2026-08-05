@@ -157,7 +157,8 @@ def set_arancel(
 
 def default_arancel_item_group() -> str:
 	return (
-		frappe.db.get_value("Item Group", {"name": ["like", "ICDPE / Aranceles%"]}, "name")
+		frappe.db.get_value("Item Group", {"name": "Ingresos por Actividades Deportivas"}, "name")
+		or frappe.db.get_value("Item Group", {"name": ["like", "ICDPE / Aranceles%"]}, "name")
 		or frappe.db.get_value("Item Group", {"name": ["like", "ICDPE%"]}, "name")
 		or frappe.db.get_value("Item Group", {}, "name")
 		or "All Item Groups"

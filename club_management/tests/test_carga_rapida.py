@@ -42,7 +42,7 @@ class TestCargaRapida(MembersTestCase):
 		self.skipTest(f"Supplier {name} no sembrado")
 
 	def test_registrar_egreso_crea_purchase_invoice(self) -> None:
-		self._require_item("ICDPE-FIN-SUELDOS")
+		self._require_item("ICDPE-FIN-SUELDO-ADMIN")
 		supplier = self._require_supplier("ICDPE-Sueldos Personal")
 		due = add_days(today(), 3)
 
@@ -50,7 +50,7 @@ class TestCargaRapida(MembersTestCase):
 		try:
 			result = registrar_egreso(
 				supplier=supplier,
-				item_code="ICDPE-FIN-SUELDOS",
+				item_code="ICDPE-FIN-SUELDO-ADMIN",
 				amount=1000,
 				due_date=due,
 				club_concepto="Personal",
@@ -60,16 +60,16 @@ class TestCargaRapida(MembersTestCase):
 
 		pi = result["purchase_invoice"]
 		self.assertTrue(pi)
-		self.assertEqual(frappe.db.get_value("Purchase Invoice", pi, "docstatus"), 1)
-		self.assertEqual(flt(frappe.db.get_value("Purchase Invoice", pi, "outstanding_amount")), 1000)
+		# Flujo Borrador → Aprobación: la factura queda en Borrador (docstatus=0).
+		self.assertEqual(frappe.db.get_value("Purchase Invoice", pi, "docstatus"), 0)
+		self.assertIsNone(result["payment_entry"])
 		if frappe.get_meta("Purchase Invoice").has_field("club_concepto"):
 			self.assertEqual(frappe.db.get_value("Purchase Invoice", pi, "club_concepto"), "Personal")
 
-	def test_egreso_pagado_ahora_crea_payment_entry(self) -> None:
+	def test_egreso_ignora_pago_inmediato(self) -> None:
+		# No se paga un Borrador: pagado_ahora se ignora, la PI queda sin pago.
 		self._require_item("ICDPE-FIN-LUZ")
 		supplier = self._require_supplier("ICDPE-Servicios Publicos")
-		if not frappe.db.exists("Mode of Payment", "Cash"):
-			self.skipTest("Mode of Payment Cash no configurado")
 
 		frappe.set_user(self.secretaria)
 		try:
@@ -85,10 +85,9 @@ class TestCargaRapida(MembersTestCase):
 		finally:
 			frappe.set_user("Administrator")
 
-		self.assertTrue(result["payment_entry"])
+		self.assertIsNone(result["payment_entry"])
 		self.assertEqual(
-			flt(frappe.db.get_value("Purchase Invoice", result["purchase_invoice"], "outstanding_amount")),
-			0,
+			frappe.db.get_value("Purchase Invoice", result["purchase_invoice"], "docstatus"), 0
 		)
 
 	def test_registrar_ingreso_crea_sales_invoice(self) -> None:
@@ -110,14 +109,14 @@ class TestCargaRapida(MembersTestCase):
 		self.assertEqual(flt(frappe.db.get_value("Sales Invoice", si, "outstanding_amount")), 2500)
 
 	def test_concepto_invalido_falla(self) -> None:
-		self._require_item("ICDPE-FIN-SUELDOS")
+		self._require_item("ICDPE-FIN-SUELDO-ADMIN")
 		supplier = self._require_supplier("ICDPE-Sueldos Personal")
 		frappe.set_user(self.secretaria)
 		try:
 			with self.assertRaises(frappe.ValidationError):
 				registrar_egreso(
 					supplier=supplier,
-					item_code="ICDPE-FIN-SUELDOS",
+					item_code="ICDPE-FIN-SUELDO-ADMIN",
 					amount=100,
 					due_date=today(),
 					club_concepto="Inventado",

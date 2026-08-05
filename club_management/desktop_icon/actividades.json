@@ -1,0 +1,22 @@
+{
+ "app": "club_management",
+ "bg_color": "blue",
+ "creation": "2026-07-28 19:39:01.007605",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon": "activity",
+ "icon_type": "Link",
+ "idx": 2,
+ "label": "Actividades",
+ "link_to": "Actividades",
+ "link_type": "Workspace Sidebar",
+ "modified": "2026-07-28 19:39:04.393319",
+ "modified_by": "Administrator",
+ "name": "Actividades",
+ "owner": "Administrator",
+ "parent_icon": "SICLUB",
+ "restrict_removal": 1,
+ "roles": [],
+ "standard": 1
+}

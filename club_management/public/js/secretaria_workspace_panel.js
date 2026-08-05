@@ -221,18 +221,22 @@
 			return (s.total || 0) > 0;
 		},
 
+		has_medios_chart(medios) {
+			return Boolean(medios?.disponible);
+		},
+
+		has_medios_montos(medios) {
+			const m = medios || {};
+			return Boolean(m.efectivo || m.tarjeta || m.transferencia || m.otro);
+		},
+
 		render_charts(metricas) {
 			const socios = metricas.socios || {};
 			const tendencia = metricas.tendencia_recaudacion || {};
 			const medios = metricas.medios_pago || {};
 			const showTrend = tendencia.disponible && (tendencia.dias || []).length;
 			const showSegmentos = this.has_segmentos_chart(socios.segmentos);
-			const showMedios =
-				medios.disponible &&
-				(medios.efectivo ||
-					medios.tarjeta ||
-					medios.transferencia ||
-					medios.otro);
+			const showMedios = this.has_medios_chart(medios);
 			if (!showTrend && !showSegmentos && !showMedios) {
 				return "";
 			}
@@ -287,7 +291,15 @@
 		},
 
 		mount_medios_chart($container, medios) {
-			if (!$container?.length || !medios?.disponible) {
+			if (!$container?.length || !this.has_medios_chart(medios)) {
+				return;
+			}
+			$container.empty();
+			if (!this.has_medios_montos(medios)) {
+				$container.html(
+					`<p class="text-muted mb-0">${__("Sin cobros del mes")}</p>`
+				);
+				this._chart_medios = null;
 				return;
 			}
 			this._chart_medios = new frappe.Chart($container[0], {
@@ -481,6 +493,9 @@
 					<button type="button" class="btn btn-secondary club-secretaria-cobranza">
 						${__("Emitir cupón / Registrar cobro")}
 					</button>
+					<button type="button" class="btn btn-secondary club-secretaria-nuevo-gasto">
+						${__("Registrar Nuevo Gasto / Comprobante")}
+					</button>
 					<button type="button" class="btn btn-default" disabled title="${__("Próximamente")}">
 						${__("Enviar recordatorio de deuda masivo")}
 					</button>
@@ -565,6 +580,10 @@
 
 			$panel.find(".club-secretaria-nueva-pi").on("click", () => {
 				frappe.set_route("Form", "Purchase Invoice", "new");
+			});
+
+			$panel.find(".club-secretaria-nuevo-gasto").on("click", () => {
+				frappe.new_doc("Purchase Invoice");
 			});
 
 			$panel.find(".club-secretaria-solicitud-row").on("click", (e) => {

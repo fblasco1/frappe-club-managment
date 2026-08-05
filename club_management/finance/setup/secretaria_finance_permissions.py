@@ -38,16 +38,9 @@ DOCTYPES_EN_MODO_CUSTOM: frozenset[str] = frozenset(
 )
 
 # Permisos operativos a asegurar para Secretaría (permlevel 0).
+# NOTA: `Purchase Invoice` se gestiona en `purchase_invoice_permissions.py`
+# (draft-only: sin submit para Secretaría). No declararlo aquí.
 OPERATIVE_PERMS: dict[str, dict[str, int]] = {
-	"Purchase Invoice": {
-		"read": 1,
-		"write": 1,
-		"create": 1,
-		"submit": 1,
-		"print": 1,
-		"report": 1,
-		"export": 1,
-	},
 	"Payment Entry": {
 		"read": 1,
 		"write": 1,
@@ -56,13 +49,21 @@ OPERATIVE_PERMS: dict[str, dict[str, int]] = {
 		"print": 1,
 		"report": 1,
 	},
-	"Supplier": {"read": 1, "write": 1, "create": 1},
-	# Masters de solo lectura necesarios para el formulario de factura de compra.
-	"Item": {"read": 1},
-	"Account": {"read": 1},
-	"Cost Center": {"read": 1},
-	"Company": {"read": 1},
-	"Mode of Payment": {"read": 1},
+	"Supplier": {"read": 1, "write": 1, "create": 1, "select": 1},
+	# Item: Secretaría alta/edita catálogo operativo y lo selecciona en Links.
+	"Item": {
+		"read": 1,
+		"select": 1,
+		"write": 1,
+		"create": 1,
+		"report": 1,
+		"print": 1,
+	},
+	# Masters de solo lectura (con select para Link fields).
+	"Account": {"read": 1, "select": 1},
+	"Cost Center": {"read": 1, "select": 1},
+	"Company": {"read": 1, "select": 1},
+	"Mode of Payment": {"read": 1, "select": 1},
 }
 
 _PERM_FLAGS = (
@@ -78,6 +79,7 @@ _PERM_FLAGS = (
 	"print",
 	"email",
 	"share",
+	"select",
 )
 
 
@@ -107,6 +109,8 @@ def _ensure_perm(doctype: str, role: str, perms: dict[str, int]) -> bool:
 
 	changed = not existing
 	for flag in _PERM_FLAGS:
+		if not frappe.get_meta("Custom DocPerm").has_field(flag):
+			continue
 		valor = int(perms.get(flag, 0))
 		if int(doc.get(flag) or 0) != valor:
 			doc.set(flag, valor)

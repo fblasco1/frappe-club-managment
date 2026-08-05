@@ -19,7 +19,7 @@ Notas ERPNext 16:
 
 Requisitos:
 - Cuentas importadas (números según `Chart of Accounts Importer - ICDPE.csv`)
-- Centros de costo importados (names = `Identificador` del CSV, ej: `Deportes - Futbol - ICDPE`)
+- Centros de costo importados (names = `Identificador` del CSV, ej: `Futbol - ICDPE`)
 """
 
 from __future__ import annotations
@@ -33,6 +33,12 @@ import frappe
 
 from club_management.setup.basquet_cost_center import BASQUET_COST_CENTER
 from club_management.setup.icdpe_company import resolve_icdpe_company
+from club_management.activities.data.arancel_item_spec import format_arancel_mensual_item_name
+from club_management.finance.setup.icdpe_income_item_groups import (
+	LEAF_CARGOS,
+	ensure_ingresos_item_group_tree,
+	resolve_ingreso_leaf_for_item,
+)
 
 # Raíz estándar ERPNext para Item Group (si no existe, se crea bajo "All Item Groups")
 DEFAULT_ITEM_GROUP_ROOT = "All Item Groups"
@@ -176,7 +182,8 @@ def _upsert_item_default(item_name: str, company: str, income_account: str, sell
 
 
 def upsert_service_item(spec: ServiceItemSpec) -> str:
-    _ensure_item_group(spec.item_group)
+    ensure_ingresos_item_group_tree()
+    leaf = resolve_ingreso_leaf_for_item(spec.item_code)
     company = resolve_icdpe_company()
     _resolve_cost_center(company, spec.cost_center_name)
     income_account = _resolve_income_account(company, spec.income_account_number)
@@ -188,8 +195,8 @@ def upsert_service_item(spec: ServiceItemSpec) -> str:
         if item.item_name != spec.item_name:
             item.item_name = spec.item_name
             changed = True
-        if item.item_group != spec.item_group:
-            item.item_group = spec.item_group
+        if item.item_group != leaf:
+            item.item_group = leaf
             changed = True
         if int(item.is_stock_item or 0) != 0:
             item.is_stock_item = 0
@@ -212,7 +219,7 @@ def upsert_service_item(spec: ServiceItemSpec) -> str:
             "doctype": "Item",
             "item_code": spec.item_code,
             "item_name": spec.item_name,
-            "item_group": spec.item_group,
+            "item_group": leaf,
             "is_stock_item": 0,
             "is_sales_item": 1,
             "stock_uom": "Servicio",
@@ -232,198 +239,149 @@ def upsert_service_item(spec: ServiceItemSpec) -> str:
 
 
 def _specs() -> list[ServiceItemSpec]:
+    # item_group en specs es informativo; upsert resuelve la hoja por item_code.
+    def _sg(code: str, name: str, account: str, cc: str) -> ServiceItemSpec:
+        return ServiceItemSpec(
+            item_code=code,
+            item_name=name,
+            item_group=resolve_ingreso_leaf_for_item(code),
+            income_account_number=account,
+            cost_center_name=cc,
+        )
+
     # --- Institucional ---
     institutional: list[ServiceItemSpec] = [
-        ServiceItemSpec(
-            item_code="ICDPE-CUOTA-SOCIAL",
-            item_name="Cuota social",
-            item_group="ICDPE / Cuotas y membresías",
-            income_account_number="411001",
-            cost_center_name="Administración - ICDPE",
-        ),
-        ServiceItemSpec(
-            item_code="ICDPE-INSCRIPCION",
-            item_name="Inscripción / matrícula",
-            item_group="ICDPE / Cuotas y membresías",
-            income_account_number="411002",
-            cost_center_name="Administración - ICDPE",
-        ),
+        _sg("ICDPE-CUOTA-SOCIAL", "Cuota social", "411001", "Administración - ICDPE"),
+        _sg("ICDPE-INSCRIPCION", "Inscripción / matrícula", "411002", "Administración - ICDPE"),
     ]
 
     # --- Deportes (aranceles mensuales + federativo; sin packs) ---
-    sports_cc: list[tuple[str, str]] = [
-        ("Deportes - Futbol - ICDPE", "Futbol"),
-        (BASQUET_COST_CENTER, "Basquet Masculino"),
-        (BASQUET_COST_CENTER, "Basquet Escuelita"),
-        (BASQUET_COST_CENTER, "Basquet Femenino"),
-        ("Deportes - Voley - ICDPE", "Voley"),
-        ("Deportes - Patin - ICDPE", "Patin"),
-        ("Deportes - Boxeo - ICDPE", "Boxeo"),
-        ("Deportes - Gimnasia Artistica - ICDPE", "Gimnasia Artistica"),
-        ("Deportes - Taekwondo - ICDPE", "Taekwondo"),
-        ("Deportes - Shui Lu - ICDPE", "Shui Lu"),
+    # (cc, slug_label, segmentos nombre arancel)
+    sports_cc: list[tuple[str, str, tuple[str, ...]]] = [
+        ("Futbol - ICDPE", "Futbol", ("FUTBOL",)),
+        (BASQUET_COST_CENTER, "Basquet Masculino", ("BASQUET", "MASCULINO")),
+        (BASQUET_COST_CENTER, "Basquet Escuelita", ("BASQUET", "MIXTO", "ESCUELITA")),
+        (BASQUET_COST_CENTER, "Basquet Femenino", ("BASQUET", "FEMENINO")),
+        ("Voley - ICDPE", "Voley", ("VOLEY", "FEMENINO")),
+        ("Patin - ICDPE", "Patin", ("PATIN ARTISTICO",)),
+        ("Boxeo - ICDPE", "Boxeo", ("BOXEO",)),
+        ("Gimnasia Artistica - ICDPE", "Gimnasia Artistica", ("GIMNASIA ARTISTICA",)),
+        ("Taekwondo - ICDPE", "Taekwondo", ("TAEKWONDO",)),
+        ("Shui Lu - ICDPE", "Shui Lu", ("SHUI LU",)),
     ]
 
     sports_items: list[ServiceItemSpec] = []
-    for cc, label in sports_cc:
+    for cc, label, name_segments in sports_cc:
         slug = _slugify_item_code_part(label)
         sports_items += [
-            ServiceItemSpec(
-                item_code=f"ICDPE-ARANCEL-MENSUAL-{slug}",
-                item_name=f"Arancel mensual actividad — {label}",
-                item_group="ICDPE / Aranceles deportes",
-                income_account_number="412001",
-                cost_center_name=cc,
+            _sg(
+                f"ICDPE-ARANCEL-MENSUAL-{slug}",
+                format_arancel_mensual_item_name(*name_segments),
+                "412001",
+                cc,
             ),
-            ServiceItemSpec(
-                item_code=f"ICDPE-CUOTA-FEDERATIVA-{slug}",
-                item_name=f"Cuota federativa — {label}",
-                item_group="ICDPE / Federaciones deportes",
-                income_account_number="413001",
-                cost_center_name=cc,
+            _sg(
+                f"ICDPE-CUOTA-FEDERATIVA-{slug}",
+                f"Cuota federativa — {label}",
+                "413001",
+                cc,
             ),
         ]
 
     # --- Actividades (aranceles mensuales) ---
     act_cc = [
-        "Actividades - Iniciacion Deportiva - ICDPE",
-        "Actividades - Danza - ICDPE",
-        "Actividades - Yoga - ICDPE",
-        "Actividades - CrossFit - ICDPE",
-        "Actividades - Funcional - ICDPE",
-        "Actividades - Ritmos Latinos - ICDPE",
-        "Actividades - Zumba - ICDPE",
+        ("Iniciacion Deportiva - ICDPE", ("INICIACION DEPORTIVA",)),
+        ("Danza - ICDPE", ("DANZA",)),
+        ("Yoga - ICDPE", ("YOGA",)),
+        ("CrossFit - ICDPE", ("CROSSFIT",)),
+        ("Funcional - ICDPE", ("FUNCIONAL",)),
+        ("Ritmos Latinos - ICDPE", ("RITMOS LATINOS",)),
+        ("Zumba - ICDPE", ("ZUMBA",)),
     ]
     act_items: list[ServiceItemSpec] = []
-    for cc in act_cc:
-        label = cc.replace("Actividades - ", "").replace(" - ICDPE", "")
+    for cc, name_segments in act_cc:
+        label = cc.replace(" - ICDPE", "")
         slug = _slugify_item_code_part(label)
         act_items += [
-            ServiceItemSpec(
-                item_code=f"ICDPE-ARANCEL-MENSUAL-ACT-{slug}",
-                item_name=f"Arancel mensual actividad — {label}",
-                item_group="ICDPE / Aranceles actividades",
-                income_account_number="412001",
-                cost_center_name=cc,
+            _sg(
+                f"ICDPE-ARANCEL-MENSUAL-ACT-{slug}",
+                format_arancel_mensual_item_name(*name_segments),
+                "412001",
+                cc,
             ),
         ]
 
     # --- Fitness ---
     fitness_items = [
-        ServiceItemSpec(
-            item_code="ICDPE-ARANCEL-MENSUAL-FITNESS-MUSC",
-            item_name="Arancel mensual actividad — Gimnasio de musculación",
-            item_group="ICDPE / Aranceles fitness",
-            income_account_number="412001",
-            cost_center_name="Fitness - Gimnasio de Musculacion - ICDPE",
+        _sg(
+            "ICDPE-ARANCEL-MENSUAL-FITNESS-MUSC",
+            format_arancel_mensual_item_name("GIMNASIO FITNESS"),
+            "412001",
+            "Gimnasio de Musculacion - ICDPE",
         ),
     ]
 
     # --- Gastronomía (POS) ---
     gastro_items = [
-        ServiceItemSpec(
-            item_code="ICDPE-POS-BUFFET",
-            item_name="Venta mostrador (POS) — Buffet",
-            item_group="ICDPE / Gastronomía POS",
-            income_account_number="441001",
-            cost_center_name="Gastronomía - Buffet - ICDPE",
+        _sg("ICDPE-POS-BUFFET", "Venta mostrador (POS) — Buffet", "441001", "Buffet - ICDPE"),
+        _sg(
+            "ICDPE-POS-PENA-ROCK",
+            "Venta mostrador (POS) — Peña de Rock",
+            "441001",
+            "Peña de Rock - ICDPE",
         ),
-        ServiceItemSpec(
-            item_code="ICDPE-POS-PENA-ROCK",
-            item_name="Venta mostrador (POS) — Peña de Rock",
-            item_group="ICDPE / Gastronomía POS",
-            income_account_number="441001",
-            cost_center_name="Gastronomía - Peña de Rock - ICDPE",
-        ),
-        ServiceItemSpec(
-            item_code="ICDPE-POS-RESTAURANTE",
-            item_name="Venta mostrador (POS) — Restaurante",
-            item_group="ICDPE / Gastronomía POS",
-            income_account_number="441001",
-            cost_center_name="Gastronomía - Restaurante - ICDPE",
+        _sg(
+            "ICDPE-POS-RESTAURANTE",
+            "Venta mostrador (POS) — Restaurante",
+            "441001",
+            "Restaurante - ICDPE",
         ),
     ]
 
     # --- Alquileres ---
     rental_items = [
-        ServiceItemSpec(
-            item_code="ICDPE-ALQ-ARS-TEMP",
-            item_name="Alquiler canchas / espacios (ARS) — Temporal",
-            item_group="ICDPE / Alquileres",
-            income_account_number="421001",
-            cost_center_name="Alquileres - Temporal - ICDPE",
+        _sg(
+            "ICDPE-ALQ-ARS-TEMP",
+            "Alquiler canchas / espacios (ARS) — Temporal",
+            "421001",
+            "Temporal - ICDPE",
         ),
-        ServiceItemSpec(
-            item_code="ICDPE-ALQ-ARS-REC",
-            item_name="Alquiler canchas / espacios (ARS) — Recurrente",
-            item_group="ICDPE / Alquileres",
-            income_account_number="421001",
-            cost_center_name="Alquileres - Recurrente - ICDPE",
+        _sg(
+            "ICDPE-ALQ-ARS-REC",
+            "Alquiler canchas / espacios (ARS) — Recurrente",
+            "421001",
+            "Recurrente - ICDPE",
         ),
-        ServiceItemSpec(
-            item_code="ICDPE-ALQ-USD-TEMP",
-            item_name="Alquiler canchas / espacios (USD) — Temporal",
-            item_group="ICDPE / Alquileres",
-            income_account_number="421002",
-            cost_center_name="Alquileres - Temporal - ICDPE",
+        _sg(
+            "ICDPE-ALQ-USD-TEMP",
+            "Alquiler canchas / espacios (USD) — Temporal",
+            "421002",
+            "Temporal - ICDPE",
         ),
-        ServiceItemSpec(
-            item_code="ICDPE-ALQ-USD-REC",
-            item_name="Alquiler canchas / espacios (USD) — Recurrente",
-            item_group="ICDPE / Alquileres",
-            income_account_number="421002",
-            cost_center_name="Alquileres - Recurrente - ICDPE",
+        _sg(
+            "ICDPE-ALQ-USD-REC",
+            "Alquiler canchas / espacios (USD) — Recurrente",
+            "421002",
+            "Recurrente - ICDPE",
         ),
     ]
 
     # --- Comercial / otros ---
     other_items = [
-        ServiceItemSpec(
-            item_code="ICDPE-SPONSOR-PUB",
-            item_name="Sponsors / Publicidad",
-            item_group="ICDPE / Comercial",
-            income_account_number="451001",
-            cost_center_name="Administración - ICDPE",
+        _sg("ICDPE-VENTA-INDUMENTARIA", "Venta indumentaria", "451002", "Administración - ICDPE"),
+        _sg(
+            "ICDPE-COLONIAS",
+            "Colonias",
+            "431002",
+            "Iniciacion Deportiva - ICDPE",
         ),
-        ServiceItemSpec(
-            item_code="ICDPE-VENTA-INDUMENTARIA",
-            item_name="Venta indumentaria",
-            item_group="ICDPE / Comercial",
-            income_account_number="451002",
-            cost_center_name="Administración - ICDPE",
-        ),
-        ServiceItemSpec(
-            item_code="ICDPE-COLONIAS",
-            item_name="Colonias",
-            item_group="ICDPE / Actividades puntuales",
-            income_account_number="431002",
-            cost_center_name="Actividades - Iniciacion Deportiva - ICDPE",
-        ),
-        ServiceItemSpec(
-            item_code="ICDPE-EVENTOS",
-            item_name="Eventos",
-            item_group="ICDPE / Actividades puntuales",
-            income_account_number="431003",
-            cost_center_name="Actividades - Danza - ICDPE",
-        ),
+        _sg("ICDPE-EVENTOS", "Eventos", "431003", "Danza - ICDPE"),
     ]
 
     # --- Conceptos generales para cargos extra (sin actividad) ---
     cargos_varios_items = [
-        ServiceItemSpec(
-            item_code="ICDPE-MULTA",
-            item_name="Multa",
-            item_group="ICDPE / Cargos varios",
-            income_account_number=OTROS_CARGOS_ACCOUNT_NUMBER,
-            cost_center_name="Administración - ICDPE",
-        ),
-        ServiceItemSpec(
-            item_code="ICDPE-CARGO-VARIOS",
-            item_name="Cargo varios",
-            item_group="ICDPE / Cargos varios",
-            income_account_number=OTROS_CARGOS_ACCOUNT_NUMBER,
-            cost_center_name="Administración - ICDPE",
-        ),
+        _sg("ICDPE-MULTA", "Multa", OTROS_CARGOS_ACCOUNT_NUMBER, "Administración - ICDPE"),
+        _sg("ICDPE-CARGO-VARIOS", "Cargo varios", OTROS_CARGOS_ACCOUNT_NUMBER, "Administración - ICDPE"),
     ]
 
     return (
@@ -440,6 +398,7 @@ def _specs() -> list[ServiceItemSpec]:
 
 def run() -> dict[str, object]:
     _ensure_uom("Servicio")
+    ensure_ingresos_item_group_tree()
 
     company = resolve_icdpe_company()
     _ensure_otros_cargos_account(company)
@@ -451,7 +410,7 @@ def run() -> dict[str, object]:
             {
                 "item_code": spec.item_code,
                 "action": action,
-                "item_group": spec.item_group,
+                "item_group": resolve_ingreso_leaf_for_item(spec.item_code),
                 "income_account_number": spec.income_account_number,
                 "income_account": income_account,
                 "selling_cost_center": spec.cost_center_name,
@@ -468,12 +427,15 @@ def ensure_cargos_varios_items() -> dict[str, object]:
     como patch aunque falten centros de costo de otras áreas.
     """
     _ensure_uom("Servicio")
+    ensure_ingresos_item_group_tree()
     company = resolve_icdpe_company()
     _ensure_otros_cargos_account(company)
 
     results: list[dict[str, str]] = []
     for spec in _specs():
-        if spec.item_group != "ICDPE / Cargos varios":
+        if resolve_ingreso_leaf_for_item(spec.item_code) != LEAF_CARGOS:
+            continue
+        if spec.item_code not in ("ICDPE-MULTA", "ICDPE-CARGO-VARIOS"):
             continue
         results.append({"item_code": spec.item_code, "action": upsert_service_item(spec)})
     return {"company": company, "items": results}

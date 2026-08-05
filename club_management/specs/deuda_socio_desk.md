@@ -6,6 +6,45 @@ Secretaría debe ver en cada `Socio` el **saldo impago** y el **detalle de conce
 
 ---
 
+## Scenario: panel de deuda muestra el mes / período
+
+Given un `Socio` con una `Sales Invoice` pendiente con `periodo_cobro = 03/2026`
+When Secretaría abre el formulario `Socio` y ve **Detalle de deuda**
+Then cada fila de factura muestra el **período** (p. ej. `03/2026`)
+And el diálogo **Registrar cobro** también indica el período junto al concepto.
+
+---
+
+## Scenario: detalle de deuda ordenado por período cronológico
+
+Given un `Socio` con facturas pendientes de períodos `12/2025` y `01/2026` (y opcionalmente `03/2026`)
+When Secretaría consulta `list_facturas_pendientes` / el panel **Detalle de deuda**
+Then las filas aparecen ordenadas por período calendario ascendente (`12/2025` antes de `01/2026`)
+And **no** por orden lexicográfico de `MM/YYYY` ni solo por `posting_date`.
+
+---
+
+## Scenario: diálogo Registrar cobro muestra total con mora al abrir
+
+Given un `Socio` con cuota atrasada sujeta a mora al cobro
+When Secretaría abre **Registrar cobro**
+Then ve un resumen con el **total a cobrar** (incluyendo recargos %)
+And por cada factura seleccionada la **composición** (valor actual × factores = exigido)
+And el monto del medio de pago se actualiza a ese total (si no hay segundo medio)
+And al cambiar la **fecha de cobro** el resumen se recalcula.
+
+---
+
+## Scenario: al marcar/desmarcar facturas se recalcula mora y montos
+
+Given el diálogo **Registrar cobro** abierto con varias facturas
+When Secretaría marca o desmarca facturas (o usa seleccionar/deseleccionar todas)
+Then el resumen de mora y el **Monto medio 1** se actualizan al total exigido de la selección
+And las etiquetas de cada factura muestran el monto **con mora** (no solo el outstanding histórico)
+And al confirmar con un solo medio, el cobro usa ese total (sin error de “no coinciden”).
+
+---
+
 ## Scenario: panel de deuda en Desk
 
 Given un `Socio` con facturas ERPNext impagas y/o cargos extra pendientes

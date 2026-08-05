@@ -224,13 +224,30 @@ class TestSocioAuditoria(MembersTestCase):
 class TestSocioMenorRequiereTutor(MembersTestCase):
     """Invariantes del menor."""
 
-    def test_menor_sin_tutor_falla(self) -> None:
+    def test_menor_sin_tutor_se_crea(self) -> None:
         payload = make_socio_payload(
             dni="55222222",
             email="hijo@example.com",
             fecha_nacimiento=minor_birthdate(12),
             categoria="Menor",
         )
+        payload.pop("tipo_tutor", None)
+        payload.pop("tutor", None)
+        socio = frappe.get_doc(payload)
+        socio.insert(ignore_permissions=True)
+        self.assertEqual(socio.categoria, "Menor")
+        self.assertFalse(socio.tipo_tutor)
+        self.assertFalse(socio.tutor)
+
+    def test_menor_con_tutor_incompleto_falla(self) -> None:
+        payload = make_socio_payload(
+            dni="55222225",
+            email="hijo.incompleto@example.com",
+            fecha_nacimiento=minor_birthdate(12),
+            categoria="Menor",
+            tipo_tutor="Socio",
+        )
+        payload.pop("tutor", None)
         with self.assertRaises(frappe.ValidationError):
             frappe.get_doc(payload).insert(ignore_permissions=True)
 

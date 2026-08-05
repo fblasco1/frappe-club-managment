@@ -219,3 +219,46 @@ class TestGestionSociosDashboardRecaudacion(MembersTestCase):
 		self.assertTrue(data["disponible"])
 		self.assertEqual(data["periodo"], format_periodo_cobro(ref))
 		self.assertGreater(data["efectivo"], 0)
+
+	def test_medios_pago_sin_cobros_payload_disponible_con_ceros(self) -> None:
+		"""Spec: sin Payment Entry del mes → disponible True y montos en cero."""
+		if not erpnext_cobranza_disponible():
+			self.skipTest("ERPNext cobranza no disponible")
+		from frappe.utils import add_months, get_first_day, today
+
+		# Mes sin cobros tipicamente: usar un mes futuro lejano
+		ref = get_first_day(add_months(today(), 24))
+		data = get_medios_pago_payload(reference_date=ref)
+		self.assertTrue(data["disponible"])
+		self.assertEqual(data["efectivo"], 0.0)
+		self.assertEqual(data["tarjeta"], 0.0)
+		self.assertEqual(data["transferencia"], 0.0)
+		self.assertEqual(data["otro"], 0.0)
+
+	def test_panel_js_medios_pago_estado_vacio_sin_desaparecer(self) -> None:
+		"""Spec: tarjeta visible con mensaje 'Sin cobros del mes' si montos = 0."""
+		from pathlib import Path
+
+		js_path = (
+			Path(__file__).resolve().parents[2]
+			/ "public"
+			/ "js"
+			/ "secretaria_workspace_panel.js"
+		)
+		js = js_path.read_text(encoding="utf-8")
+		self.assertIn(
+			"Sin cobros del mes",
+			js,
+			"El panel debe mostrar estado vacío 'Sin cobros del mes'",
+		)
+		self.assertIn(
+			"has_medios_chart",
+			js,
+			"Debe existir has_medios_chart para mostrar la tarjeta aunque no haya montos",
+		)
+		# No ocultar la tarjeta por montos en cero (patrón anterior)
+		self.assertNotRegex(
+			js,
+			r"showMedios\s*=\s*medios\.disponible\s*&&\s*\(\s*medios\.efectivo",
+			"No debe exigir montos > 0 para mostrar la tarjeta de medios de pago",
+		)

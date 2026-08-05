@@ -51,6 +51,15 @@ Then PermissionError.
 
 ---
 
+## Scenario: Desk no llama slug sin argumento (render Query Report)
+
+Given el bundle de navegación del club (`club_desk_navigation.js`, `inicio_workspace.js`)
+When se resuelve el workspace activo o se detecta Inicio
+Then **nunca** se invoca `frappe.router.slug()` sin el nombre a slugificar
+And el Query Report «Proyeccion Flujo de Fondos» puede completar la carga (deja de quedar en «Cargando…»).
+
+---
+
 ## Artefactos
 
 | Artefacto | Ubicación |

@@ -14,12 +14,19 @@ import frappe
 from club_management.activities.services.inscripcion_socio import (
 	resolve_item_arancel_inscripcion,
 )
+from club_management.finance.setup.icdpe_income_item_groups import (
+	LEAF_CARGOS,
+	LEAF_PUNTUALES,
+)
 from club_management.members.services.cobranza_manual import _default_company
 
 INSCRIPCION_DOCTYPE = "Inscripcion Actividad"
 
 # Grupos de ítems "generales" (no atados a una actividad puntual).
+# Incluye nombres legacy hasta que el patch de jerarquía los vacíe.
 GRUPOS_CONCEPTOS_GENERALES: tuple[str, ...] = (
+	LEAF_CARGOS,
+	LEAF_PUNTUALES,
 	"ICDPE / Cargos varios",
 	"ICDPE / Actividades puntuales",
 )

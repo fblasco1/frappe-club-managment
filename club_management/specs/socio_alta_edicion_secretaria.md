@@ -74,7 +74,8 @@ Then recibe error de validación y no se crea el documento.
 Given no existe un `Socio` con `name` = `"1500"` (ni `numero_socio` = 1500)
 When Secretaría crea un socio desde **Alta guiada** o `crear_socio_desk` con `numero_socio = 1500`
 Then el documento se persiste con `name` = `"1500"` y `numero_socio` = 1500
-And el número queda inmutable en ediciones posteriores.
+And el número no se edita libremente en el formulario
+And la reasignación controlada usa `corregir_numero_socio` (`corregir_numero_socio.md`).
 
 ---
 
@@ -95,14 +96,33 @@ Then el controller asigna `MAX(numero_socio) + 1` (misma regla que `socio_minimo
 
 ---
 
-## Scenario: menor con tutor en alta manual
+## Scenario: menor sin tutor en alta manual (no bloquea)
 
 Given `categoria = Menor`
 When `crear_socio_desk` sin `tipo_tutor` / `tutor`
-Then recibe error de validación
+Then el socio se crea igual (tutor no es obligatorio en alta Desk)
+And `tipo_tutor` / `tutor` quedan como **datos críticos** incompletos (advertencia en edición)
+And `grupo_familiar` sigue opcional en operación interna (fase 2).
+
+---
+
+## Scenario: menor con tutor en alta manual
+
+Given `categoria = Menor`
 When completa vínculo tutor (Socio o Tutor No Socio)
 Then el socio se crea con esos vínculos
-And `grupo_familiar` es opcional en operación interna (fase 2).
+And si el tutor está cargado, se validan edad (≥ 18) y, si hay `grupo_familiar`, titularidad activa.
+
+---
+
+## Scenario: alta guiada — crear Tutor No Socio sin abandonar el asistente
+
+Given Secretaría tiene abierta **Alta guiada** con `categoria = Menor` y `tipo_tutor = Tutor No Socio`
+When elige **Crear tutor no socio** (acción del asistente, no el «Create New» del Link)
+Then se abre un diálogo anidado para cargar el tutor
+And al guardar el `Tutor No Socio` vuelve al asistente de socio con el campo tutor ya seleccionado
+And los datos del socio ya cargados en el asistente **no** se pierden
+And el Link de tutor no socio es `only_select` (no navega al Form de Tutor No Socio).
 
 ---
 

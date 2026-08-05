@@ -19,8 +19,10 @@ And cada uno tiene `Item Default` con `income_account` y `selling_cost_center`.
 
 Given el mismo setup
 When corre el seed
-Then existen ítems de gasto (sueldos, 931/cargas, electricidad, insumos deportivos, federaciones, etc.)
+Then existen ítems de gasto del catálogo detallado (remuneraciones, 931/cargas, servicios públicos, federativos, etc.)
 And `Item Default` incluye `expense_account` y `buying_cost_center`.
+
+Ver jerarquía completa en `catalogo_egresos_item_groups.md`.
 
 ---
 

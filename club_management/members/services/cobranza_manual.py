@@ -758,57 +758,6 @@ def registrar_cobro_compuesto(
 	}
 
 
-
-
-def list_facturas_impagas_cancelables_socio(socio_name: str) -> list[dict[str, Any]]:
-	"""Facturas submitted del socio sin cobros (outstanding = grand_total)."""
-	rows = list_facturas_pendientes_socio(socio_name)
-	return [
-		row
-		for row in rows
-		if flt(row.get("outstanding_amount")) == flt(row.get("grand_total"))
-		and flt(row.get("grand_total")) > 0
-	]
-
-
-def cancelar_factura_venta_impaga(socio_name: str, sales_invoice_name: str) -> dict[str, Any]:
-	"""Cancela una Sales Invoice del socio solo si está totalmente impaga."""
-	from club_management.integrations.payment_ledger_postgres import apply_patch
-
-	apply_patch()
-	if not erpnext_cobranza_disponible():
-		frappe.throw(_("ERPNext no está disponible para cobranza."), frappe.ValidationError)
-
-	ensure_secretaria_operacion_access()
-	if not socio_name or not sales_invoice_name:
-		frappe.throw(_("Socio y factura son obligatorios."), frappe.ValidationError)
-
-	if not frappe.db.exists(SALES_INVOICE_DOCTYPE, sales_invoice_name):
-		frappe.throw(_("Factura no encontrada."), frappe.DoesNotExistError)
-
-	campo = _campo_socio_en(SALES_INVOICE_DOCTYPE)
-	invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, sales_invoice_name)
-
-	if campo and invoice.get(campo) != socio_name:
-		frappe.throw(_("La factura no pertenece a este socio."), frappe.ValidationError)
-
-	if invoice.docstatus != 1:
-		frappe.throw(_("Solo se pueden cancelar facturas presentadas."), frappe.ValidationError)
-
-	outstanding = flt(invoice.outstanding_amount)
-	grand_total = flt(invoice.grand_total)
-	if outstanding <= 0 or outstanding != grand_total:
-		frappe.throw(
-			_("Solo se pueden cancelar facturas totalmente impagas (sin cobros)."),
-			frappe.ValidationError,
-		)
-
-	invoice.flags.ignore_permissions = True
-	invoice.cancel()
-	saldo = sync_saldo_deuda_socio(socio_name)
-	return {"status": "ok", "sales_invoice": sales_invoice_name, "saldo_deuda": saldo}
-
-
 def registrar_cobro_manual(
 	socio_name: str,
 	sales_invoice_name: str,

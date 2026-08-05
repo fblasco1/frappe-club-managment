@@ -83,13 +83,50 @@ class TestDeudaSocioDesk(MembersTestCase):
 
 		frappe.set_user(self._secretaria)
 		try:
-			invoice_name = generar_cargo_socio(socio.name, incluir_actividades=False)
+			invoice_names = generar_cargo_socio(socio.name, incluir_actividades=False)
 		finally:
 			frappe.set_user("Administrator")
 
-		invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, invoice_name)
-		item_codes = {row.item_code for row in invoice.items}
+		item_codes: set[str] = set()
+		for invoice_name in invoice_names:
+			invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, invoice_name)
+			item_codes |= {row.item_code for row in invoice.items}
 		self.assertIn(self._item, item_codes)
+
+	def test_detalle_deuda_incluye_periodo_cobro(self) -> None:
+		socio = self._socio_activo(dni="75001004", email="deuda.periodo@example.com")
+		frappe.set_user(self._secretaria)
+		try:
+			invoices = generar_cargo_socio(
+				socio.name,
+				incluir_actividades=False,
+				reference_date="2026-03-01",
+			)
+			detalle = get_detalle_deuda_socio(socio.name)
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertTrue(invoices)
+		self.assertTrue(detalle["facturas"])
+		periodos = {row.get("periodo_cobro") for row in detalle["facturas"]}
+		self.assertIn("03/2026", periodos)
+
+	def test_detalle_deuda_ordenado_por_periodo_cronologico(self) -> None:
+		socio = self._socio_activo(dni="75001005", email="deuda.orden@example.com")
+		frappe.set_user(self._secretaria)
+		try:
+			generar_cargo_socio(socio.name, incluir_actividades=False, reference_date="2026-01-01")
+			generar_cargo_socio(socio.name, incluir_actividades=False, reference_date="2025-12-01")
+			detalle = get_detalle_deuda_socio(socio.name)
+		finally:
+			frappe.set_user("Administrator")
+
+		periodos = [row.get("periodo_cobro") for row in detalle["facturas"] if row.get("periodo_cobro")]
+		self.assertIn("12/2025", periodos)
+		self.assertIn("01/2026", periodos)
+		idx_dic = periodos.index("12/2025")
+		idx_ene = periodos.index("01/2026")
+		self.assertLess(idx_dic, idx_ene)
 
 	def test_detalle_deuda_muestra_factura_y_cargo_pendiente(self) -> None:
 		socio = self._socio_activo(dni="75001002", email="deuda.det@example.com")

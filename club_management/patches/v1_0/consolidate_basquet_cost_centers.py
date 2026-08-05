@@ -1,4 +1,4 @@
-"""Consolida CC básquet legacy → Deportes - Basquet - ICDPE."""
+"""Consolida CC básquet legacy → Basquet - ICDPE."""
 
 from __future__ import annotations
 

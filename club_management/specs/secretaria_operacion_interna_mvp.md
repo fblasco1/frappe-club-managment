@@ -33,17 +33,19 @@ And sigue apareciendo la lista de socios morosos y cuotas sociales.
 Given Secretaría abre un formulario `Socio` (nuevo o existente)
 When visualiza la sección de vínculos
 Then los campos `grupo_familiar` y `solicitud_origen` no se muestran
-And para `categoria = Menor` sigue siendo obligatorio `tipo_tutor` y `tutor`.
+And para `categoria = Menor`, `tipo_tutor` y `tutor` son opcionales en alta/edición Desk
+  (quedan como datos críticos si faltan).
 
 ---
 
-## Scenario: alta guiada menor exige tutor adulto sin grupo familiar
+## Scenario: alta guiada menor permite tutor opcional sin grupo familiar
 
 Given Secretaría usa **Alta guiada** con `categoria = Menor`
-When intenta crear sin `tipo_tutor` o `tutor`
-Then recibe error de validación
+When crea sin `tipo_tutor` o `tutor`
+Then el socio se crea correctamente
 When completa tutor (Socio o Tutor No Socio) sin `grupo_familiar`
-Then el socio se crea correctamente.
+Then el socio se crea con ese vínculo
+And crear un `Tutor No Socio` desde el asistente no abandona el diálogo de alta.
 
 ---
 

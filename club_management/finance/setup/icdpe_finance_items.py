@@ -1,4 +1,9 @@
-"""Catálogo de Items financieros ICDPE (ingresos eventuales + egresos)."""
+"""Catálogo de Items financieros ICDPE (ingresos eventuales + egresos).
+
+Egresos: 4 pilares bajo ``All Item Groups`` con subgrupos hoja para Secretaría /
+Tesorería (Flujo de Fondos). Seed idempotente; no borra ítems legacy (los
+deshabilita).
+"""
 
 from __future__ import annotations
 
@@ -7,13 +12,82 @@ from dataclasses import dataclass
 import frappe
 
 from club_management.setup.icdpe_company import resolve_icdpe_company
+from club_management.finance.setup.icdpe_income_item_groups import (
+	INGRESO_LEAF_GROUPS,
+	INGRESO_PILLARS,
+	LEAF_ALQUILERES,
+	LEAF_DONACIONES,
+	LEAF_ENTRADAS,
+	LEAF_GASTRONOMIA,
+	LEAF_RECAUDACION,
+	LEAF_SPONSORS,
+	LEAF_SUBSIDIOS,
+	ensure_ingresos_item_group_tree,
+)
 
 DEFAULT_ITEM_GROUP_ROOT = "All Item Groups"
+
 ADMIN_CC = "Administración - ICDPE"
-BUFFET_CC = "Gastronomía - Buffet - ICDPE"
-RESTAURANTE_CC = "Gastronomía - Restaurante - ICDPE"
-ALQUILER_TEMP_CC = "Alquileres - Temporal - ICDPE"
-BASQUET_CC = "Deportes - Basquet - ICDPE"
+BUFFET_CC = "Buffet - ICDPE"
+RESTAURANTE_CC = "Restaurante - ICDPE"
+ALQUILER_TEMP_CC = "Temporal - ICDPE"
+BASQUET_CC = "Basquet - ICDPE"
+
+# --- 4 pilares centrales (is_group = 1) ---
+CENTRAL_ESTRUCTURA = "Gastos de Estructura y Servicios"
+CENTRAL_PERSONAL = "Gastos de Personal (Nómina)"
+CENTRAL_DEPORTIVOS = "Costos Operativos Deportivos"
+CENTRAL_MANTENIMIENTO = "Mantenimiento e Infraestructura"
+
+EGRESO_CENTRAL_GROUPS: tuple[str, ...] = (
+	CENTRAL_ESTRUCTURA,
+	CENTRAL_PERSONAL,
+	CENTRAL_DEPORTIVOS,
+	CENTRAL_MANTENIMIENTO,
+)
+
+# --- Subgrupos hoja (is_group = 0; reciben Items) ---
+GROUP_SERVICIOS_PUB = "Servicios Públicos"
+GROUP_IMPUESTOS = "Impuestos y Tasas"
+# Extra bajo Estructura: RC / emergencias / accidentes.
+GROUP_SEGUROS = "Seguros y Coberturas"
+
+GROUP_REMUNERACIONES = "Remuneraciones y Sueldos"
+GROUP_CARGAS = "Cargas Sociales y Contribuciones Patronales"
+
+GROUP_HONORARIOS = "Honorarios y Servicios Profesionales"
+GROUP_FEDERATIVOS = "Afiliaciones y Aranceles Federativos"
+GROUP_INSUMOS = "Insumos y Materiales Deportivos"
+
+GROUP_REPARACIONES = "Reparaciones y Repuestos"
+GROUP_OBRAS = "Obras y Materiales"
+
+# central → hojas
+EGRESO_TREE: dict[str, tuple[str, ...]] = {
+	CENTRAL_ESTRUCTURA: (GROUP_SERVICIOS_PUB, GROUP_IMPUESTOS, GROUP_SEGUROS),
+	CENTRAL_PERSONAL: (GROUP_REMUNERACIONES, GROUP_CARGAS),
+	CENTRAL_DEPORTIVOS: (GROUP_HONORARIOS, GROUP_FEDERATIVOS, GROUP_INSUMOS),
+	CENTRAL_MANTENIMIENTO: (GROUP_REPARACIONES, GROUP_OBRAS),
+}
+
+EGRESO_LEAF_GROUPS: tuple[str, ...] = tuple(
+	leaf for leaves in EGRESO_TREE.values() for leaf in leaves
+)
+
+# Ítems genéricos del catálogo plano previo — se deshabilitan (no se borran).
+LEGACY_EXPENSE_ITEMS_TO_DISABLE: tuple[str, ...] = (
+	"ICDPE-FIN-SUELDOS",
+	"ICDPE-FIN-IMPUESTOS",
+	"ICDPE-FIN-FEDERACION",
+	"ICDPE-FIN-INSUMOS-DEP",
+	"ICDPE-FIN-MANT-IMPLEMENTOS",
+	"ICDPE-FIN-MANT-INSTALACIONES",
+	"ICDPE-FIN-OBRAS",
+	"ICDPE-FIN-ENTRENADORES",
+	"ICDPE-FIN-ARBITROS",
+	"ICDPE-FIN-VIATICOS",
+	"ICDPE-FIN-SEGURIDAD",
+)
 
 
 @dataclass(frozen=True)
@@ -31,98 +105,119 @@ INCOME_SPECS: tuple[FinanceItemSpec, ...] = (
 	FinanceItemSpec(
 		"ICDPE-FIN-ENTRADAS",
 		"Entradas partidos / eventos",
-		"ICDPE / Finanzas ingresos",
+		LEAF_ENTRADAS,
 		"431003",
 		ADMIN_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-INDUMENTARIA",
 		"Venta indumentaria",
-		"ICDPE / Finanzas ingresos",
+		LEAF_SPONSORS,
 		"451002",
 		ADMIN_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-BUFFET",
 		"Ventas buffet",
-		"ICDPE / Finanzas ingresos",
+		LEAF_GASTRONOMIA,
 		"441001",
 		BUFFET_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-RESTAURANTE",
 		"Ventas restaurante",
-		"ICDPE / Finanzas ingresos",
+		LEAF_GASTRONOMIA,
 		"441001",
 		RESTAURANTE_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-CANON-CONCESION",
 		"Canon concesión buffet/restaurante",
-		"ICDPE / Finanzas ingresos",
+		LEAF_GASTRONOMIA,
 		"441001",
 		BUFFET_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-SPONSOR",
 		"Sponsoreo y publicidad",
-		"ICDPE / Finanzas ingresos",
+		LEAF_SPONSORS,
 		"451001",
 		ADMIN_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-ALQUILER-TEMP",
 		"Alquiler temporal instalaciones",
-		"ICDPE / Finanzas ingresos",
+		LEAF_ALQUILERES,
 		"421001",
 		ALQUILER_TEMP_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-SUBSIDIO",
 		"Subsidios gubernamentales",
-		"ICDPE / Finanzas ingresos",
+		LEAF_SUBSIDIOS,
 		"491001",
 		ADMIN_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-DONACION",
 		"Donaciones",
-		"ICDPE / Finanzas ingresos",
+		LEAF_DONACIONES,
 		"491001",
 		ADMIN_CC,
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-EVENTO-RECAUDACION",
 		"Eventos de recaudación (rifas, cenas)",
-		"ICDPE / Finanzas ingresos",
+		LEAF_RECAUDACION,
 		"431003",
 		ADMIN_CC,
 	),
 )
 
+# Catálogo detallado de egresos (Secretaría / Flujo de Fondos).
 EXPENSE_SPECS: tuple[FinanceItemSpec, ...] = (
+	# 1. Impuestos y Tasas
 	FinanceItemSpec(
-		"ICDPE-FIN-SUELDOS",
-		"Sueldos personal",
-		"ICDPE / Finanzas egresos",
-		"511001",
+		"ICDPE-FIN-IMP-ABL",
+		"ABL y Tasas Inmobiliarias",
+		GROUP_IMPUESTOS,
+		"552001",
 		ADMIN_CC,
 		is_sales=False,
 		is_purchase=True,
 	),
+	FinanceItemSpec(
+		"ICDPE-FIN-IMP-SELLOS",
+		"Impuesto a los Sellos",
+		GROUP_IMPUESTOS,
+		"551001",
+		ADMIN_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	FinanceItemSpec(
+		"ICDPE-FIN-IMP-TASAS-MUNI",
+		"Tasas e Inspecciones Municipales",
+		GROUP_IMPUESTOS,
+		"552001",
+		ADMIN_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	FinanceItemSpec(
+		"ICDPE-FIN-IMP-OBRA-CATASTRO",
+		"Derechos de Obra y Tasas Catastrales",
+		GROUP_IMPUESTOS,
+		"552001",
+		ADMIN_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	# 2. Cargas Sociales y Obligaciones Laborales
 	FinanceItemSpec(
 		"ICDPE-FIN-CARGAS-931",
-		"Cargas sociales / Formulario 931",
-		"ICDPE / Finanzas egresos",
-		"512001",
-		ADMIN_CC,
-		is_sales=False,
-		is_purchase=True,
-	),
-	FinanceItemSpec(
-		"ICDPE-FIN-UTEDYC",
-		"Aportes sindicales UTEDYC",
-		"ICDPE / Finanzas egresos",
+		"Formulario 931 ARCA",
+		GROUP_CARGAS,
 		"512001",
 		ADMIN_CC,
 		is_sales=False,
@@ -130,116 +225,222 @@ EXPENSE_SPECS: tuple[FinanceItemSpec, ...] = (
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-ART",
-		"ART",
-		"ICDPE / Finanzas egresos",
+		"ART (Aseguradora de Riesgos del Trabajo)",
+		GROUP_CARGAS,
 		"512001",
 		ADMIN_CC,
 		is_sales=False,
 		is_purchase=True,
 	),
 	FinanceItemSpec(
-		"ICDPE-FIN-ENTRENADORES",
-		"Honorarios entrenadores / profesores",
-		"ICDPE / Finanzas egresos",
+		"ICDPE-FIN-UTEDYC",
+		"Cuota Sindical UTEDYC y CCT",
+		GROUP_CARGAS,
+		"512001",
+		ADMIN_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	FinanceItemSpec(
+		"ICDPE-FIN-SEGURO-VIDA",
+		"Seguro de Vida Obligatorio",
+		GROUP_CARGAS,
+		"512001",
+		ADMIN_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	# 3. Remuneraciones Personal de Estructura
+	FinanceItemSpec(
+		"ICDPE-FIN-SUELDO-MANT",
+		"Sueldo Personal Mantenimiento / Maestranza",
+		GROUP_REMUNERACIONES,
+		"511001",
+		ADMIN_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	FinanceItemSpec(
+		"ICDPE-FIN-SUELDO-ADMIN",
+		"Sueldo Personal Administrativo",
+		GROUP_REMUNERACIONES,
+		"511001",
+		ADMIN_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	FinanceItemSpec(
+		"ICDPE-FIN-SUELDO-INTEND",
+		"Sueldo Personal Intendencia",
+		GROUP_REMUNERACIONES,
+		"511001",
+		ADMIN_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	# 4. Honorarios y Servicios Deportivos
+	FinanceItemSpec(
+		"ICDPE-FIN-HON-ENTRENADOR",
+		"Honorario Entrenador / Director Técnico",
+		GROUP_HONORARIOS,
 		"513001",
-		ADMIN_CC,
-		is_sales=False,
-		is_purchase=True,
-	),
-	FinanceItemSpec(
-		"ICDPE-FIN-INSUMOS-DEP",
-		"Insumos deportivos",
-		"ICDPE / Finanzas egresos",
-		"541001",
 		BASQUET_CC,
 		is_sales=False,
 		is_purchase=True,
 	),
 	FinanceItemSpec(
-		"ICDPE-FIN-FEDERACION",
-		"Pagos a federaciones",
-		"ICDPE / Finanzas egresos",
-		"543001",
+		"ICDPE-FIN-HON-PREP-FISICO",
+		"Honorario Preparador Físico",
+		GROUP_HONORARIOS,
+		"513001",
 		BASQUET_CC,
 		is_sales=False,
 		is_purchase=True,
 	),
 	FinanceItemSpec(
-		"ICDPE-FIN-VIATICOS",
-		"Viáticos y traslados",
-		"ICDPE / Finanzas egresos",
-		"544001",
-		ADMIN_CC,
+		"ICDPE-FIN-HON-MONITOR",
+		"Honorario Monitor / Ayudante de Campo",
+		GROUP_HONORARIOS,
+		"513001",
+		BASQUET_CC,
 		is_sales=False,
 		is_purchase=True,
 	),
 	FinanceItemSpec(
-		"ICDPE-FIN-ARBITROS",
-		"Árbitros / oficiales de mesa",
-		"ICDPE / Finanzas egresos",
+		"ICDPE-FIN-HON-ARBITROS",
+		"Honorarios Árbitros",
+		GROUP_HONORARIOS,
 		"542001",
 		BASQUET_CC,
 		is_sales=False,
 		is_purchase=True,
 	),
 	FinanceItemSpec(
-		"ICDPE-FIN-SEGURIDAD",
-		"Seguridad privada / policía partidos",
-		"ICDPE / Finanzas egresos",
-		"533001",
-		ADMIN_CC,
+		"ICDPE-FIN-HON-MESA",
+		"Honorarios Oficiales de Mesa",
+		GROUP_HONORARIOS,
+		"542001",
+		BASQUET_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	# 5. Afiliaciones y Aranceles Federativos
+	FinanceItemSpec(
+		"ICDPE-FIN-FED-INSCRIPCION",
+		"Inscripción a Torneos y Ligas",
+		GROUP_FEDERATIVOS,
+		"543001",
+		BASQUET_CC,
 		is_sales=False,
 		is_purchase=True,
 	),
 	FinanceItemSpec(
-		"ICDPE-FIN-MANT-IMPLEMENTOS",
-		"Mantenimiento implementos deportivos",
-		"ICDPE / Finanzas egresos",
+		"ICDPE-FIN-FED-MULTAS",
+		"Multas y Sanciones Federativas",
+		GROUP_FEDERATIVOS,
+		"543001",
+		BASQUET_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	FinanceItemSpec(
+		"ICDPE-FIN-FED-LICENCIAS",
+		"Licencias y Pases de Jugadores",
+		GROUP_FEDERATIVOS,
+		"543001",
+		BASQUET_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	# 6. Insumos y Materiales Deportivos
+	FinanceItemSpec(
+		"ICDPE-FIN-INS-PELOTAS",
+		"Material Deportivo - Pelotas",
+		GROUP_INSUMOS,
+		"541001",
+		BASQUET_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	FinanceItemSpec(
+		"ICDPE-FIN-INS-REDES",
+		"Material Deportivo - Redes y Accesorios",
+		GROUP_INSUMOS,
+		"541001",
+		BASQUET_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	FinanceItemSpec(
+		"ICDPE-FIN-INS-INDUMENTARIA",
+		"Indumentaria Deportiva y Competencia",
+		GROUP_INSUMOS,
+		"541001",
+		BASQUET_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	# 7. Reparaciones y Mantenimiento (Equipamiento)
+	FinanceItemSpec(
+		"ICDPE-FIN-MANT-TABLERO",
+		'Mantenimiento de Tablero Electrónico y Reloj de 24"',
+		GROUP_REPARACIONES,
 		"531001",
 		BASQUET_CC,
 		is_sales=False,
 		is_purchase=True,
 	),
 	FinanceItemSpec(
-		"ICDPE-FIN-MANT-INSTALACIONES",
-		"Mantenimiento instalaciones",
-		"ICDPE / Finanzas egresos",
+		"ICDPE-FIN-MANT-PARQUET",
+		"Reparación y Mantenimiento de Piso Deportivo (Parquet)",
+		GROUP_REPARACIONES,
+		"531001",
+		BASQUET_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	FinanceItemSpec(
+		"ICDPE-FIN-MANT-CALDERAS",
+		"Mantenimiento de Calderas y Bombas",
+		GROUP_REPARACIONES,
+		"531001",
+		ADMIN_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	# 8. Obras y Materiales de Infraestructura
+	FinanceItemSpec(
+		"ICDPE-FIN-OBRA-FERRETERIA",
+		"Ferretería y Materiales de Construcción",
+		GROUP_OBRAS,
 		"531001",
 		ADMIN_CC,
 		is_sales=False,
 		is_purchase=True,
 	),
 	FinanceItemSpec(
-		"ICDPE-FIN-OBRAS",
-		"Obras de infraestructura",
-		"ICDPE / Finanzas egresos",
+		"ICDPE-FIN-OBRA-PINTURA",
+		"Pintura General e Insumos",
+		GROUP_OBRAS,
 		"531001",
 		ADMIN_CC,
 		is_sales=False,
 		is_purchase=True,
 	),
 	FinanceItemSpec(
-		"ICDPE-FIN-EMERGENCIAS-MED",
-		"Abono emergencias médicas",
-		"ICDPE / Finanzas egresos",
-		"561001",
+		"ICDPE-FIN-OBRA-ELECTRICOS",
+		"Materiales Eléctricos y Luminarias LED",
+		GROUP_OBRAS,
+		"531001",
 		ADMIN_CC,
 		is_sales=False,
 		is_purchase=True,
 	),
-	FinanceItemSpec(
-		"ICDPE-FIN-SEGURO-RC",
-		"Seguro responsabilidad civil",
-		"ICDPE / Finanzas egresos",
-		"561001",
-		ADMIN_CC,
-		is_sales=False,
-		is_purchase=True,
-	),
+	# 9. Servicios Públicos
 	FinanceItemSpec(
 		"ICDPE-FIN-LUZ",
-		"Electricidad",
-		"ICDPE / Finanzas egresos",
+		"Servicio de Energía Eléctrica (Luz)",
+		GROUP_SERVICIOS_PUB,
 		"521001",
 		ADMIN_CC,
 		is_sales=False,
@@ -247,8 +448,8 @@ EXPENSE_SPECS: tuple[FinanceItemSpec, ...] = (
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-GAS",
-		"Gas",
-		"ICDPE / Finanzas egresos",
+		"Servicio de Gas Natural",
+		GROUP_SERVICIOS_PUB,
 		"523001",
 		ADMIN_CC,
 		is_sales=False,
@@ -256,18 +457,46 @@ EXPENSE_SPECS: tuple[FinanceItemSpec, ...] = (
 	),
 	FinanceItemSpec(
 		"ICDPE-FIN-AGUA",
-		"Agua",
-		"ICDPE / Finanzas egresos",
+		"Servicio de Agua y Saneamiento",
+		GROUP_SERVICIOS_PUB,
 		"522001",
 		ADMIN_CC,
 		is_sales=False,
 		is_purchase=True,
 	),
 	FinanceItemSpec(
-		"ICDPE-FIN-IMPUESTOS",
-		"Impuestos",
-		"ICDPE / Finanzas egresos",
-		"551001",
+		"ICDPE-FIN-INTERNET",
+		"Servicio de Internet y Telefonía",
+		GROUP_SERVICIOS_PUB,
+		"524001",
+		ADMIN_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	# 10. Seguros y Coberturas
+	FinanceItemSpec(
+		"ICDPE-FIN-SEGURO-RC",
+		"Seguro de Responsabilidad Civil",
+		GROUP_SEGUROS,
+		"561001",
+		ADMIN_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	FinanceItemSpec(
+		"ICDPE-FIN-EMERGENCIAS-MED",
+		"Servicio de Emergencias Médicas (Área Protegida)",
+		GROUP_SEGUROS,
+		"561001",
+		ADMIN_CC,
+		is_sales=False,
+		is_purchase=True,
+	),
+	FinanceItemSpec(
+		"ICDPE-FIN-SEGURO-ACCIDENTES",
+		"Seguro de Accidentes Personales (Deportistas)",
+		GROUP_SEGUROS,
+		"561001",
 		ADMIN_CC,
 		is_sales=False,
 		is_purchase=True,
@@ -281,19 +510,46 @@ def _ensure_uom(uom_name: str) -> None:
 	frappe.get_doc({"doctype": "UOM", "uom_name": uom_name}).insert(ignore_permissions=True)
 
 
-def _ensure_item_group(name: str) -> None:
+def _ensure_item_group(name: str, *, parent: str, is_group: int = 0) -> None:
+	"""Crea o alinea un Item Group (idempotente)."""
 	if frappe.db.exists("Item Group", name):
+		doc = frappe.get_doc("Item Group", name)
+		changed = False
+		if int(doc.is_group or 0) != int(is_group):
+			doc.is_group = is_group
+			changed = True
+		if doc.parent_item_group != parent and parent:
+			doc.parent_item_group = parent
+			changed = True
+		if changed:
+			doc.save(ignore_permissions=True)
 		return
-	if not frappe.db.exists("Item Group", DEFAULT_ITEM_GROUP_ROOT):
-		frappe.throw(f"No existe el Item Group raíz '{DEFAULT_ITEM_GROUP_ROOT}'")
+
+	if parent and not frappe.db.exists("Item Group", parent):
+		frappe.throw(f"No existe el Item Group padre '{parent}'")
+
 	frappe.get_doc(
 		{
 			"doctype": "Item Group",
 			"item_group_name": name,
-			"parent_item_group": DEFAULT_ITEM_GROUP_ROOT,
-			"is_group": 0,
+			"parent_item_group": parent,
+			"is_group": is_group,
 		}
 	).insert(ignore_permissions=True)
+
+
+def ensure_egresos_item_group_tree() -> None:
+	"""All Item Groups → 4 pilares → subgrupos hoja."""
+	if not frappe.db.exists("Item Group", DEFAULT_ITEM_GROUP_ROOT):
+		frappe.throw(f"No existe el Item Group raíz '{DEFAULT_ITEM_GROUP_ROOT}'")
+
+	for central, leaves in EGRESO_TREE.items():
+		_ensure_item_group(central, parent=DEFAULT_ITEM_GROUP_ROOT, is_group=1)
+		for leaf in leaves:
+			_ensure_item_group(leaf, parent=central, is_group=0)
+
+	# Árbol de ingresos (pilares nodos + hojas).
+	ensure_ingresos_item_group_tree()
 
 
 def _resolve_account(company: str, account_number: str) -> str | None:
@@ -309,7 +565,6 @@ def _resolve_account(company: str, account_number: str) -> str | None:
 def _resolve_cost_center(cost_center_name: str) -> str | None:
 	if frappe.db.exists("Cost Center", cost_center_name):
 		return cost_center_name
-	# fallback Administración
 	if frappe.db.exists("Cost Center", ADMIN_CC):
 		return ADMIN_CC
 	return None
@@ -352,7 +607,15 @@ def _upsert_item_defaults(
 def upsert_finance_item(spec: FinanceItemSpec) -> str:
 	"""Crea o actualiza un Item financiero. Devuelve created|updated|skipped."""
 	_ensure_uom("Servicio")
-	_ensure_item_group(spec.item_group)
+	if spec.item_group in EGRESO_LEAF_GROUPS or spec.item_group in INGRESO_LEAF_GROUPS or spec.item_group in (
+		*INGRESO_PILLARS,
+	):
+		# Árboles de egreso/ingreso ya asegurados por el seed.
+		if not frappe.db.exists("Item Group", spec.item_group):
+			_ensure_item_group(spec.item_group, parent=DEFAULT_ITEM_GROUP_ROOT, is_group=0)
+	else:
+		_ensure_item_group(spec.item_group, parent=DEFAULT_ITEM_GROUP_ROOT, is_group=0)
+
 	company = resolve_icdpe_company()
 	account = _resolve_account(company, spec.account_number)
 	cc = _resolve_cost_center(spec.cost_center_name)
@@ -372,6 +635,7 @@ def upsert_finance_item(spec: FinanceItemSpec) -> str:
 		item.stock_uom = "Servicio"
 		item.is_sales_item = 1 if spec.is_sales else 0
 		item.is_purchase_item = 1 if spec.is_purchase else 0
+		item.disabled = 0
 		item.save(ignore_permissions=True)
 		_upsert_item_defaults(
 			spec.item_code,
@@ -394,6 +658,7 @@ def upsert_finance_item(spec: FinanceItemSpec) -> str:
 			"is_purchase_item": 1 if spec.is_purchase else 0,
 			"stock_uom": "Servicio",
 			"include_item_in_manufacturing": 0,
+			"disabled": 0,
 		}
 	).insert(ignore_permissions=True)
 	_upsert_item_defaults(
@@ -407,10 +672,32 @@ def upsert_finance_item(spec: FinanceItemSpec) -> str:
 	return "created"
 
 
+def disable_legacy_expense_items() -> int:
+	"""Marca disabled=1 en ítems genéricos reemplazados. No borra."""
+	n = 0
+	for code in LEGACY_EXPENSE_ITEMS_TO_DISABLE:
+		if not frappe.db.exists("Item", code):
+			continue
+		if int(frappe.db.get_value("Item", code, "disabled") or 0) == 1:
+			continue
+		frappe.db.set_value("Item", code, "disabled", 1, update_modified=False)
+		n += 1
+	return n
+
+
 def run_finance_items_seed() -> dict[str, int]:
-	"""Seed idempotente de todos los ítems financieros."""
-	counts = {"created": 0, "updated": 0, "skipped": 0}
+	"""Seed idempotente de jerarquía + ítems financieros."""
+	ensure_egresos_item_group_tree()
+	counts: dict[str, int] = {"created": 0, "updated": 0, "skipped": 0, "disabled_legacy": 0, "error": 0}
 	for spec in (*INCOME_SPECS, *EXPENSE_SPECS):
 		result = upsert_finance_item(spec)
 		counts[result] = counts.get(result, 0) + 1
+	counts["disabled_legacy"] = disable_legacy_expense_items()
+	from club_management.finance.setup.cleanup_residual_item_groups import (
+		run_cleanup_residual_item_groups,
+	)
+	from club_management.finance.setup.fix_sponsors_y_ventas import run_fix_sponsors_y_ventas
+
+	run_cleanup_residual_item_groups()
+	run_fix_sponsors_y_ventas()
 	return counts

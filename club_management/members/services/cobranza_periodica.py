@@ -280,3 +280,71 @@ def complementar_aranceles_periodo_socios(
 	frappe.logger("club_management.cobranza").info("complementar_aranceles_periodo_socios %s", result)
 	return result
 
+
+def _iter_primeros_de_mes(desde: date, hasta: date) -> list[date]:
+	"""Primer día de cada mes entre `desde` y `hasta` (inclusive por mes)."""
+	cur = date(desde.year, desde.month, 1)
+	end = date(hasta.year, hasta.month, 1)
+	if cur > end:
+		cur, end = end, cur
+	out: list[date] = []
+	while cur <= end:
+		out.append(cur)
+		if cur.month == 12:
+			cur = date(cur.year + 1, 1, 1)
+		else:
+			cur = date(cur.year, cur.month + 1, 1)
+	return out
+
+
+def generar_deuda_rango_meses(
+	socio_name: str,
+	*,
+	desde: str | date,
+	hasta: str | date,
+) -> dict[str, Any]:
+	"""Emite deuda idempotente para cada mes del rango (Secretaría / ops)."""
+	from club_management.members.services.cobranza_manual import generar_cargo_socio
+	from club_management.members.services.socio_operaciones_secretaria import (
+		ensure_secretaria_operacion_access,
+	)
+
+	ensure_secretaria_operacion_access()
+	start = getdate(desde)
+	end = getdate(hasta)
+	creadas: list[str] = []
+	periodos_creados: list[str] = []
+	periodos_omitidos: list[str] = []
+	errores: list[dict[str, str]] = []
+
+	for month_start in _iter_primeros_de_mes(start, end):
+		periodo = format_periodo_cobro(month_start)
+		try:
+			names = generar_cargo_socio(socio_name, reference_date=month_start)
+			creadas.extend(names)
+			periodos_creados.append(periodo)
+		except frappe.ValidationError as exc:
+			msg = str(exc)
+			if "No hay conceptos pendientes" in msg or "ya cargados" in msg:
+				periodos_omitidos.append(periodo)
+			else:
+				errores.append({"periodo": periodo, "error": msg})
+		except Exception:
+			errores.append({"periodo": periodo, "error": frappe.get_traceback()})
+			frappe.log_error(
+				title=_("Deuda rango — error {0} {1}").format(socio_name, periodo),
+				message=frappe.get_traceback(),
+			)
+
+	return {
+		"socio": socio_name,
+		"desde": str(start),
+		"hasta": str(end),
+		"facturas_creadas": len(creadas),
+		"invoice_names": creadas,
+		"periodos_creados": periodos_creados,
+		"periodos_omitidos": periodos_omitidos,
+		"errores": len(errores),
+		"detalle_errores": errores,
+	}
+

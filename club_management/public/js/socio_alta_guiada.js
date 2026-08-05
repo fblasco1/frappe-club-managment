@@ -146,20 +146,26 @@ club_management_socio_alta_guiada.open = function (frm) {
 				options: "\nActivo\nMenor\n2° Hermano\n3° Hermano\nAdherente\nJubilado\nVitalicio",
 				reqd: 1,
 				default: prefill.categoria || "Activo",
+				onchange: () => club_management_socio_alta_guiada._wire_tutor_fields(d),
 			},
 			{
 				fieldname: "tipo_tutor",
 				fieldtype: "Select",
-				label: __("Tipo de tutor"),
+				label: __("Tipo de tutor (opcional)"),
 				options: "\nSocio\nTutor No Socio",
 				depends_on: "eval:doc.categoria=='Menor'",
+				description: __(
+					"Opcional en el alta. Puede completarlo después. Si crea un tutor no socio, use el botón del asistente (no abandona este formulario)."
+				),
 				default: prefill.tipo_tutor,
+				onchange: () => club_management_socio_alta_guiada._wire_tutor_fields(d),
 			},
 			{
 				fieldname: "tutor_socio",
 				fieldtype: "Link",
 				label: __("Tutor (socio)"),
 				options: "Socio",
+				only_select: 1,
 				depends_on: "eval:doc.categoria=='Menor' && doc.tipo_tutor=='Socio'",
 				default: prefill.tipo_tutor === "Socio" ? prefill.tutor : "",
 			},
@@ -168,6 +174,7 @@ club_management_socio_alta_guiada.open = function (frm) {
 				fieldtype: "Link",
 				label: __("Tutor (no socio)"),
 				options: "Tutor No Socio",
+				only_select: 1,
 				depends_on: "eval:doc.categoria=='Menor' && doc.tipo_tutor=='Tutor No Socio'",
 				default: prefill.tipo_tutor === "Tutor No Socio" ? prefill.tutor : "",
 			},
@@ -220,9 +227,149 @@ club_management_socio_alta_guiada.open = function (frm) {
 	});
 	d.show();
 	club_management.inscripcion_cascada.setup_dialog_cascada(d);
+	club_management_socio_alta_guiada._wire_tutor_fields(d);
 	if (prefill.fecha_nacimiento) {
 		club_management_socio_alta_guiada._sugerir_categoria(d);
 	}
+};
+
+/** Evita navegar al Form al crear tutor; ofrece alta anidada que vuelve al asistente. */
+club_management_socio_alta_guiada._wire_tutor_fields = function (d) {
+	for (const fieldname of ["tutor_socio", "tutor_no_socio"]) {
+		const field = d.get_field(fieldname);
+		if (field?.df) {
+			field.df.only_select = 1;
+		}
+	}
+	const field = d.get_field("tutor_no_socio");
+	if (!field?.$wrapper) {
+		return;
+	}
+	field.$wrapper.find(".club-crear-tns").remove();
+	if (d.get_value("tipo_tutor") !== "Tutor No Socio") {
+		return;
+	}
+	const $btn = $(
+		`<button type="button" class="btn btn-xs btn-default club-crear-tns" style="margin-top: 6px;">
+			${__("Crear tutor no socio")}
+		</button>`
+	);
+	$btn.on("click", (e) => {
+		e.preventDefault();
+		club_management_socio_alta_guiada._abrir_dialog_tutor_no_socio(d);
+	});
+	field.$wrapper.append($btn);
+};
+
+club_management_socio_alta_guiada._abrir_dialog_tutor_no_socio = function (parent_dialog) {
+	const nested = new frappe.ui.Dialog({
+		title: __("Nuevo tutor no socio"),
+		size: "large",
+		fields: [
+			{ fieldtype: "Section Break", label: __("Datos personales") },
+			{ fieldname: "nombre", fieldtype: "Data", label: __("Nombre"), reqd: 1 },
+			{ fieldname: "apellido", fieldtype: "Data", label: __("Apellido"), reqd: 1 },
+			{ fieldname: "dni", fieldtype: "Data", label: __("DNI"), reqd: 1 },
+			{
+				fieldname: "nacionalidad",
+				fieldtype: "Link",
+				label: __("Nacionalidad"),
+				options: "Country",
+				reqd: 1,
+				default: "Argentina",
+			},
+			{
+				fieldname: "fecha_nacimiento",
+				fieldtype: "Date",
+				label: __("Fecha de nacimiento"),
+				reqd: 1,
+			},
+			{
+				fieldname: "genero",
+				fieldtype: "Select",
+				label: __("Género"),
+				options: "\nMasculino\nFemenino\nOtro\nPrefiero no decir",
+				reqd: 1,
+			},
+			{
+				fieldname: "email",
+				fieldtype: "Data",
+				label: __("Email"),
+				options: "Email",
+				reqd: 1,
+			},
+			{ fieldname: "telefono_fijo", fieldtype: "Data", label: __("Teléfono fijo") },
+			{
+				fieldname: "telefono_movil",
+				fieldtype: "Data",
+				label: __("Teléfono móvil"),
+				reqd: 1,
+			},
+			{ fieldtype: "Section Break", label: __("Domicilio") },
+			{ fieldname: "calle", fieldtype: "Data", label: __("Calle"), reqd: 1 },
+			{ fieldname: "numero", fieldtype: "Data", label: __("Número") },
+			{ fieldname: "piso", fieldtype: "Data", label: __("Piso") },
+			{ fieldname: "departamento", fieldtype: "Data", label: __("Departamento") },
+			{ fieldname: "provincia", fieldtype: "Data", label: __("Provincia"), reqd: 1 },
+			{ fieldname: "ciudad", fieldtype: "Data", label: __("Ciudad") },
+			{
+				fieldname: "localidad_barrio",
+				fieldtype: "Data",
+				label: __("Localidad / Barrio"),
+				reqd: 1,
+			},
+			{ fieldname: "codigo_postal", fieldtype: "Data", label: __("Código postal"), reqd: 1 },
+		],
+		primary_action_label: __("Guardar y volver al alta"),
+		primary_action(values) {
+			frappe.call({
+				method: "frappe.client.insert",
+				args: {
+					doc: {
+						doctype: "Tutor No Socio",
+						nombre: values.nombre,
+						apellido: values.apellido,
+						dni: values.dni,
+						nacionalidad: values.nacionalidad,
+						fecha_nacimiento: values.fecha_nacimiento,
+						genero: values.genero,
+						email: values.email,
+						telefono_fijo: values.telefono_fijo,
+						telefono_movil: values.telefono_movil,
+						calle: values.calle,
+						numero: values.numero,
+						piso: values.piso,
+						departamento: values.departamento,
+						provincia: values.provincia,
+						ciudad: values.ciudad,
+						localidad_barrio: values.localidad_barrio,
+						codigo_postal: values.codigo_postal,
+					},
+				},
+				freeze: true,
+				freeze_message: __("Creando tutor…"),
+				callback(r) {
+					if (r.exc || !r.message?.name) {
+						return;
+					}
+					nested.hide();
+					parent_dialog.set_value("tipo_tutor", "Tutor No Socio").then(() => {
+						parent_dialog.set_value("tutor_no_socio", r.message.name);
+						club_management_socio_alta_guiada._wire_tutor_fields(parent_dialog);
+					});
+					frappe.show_alert({
+						message: __("Tutor creado: {0}", [r.message.name]),
+						indicator: "green",
+					});
+				},
+			});
+		},
+		secondary_action_label: __("Volver al alta de socio"),
+		secondary_action() {
+			nested.hide();
+		},
+	});
+	nested.show();
 };
 
 club_management_socio_alta_guiada._collect_from_frm = function (frm) {
@@ -268,7 +415,9 @@ club_management_socio_alta_guiada._sugerir_categoria = function (d) {
 		args: { fecha_nacimiento: fecha },
 		callback(r) {
 			if (r.message?.categoria) {
-				d.set_value("categoria", r.message.categoria);
+				d.set_value("categoria", r.message.categoria).then(() => {
+					club_management_socio_alta_guiada._wire_tutor_fields(d);
+				});
 			}
 		},
 	});
@@ -317,9 +466,16 @@ club_management_socio_alta_guiada._build_datos = function (values) {
 		datos.numero_socio = values.numero_socio;
 	}
 	if (values.categoria === "Menor") {
-		datos.tipo_tutor = values.tipo_tutor;
-		datos.tutor =
-			values.tipo_tutor === "Socio" ? values.tutor_socio : values.tutor_no_socio;
+		const tutor =
+			values.tipo_tutor === "Socio"
+				? values.tutor_socio
+				: values.tipo_tutor === "Tutor No Socio"
+					? values.tutor_no_socio
+					: null;
+		if (values.tipo_tutor && tutor) {
+			datos.tipo_tutor = values.tipo_tutor;
+			datos.tutor = tutor;
+		}
 	}
 	return datos;
 };
@@ -354,11 +510,7 @@ club_management_socio_alta_guiada._crear_socio = function (d, values, frm) {
 		callback(r) {
 			if (!r.exc && r.message) {
 				d.hide();
-				if (frm && frm.is_new()) {
-					frappe.set_route("Form", "Socio", r.message.socio);
-				} else {
-					frappe.set_route("Form", "Socio", r.message.socio);
-				}
+				frappe.set_route("Form", "Socio", r.message.socio);
 				frappe.show_alert({
 					message: __("Socio creado — {0}", [r.message.estado]),
 					indicator: "green",

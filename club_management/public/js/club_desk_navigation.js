@@ -44,6 +44,22 @@
 
 		},
 
+		{
+
+			label: __("Tesorería"),
+
+			workspace: "Tesorería",
+
+			icon: "currency-exchange",
+
+			emoji: "🏦",
+
+			tab: "tesoreria",
+
+			type: "workspace",
+
+		},
+
 	];
 
 
@@ -56,6 +72,8 @@
 
 		"Deuda por actividad",
 
+		"Pagos del dia",
+
 	]);
 
 
@@ -67,6 +85,8 @@
 		"Pagos por equipo",
 
 		"Deuda por actividad",
+
+		"Pagos del dia",
 
 	]);
 
@@ -131,6 +151,12 @@
 
 	club_management.club_desk_navigation.workspace_slug = function (workspace) {
 
+		if (!workspace) {
+
+			return "";
+
+		}
+
 		return frappe.router.slug(workspace);
 
 	};
@@ -155,11 +181,16 @@
 
 		}
 
-		const slug = frappe.router?.slug?.();
+		// Ruta de un solo segmento (p. ej. /desk/tesorería): slugificar el segmento, nunca slug().
+		if (route.length === 1 && route[0]) {
 
-		if (slug && frappe.workspaces?.[slug]) {
+			const key = this.workspace_slug(route[0]);
 
-			return frappe.workspaces[slug].name;
+			if (key && frappe.workspaces?.[key]) {
+
+				return frappe.workspaces[key].name;
+
+			}
 
 		}
 
@@ -243,7 +274,11 @@
 
 		return (
 
-			active === "Secretaría" || active === "Gestión de Actividades"
+			active === "Secretaría" ||
+
+			active === "Gestión de Actividades" ||
+
+			active === "Tesorería"
 
 		);
 
@@ -545,7 +580,9 @@
 
 			const is_active = active_tab?.tab === tab.tab;
 
-			const icon = frappe.utils.icon(tab.icon, "sm", "", "", "club-desk-nav-icon");
+			const icon = tab.emoji
+				? `<span class="club-desk-nav-emoji" aria-hidden="true">${tab.emoji}</span>`
+				: frappe.utils.icon(tab.icon, "sm", "", "", "club-desk-nav-icon");
 
 			const data_attrs = `data-nav-type="workspace" data-workspace="${frappe.utils.escape_html(tab.workspace)}"`;
 

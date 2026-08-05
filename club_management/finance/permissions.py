@@ -11,6 +11,8 @@ ROLE_SYSTEM_MANAGER = "System Manager"
 
 _ROLES_TESORERIA = frozenset({ROLE_TESORERIA, ROLE_SYSTEM_MANAGER})
 _ROLES_CARGA = frozenset({ROLE_SECRETARIA, ROLE_SYSTEM_MANAGER})
+# Panel operativo de Finanzas: Tesorería + Secretaría (acceso operativo GF-6).
+_ROLES_FINANCE_PANEL = frozenset({ROLE_TESORERIA, ROLE_SECRETARIA, ROLE_SYSTEM_MANAGER})
 
 
 def ensure_role_tesoreria_exists() -> None:
@@ -48,3 +50,13 @@ def user_has_tesoreria_access() -> bool:
 	if frappe.session.user == "Administrator":
 		return True
 	return bool(_ROLES_TESORERIA.intersection(frappe.get_roles()))
+
+
+def ensure_finance_panel_access() -> None:
+	"""Gate del panel operativo de Finanzas (Tesorería y Secretaría)."""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("No autorizado"), frappe.PermissionError)
+	if frappe.session.user == "Administrator":
+		return
+	if not _ROLES_FINANCE_PANEL.intersection(frappe.get_roles()):
+		frappe.throw(_("No autorizado"), frappe.PermissionError)

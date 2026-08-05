@@ -5,7 +5,7 @@
 - Aranceles mensuales por equipo (`Equipo Actividad.item`), igual que básquet.
 - Sin packs CLASES.
 
-## Vóley — ítems ERPNext (cuenta 412001, CC `Deportes - Voley - ICDPE`)
+## Vóley — ítems ERPNext (cuenta 412001, CC `Voley - ICDPE`)
 
 | item_code | Monto ARS | Equipos |
 |-----------|-----------|---------|

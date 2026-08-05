@@ -68,11 +68,22 @@ And el resto de KPIs del panel siguen referidos al mes en curso salvo el gráfic
 
 Given `Payment Entry` submitted del mes contra facturas de socios
 When Secretaria consulta el dashboard
-Then ve un gráfico de torta agrupado en:
+Then ve un gráfico de torta (donut) titulado **Medios de pago del mes** agrupado en:
 **Efectivo** (`Cash`, `Cheque`),
 **Tarjeta** (`Credit Card`, `Bank Draft`),
 **Transferencia** (`Wire Transfer`),
 **Otro** (demás modos).
+
+---
+
+## Scenario: medios de pago sin cobros del mes (estado vacío)
+
+Given ERPNext cobranza disponible
+And no hay `Payment Entry` submitted del mes contra facturas de socios (montos en cero)
+When Secretaria consulta el dashboard
+Then la tarjeta **Medios de pago del mes** sigue visible
+And en lugar del donut se muestra el mensaje **Sin cobros del mes**
+And la tarjeta **no** desaparece del panel.
 
 ---
 

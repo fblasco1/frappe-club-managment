@@ -139,12 +139,13 @@ def _normalizar_datos_alta(datos: dict[str, Any]) -> dict[str, Any]:
 		)
 
 	if payload.get("categoria") == "Menor":
-		for campo in ("tipo_tutor", "tutor"):
-			if not payload.get(campo):
-				frappe.throw(
-					_("Menor: complete el tutor responsable."),
-					frappe.ValidationError,
-				)
+		tiene_tipo = bool(payload.get("tipo_tutor"))
+		tiene_tutor = bool(payload.get("tutor"))
+		if tiene_tipo ^ tiene_tutor:
+			frappe.throw(
+				_("Menor: el vínculo de tutor está incompleto (indique tipo y tutor, o déjelos vacíos)."),
+				frappe.ValidationError,
+			)
 
 	if payload.get("numero_socio") is not None and payload.get("numero_socio") != "":
 		try:

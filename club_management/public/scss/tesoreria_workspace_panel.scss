@@ -1,0 +1,94 @@
+/* Panel Tesorería — operaciones (ancho completo) */
+
+body.club-tesoreria-active-workspace .layout-main-section-wrapper,
+body.club-tesoreria-active-workspace .layout-main .layout-main-section-wrapper,
+.club-tesoreria-workspace-body.layout-main-section-wrapper,
+.club-tesoreria-workspace-body.layout-main-section,
+.club-tesoreria-workspace-body.page-body,
+.club-tesoreria-workspace-body.container,
+.club-tesoreria-workspace-body.workspace-content,
+.club-tesoreria-workspace-body.layout-main,
+.club-tesoreria-workspace-body .layout-main-section-wrapper,
+.club-tesoreria-workspace-body .layout-main-section,
+.club-tesoreria-workspace-body .layout-main {
+	width: 100% !important;
+	max-width: none !important;
+	flex: 1 1 100% !important;
+}
+
+.club-tesoreria-workspace,
+.club-tesoreria-workspace .editor-js-container,
+#club-tesoreria-panel {
+	width: 100%;
+	max-width: none;
+	box-sizing: border-box;
+}
+
+.club-tesoreria-workspace .editor-js-container {
+	width: 100%;
+	max-width: none;
+	padding-left: 0;
+	padding-right: 0;
+}
+
+.club-tesoreria-workspace .codex-editor,
+.club-tesoreria-workspace .codex-editor__redactor {
+	min-height: unset !important;
+}
+
+.club-tesoreria-workspace .editor-holder,
+.club-tesoreria-workspace #editorjs {
+	display: none;
+}
+
+/* Botones de acción alineados a la izquierda */
+.club-tesoreria-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-start;
+	gap: 0.5rem;
+	margin-bottom: 1.25rem;
+}
+
+/* Tarjetas de listas */
+.club-tesoreria-list-card {
+	background: var(--card-bg);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-lg);
+	padding: 1rem 1.25rem;
+	margin-bottom: 1.25rem;
+}
+
+.club-tesoreria-list-header {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin-bottom: 0.75rem;
+}
+
+.club-tesoreria-list-icon {
+	font-size: 1.1rem;
+}
+
+.club-tesoreria-table th {
+	font-weight: 600;
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+
+.club-tesoreria-table tbody tr.club-tesoreria-row {
+	cursor: pointer;
+}
+
+.club-tesoreria-table tbody tr.club-tesoreria-row:hover {
+	background: var(--fg-hover-color);
+}
+
+.club-tesoreria-badge {
+	display: inline-block;
+	padding: 0.1rem 0.5rem;
+	border-radius: 999px;
+	background: var(--control-bg);
+	color: var(--text-color);
+	font-size: 0.75rem;
+}

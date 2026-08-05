@@ -46,9 +46,9 @@ class TestItemsFinanceCostCenter(MembersTestCase):
 		self.assertTrue(frappe.db.exists("Cost Center", cc))
 
 	def test_resolve_buying_cost_center_desde_item(self) -> None:
-		if not frappe.db.exists("Item", "ICDPE-FIN-SUELDOS"):
-			self.skipTest("Ítem sueldos no sembrado")
-		cc = resolve_buying_cost_center("ICDPE-FIN-SUELDOS", self.company)
+		if not frappe.db.exists("Item", "ICDPE-FIN-SUELDO-ADMIN"):
+			self.skipTest("Ítem sueldo administrativo no sembrado")
+		cc = resolve_buying_cost_center("ICDPE-FIN-SUELDO-ADMIN", self.company)
 		self.assertTrue(cc)
 
 	def test_sin_cc_falla(self) -> None:
