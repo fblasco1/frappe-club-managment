@@ -11,22 +11,27 @@ from club_management.activities.data.futbol_aranceles_icdpe import (
 )
 from club_management.activities.data.voley_aranceles_icdpe import (
 	ITEM_VOLEY_ESCUELITA_MINIVOLEY,
-	ITEM_VOLEY_TIRA_21500,
 	ITEM_VOLEY_TIRA_30500,
 )
 from club_management.activities.services.estructura_actividades_seed import (
 	seed_estructura_actividades_completa,
 )
-from club_management.members.test_helpers import MembersTestCase
+from club_management.activities.services.inscripcion_socio import (
+	inscribir_socio_selecciones,
+	resolve_item_arancel_inscripcion,
+)
+from club_management.members.test_helpers import MembersTestCase, insert_socio
 
 
 class TestVoleyFutbolArancelesIcdpe(MembersTestCase):
-	def test_seed_voley_tira_u12(self) -> None:
+	def test_seed_voley_tira_u12_formativas(self) -> None:
 		seed_estructura_actividades_completa(crear_equipos=True)
 		vf = frappe.db.get_value("Actividad", {"titulo": "Voley Femenino"}, "name")
-		equipo = f"{vf} / Tira / U12"
+		grupo = f"{vf} / Tira"
+		equipo = f"{grupo} / U12"
 		self.assertTrue(frappe.db.exists("Equipo Actividad", equipo))
-		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), ITEM_VOLEY_TIRA_21500)
+		self.assertEqual(frappe.db.get_value("Grupo Actividad", grupo, "item"), ITEM_VOLEY_TIRA_30500)
+		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), ITEM_VOLEY_TIRA_30500)
 
 	def test_seed_voley_superior_a(self) -> None:
 		seed_estructura_actividades_completa(crear_equipos=True)
@@ -37,17 +42,55 @@ class TestVoleyFutbolArancelesIcdpe(MembersTestCase):
 	def test_seed_voley_escuelita_minivoley(self) -> None:
 		seed_estructura_actividades_completa(crear_equipos=True)
 		vf = frappe.db.get_value("Actividad", {"titulo": "Voley Femenino"}, "name")
-		equipo = f"{vf} / Escuelita Minivoley / Escuelita Minivoley"
+		grupo = f"{vf} / Escuelita Minivoley"
+		equipo = f"{grupo} / Escuelita Minivoley"
+		self.assertEqual(frappe.db.get_value("Grupo Actividad", grupo, "item"), ITEM_VOLEY_ESCUELITA_MINIVOLEY)
 		self.assertEqual(
 			frappe.db.get_value("Equipo Actividad", equipo, "item"),
 			ITEM_VOLEY_ESCUELITA_MINIVOLEY,
 		)
 
+	def test_voley_tira_sin_equipo_usa_grupo_formativas(self) -> None:
+		seed_estructura_actividades_completa(crear_equipos=True)
+		vf = frappe.db.get_value("Actividad", {"titulo": "Voley Femenino"}, "name")
+		grupo = f"{vf} / Tira"
+		socio = insert_socio(dni="72001001", email="voley.tira.grupo@example.com", estado="Activo")
+		inscribir_socio_selecciones(
+			socio.name,
+			[{"actividad": vf, "grupo": grupo}],
+			activar=False,
+		)
+		ins_name = frappe.db.get_value(
+			"Inscripcion Actividad",
+			{"socio": socio.name, "grupo_actividad": grupo},
+			"name",
+		)
+		self.assertEqual(resolve_item_arancel_inscripcion(ins_name), ITEM_VOLEY_TIRA_30500)
+
 	def test_seed_futbol_fafi_2016(self) -> None:
 		seed_estructura_actividades_completa(crear_equipos=True)
 		futbol = frappe.db.get_value("Actividad", {"titulo": "Futbol"}, "name")
-		equipo = f"{futbol} / FAFI / 2016"
+		grupo = f"{futbol} / FAFI"
+		equipo = f"{grupo} / 2016"
+		self.assertEqual(frappe.db.get_value("Grupo Actividad", grupo, "item"), ITEM_FUTBOL_FAFI)
 		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), ITEM_FUTBOL_FAFI)
+
+	def test_futbol_fafi_sin_equipo_usa_grupo(self) -> None:
+		seed_estructura_actividades_completa(crear_equipos=True)
+		futbol = frappe.db.get_value("Actividad", {"titulo": "Futbol"}, "name")
+		grupo = f"{futbol} / FAFI"
+		socio = insert_socio(dni="72001002", email="futbol.fafi.grupo@example.com", estado="Activo")
+		inscribir_socio_selecciones(
+			socio.name,
+			[{"actividad": futbol, "grupo": grupo}],
+			activar=False,
+		)
+		ins_name = frappe.db.get_value(
+			"Inscripcion Actividad",
+			{"socio": socio.name, "grupo_actividad": grupo},
+			"name",
+		)
+		self.assertEqual(resolve_item_arancel_inscripcion(ins_name), ITEM_FUTBOL_FAFI)
 
 	def test_seed_futbol_tabi_b(self) -> None:
 		seed_estructura_actividades_completa(crear_equipos=True)
@@ -60,7 +103,10 @@ class TestVoleyFutbolArancelesIcdpe(MembersTestCase):
 		futbol = frappe.db.get_value("Actividad", {"titulo": "Futbol"}, "name")
 		self.assertEqual(GRUPO_FUTBOL_ESCUELITA, "TABI B")
 		self.assertTrue(frappe.db.get_value("Grupo Actividad", f"{futbol} / TABI B", "habilitada"))
-		self.assertFalse(frappe.db.exists("Grupo Actividad", f"{futbol} / Escuelita"))
+		# Legacy «Escuelita» puede existir deshabilitado; no debe estar habilitado.
+		self.assertFalse(
+			frappe.db.get_value("Grupo Actividad", f"{futbol} / Escuelita", "habilitada")
+		)
 		equipo = f"{futbol} / TABI B / 2020/2021"
 		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), ITEM_FUTBOL_TABI_B)
 

@@ -31,12 +31,9 @@ def upsert_grupo_actividad(
 		frappe.throw(f"Actividad inexistente: {actividad_titulo}")
 
 	name = f"{actividad} / {grupo.titulo}"
-	# Si los equipos tienen ítem propio, el arancel no va en el grupo.
-	item_link = None
-	if grupo.equipos:
-		item_link = None
-	elif grupo.item_code:
-		item_link = resolve_item_name(grupo.item_code)
+	# Si el grupo declara item_code, es la fuente de cobro (aunque existan equipos).
+	# Basquet no setea item_code → Grupo.item queda vacío y cobra por equipo.
+	item_link = resolve_item_name(grupo.item_code) if grupo.item_code else None
 
 	payload: dict = {
 		"actividad": actividad,
@@ -122,7 +119,20 @@ def _seed_equipos_grupo(grupo_name: str, grupo: GrupoSeed) -> int:
 
 def seed_estructura_actividades_completa(*, crear_equipos: bool = True) -> dict[str, int]:
 	"""Sincroniza catálogo ICDPE + grupos + equipos. Devuelve conteos."""
+	from club_management.activities.data.futbol_aranceles_icdpe import FUTBOL_ITEM_SPECS
+	from club_management.activities.data.otras_actividades_aranceles_icdpe import (
+		OTRAS_ACTIVIDADES_ITEM_SPECS,
+	)
+	from club_management.activities.data.patin_aranceles_icdpe import PATIN_ITEM_SPECS
+	from club_management.activities.data.voley_aranceles_icdpe import VOLEY_ITEM_SPECS
+	from club_management.activities.services.deporte_icdpe_items import sync_arancel_items
+
 	sync_actividades_catalogo_icdpe(deshabilitar_legacy=True)
+	# Asegura ítems antes de linkear Grupo/Equipo.item (cobro por tira).
+	sync_arancel_items(VOLEY_ITEM_SPECS)
+	sync_arancel_items(FUTBOL_ITEM_SPECS)
+	sync_arancel_items(PATIN_ITEM_SPECS)
+	sync_arancel_items(OTRAS_ACTIVIDADES_ITEM_SPECS)
 
 	grupos_creados = 0
 	equipos_creados = 0

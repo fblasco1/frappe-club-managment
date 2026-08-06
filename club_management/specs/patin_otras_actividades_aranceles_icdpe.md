@@ -2,8 +2,10 @@
 
 ## Modelo
 
-- Arancel por `Equipo Actividad.item` o `Grupo Actividad.item` → `Actividad.item`.
-- Actividades con un solo plan usan `usa_grupos = 0` e ítem en la actividad.
+- **Cobro operativo:** `Grupo Actividad.item` cuando la inscripción no tiene equipo
+  (cascada equipo → grupo → actividad).
+- Equipos pueden compartir el mismo ítem del grupo.
+- Actividades planas usan `usa_grupos = 0` e ítem en la actividad.
 
 ## Patín Artístico — grupos y equipos
 
@@ -21,6 +23,12 @@
 Given `Patin Artistico` / `Patin Avanzado` / `B`
 When se resuelve el arancel
 Then devuelve `ICDPE-PATIN-AVANZADO` con tarifa 42.000.
+
+## Scenario: patín avanzado solo grupo
+
+Given inscripción en `Patin Artistico` / `Patin Avanzado` **sin** equipo
+When se resuelve el arancel
+Then usa `Grupo Actividad.item` = `ICDPE-PATIN-AVANZADO`.
 
 ## Scenario: patín mini
 

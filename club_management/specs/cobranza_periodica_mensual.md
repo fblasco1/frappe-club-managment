@@ -70,6 +70,15 @@ Then la línea usa `resolve_item_arancel_inscripcion` y monto de `Item.standard_
 
 ---
 
+## Scenario: arancel desde grupo sin equipo (deportes no-básquet)
+
+Given inscripción activa en fútbol/vóley/patín/otras con `grupo_actividad.item` seteado
+And `equipo_actividad` vacío
+When se genera la deuda mensual del socio
+Then la línea de arancel usa el ítem del **grupo/tira** (no el genérico de actividad).
+
+---
+
 ## Scenario: desactivar suscripción ERPNext duplicada
 
 Given el socio tiene `Subscription` activa que también genera facturas de cuota social
