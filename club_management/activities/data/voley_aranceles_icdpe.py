@@ -7,8 +7,8 @@ from club_management.activities.data.arancel_item_spec import (
 	format_arancel_mensual_item_name,
 )
 
-ITEM_VOLEY_TIRA_21500 = "ICDPE-VOLEY-TIRA-21500"
-ITEM_VOLEY_TIRA_30500 = "ICDPE-VOLEY-TIRA-30500"
+ITEM_VOLEY_TIRA_21500 = "ICDPE-VOLEY-TIRA-21500"  # legacy U11-U12; Tira unificada usa 30500
+ITEM_VOLEY_TIRA_30500 = "ICDPE-VOLEY-TIRA-30500"  # Formativas — tarifa única de Tira
 ITEM_VOLEY_ESCUELA_ADOLESCENTE = "ICDPE-VOLEY-ESCUELA-ADOLESCENTE"
 ITEM_VOLEY_ESCUELITA_MINIVOLEY = "ICDPE-VOLEY-ESCUELITA-MINIVOLEY"
 
@@ -23,7 +23,7 @@ VOLEY_ITEM_SPECS: tuple[ArancelItemSpec, ...] = (
 	),
 	ArancelItemSpec(
 		ITEM_VOLEY_TIRA_30500,
-		format_arancel_mensual_item_name("VOLEY", "FEMENINO", "TIRA", "FORMATIVAS-SUPERIOR"),
+		format_arancel_mensual_item_name("VOLEY", "FEMENINO", "TIRA", "FORMATIVAS"),
 		30500.0,
 		CC_VOLEY,
 	),

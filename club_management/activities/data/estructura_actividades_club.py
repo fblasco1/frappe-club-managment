@@ -45,7 +45,6 @@ from club_management.activities.data.patin_aranceles_icdpe import (
 from club_management.activities.data.voley_aranceles_icdpe import (
 	ITEM_VOLEY_ESCUELA_ADOLESCENTE,
 	ITEM_VOLEY_ESCUELITA_MINIVOLEY,
-	ITEM_VOLEY_TIRA_21500,
 	ITEM_VOLEY_TIRA_30500,
 )
 
@@ -94,7 +93,12 @@ def _eq_basquet(titulo: str, orden: int, item_code: str, descripcion: str = "") 
 
 
 def _grupo_leaf(grupo_titulo: str, orden: int, item_code: str) -> GrupoSeed:
-	return GrupoSeed(grupo_titulo, orden, equipos=(_eq(grupo_titulo, 10, item_code),))
+	return GrupoSeed(
+		grupo_titulo,
+		orden,
+		item_code=item_code,
+		equipos=(_eq(grupo_titulo, 10, item_code),),
+	)
 
 
 ESTRUCTURA_BASQUET = ActividadEstructuraSeed(
@@ -167,9 +171,10 @@ ESTRUCTURA_VOLEY_FEMENINO = ActividadEstructuraSeed(
 		GrupoSeed(
 			"Tira",
 			10,
+			item_code=ITEM_VOLEY_TIRA_30500,
 			equipos=(
-				_eq("U11", 10, ITEM_VOLEY_TIRA_21500),
-				_eq("U12", 20, ITEM_VOLEY_TIRA_21500),
+				_eq("U11", 10, ITEM_VOLEY_TIRA_30500),
+				_eq("U12", 20, ITEM_VOLEY_TIRA_30500),
 				_eq("U13", 30, ITEM_VOLEY_TIRA_30500),
 				_eq("U14", 40, ITEM_VOLEY_TIRA_30500),
 				_eq("U15", 50, ITEM_VOLEY_TIRA_30500),
@@ -183,11 +188,13 @@ ESTRUCTURA_VOLEY_FEMENINO = ActividadEstructuraSeed(
 		GrupoSeed(
 			"Escuela Adolescente",
 			20,
+			item_code=ITEM_VOLEY_ESCUELA_ADOLESCENTE,
 			equipos=(_eq("Escuela Adolescente", 10, ITEM_VOLEY_ESCUELA_ADOLESCENTE),),
 		),
 		GrupoSeed(
 			"Escuelita Minivoley",
 			30,
+			item_code=ITEM_VOLEY_ESCUELITA_MINIVOLEY,
 			equipos=(_eq("Escuelita Minivoley", 10, ITEM_VOLEY_ESCUELITA_MINIVOLEY),),
 		),
 	),
@@ -199,6 +206,7 @@ ESTRUCTURA_FUTBOL = ActividadEstructuraSeed(
 		GrupoSeed(
 			"FAFI",
 			10,
+			item_code=ITEM_FUTBOL_FAFI,
 			equipos=(
 				_eq("2019", 10, ITEM_FUTBOL_FAFI),
 				_eq("2018", 20, ITEM_FUTBOL_FAFI),
@@ -212,6 +220,7 @@ ESTRUCTURA_FUTBOL = ActividadEstructuraSeed(
 		GrupoSeed(
 			"TABI A",
 			20,
+			item_code=ITEM_FUTBOL_TABI_A,
 			equipos=(
 				_eq("2019", 10, ITEM_FUTBOL_TABI_A),
 				_eq("2018", 20, ITEM_FUTBOL_TABI_A),
@@ -224,6 +233,7 @@ ESTRUCTURA_FUTBOL = ActividadEstructuraSeed(
 		GrupoSeed(
 			GRUPO_FUTBOL_ESCUELITA,
 			30,
+			item_code=ITEM_FUTBOL_TABI_B,
 			equipos=(
 				_eq("2014/2015", 10, ITEM_FUTBOL_TABI_B),
 				_eq("2016/2017", 20, ITEM_FUTBOL_TABI_B),
@@ -241,6 +251,7 @@ ESTRUCTURA_PATIN = ActividadEstructuraSeed(
 		GrupoSeed(
 			"Patin Avanzado",
 			10,
+			item_code=ITEM_PATIN_AVANZADO,
 			equipos=(
 				_eq("A", 10, ITEM_PATIN_AVANZADO),
 				_eq("B", 20, ITEM_PATIN_AVANZADO),
@@ -251,6 +262,7 @@ ESTRUCTURA_PATIN = ActividadEstructuraSeed(
 		GrupoSeed(
 			"Patin Intermedio",
 			20,
+			item_code=ITEM_PATIN_INTERMEDIO,
 			equipos=(
 				_eq("1", 10, ITEM_PATIN_INTERMEDIO),
 				_eq("2", 20, ITEM_PATIN_INTERMEDIO),

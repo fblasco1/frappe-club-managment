@@ -49,3 +49,23 @@ class TestEstructuraActividadesSeed(MembersTestCase):
 		futbol = frappe.db.get_value("Actividad", {"titulo": "Futbol"}, "name")
 		self.assertTrue(frappe.db.exists("Grupo Actividad", f"{futbol} / FAFI"))
 		self.assertTrue(frappe.db.exists("Equipo Actividad", f"{futbol} / TABI B / 2020/2021"))
+
+	def test_seed_grupo_item_no_basquet_y_basquet_sin_item(self) -> None:
+		from club_management.activities.data.futbol_aranceles_icdpe import ITEM_FUTBOL_FAFI
+		from club_management.activities.data.voley_aranceles_icdpe import ITEM_VOLEY_TIRA_30500
+
+		seed_estructura_actividades_completa(crear_equipos=True)
+		basquet = frappe.db.get_value("Actividad", {"titulo": "Basquet"}, "name")
+		azul = f"{basquet} / Masculino / Azul"
+		self.assertFalse(frappe.db.get_value("Grupo Actividad", azul, "item"))
+
+		vf = frappe.db.get_value("Actividad", {"titulo": "Voley Femenino"}, "name")
+		self.assertEqual(
+			frappe.db.get_value("Grupo Actividad", f"{vf} / Tira", "item"),
+			ITEM_VOLEY_TIRA_30500,
+		)
+		futbol = frappe.db.get_value("Actividad", {"titulo": "Futbol"}, "name")
+		self.assertEqual(
+			frappe.db.get_value("Grupo Actividad", f"{futbol} / FAFI", "item"),
+			ITEM_FUTBOL_FAFI,
+		)

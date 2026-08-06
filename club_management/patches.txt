@@ -68,3 +68,4 @@ club_management.patches.v1_0.cleanup_test_item_groups
 club_management.patches.v1_0.cleanup_legacy_arancel_items
 club_management.patches.v1_0.sync_arancel_item_names
 club_management.patches.v1_0.add_secretaria_item_create_permissions
+club_management.patches.v1_0.sync_arancel_grupos_sin_equipo

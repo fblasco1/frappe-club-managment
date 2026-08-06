@@ -25,13 +25,40 @@ class TestPatinOtrasActividadesArancelesIcdpe(MembersTestCase):
 	def test_seed_patin_avanzado_equipo_b(self) -> None:
 		seed_estructura_actividades_completa(crear_equipos=True)
 		patin = frappe.db.get_value("Actividad", {"titulo": "Patin Artistico"}, "name")
-		equipo = f"{patin} / Patin Avanzado / B"
+		grupo = f"{patin} / Patin Avanzado"
+		equipo = f"{grupo} / B"
+		self.assertEqual(frappe.db.get_value("Grupo Actividad", grupo, "item"), ITEM_PATIN_AVANZADO)
 		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), ITEM_PATIN_AVANZADO)
+
+	def test_patin_avanzado_sin_equipo_usa_grupo(self) -> None:
+		from club_management.activities.services.inscripcion_socio import (
+			inscribir_socio_selecciones,
+			resolve_item_arancel_inscripcion,
+		)
+		from club_management.members.test_helpers import insert_socio
+
+		seed_estructura_actividades_completa(crear_equipos=True)
+		patin = frappe.db.get_value("Actividad", {"titulo": "Patin Artistico"}, "name")
+		grupo = f"{patin} / Patin Avanzado"
+		socio = insert_socio(dni="72001003", email="patin.avanzado.grupo@example.com", estado="Activo")
+		inscribir_socio_selecciones(
+			socio.name,
+			[{"actividad": patin, "grupo": grupo}],
+			activar=False,
+		)
+		ins_name = frappe.db.get_value(
+			"Inscripcion Actividad",
+			{"socio": socio.name, "grupo_actividad": grupo},
+			"name",
+		)
+		self.assertEqual(resolve_item_arancel_inscripcion(ins_name), ITEM_PATIN_AVANZADO)
 
 	def test_seed_patin_mini(self) -> None:
 		seed_estructura_actividades_completa(crear_equipos=True)
 		patin = frappe.db.get_value("Actividad", {"titulo": "Patin Artistico"}, "name")
-		equipo = f"{patin} / Patin Mini / Patin Mini"
+		grupo = f"{patin} / Patin Mini"
+		equipo = f"{grupo} / Patin Mini"
+		self.assertEqual(frappe.db.get_value("Grupo Actividad", grupo, "item"), ITEM_PATIN_MINI)
 		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), ITEM_PATIN_MINI)
 
 	def test_seed_patin_adulto(self) -> None:
@@ -50,6 +77,7 @@ class TestPatinOtrasActividadesArancelesIcdpe(MembersTestCase):
 		ga = frappe.db.get_value("Actividad", {"titulo": "Gimnasia Artistica"}, "name")
 		grupo = f"{ga} / 2 Clases por Semana"
 		self.assertTrue(frappe.db.get_value("Grupo Actividad", grupo, "habilitada"))
+		self.assertEqual(frappe.db.get_value("Grupo Actividad", grupo, "item"), ITEM_GIMNASIA_2_CLASES)
 		equipo = f"{grupo} / 2 Clases por Semana"
 		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), ITEM_GIMNASIA_2_CLASES)
 
