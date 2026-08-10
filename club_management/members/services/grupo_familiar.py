@@ -41,6 +41,60 @@ def ensure_grupo_for_socio(
 	return grupo.name
 
 
+def add_socio_a_grupo_existente(
+	socio: Document,
+	grupo_name: str,
+	*,
+	rol: str = "Otro",
+) -> str:
+	"""Suma un socio ya creado a un grupo existente, sin crear uno nuevo.
+
+	Usado por el alta familiar del portal: el titular crea el `Grupo Familiar`
+	al validarse y los demás integrantes del trámite se incorporan a ese mismo
+	grupo con su `rol_en_grupo`.
+
+	El cónyuge entra como **cotitular** (`titulares`, `es_principal=0`,
+	`rol=Cotitular`). Secretaría puede quitar la titularidad después poniendo
+	`hasta` en esa fila. El resto de roles adultos van a `miembros`.
+	"""
+	if rol == "Cónyuge":
+		return add_cotitular_a_grupo(socio, grupo_name)
+
+	_add_socio_miembro(grupo_name, socio.name, rol=rol or "Otro")
+	socio.db_set("grupo_familiar", grupo_name, commit=False)
+	return grupo_name
+
+
+def add_cotitular_a_grupo(socio: Document, grupo_name: str) -> str:
+	"""Agrega al socio como cotitular no principal del grupo.
+
+	El validate de `Grupo Familiar` sincroniza titulares Socio a `miembros`.
+	"""
+	grupo = frappe.get_doc("Grupo Familiar", grupo_name)
+	for fila in grupo.titulares or []:
+		if (
+			fila.tipo_titular == "Socio"
+			and fila.titular == socio.name
+			and not fila.hasta
+		):
+			socio.db_set("grupo_familiar", grupo_name, commit=False)
+			return grupo_name
+
+	grupo.append(
+		"titulares",
+		{
+			"tipo_titular": "Socio",
+			"titular": socio.name,
+			"es_principal": 0,
+			"rol": "Cotitular",
+			"desde": today(),
+		},
+	)
+	grupo.save(ignore_permissions=True)
+	socio.db_set("grupo_familiar", grupo_name, commit=False)
+	return grupo_name
+
+
 def find_active_grupo_for_titular(tipo_titular: str, titular: str) -> str | None:
 	rows = frappe.db.sql(
 		"""

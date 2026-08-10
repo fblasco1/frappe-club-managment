@@ -1,6 +1,6 @@
-"""Tests de emails y stub de pago — Solicitud Asociacion (Sprint 1 Commit 5).
+"""Tests de emails — Solicitud Asociacion.
 
-Spec: `club_management/specs/solicitud_asociacion_publica.md` (Commit 5).
+Spec: `solicitud_asociacion_publica.md`, `alta_sin_pago_online.md`.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from urllib.parse import unquote
 import frappe
 
 from club_management.members.email_templates.solicitud_emails import (
+	render_solicitud_validada_contacto_email,
 	render_solicitud_validada_email,
 )
 from club_management.members.services.solicitud_tokens import sign_pago_token, verify_pago_token
@@ -22,15 +23,23 @@ from club_management.members.test_helpers import (
 
 
 class TestSolicitudAsociacionEmails(MembersTestCase):
-	"""Plantillas y tokens de pago."""
+	"""Plantillas y notificaciones post-validación."""
 
-	def test_email_validada_solo_nombre_y_link_sin_dni(self) -> None:
+	def test_email_validada_pago_solo_nombre_y_link_sin_dni(self) -> None:
 		html = render_solicitud_validada_email(
 			nombre="Ana",
 			pago_url="https://example.com/pago-stub?token=abc",
 		)
 		self.assertIn("Ana", html)
 		self.assertIn("Pagar primera cuota", html)
+		self.assertNotIn("30123456", html)
+
+	def test_email_validada_contacto_sin_link_de_pago(self) -> None:
+		html = render_solicitud_validada_contacto_email(nombre="Ana")
+		self.assertIn("Ana", html)
+		self.assertIn("contactar", html.lower())
+		self.assertNotIn("/pago-stub", html)
+		self.assertNotIn("Pagar primera cuota", html)
 		self.assertNotIn("30123456", html)
 
 	def test_pago_token_no_es_adivinable_por_enumeracion(self) -> None:
@@ -43,16 +52,42 @@ class TestSolicitudAsociacionEmails(MembersTestCase):
 		self.assertEqual(verify_pago_token(token2), sol2.name)
 		self.assertIsNone(verify_pago_token("token-inventado"))
 
+	def _set_pago_online_alta(self, enabled: int) -> None:
+		settings = frappe.get_single("Club Settings")
+		settings.habilitar_pago_online_alta = enabled
+		settings.save(ignore_permissions=True)
+
 	@patch("frappe.sendmail")
-	def test_send_validacion_incluye_link_stub_firmado(self, mock_sendmail) -> None:
+	def test_send_validacion_sin_pago_online_por_defecto(self, mock_sendmail) -> None:
 		from club_management.members.services.solicitud_notificaciones import (
 			_send_validacion_pago_email,
 		)
 
+		self._set_pago_online_alta(0)
 		sol = insert_solicitud_asociacion(dni="50111003", email="mail@example.com")
 		_send_validacion_pago_email(sol.name, "mail@example.com")
 		mock_sendmail.assert_called_once()
-		html = mock_sendmail.call_args.kwargs.get("message") or mock_sendmail.call_args[1].get("message")
+		kwargs = mock_sendmail.call_args.kwargs
+		html = kwargs.get("message") or mock_sendmail.call_args[1].get("message")
+		subject = kwargs.get("subject") or mock_sendmail.call_args[1].get("subject")
+		self.assertNotIn("/pago-stub", html)
+		self.assertNotIn("Pagar primera cuota", html)
+		self.assertIn("Ana", html)
+		self.assertIn("próximo paso", (subject or "").lower())
+
+	@patch("frappe.sendmail")
+	def test_send_validacion_con_pago_online_incluye_link_stub(self, mock_sendmail) -> None:
+		from club_management.members.services.solicitud_notificaciones import (
+			_send_validacion_pago_email,
+		)
+
+		self._set_pago_online_alta(1)
+		sol = insert_solicitud_asociacion(dni="50111004", email="mail2@example.com")
+		_send_validacion_pago_email(sol.name, "mail2@example.com")
+		mock_sendmail.assert_called_once()
+		html = mock_sendmail.call_args.kwargs.get("message") or mock_sendmail.call_args[1].get(
+			"message"
+		)
 		self.assertIn("/pago-stub?token=", html)
 		match = re.search(r"/pago-stub\?token=([^\"]+)", html)
 		self.assertIsNotNone(match)

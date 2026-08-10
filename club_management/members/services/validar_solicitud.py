@@ -10,6 +10,7 @@ from frappe import _
 from frappe.model.document import Document
 
 from club_management.members.services import grupo_familiar as gf
+from club_management.members.services.alta_grupo_familiar import MSG_TITULAR_SIN_VALIDAR
 from club_management.members.services.solicitud_notificaciones import (
 	enqueue_validacion_pago_email,
 )
@@ -29,6 +30,9 @@ from club_management.members.workflow.solicitud_asociacion_workflow import (
 ESTADO_SOCIO_TRAS_VALIDAR = "Pendiente de Pago"
 CATEGORIA_MENOR = "Menor"
 ROL_MIEMBRO_MENOR = "Hijo"
+ROL_MIEMBRO_OTRO = "Otro"
+ROL_TITULAR_GRUPO = "Titular"
+TRAMITE_DOCTYPE = "Solicitud Grupo Familiar"
 
 MSG_EMAIL_ADULTO_TOMADO = _(
 	"El email ya tiene cuenta en el portal; pedí al solicitante un email distinto"
@@ -60,6 +64,8 @@ def ejecutar_validacion_desde_solicitud(solicitud: Document) -> None:
 	if solicitud.workflow_state != STATE_VALIDADA:
 		return
 
+	_assert_orden_de_validacion_del_tramite(solicitud)
+
 	if solicitud.categoria_solicitada == CATEGORIA_MENOR:
 		_validar_menor(solicitud)
 	else:
@@ -74,7 +80,14 @@ def _validar_adulto(solicitud: Document) -> None:
 
 	socio = _insert_socio_desde_solicitud(solicitud, categoria=solicitud.categoria_solicitada)
 	user_name = provision_user_for_socio(socio.name)
-	grupo_name = gf.ensure_grupo_for_socio(socio, solicitud=solicitud)
+
+	grupo_del_tramite = _grupo_familiar_del_tramite(solicitud)
+	if grupo_del_tramite:
+		grupo_name = gf.add_socio_a_grupo_existente(
+			socio, grupo_del_tramite, rol=solicitud.rol_en_grupo or ROL_MIEMBRO_OTRO
+		)
+	else:
+		grupo_name = gf.ensure_grupo_for_socio(socio, solicitud=solicitud)
 
 	_finalize_solicitud(
 		solicitud,
@@ -239,6 +252,49 @@ def _validar_menor_con_tutor_nuevo_tns(solicitud: Document) -> None:
 	)
 
 
+def _grupo_familiar_del_tramite(solicitud: Document) -> str:
+	"""Grupo ya creado por el titular del trámite familiar, o `""`.
+
+	Devuelve vacío para altas individuales y para la solicitud del titular:
+	en ambos casos corresponde crear un `Grupo Familiar` nuevo.
+	"""
+	if not solicitud.get("solicitud_grupo"):
+		return ""
+	if solicitud.get("rol_en_grupo") == ROL_TITULAR_GRUPO:
+		return ""
+	return (
+		frappe.db.get_value(
+			TRAMITE_DOCTYPE, solicitud.solicitud_grupo, "grupo_familiar_generado"
+		)
+		or ""
+	)
+
+
+def _assert_orden_de_validacion_del_tramite(solicitud: Document) -> None:
+	"""El titular crea el grupo: nadie más puede validarse antes que él."""
+	if not solicitud.get("solicitud_grupo"):
+		return
+	if solicitud.get("rol_en_grupo") == ROL_TITULAR_GRUPO:
+		return
+	if frappe.db.get_value(
+		TRAMITE_DOCTYPE, solicitud.solicitud_grupo, "grupo_familiar_generado"
+	):
+		return
+	frappe.throw(MSG_TITULAR_SIN_VALIDAR, frappe.ValidationError)
+
+
+def _registrar_grupo_en_tramite(solicitud: Document, grupo_name: str) -> None:
+	"""Deja el grupo del titular accesible para el resto del trámite."""
+	tramite = solicitud.get("solicitud_grupo")
+	if not tramite or not grupo_name:
+		return
+	if frappe.db.get_value(TRAMITE_DOCTYPE, tramite, "grupo_familiar_generado"):
+		return
+	frappe.db.set_value(
+		TRAMITE_DOCTYPE, tramite, "grupo_familiar_generado", grupo_name, update_modified=False
+	)
+
+
 def _finalize_solicitud(
 	solicitud: Document,
 	*,
@@ -250,6 +306,7 @@ def _finalize_solicitud(
 	solicitud.socio_generado = socio_name
 	solicitud.user_generado = user_name or ""
 	solicitud.grupo_familiar_generado = grupo_name
+	_registrar_grupo_en_tramite(solicitud, grupo_name)
 	sync_suscripcion_cuota_al_validar_socio(socio_name)
 	enqueue_validacion_pago_email(solicitud.name, email_destino)
 

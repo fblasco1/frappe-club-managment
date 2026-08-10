@@ -6,12 +6,21 @@ import frappe
 from frappe import _
 from club_management.members.email_templates.solicitud_emails import (
 	render_solicitud_requiere_correccion_email,
+	render_solicitud_validada_contacto_email,
 	render_solicitud_validada_email,
 )
 from club_management.members.services.solicitud_tokens import (
 	build_pago_stub_url,
 	sign_pago_token,
 )
+
+
+def _pago_online_alta_habilitado() -> bool:
+	"""True solo si Club Settings pide link de pago al validar (Cobros Plus)."""
+	try:
+		return bool(frappe.db.get_single_value("Club Settings", "habilitar_pago_online_alta"))
+	except Exception:
+		return False
 
 
 def enqueue_validacion_pago_email(solicitud_name: str, to_email: str) -> None:
@@ -37,15 +46,20 @@ def enqueue_correccion_email(solicitud_name: str) -> None:
 
 def _send_validacion_pago_email(solicitud_name: str, to_email: str) -> None:
 	solicitud = frappe.get_doc("Solicitud Asociacion", solicitud_name)
-	pago_token = sign_pago_token(solicitud_name)
-	pago_url = build_pago_stub_url(pago_token)
-	html = render_solicitud_validada_email(
-		nombre=solicitud.nombre,
-		pago_url=pago_url,
-	)
+	if _pago_online_alta_habilitado():
+		pago_token = sign_pago_token(solicitud_name)
+		pago_url = build_pago_stub_url(pago_token)
+		html = render_solicitud_validada_email(
+			nombre=solicitud.nombre,
+			pago_url=pago_url,
+		)
+		subject = _("Solicitud validada — primera cuota")
+	else:
+		html = render_solicitud_validada_contacto_email(nombre=solicitud.nombre)
+		subject = _("Solicitud validada — próximo paso")
 	frappe.sendmail(
 		recipients=[to_email],
-		subject=_("Solicitud validada — primera cuota"),
+		subject=subject,
 		message=html,
 		delayed=False,
 	)

@@ -20,6 +20,8 @@
   "column_break_cobranza",
   "incluir_aranceles_en_deuda_mensual",
   "incluir_cargos_extra_en_deuda_mensual",
+  "alta_publica_section",
+  "habilitar_pago_online_alta",
   "liquidacion_entrenadores_section",
   "pct_liquidacion_entrenador_default",
   "recibo_section",
@@ -135,6 +137,18 @@
    "fieldname": "incluir_cargos_extra_en_deuda_mensual",
    "fieldtype": "Check",
    "label": "Incluir cargos extra recurrentes"
+  },
+  {
+   "fieldname": "alta_publica_section",
+   "fieldtype": "Section Break",
+   "label": "Alta pública"
+  },
+  {
+   "default": "0",
+   "fieldname": "habilitar_pago_online_alta",
+   "fieldtype": "Check",
+   "label": "Habilitar pago online al validar solicitud",
+   "description": "Off (default) hasta Cobros Plus: el email post-validación no incluye link de pago; Secretaría contacta por WhatsApp/presencial y activa en Desk. On: envía link de pago firmado (stub / futuro Cobrand)."
   },
   {
    "fieldname": "liquidacion_entrenadores_section",
