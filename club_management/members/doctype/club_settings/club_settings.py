@@ -24,7 +24,7 @@ class ClubSettings(Document):
 		if self.dia_primer_vencimiento is None:
 			self.dia_primer_vencimiento = 10
 		if not self.dia_segundo_vencimiento:
-			self.dia_segundo_vencimiento = "Ultimo dia del mes"
+			self.dia_segundo_vencimiento = "20"
 		if self.recargo_segundo_vencimiento_pct is None:
 			self.recargo_segundo_vencimiento_pct = 10
 		if self.recargo_mes_vencido_pct is None:
@@ -58,7 +58,7 @@ class ClubSettings(Document):
 				)
 			)
 
-		segundo = (self.dia_segundo_vencimiento or "Ultimo dia del mes").strip()
+		segundo = (self.dia_segundo_vencimiento or "20").strip()
 		if segundo not in _SEGUNDO_VENCIMIENTO_OPCIONES:
 			frappe.throw(_("Segundo vencimiento inválido."))
 

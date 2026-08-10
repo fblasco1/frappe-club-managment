@@ -6,7 +6,7 @@ vencimientos del **período de la factura** (`periodo_cobro` = `MM/YYYY`):
 | Momento de pago | Recargo | Base |
 |-----------------|---------|------|
 | Hasta el **1.er vencimiento** (día 10 del mes del período) inclusive | **0 %** | Saldo / valor facturado |
-| Después del 1.er vencimiento y hasta el **2.º vencimiento** (último día del mes del período) inclusive | **+10 %** | Valor vigente del concepto |
+| Después del 1.er vencimiento y hasta el **2.º vencimiento** (**día 20** del mes del período) inclusive | **+10 %** | Valor vigente del concepto |
 | **Después** del 2.º vencimiento | **+15 %** (= 10 % + 5 %) | **Cuota / valor del mes en que se paga** |
 
 ```
@@ -25,13 +25,15 @@ si pago > 2.º venc. del período        → valor_mes_pago × (1 + 0,15)
 
 ## Ejemplo canónico (período marzo)
 
-- 1.er vencimiento = **10/03**; 2.º = **31/03**.
+- 1.er vencimiento = **10/03**; 2.º = **20/03**.
 - Cuota marzo = 10; cuota abril = **12**.
 
 | Fecha de pago | Tramo | Monto |
 |---------------|-------|-------|
 | 08/03 | ninguno | outstanding / valor período (sin %) |
 | 15/03 | post 1.er | `10 × 1,10` = **11,00** (o valor vigente marzo) |
+| 20/03 | post 1.er | `10 × 1,10` (aún dentro del 2.º vencimiento) |
+| 21/03 | post 2.º | valor vigente marzo × **1,15** |
 | 08/04 | post 2.º | `12 × 1,15` = **13,80** |
 | 15/07 | post 2.º | valor julio × **1,15** |
 
@@ -42,8 +44,8 @@ si pago > 2.º venc. del período        → valor_mes_pago × (1 + 0,15)
 | ID | Decisión |
 |----|----------|
 | **D1** | El 10 % aplica si `posting_date` es **posterior** al 1.er vencimiento del **período adeudado** (día `dia_primer_vencimiento` de ese mes). |
-| **D2** | El 5 % extra aplica solo si `posting_date` es **posterior** al 2.º vencimiento del período (default: último día de ese mes). Junto con el 10 % suma **15 %**. |
-| **D3** | Post 2.º vencimiento: base = **valor vigente del mes de pago** (revalorización). |
+| **D2** | El 5 % extra aplica solo si `posting_date` es **posterior** al 2.º vencimiento del período (default operativo: **día 20**). Junto con el 10 % suma **15 %**. |
+| **D3** | Post 2.º vencimiento: base = **valor vigente del mes de pago** (revalorización). Ej.: debe abril (valía 11), paga en agosto (vale 13) → `13 × 1,15`. |
 | **D4** | El job legado `recargo_segundo_vencimiento_pct` **no** es la fuente de verdad; la mora se calcula **al cobrar**. |
 
 ---
@@ -53,7 +55,7 @@ si pago > 2.º venc. del período        → valor_mes_pago × (1 + 0,15)
 | Campo | Label sugerido | Default | Rol |
 |-------|----------------|---------|-----|
 | `dia_primer_vencimiento` | Día primer vencimiento | 10 | 1.er vencimiento del mes del período |
-| `dia_segundo_vencimiento` | Segundo vencimiento | Último día del mes | 2.º vencimiento del período |
+| `dia_segundo_vencimiento` | Segundo vencimiento | **20** | 2.º vencimiento del período |
 | `recargo_post_vencimiento_pct` | Recargo post 1.er vencimiento (%) | 10 | +10 % entre 1.er y 2.º venc. |
 | `recargo_mes_vencido_pct` | Recargo extra post 2.º vencimiento (%) | 5 | +5 % adicional tras el 2.º (total 15 %) |
 | `item_recargo_mora` | Ítem recargo mora | — | Obligatorio para crear SI de ajuste |
@@ -70,13 +72,29 @@ And monto = outstanding del grupo (sin recargo).
 
 ---
 
-## Scenario: mismo mes, entre día 10 y fin de mes (+10 %)
+## Scenario: mismo mes, entre día 11 y día 20 inclusive (+10 %)
 
 Given deuda período `03/2026`, valor vigente = 12
+And `dia_segundo_vencimiento = 20`
 And `recargo_post_vencimiento_pct = 10`
 When paga el 2026-03-15
 Then tramo = post_primer
 And monto = `12 * 1.10` = 13,20.
+
+Given deuda período `03/2026`
+When paga el 2026-03-20
+Then tramo = post_primer.
+
+---
+
+## Scenario: mismo mes, después del día 20 (+15 % revalorizado)
+
+Given deuda período `03/2026`
+And `dia_segundo_vencimiento = 20`
+And valor vigente = 12
+When paga el 2026-03-21
+Then tramo = post_segundo
+And monto = `12 * 1.15` = 13,80.
 
 ---
 
@@ -85,19 +103,19 @@ And monto = `12 * 1.10` = 13,20.
 Given deuda período `03/2026`
 And valor cuota vigente en abril = 12
 And `recargo_post_vencimiento_pct = 10`, `recargo_mes_vencido_pct = 5`
-When paga el 2026-04-08 (posterior al 31/03)
+When paga el 2026-04-08 (posterior al 20/03)
 Then tramo = post_segundo
 And monto = `12 * 1.15` = 13,80
 And la composición muestra `12.000 × (1 + 10% + 5%)` (o equivalente 15 %), **sin** `×N meses`.
 
 ---
 
-## Scenario: varios meses después sigue siendo +15 % fijo
+## Scenario: varios meses después sigue siendo +15 % fijo (revalorización)
 
-Given deuda de marzo, paga en julio con valor julio = 29000
+Given deuda de abril (histórica 11), paga en agosto con valor agosto = 13
 When calcula mora
-Then monto = `29000 * 1.15` = 33350
-And **no** escala el % con la cantidad de meses.
+Then monto = `13 * 1.15` = 14,95
+And **no** usa el 11 histórico ni escala el % con la cantidad de meses.
 
 ---
 

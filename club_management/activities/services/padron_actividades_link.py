@@ -66,14 +66,28 @@ _PRESETS: dict[str, dict[str, str]] = {
 	"INICIACION DEPORTIVA": {"actividad": "Iniciacion Deportiva", "grupo": "1 Clase por Semana"},
 	"FUNCIONAL 1 CLASE POR SEMANA": {
 		"actividad": "Funcional",
-		"grupo": "1 Clase por Semana",
+		"grupo": "Funcional 1 vez/sem - Prof Facundo",
 	},
 	"FUNCIONAL 2 CLASES POR SEMANA": {
 		"actividad": "Funcional",
-		"grupo": "2 Clases por Semana",
+		"grupo": "Funcional 2 veces/sem - Prof Facundo",
 	},
-	"GAP 2 CLASES POR SEMANA": {"actividad": "Funcional", "grupo": "GAP"},
-	"CROSSFIT 2 CLASES POR SEMANA": {"actividad": "Crossfit"},
+	"GAP 1 CLASE POR SEMANA": {
+		"actividad": "Funcional",
+		"grupo": "GAP 1 vez/sem - Prof Noelia",
+	},
+	"GAP 2 CLASES POR SEMANA": {
+		"actividad": "Funcional",
+		"grupo": "GAP 2 veces/sem - Prof Noelia",
+	},
+	"CROSSFIT 1 CLASE POR SEMANA": {
+		"actividad": "Funcional",
+		"grupo": "CROSSFIT 1 vez/sem - Prof Noelia",
+	},
+	"CROSSFIT 2 CLASES POR SEMANA": {
+		"actividad": "Funcional",
+		"grupo": "CROSSFIT 2 veces/sem - Prof Noelia",
+	},
 	"ARTISTICA": {
 		"actividad": "Gimnasia Artistica",
 		"grupo": "2 Clases por Semana",

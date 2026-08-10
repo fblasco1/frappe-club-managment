@@ -60,7 +60,19 @@ class TestMoraValorActualFormula(MembersTestCase):
 	def test_tramo_mismo_mes_post_dia_10(self) -> None:
 		self.assertEqual(resolver_tramo_mora("03/2026", "2026-03-15"), "post_primer")
 
-	def test_tramo_post_fin_de_mes(self) -> None:
+	def test_tramo_dia_20_inclusive_sigue_post_primer(self) -> None:
+		self.assertEqual(
+			resolver_tramo_mora("03/2026", "2026-03-20", dia_segundo_vencimiento="20"),
+			"post_primer",
+		)
+
+	def test_tramo_dia_21_post_segundo(self) -> None:
+		self.assertEqual(
+			resolver_tramo_mora("03/2026", "2026-03-21", dia_segundo_vencimiento="20"),
+			"post_segundo",
+		)
+
+	def test_tramo_post_segundo_vencimiento(self) -> None:
 		self.assertEqual(resolver_tramo_mora("03/2026", "2026-04-01"), "post_segundo")
 		self.assertEqual(resolver_tramo_mora("03/2026", "2026-04-08"), "post_segundo")
 		self.assertEqual(resolver_tramo_mora("03/2026", "2026-07-15"), "post_segundo")
@@ -162,6 +174,7 @@ class TestMoraValorActualIntegracion(MembersTestCase):
 		settings = frappe.get_single("Club Settings")
 		settings.dia_generacion_deuda = 1
 		settings.dia_primer_vencimiento = 10
+		settings.dia_segundo_vencimiento = "20"
 		settings.recargo_mes_vencido_pct = 5
 		settings.recargo_post_vencimiento_pct = 10
 		# Preferir empresa ICDPE del sitio (leaf cost centers reales)

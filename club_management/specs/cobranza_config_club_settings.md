@@ -12,7 +12,7 @@ Parámetros del calendario mensual de deuda, vencimientos y recargo.
 |-------|------|---------|-------------|
 | `dia_generacion_deuda` | Int | 1 | Día del mes en que se genera la deuda (1–28) |
 | `dia_primer_vencimiento` | Int | 10 | Día del mes del 1er vencimiento |
-| `dia_segundo_vencimiento` | Select | `Ultimo dia del mes` | `Ultimo dia del mes` o día fijo 15–28 |
+| `dia_segundo_vencimiento` | Select | `20` | Día fijo 15–28 u `Ultimo dia del mes` (operativo ICDPE: **20**) |
 | `recargo_segundo_vencimiento_pct` | Percent | 10 | Legado: job fin de mes (no usar en mora al cobro) |
 | `recargo_post_vencimiento_pct` | Percent | 10 | Mora al cobro: +% tras 1.er vencimiento |
 | `recargo_mes_vencido_pct` | Percent | 5 | Mora al cobro: +% extra tras 2.º vencimiento (total 15 %) |

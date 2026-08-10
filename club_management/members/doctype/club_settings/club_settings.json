@@ -77,10 +77,11 @@
    "description": "Día del mes (1–28) del primer vencimiento."
   },
   {
-   "default": "Ultimo dia del mes",
+   "default": "20",
    "fieldname": "dia_segundo_vencimiento",
    "fieldtype": "Select",
    "label": "Segundo vencimiento",
+   "description": "Hasta este día inclusive aplica +10 %. Después: valor del mes de pago × 1,15.",
    "options": "Ultimo dia del mes\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28"
   },
   {
@@ -95,14 +96,14 @@
    "fieldname": "recargo_post_vencimiento_pct",
    "fieldtype": "Percent",
    "label": "Recargo post 1.er vencimiento (%)",
-   "description": "Después del día 10 del mes del período y hasta el 2.º vencimiento: +10 %."
+   "description": "Después del 1.er vencimiento y hasta el 2.º (default día 20) inclusive: +10 %."
   },
   {
    "default": "5",
    "fieldname": "recargo_mes_vencido_pct",
    "fieldtype": "Percent",
    "label": "Recargo extra post 2.º vencimiento (%)",
-   "description": "Después del último día del mes del período: +5 % adicional (total 15 % = 10 %+5 %). Base = valor del mes de pago."
+   "description": "Después del 2.º vencimiento del período: +5 % adicional (total 15 % = 10 %+5 %). Base = valor del mes de pago."
   },
   {
    "fieldname": "item_recargo_mora",

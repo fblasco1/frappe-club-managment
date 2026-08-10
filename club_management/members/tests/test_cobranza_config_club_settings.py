@@ -29,7 +29,7 @@ class TestCobranzaConfigClubSettings(MembersTestCase):
 		settings.reload()
 		self.assertEqual(settings.dia_generacion_deuda, 1)
 		self.assertEqual(settings.dia_primer_vencimiento, 10)
-		self.assertEqual(settings.dia_segundo_vencimiento, "Ultimo dia del mes")
+		self.assertEqual(settings.dia_segundo_vencimiento, "20")
 		self.assertEqual(settings.recargo_segundo_vencimiento_pct, 10)
 		self.assertEqual(settings.recargo_mes_vencido_pct, 5)
 		self.assertEqual(settings.recargo_post_vencimiento_pct, 10)

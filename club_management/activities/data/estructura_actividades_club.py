@@ -25,6 +25,8 @@ from club_management.activities.data.otras_actividades_aranceles_icdpe import (
 	ITEM_BOXEO_1_CLASE,
 	ITEM_BOXEO_2_CLASES,
 	ITEM_BOXEO_3_CLASES,
+	ITEM_FUNCIONAL_1_CLASE,
+	ITEM_FUNCIONAL_2_CLASES,
 	ITEM_GIMNASIA_1_CLASE,
 	ITEM_GIMNASIA_2_CLASES,
 	ITEM_GYM_NO_SOCIO,
@@ -316,14 +318,15 @@ ESTRUCTURA_INICIACION_DEPORTIVA = ActividadEstructuraSeed(
 	),
 )
 
-ITEM_FUNCIONAL = "ICDPE-ARANCEL-MENSUAL-ACT-funcional"
-
 ESTRUCTURA_FUNCIONAL = ActividadEstructuraSeed(
 	"Funcional",
 	(
-		_grupo_leaf("1 Clase por Semana", 10, ITEM_FUNCIONAL),
-		_grupo_leaf("2 Clases por Semana", 20, ITEM_FUNCIONAL),
-		_grupo_leaf("GAP", 30, ITEM_FUNCIONAL),
+		_grupo_leaf("GAP 1 vez/sem - Prof Noelia", 10, ITEM_FUNCIONAL_1_CLASE),
+		_grupo_leaf("GAP 2 veces/sem - Prof Noelia", 20, ITEM_FUNCIONAL_2_CLASES),
+		_grupo_leaf("CROSSFIT 1 vez/sem - Prof Noelia", 30, ITEM_FUNCIONAL_1_CLASE),
+		_grupo_leaf("CROSSFIT 2 veces/sem - Prof Noelia", 40, ITEM_FUNCIONAL_2_CLASES),
+		_grupo_leaf("Funcional 1 vez/sem - Prof Facundo", 50, ITEM_FUNCIONAL_1_CLASE),
+		_grupo_leaf("Funcional 2 veces/sem - Prof Facundo", 60, ITEM_FUNCIONAL_2_CLASES),
 	),
 )
 

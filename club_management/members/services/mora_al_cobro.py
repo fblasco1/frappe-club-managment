@@ -3,8 +3,8 @@
 Spec: `club_management/specs/recargos_mora_dos_tramos.md`
 
 - Hasta 1.er venc. (día 10 del mes del período): sin mora
-- Tras 1.er y hasta 2.º (fin de mes del período): +10 %
-- Tras 2.º venc.: valor del mes de pago + 15 % (10 % + 5 %)
+- Tras 1.er y hasta 2.º (default día 20): +10 %
+- Tras 2.º venc.: valor del mes de pago × 1,15 (10 % + 5 %)
 """
 
 from __future__ import annotations
@@ -75,13 +75,13 @@ def meses_vencidos_entre(periodo_cobro: str, posting_date: str | date) -> int:
 
 def _segundo_vencimiento_dia(inicio: date, dia_segundo_vencimiento: str | None) -> date:
 	ultimo = calendar.monthrange(inicio.year, inicio.month)[1]
-	raw = (dia_segundo_vencimiento or "Ultimo dia del mes").strip()
+	raw = (dia_segundo_vencimiento or "20").strip()
 	if raw == "Ultimo dia del mes":
 		return date(inicio.year, inicio.month, ultimo)
 	try:
 		dia = int(raw)
 	except ValueError:
-		dia = ultimo
+		dia = 20
 	return date(inicio.year, inicio.month, min(max(1, dia), ultimo))
 
 
@@ -89,7 +89,7 @@ def fechas_vencimiento_periodo(
 	periodo_cobro: str,
 	*,
 	dia_primer_vencimiento: int = 10,
-	dia_segundo_vencimiento: str | None = "Ultimo dia del mes",
+	dia_segundo_vencimiento: str | None = "20",
 ) -> tuple[date, date] | None:
 	"""1.er y 2.º vencimiento del mes del período adeudado."""
 	inicio = parse_periodo_cobro(periodo_cobro)
@@ -109,7 +109,7 @@ def resolver_tramo_mora(
 	posting_date: str | date,
 	*,
 	dia_primer_vencimiento: int = 10,
-	dia_segundo_vencimiento: str | None = "Ultimo dia del mes",
+	dia_segundo_vencimiento: str | None = "20",
 ) -> TramoMora:
 	fechas = fechas_vencimiento_periodo(
 		periodo_cobro,
@@ -333,7 +333,7 @@ def calcular_detalle_mora_factura(
 		return result
 
 	dia_v1 = int(settings.dia_primer_vencimiento or 10)
-	dia_v2 = settings.dia_segundo_vencimiento or "Ultimo dia del mes"
+	dia_v2 = settings.dia_segundo_vencimiento or "20"
 	pct_extra = result["pct_mes_vencido"]
 	pct_post = result["pct_post_vencimiento"]
 	outstanding_grupo = _outstanding_grupo(invoice_name, socio_name)
@@ -469,7 +469,7 @@ def asegurar_ajuste_mora_factura(
 		return result
 
 	dia_v1 = int(settings.dia_primer_vencimiento or 10)
-	dia_v2 = settings.dia_segundo_vencimiento or "Ultimo dia del mes"
+	dia_v2 = settings.dia_segundo_vencimiento or "20"
 	pct_extra = flt(settings.recargo_mes_vencido_pct if settings.recargo_mes_vencido_pct is not None else 5)
 	pct_post = flt(
 		settings.recargo_post_vencimiento_pct if settings.recargo_post_vencimiento_pct is not None else 10

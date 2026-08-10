@@ -99,6 +99,50 @@ class TestPatinOtrasActividadesArancelesIcdpe(MembersTestCase):
 		equipo = f"{ini} / 2 Clases por Semana / 2 Clases por Semana"
 		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), ITEM_INICIACION_2_CLASES)
 
+	def test_seed_funcional_grupos_por_frecuencia(self) -> None:
+		from club_management.activities.data.otras_actividades_aranceles_icdpe import (
+			ITEM_FUNCIONAL_1_CLASE,
+			ITEM_FUNCIONAL_2_CLASES,
+		)
+
+		seed_estructura_actividades_completa(crear_equipos=True)
+		func = frappe.db.get_value("Actividad", {"titulo": "Funcional"}, "name")
+		self.assertTrue(frappe.db.get_value("Actividad", func, "usa_grupos"))
+		gap1 = f"{func} / GAP 1 vez/sem - Prof Noelia"
+		cross2 = f"{func} / CROSSFIT 2 veces/sem - Prof Noelia"
+		fac2 = f"{func} / Funcional 2 veces/sem - Prof Facundo"
+		self.assertEqual(frappe.db.get_value("Grupo Actividad", gap1, "item"), ITEM_FUNCIONAL_1_CLASE)
+		self.assertEqual(frappe.db.get_value("Grupo Actividad", cross2, "item"), ITEM_FUNCIONAL_2_CLASES)
+		self.assertEqual(frappe.db.get_value("Grupo Actividad", fac2, "item"), ITEM_FUNCIONAL_2_CLASES)
+		self.assertEqual(frappe.db.get_value("Item", ITEM_FUNCIONAL_1_CLASE, "standard_rate"), 18000)
+		self.assertEqual(frappe.db.get_value("Item", ITEM_FUNCIONAL_2_CLASES, "standard_rate"), 27500)
+
+	def test_funcional_gap_sin_equipo_resuelve_item(self) -> None:
+		from club_management.activities.data.otras_actividades_aranceles_icdpe import (
+			ITEM_FUNCIONAL_1_CLASE,
+		)
+		from club_management.activities.services.inscripcion_socio import (
+			inscribir_socio_selecciones,
+			resolve_item_arancel_inscripcion,
+		)
+		from club_management.members.test_helpers import insert_socio
+
+		seed_estructura_actividades_completa(crear_equipos=True)
+		func = frappe.db.get_value("Actividad", {"titulo": "Funcional"}, "name")
+		grupo = f"{func} / GAP 1 vez/sem - Prof Noelia"
+		socio = insert_socio(dni="72001901", email="funcional.gap1@example.com", estado="Activo")
+		inscribir_socio_selecciones(
+			socio.name,
+			[{"actividad": func, "grupo": grupo}],
+			activar=False,
+		)
+		ins_name = frappe.db.get_value(
+			"Inscripcion Actividad",
+			{"socio": socio.name, "grupo_actividad": grupo},
+			"name",
+		)
+		self.assertEqual(resolve_item_arancel_inscripcion(ins_name), ITEM_FUNCIONAL_1_CLASE)
+
 	def test_catalogo_actividades_planas_con_item(self) -> None:
 		from club_management.patches.v1_0.sync_patin_otras_actividades_aranceles_icdpe import execute
 

@@ -51,6 +51,36 @@ Then devuelve `ICDPE-PATIN-ADULTO` con tarifa 26.500.
 | Yoga | 1 / 2 clases por semana | 23.500 / 28.500 |
 | Gimnasio Fitness | No Socio / Socio | 44.000 / 22.000 |
 | Iniciacion Deportiva | 1 / 2 clases por semana | 15.500 / 20.500 |
+| Funcional | GAP / CROSSFIT / Funcional × 1–2×sem + profe | 18.000 / 27.500 |
+
+## Funcional — grupos y aranceles
+
+| Grupo | Ítem | Monto ARS |
+|-------|------|-----------|
+| GAP 1 vez/sem - Prof Noelia | `ICDPE-FUNCIONAL-1-CLASE` | 18.000 |
+| GAP 2 veces/sem - Prof Noelia | `ICDPE-FUNCIONAL-2-CLASES` | 27.500 |
+| CROSSFIT 1 vez/sem - Prof Noelia | `ICDPE-FUNCIONAL-1-CLASE` | 18.000 |
+| CROSSFIT 2 veces/sem - Prof Noelia | `ICDPE-FUNCIONAL-2-CLASES` | 27.500 |
+| Funcional 1 vez/sem - Prof Facundo | `ICDPE-FUNCIONAL-1-CLASE` | 18.000 |
+| Funcional 2 veces/sem - Prof Facundo | `ICDPE-FUNCIONAL-2-CLASES` | 27.500 |
+
+### Scenario: funcional GAP 1 vez
+
+Given `Funcional` / `GAP 1 vez/sem - Prof Noelia`
+When se resuelve el arancel
+Then devuelve `ICDPE-FUNCIONAL-1-CLASE` con tarifa 18.000.
+
+### Scenario: funcional Facundo 2 veces
+
+Given `Funcional` / `Funcional 2 veces/sem - Prof Facundo`
+When se resuelve el arancel
+Then devuelve `ICDPE-FUNCIONAL-2-CLASES` con tarifa 27.500.
+
+### Scenario: CROSSFIT bajo Funcional comparte ítem por frecuencia
+
+Given `Funcional` / `CROSSFIT 2 veces/sem - Prof Noelia`
+When se resuelve el arancel
+Then usa el mismo ítem `ICDPE-FUNCIONAL-2-CLASES` (27.500).
 
 ## Scenario: iniciación deportiva 1 clase
 
