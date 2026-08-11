@@ -1,7 +1,7 @@
 """Catálogo oficial de actividades alineado al plan ICDPE (Items + centros de costo).
 
-Cada fila apunta al Item de arancel mensual creado por
-`scripts/icdpe_create_service_items.py` (prefijo `ICDPE-ARANCEL-MENSUAL-…`).
+Cada fila apunta al Item de arancel mensual canónico
+(`ICDPE-BASQUET-*`, `ICDPE-BOXEO-*`, … — ver `arancel_catalogo_unico.md`).
 """
 
 from __future__ import annotations
@@ -23,9 +23,9 @@ class ActividadCatalogEntry:
 
 # Orden y títulos acordados con Secretaría / plan de cuentas ICDPE.
 ACTIVIDADES_CATALOGO_ICDPE: tuple[ActividadCatalogEntry, ...] = (
-	ActividadCatalogEntry("Basquet", 10, "ICDPE-ARANCEL-MENSUAL-basquet-masculino"),
-	ActividadCatalogEntry("Voley Femenino", 30, "ICDPE-ARANCEL-MENSUAL-voley"),
-	ActividadCatalogEntry("Futbol", 40, "ICDPE-ARANCEL-MENSUAL-futbol"),
+	ActividadCatalogEntry("Basquet", 10, "ICDPE-BASQUET-ESCUELITA"),
+	ActividadCatalogEntry("Voley Femenino", 30, "ICDPE-VOLEY-TIRA-30500"),
+	ActividadCatalogEntry("Futbol", 40, "ICDPE-FUTBOL-TABI-A"),
 	ActividadCatalogEntry("Patin Artistico", 50, "ICDPE-PATIN-MINI"),
 	ActividadCatalogEntry("Boxeo", 52, "ICDPE-BOXEO-1-CLASE"),
 	ActividadCatalogEntry("Gimnasia Artistica", 60, "ICDPE-GIMNASIA-ARTISTICA-1-CLASE"),
@@ -35,10 +35,10 @@ ACTIVIDADES_CATALOGO_ICDPE: tuple[ActividadCatalogEntry, ...] = (
 	ActividadCatalogEntry("Gimnasio Fitness", 90, "ICDPE-GYM-PASE-LIBRE-SOCIO"),
 	ActividadCatalogEntry("Taekwondo", 92, "ICDPE-TAEKWONDO"),
 	ActividadCatalogEntry("Shui Lu", 94, "ICDPE-SHUI-LU"),
-	ActividadCatalogEntry("Funcional", 100, "ICDPE-ARANCEL-MENSUAL-ACT-funcional"),
-	ActividadCatalogEntry("Crossfit", 110, "ICDPE-ARANCEL-MENSUAL-ACT-crossfit"),
+	ActividadCatalogEntry("Funcional", 100, "ICDPE-FUNCIONAL-1-CLASE"),
+	ActividadCatalogEntry("Crossfit", 110, "ICDPE-FUNCIONAL-1-CLASE"),
 	ActividadCatalogEntry("Ritmos Latinos", 120, "ICDPE-RITMOS-LATINOS"),
-	ActividadCatalogEntry("Zumba", 130, "ICDPE-ARANCEL-MENSUAL-ACT-zumba"),
+	ActividadCatalogEntry("Zumba", 130, "ICDPE-RITMOS-LATINOS"),
 )
 
 # Actividades que requieren elegir grupo/tira al inscribir (el arancel va en Grupo Actividad).

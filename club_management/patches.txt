@@ -73,3 +73,4 @@ club_management.patches.v1_0.set_dia_segundo_vencimiento_20
 club_management.patches.v1_0.sync_funcional_aranceles_grupos
 club_management.patches.v1_0.fix_funcional_item_groups
 club_management.patches.v1_0.retire_legacy_basquet_arancel_items
+club_management.patches.v1_0.retire_legacy_arancel_mensual_catalog

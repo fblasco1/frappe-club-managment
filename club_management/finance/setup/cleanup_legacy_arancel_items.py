@@ -13,30 +13,52 @@ DEMO_SHOE_ITEM_CODE = "138-CMS Shoe"
 
 ARANCEL_MENSUAL_PREFIX = "ICDPE-ARANCEL-MENSUAL-"
 
-# Placeholders / capa actividad que el catálogo oficial puede recrear o reactivar.
-KEEP_ARANCEL_MENSUAL_CODES: frozenset[str] = frozenset(
-	{
-		"ICDPE-ARANCEL-MENSUAL-ACT-funcional",
-		"ICDPE-ARANCEL-MENSUAL-ACT-crossfit",
-		"ICDPE-ARANCEL-MENSUAL-ACT-zumba",
-		"ICDPE-ARANCEL-MENSUAL-futbol",
-		"ICDPE-ARANCEL-MENSUAL-voley",
-	}
-)
+# Sin placeholders: el catálogo usa solo códigos canónicos (`arancel_catalogo_unico.md`).
+KEEP_ARANCEL_MENSUAL_CODES: frozenset[str] = frozenset()
 
-# Legacy disabled → canónico oficial (para remapar Links antes de borrar).
+# Legacy → canónico oficial (para remapar Links antes de borrar / deshabilitar).
 LEGACY_ARANCEL_TO_CANONICAL: dict[str, str] = {
 	"ICDPE-ARANCEL-MENSUAL-BOXEO-1_VEZ": "ICDPE-BOXEO-1-CLASE",
 	"ICDPE-ARANCEL-MENSUAL-BOXEO-2_VECES": "ICDPE-BOXEO-2-CLASES",
 	"ICDPE-ARANCEL-MENSUAL-BOXEO-3_VECES": "ICDPE-BOXEO-3-CLASES",
+	"ICDPE-ARANCEL-MENSUAL-boxeo": "ICDPE-BOXEO-1-CLASE",
 	"ICDPE-ARANCEL-MENSUAL-FUTBOL-GENERAL": "ICDPE-FUTBOL-TABI-A",
 	"ICDPE-ARANCEL-MENSUAL-FUTBOL-ESCUELITA": "ICDPE-FUTBOL-TABI-B",
+	"ICDPE-ARANCEL-MENSUAL-futbol": "ICDPE-FUTBOL-TABI-A",
 	"ICDPE-ARANCEL-MENSUAL-BASQUET-MINIBASQUET": "ICDPE-BASQUET-MASCULINO-MINIBASQUET",
 	"ICDPE-ARANCEL-MENSUAL-BASQUET-FORMATIVAS-AZUL": "ICDPE-BASQUET-MASCULINO-FORMATIVAS-AZUL",
 	"ICDPE-ARANCEL-MENSUAL-BASQUET-FORMATIVAS-AMARILLO": "ICDPE-BASQUET-MASCULINO-FORMATIVAS-AMARILLA",
 	"ICDPE-ARANCEL-MENSUAL-BASQUET-FORMATIVAS-MINIBASQUET-FEMENINO": "ICDPE-BASQUET-ESCUELITA",
 	"ICDPE-ARANCEL-MENSUAL-basquet-femenino": "ICDPE-BASQUET-FEMENINO-SUP",
-	"ICDPE-ARANCEL-MENSUAL-basquet-masculino": "ICDPE-BASQUET-MASCULINO-MINIBASQUET",
+	"ICDPE-ARANCEL-MENSUAL-basquet-masculino": "ICDPE-BASQUET-ESCUELITA",
+	"ICDPE-ARANCEL-MENSUAL-voley": "ICDPE-VOLEY-TIRA-30500",
+	"ICDPE-ARANCEL-MENSUAL-VOLEY-GENERAL": "ICDPE-VOLEY-TIRA-30500",
+	"ICDPE-ARANCEL-MENSUAL-VOLEY-ESCUELITA": "ICDPE-VOLEY-ESCUELITA-MINIVOLEY",
+	"ICDPE-ARANCEL-MENSUAL-patin": "ICDPE-PATIN-MINI",
+	"ICDPE-ARANCEL-MENSUAL-PATIN-ADULTO": "ICDPE-PATIN-ADULTO",
+	"ICDPE-ARANCEL-MENSUAL-PATIN-AVANZADO_3": "ICDPE-PATIN-AVANZADO",
+	"ICDPE-ARANCEL-MENSUAL-PATIN-DANZA": "ICDPE-PATIN-DANZA",
+	"ICDPE-ARANCEL-MENSUAL-PATIN-INICIAL": "ICDPE-PATIN-MINI",
+	"ICDPE-ARANCEL-MENSUAL-PATIN-INTERMEDIO_1": "ICDPE-PATIN-INTERMEDIO",
+	"ICDPE-ARANCEL-MENSUAL-gimnasia-artistica": "ICDPE-GIMNASIA-ARTISTICA-1-CLASE",
+	"ICDPE-ARANCEL-MENSUAL-GIMNASIA_ARTISTICA-1_VEZ": "ICDPE-GIMNASIA-ARTISTICA-1-CLASE",
+	"ICDPE-ARANCEL-MENSUAL-GIMNASIA_ARTISTICA-2_VECES": "ICDPE-GIMNASIA-ARTISTICA-2-CLASES",
+	"ICDPE-ARANCEL-MENSUAL-INICIACION_DEPORTIVA-1_VEZ": "ICDPE-INICIACION-DEPORTIVA-1-CLASE",
+	"ICDPE-ARANCEL-MENSUAL-INICIACION_DEPORTIVA-2_VECES": "ICDPE-INICIACION-DEPORTIVA-2-CLASES",
+	"ICDPE-ARANCEL-MENSUAL-ACT-iniciacion-deportiva": "ICDPE-INICIACION-DEPORTIVA-1-CLASE",
+	"ICDPE-ARANCEL-MENSUAL-YOGA-1_CLASE": "ICDPE-YOGA-1-CLASE",
+	"ICDPE-ARANCEL-MENSUAL-YOGA-2_CLASES": "ICDPE-YOGA-2-CLASES",
+	"ICDPE-ARANCEL-MENSUAL-GIMNASIO-FITNESS": "ICDPE-GYM-PASE-LIBRE-NO-SOCIO",
+	"ICDPE-ARANCEL-MENSUAL-GIMNASIO-FITNESS_SOCIOS": "ICDPE-GYM-PASE-LIBRE-SOCIO",
+	"ICDPE-ARANCEL-MENSUAL-DANZA-GENERAL": "ICDPE-DANZA",
+	"ICDPE-ARANCEL-MENSUAL-RITMOS_LATINOS-GENERAL": "ICDPE-RITMOS-LATINOS",
+	"ICDPE-ARANCEL-MENSUAL-shui-lu": "ICDPE-SHUI-LU",
+	"ICDPE-ARANCEL-MENSUAL-SHUI_LU-GENERAL": "ICDPE-SHUI-LU",
+	"ICDPE-ARANCEL-MENSUAL-taekwondo": "ICDPE-TAEKWONDO",
+	"ICDPE-ARANCEL-MENSUAL-TAEKWONDO-GENERAL": "ICDPE-TAEKWONDO",
+	"ICDPE-ARANCEL-MENSUAL-ACT-funcional": "ICDPE-FUNCIONAL-1-CLASE",
+	"ICDPE-ARANCEL-MENSUAL-ACT-crossfit": "ICDPE-FUNCIONAL-1-CLASE",
+	"ICDPE-ARANCEL-MENSUAL-ACT-zumba": "ICDPE-RITMOS-LATINOS",
 }
 
 _ACTIVITY_LINK_CANDIDATES: tuple[tuple[str, str], ...] = (
@@ -151,8 +173,34 @@ def delete_disabled_legacy_arancel_mensual() -> dict[str, Any]:
 	return {"deleted": deleted, "skipped": skipped, "kept": kept}
 
 
+def disable_enabled_legacy_arancel_mensual() -> list[str]:
+	"""Deshabilita todo `ICDPE-ARANCEL-MENSUAL-*` aún habilitado.
+
+	Spec: `arancel_catalogo_unico.md`.
+	"""
+	retired: list[str] = []
+	for code in frappe.get_all(
+		"Item",
+		filters={"name": ["like", f"{ARANCEL_MENSUAL_PREFIX}%"], "disabled": 0},
+		pluck="name",
+		limit_page_length=2000,
+	):
+		frappe.db.set_value("Item", code, "disabled", 1, update_modified=True)
+		retired.append(code)
+	return retired
+
+
 def run_cleanup_legacy_arancel_items() -> dict[str, Any]:
 	shoe = disable_demo_shoe()
 	remap = remape_legacy_arancel_links()
+	disabled_now = disable_enabled_legacy_arancel_mensual()
+	# Remap de nuevo por si Actividad/Grupo apuntaban a ítems recién deshabilitados.
+	remap2 = remape_legacy_arancel_links()
 	aranceles = delete_disabled_legacy_arancel_mensual()
-	return {"shoe": shoe, "remap": remap, "aranceles": aranceles}
+	return {
+		"shoe": shoe,
+		"remap": remap,
+		"remap_after_disable": remap2,
+		"disabled_now": disabled_now,
+		"aranceles": aranceles,
+	}

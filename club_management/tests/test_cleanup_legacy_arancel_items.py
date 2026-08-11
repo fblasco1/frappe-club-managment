@@ -32,6 +32,31 @@ class TestCleanupLegacyArancelItems(MembersTestCase):
 		if not frappe.db.exists("Item Group", DEFAULT_ITEM_GROUP_ROOT):
 			self.skipTest("All Item Groups ausente")
 
+	def test_deshabilita_arancel_mensual_habilitado(self) -> None:
+		from club_management.finance.setup.cleanup_legacy_arancel_items import (
+			disable_enabled_legacy_arancel_mensual,
+		)
+
+		group = _leaf_group()
+		code = "ICDPE-ARANCEL-MENSUAL-BOXEO-1_VEZ"
+		if not frappe.db.exists("Item", code):
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": code,
+					"item_name": "Arancel Mensual Boxeo - 1 Vez",
+					"item_group": group,
+					"is_stock_item": 0,
+					"disabled": 0,
+				}
+			).insert(ignore_permissions=True)
+		else:
+			frappe.db.set_value("Item", code, "disabled", 0)
+
+		retired = disable_enabled_legacy_arancel_mensual()
+		self.assertIn(code, retired)
+		self.assertEqual(int(frappe.db.get_value("Item", code, "disabled") or 0), 1)
+
 	def test_deshabilita_shoe_demo(self) -> None:
 		group = _leaf_group()
 		if not frappe.db.exists("Item", DEMO_SHOE_ITEM_CODE):

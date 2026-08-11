@@ -5,8 +5,11 @@ fixtures ERPNext y aranceles paralelos viejos ya deshabilitados por `dedupe_item
 u operaciones previas.
 
 **No toca:** egresos planos `LEGACY_EXPENSE_ITEMS_TO_DISABLE`, `ICDPE-SPONSOR-PUB`,
-`ICDPE-VENTA-INDUMENTARIA`, cuotas `CLUB-*` / `Cuota Social *`, ni placeholders
-oficiales `ICDPE-ARANCEL-MENSUAL-*` listados en `KEEP_ARANCEL_MENSUAL_CODES`.
+`ICDPE-VENTA-INDUMENTARIA`, cuotas `CLUB-*` / `Cuota Social *`.
+Los códigos canónicos (`ICDPE-BOXEO-*`, etc.) no se eliminan.
+
+También deshabilita `ICDPE-ARANCEL-MENSUAL-*` aún habilitados y remapea Links
+al canónico (`arancel_catalogo_unico.md`).
 
 ---
 
