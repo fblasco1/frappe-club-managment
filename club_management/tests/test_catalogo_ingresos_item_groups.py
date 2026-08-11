@@ -13,6 +13,7 @@ from club_management.finance.setup.icdpe_income_item_groups import (
 	LEAF_CARGOS,
 	LEAF_CUOTAS,
 	LEAF_DONACIONES,
+	LEAF_FUNCIONAL,
 	MID_DEPORTES,
 	ensure_ingresos_item_group_tree,
 	resolve_ingreso_leaf_for_item,
@@ -39,6 +40,12 @@ class TestCatalogoIngresosItemGroups(MembersTestCase):
 		self.assertEqual(resolve_ingreso_leaf_for_item("RECARGO-MORA"), LEAF_CARGOS)
 		self.assertEqual(resolve_ingreso_leaf_for_item("ICDPE-BASQUET-ESCUELITA"), LEAF_BASQUET)
 		self.assertEqual(resolve_ingreso_leaf_for_item("ICDPE-FIN-DONACION"), LEAF_DONACIONES)
+		self.assertEqual(resolve_ingreso_leaf_for_item("ICDPE-FUNCIONAL-1-CLASE"), LEAF_FUNCIONAL)
+		self.assertEqual(resolve_ingreso_leaf_for_item("ICDPE-FUNCIONAL-2-CLASES"), LEAF_FUNCIONAL)
+		self.assertEqual(
+			resolve_ingreso_leaf_for_item("ICDPE-ARANCEL-MENSUAL-FUNCIONAL-GAP"),
+			LEAF_FUNCIONAL,
+		)
 
 	def test_ensure_tree_pilares_nodos_y_hojas(self) -> None:
 		run_ingresos_item_groups_migration()

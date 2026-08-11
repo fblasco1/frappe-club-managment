@@ -35,7 +35,8 @@ Migración: `icdpe_income_item_groups.ITEM_TO_LEAF` + reglas por prefijo.
 | `ICDPE-DANZA`, `…DANZA*` | Danza |
 | `ICDPE-RITMOS-LATINOS*` | Ritmos latinos |
 | `ICDPE-INICIACION-DEPORTIVA-*` | Iniciación deportiva |
-| `ICDPE-ARANCEL-MENSUAL-FITNESS*`, funcional/crossfit | Funcional y CrossFit |
+| `ICDPE-FUNCIONAL-*`, `ICDPE-ARANCEL-MENSUAL-FUNCIONAL*`, `…ACT-funcional`, `…ACT-crossfit` | Funcional y CrossFit |
+| `ICDPE-ARANCEL-MENSUAL-FITNESS*` | Gimnasio |
 
 ## Otros actividades
 
