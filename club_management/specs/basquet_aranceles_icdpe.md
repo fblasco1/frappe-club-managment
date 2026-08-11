@@ -40,6 +40,16 @@ Given existían ítems `ICDPE-PACKS-CLASES-*`
 When corre el patch `retire_packs_clases_items`
 Then esos ítems quedan `disabled = 1` y no se crean de nuevo en el seed.
 
+## Scenario: un solo etiquetado canónico (sin duplicados ARANCEL-MENSUAL)
+
+Given coexistían ítems legacy `ICDPE-ARANCEL-MENSUAL-BASQUET-*` / `…basquet-*`
+  con nombres tipo «Arancel mensual actividad - …»
+And los canónicos `ICDPE-BASQUET-*` usan `ARANCEL MENSUAL - BASQUET/…`
+When corre `retire_legacy_basquet_arancel_mensual_items`
+Then los legacy quedan `disabled = 1`
+And los canónicos permanecen habilitados con el nombre `format_arancel_mensual_item_name`
+And no se facturan ni se enlazan equipos a los legacy.
+
 ## Scenario: seed estructura básquet unificada
 
 Given patch `sync_basquet_aranceles_icdpe`

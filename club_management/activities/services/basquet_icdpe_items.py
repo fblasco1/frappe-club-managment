@@ -84,3 +84,43 @@ def retire_packs_clases_items() -> list[str]:
 		frappe.db.set_value("Item", row, "disabled", 1, update_modified=True)
 		retired.append(row)
 	return retired
+
+
+# Nombres viejos «Arancel mensual actividad - …» / códigos ARANCEL-MENSUAL-BASQUET*
+_LEGACY_BASQUET_ARANCEL_LIKE: tuple[str, ...] = (
+	"ICDPE-ARANCEL-MENSUAL-BASQUET%",
+	"ICDPE-ARANCEL-MENSUAL-basquet%",
+)
+
+
+def retire_legacy_basquet_arancel_mensual_items() -> list[str]:
+	"""Deshabilita duplicados legacy; deja solo `ICDPE-BASQUET-*` con etiqueta canónica.
+
+	Spec: `basquet_aranceles_icdpe.md` (un solo etiquetado).
+	"""
+	from club_management.finance.setup.cleanup_legacy_arancel_items import (
+		remape_legacy_arancel_links,
+	)
+
+	remape_legacy_arancel_links()
+
+	codes: set[str] = set()
+	for pattern in _LEGACY_BASQUET_ARANCEL_LIKE:
+		codes.update(
+			frappe.get_all(
+				"Item",
+				filters={"name": ["like", pattern]},
+				pluck="name",
+			)
+		)
+
+	retired: list[str] = []
+	for code in sorted(codes):
+		# Canónicos oficiales usan prefijo ICDPE-BASQUET- (no ARANCEL-MENSUAL).
+		if code.startswith("ICDPE-BASQUET-"):
+			continue
+		if int(frappe.db.get_value("Item", code, "disabled") or 0):
+			continue
+		frappe.db.set_value("Item", code, "disabled", 1, update_modified=True)
+		retired.append(code)
+	return retired

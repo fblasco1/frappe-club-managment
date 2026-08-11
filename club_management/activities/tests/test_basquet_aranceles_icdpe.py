@@ -87,3 +87,36 @@ class TestBasquetArancelesIcdpe(MembersTestCase):
 		retired = retire_packs_clases_items()
 		self.assertIn(code, retired)
 		self.assertEqual(frappe.db.get_value("Item", code, "disabled"), 1)
+
+	def test_retire_legacy_basquet_arancel_mensual(self) -> None:
+		from club_management.activities.data.arancel_item_spec import format_arancel_mensual_item_name
+		from club_management.activities.services.basquet_icdpe_items import (
+			retire_legacy_basquet_arancel_mensual_items,
+			sync_basquet_icdpe_items,
+		)
+
+		legacy = "ICDPE-ARANCEL-MENSUAL-BASQUET-MINIBASQUET"
+		if not frappe.db.exists("Item", legacy):
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": legacy,
+					"item_name": "Arancel mensual actividad - BASQUET/MINIBASQUET",
+					"item_group": "All Item Groups",
+					"is_stock_item": 0,
+					"is_sales_item": 1,
+					"disabled": 0,
+				}
+			).insert(ignore_permissions=True)
+		else:
+			frappe.db.set_value("Item", legacy, "disabled", 0)
+
+		sync_basquet_icdpe_items()
+		retired = retire_legacy_basquet_arancel_mensual_items()
+		self.assertIn(legacy, retired)
+		self.assertEqual(frappe.db.get_value("Item", legacy, "disabled"), 1)
+		self.assertEqual(frappe.db.get_value("Item", ITEM_MINIBASQUET, "disabled"), 0)
+		self.assertEqual(
+			frappe.db.get_value("Item", ITEM_MINIBASQUET, "item_name"),
+			format_arancel_mensual_item_name("BASQUET", "MASCULINO", "MINIBASQUET"),
+		)
