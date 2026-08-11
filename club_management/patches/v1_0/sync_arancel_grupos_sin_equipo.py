@@ -1,7 +1,7 @@
 """Sincroniza aranceles a nivel Grupo/tira (facturación sin equipo).
 
 - Re-seed estructura con `Grupo.item` en deportes no-básquet.
-- Remapea equipos Vóley Tira U11/U12 de ICDPE-VOLEY-TIRA-21500 → 30500 (Formativas).
+- Remapea equipos Vóley Tira U11/U12 de ICDPE-VOLEY-TIRA-21500 → FEDERADO.
 """
 
 from __future__ import annotations
@@ -14,8 +14,8 @@ from club_management.activities.data.otras_actividades_aranceles_icdpe import (
 )
 from club_management.activities.data.patin_aranceles_icdpe import PATIN_ITEM_SPECS
 from club_management.activities.data.voley_aranceles_icdpe import (
+	ITEM_VOLEY_FEDERADO,
 	ITEM_VOLEY_TIRA_21500,
-	ITEM_VOLEY_TIRA_30500,
 	VOLEY_ITEM_SPECS,
 )
 from club_management.activities.services.deporte_icdpe_items import sync_arancel_items
@@ -24,9 +24,9 @@ from club_management.activities.services.estructura_actividades_seed import (
 )
 
 
-def _remap_voley_tira_u11_u12_to_formativas() -> int:
-	"""Equipos U11/U12 que aún apuntan al ítem legacy 21500 pasan a Formativas."""
-	if not frappe.db.exists("Item", ITEM_VOLEY_TIRA_30500):
+def _remap_voley_tira_u11_u12_to_federado() -> int:
+	"""Equipos U11/U12 que aún apuntan al ítem legacy 21500 pasan a Federado."""
+	if not frappe.db.exists("Item", ITEM_VOLEY_FEDERADO):
 		return 0
 	updated = 0
 	for name in frappe.get_all(
@@ -42,7 +42,7 @@ def _remap_voley_tira_u11_u12_to_formativas() -> int:
 			"Equipo Actividad",
 			name,
 			"item",
-			ITEM_VOLEY_TIRA_30500,
+			ITEM_VOLEY_FEDERADO,
 			update_modified=True,
 		)
 		updated += 1
@@ -55,4 +55,4 @@ def execute() -> None:
 	sync_arancel_items(PATIN_ITEM_SPECS)
 	sync_arancel_items(OTRAS_ACTIVIDADES_ITEM_SPECS)
 	seed_estructura_actividades_completa(crear_equipos=True)
-	_remap_voley_tira_u11_u12_to_formativas()
+	_remap_voley_tira_u11_u12_to_federado()

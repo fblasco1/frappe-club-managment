@@ -7,8 +7,13 @@ from club_management.activities.data.arancel_item_spec import (
 	format_arancel_mensual_item_name,
 )
 
-ITEM_VOLEY_TIRA_21500 = "ICDPE-VOLEY-TIRA-21500"  # legacy U11-U12; Tira unificada usa 30500
-ITEM_VOLEY_TIRA_30500 = "ICDPE-VOLEY-TIRA-30500"  # Formativas — tarifa única de Tira
+# Canónicos (un solo etiquetado): Escuela vs Federado.
+ITEM_VOLEY_ESCUELA = "ICDPE-VOLEY-ESCUELA"
+ITEM_VOLEY_FEDERADO = "ICDPE-VOLEY-FEDERADO"
+
+# Legacy (remap → canónicos; no crear en seed nuevo).
+ITEM_VOLEY_TIRA_21500 = "ICDPE-VOLEY-TIRA-21500"
+ITEM_VOLEY_TIRA_30500 = "ICDPE-VOLEY-TIRA-30500"
 ITEM_VOLEY_ESCUELA_ADOLESCENTE = "ICDPE-VOLEY-ESCUELA-ADOLESCENTE"
 ITEM_VOLEY_ESCUELITA_MINIVOLEY = "ICDPE-VOLEY-ESCUELITA-MINIVOLEY"
 
@@ -16,27 +21,26 @@ CC_VOLEY = "Voley - ICDPE"
 
 VOLEY_ITEM_SPECS: tuple[ArancelItemSpec, ...] = (
 	ArancelItemSpec(
-		ITEM_VOLEY_TIRA_21500,
-		format_arancel_mensual_item_name("VOLEY", "FEMENINO", "TIRA", "U11-U12"),
+		ITEM_VOLEY_ESCUELA,
+		format_arancel_mensual_item_name("VOLEY", "ESCUELA"),
 		21500.0,
 		CC_VOLEY,
 	),
 	ArancelItemSpec(
-		ITEM_VOLEY_TIRA_30500,
-		format_arancel_mensual_item_name("VOLEY", "FEMENINO", "TIRA", "FORMATIVAS"),
+		ITEM_VOLEY_FEDERADO,
+		format_arancel_mensual_item_name("VOLEY", "FEDERADO"),
 		30500.0,
 		CC_VOLEY,
 	),
-	ArancelItemSpec(
-		ITEM_VOLEY_ESCUELA_ADOLESCENTE,
-		format_arancel_mensual_item_name("VOLEY", "FEMENINO", "ESCUELA ADOLESCENTE"),
-		21500.0,
-		CC_VOLEY,
-	),
-	ArancelItemSpec(
-		ITEM_VOLEY_ESCUELITA_MINIVOLEY,
-		format_arancel_mensual_item_name("VOLEY", "FEMENINO", "ESCUELITA", "MINIVOLEY"),
-		21500.0,
-		CC_VOLEY,
-	),
 )
+
+# Remap de códigos viejos → canónicos.
+VOLEY_LEGACY_TO_CANONICAL: dict[str, str] = {
+	ITEM_VOLEY_TIRA_30500: ITEM_VOLEY_FEDERADO,
+	ITEM_VOLEY_TIRA_21500: ITEM_VOLEY_FEDERADO,
+	ITEM_VOLEY_ESCUELA_ADOLESCENTE: ITEM_VOLEY_ESCUELA,
+	ITEM_VOLEY_ESCUELITA_MINIVOLEY: ITEM_VOLEY_ESCUELA,
+	"ICDPE-ARANCEL-MENSUAL-voley": ITEM_VOLEY_FEDERADO,
+	"ICDPE-ARANCEL-MENSUAL-VOLEY-GENERAL": ITEM_VOLEY_FEDERADO,
+	"ICDPE-ARANCEL-MENSUAL-VOLEY-ESCUELITA": ITEM_VOLEY_ESCUELA,
+}

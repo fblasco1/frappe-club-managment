@@ -24,7 +24,7 @@ class ActividadCatalogEntry:
 # Orden y títulos acordados con Secretaría / plan de cuentas ICDPE.
 ACTIVIDADES_CATALOGO_ICDPE: tuple[ActividadCatalogEntry, ...] = (
 	ActividadCatalogEntry("Basquet", 10, "ICDPE-BASQUET-ESCUELITA"),
-	ActividadCatalogEntry("Voley Femenino", 30, "ICDPE-VOLEY-TIRA-30500"),
+	ActividadCatalogEntry("Voley Femenino", 30, "ICDPE-VOLEY-FEDERADO"),
 	ActividadCatalogEntry("Futbol", 40, "ICDPE-FUTBOL-TABI-A"),
 	ActividadCatalogEntry("Patin Artistico", 50, "ICDPE-PATIN-MINI"),
 	ActividadCatalogEntry("Boxeo", 52, "ICDPE-BOXEO-1-CLASE"),

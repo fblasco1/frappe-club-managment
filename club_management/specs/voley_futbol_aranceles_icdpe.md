@@ -10,30 +10,32 @@
 
 ## Vóley — ítems ERPNext (cuenta 412001, CC `Voley - ICDPE`)
 
-| item_code | Monto ARS | Uso |
-|-----------|-----------|-----|
-| ICDPE-VOLEY-TIRA-30500 | 30.500 | **Tira unificada (Formativas)** — todas las categorías U11–Superior |
-| ICDPE-VOLEY-ESCUELA-ADOLESCENTE | 21.500 | Escuela Adolescente |
-| ICDPE-VOLEY-ESCUELITA-MINIVOLEY | 21.500 | Escuelita Minivoley |
-| ICDPE-VOLEY-TIRA-21500 | 21.500 | Legacy U11-U12; no usar en Tira unificada |
+Solo **dos** aranceles (etiquetado único):
 
-## Scenario: vóley tira unificada Formativas
+| item_code | Nombre | Monto ARS | Uso |
+|-----------|--------|-----------|-----|
+| `ICDPE-VOLEY-FEDERADO` | `ARANCEL MENSUAL - VOLEY/FEDERADO` | 30.500 | Grupo **Tira** (U11–Superior) |
+| `ICDPE-VOLEY-ESCUELA` | `ARANCEL MENSUAL - VOLEY/ESCUELA` | 21.500 | **Escuela Adolescente** y **Escuelita Minivoley** |
 
-Given `Voley Femenino` / grupo `Tira` con `item = ICDPE-VOLEY-TIRA-30500`
+Legacy (`ICDPE-VOLEY-TIRA-*`, `…ESCUELA-ADOLESCENTE`, `…ESCUELITA-MINIVOLEY`) se remapean y deshabilitan.
+
+## Scenario: vóley federado (tira)
+
+Given `Voley Femenino` / grupo `Tira` con `item = ICDPE-VOLEY-FEDERADO`
 When se resuelve el arancel (con o sin equipo)
-Then devuelve `ICDPE-VOLEY-TIRA-30500` con tarifa 30.500.
+Then devuelve `ICDPE-VOLEY-FEDERADO` con tarifa 30.500.
 
-## Scenario: vóley tira U12 sin equipo
+## Scenario: vóley tira sin equipo
 
 Given inscripción en `Voley Femenino` / `Tira` **sin** `equipo_actividad`
 When se resuelve el arancel
-Then usa el ítem del grupo Formativas (`ICDPE-VOLEY-TIRA-30500`).
+Then usa el ítem del grupo Federado (`ICDPE-VOLEY-FEDERADO`).
 
-## Scenario: vóley escuelita minivoley
+## Scenario: vóley escuela / escuelita
 
-Given `Voley Femenino` / `Escuelita Minivoley` (grupo con ítem)
+Given `Voley Femenino` / `Escuelita Minivoley` o `Escuela Adolescente`
 When se resuelve el arancel solo con grupo
-Then devuelve `ICDPE-VOLEY-ESCUELITA-MINIVOLEY` con tarifa 21.500.
+Then devuelve `ICDPE-VOLEY-ESCUELA` con tarifa 21.500.
 
 ## Fútbol — estructura
 

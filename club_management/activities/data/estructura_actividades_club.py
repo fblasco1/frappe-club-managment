@@ -45,9 +45,8 @@ from club_management.activities.data.patin_aranceles_icdpe import (
 	ITEM_PATIN_TEENS,
 )
 from club_management.activities.data.voley_aranceles_icdpe import (
-	ITEM_VOLEY_ESCUELA_ADOLESCENTE,
-	ITEM_VOLEY_ESCUELITA_MINIVOLEY,
-	ITEM_VOLEY_TIRA_30500,
+	ITEM_VOLEY_ESCUELA,
+	ITEM_VOLEY_FEDERADO,
 )
 
 # Categorías genéricas para deportes sin matriz ICDPE detallada (vóley, fútbol).
@@ -173,31 +172,31 @@ ESTRUCTURA_VOLEY_FEMENINO = ActividadEstructuraSeed(
 		GrupoSeed(
 			"Tira",
 			10,
-			item_code=ITEM_VOLEY_TIRA_30500,
+			item_code=ITEM_VOLEY_FEDERADO,
 			equipos=(
-				_eq("U11", 10, ITEM_VOLEY_TIRA_30500),
-				_eq("U12", 20, ITEM_VOLEY_TIRA_30500),
-				_eq("U13", 30, ITEM_VOLEY_TIRA_30500),
-				_eq("U14", 40, ITEM_VOLEY_TIRA_30500),
-				_eq("U15", 50, ITEM_VOLEY_TIRA_30500),
-				_eq("U16", 60, ITEM_VOLEY_TIRA_30500),
-				_eq("U18", 70, ITEM_VOLEY_TIRA_30500),
-				_eq("U21", 80, ITEM_VOLEY_TIRA_30500),
-				_eq("Superior A", 90, ITEM_VOLEY_TIRA_30500, 'SUPERIOR "A"'),
-				_eq("Superior B", 100, ITEM_VOLEY_TIRA_30500, 'SUPERIOR "B"'),
+				_eq("U11", 10, ITEM_VOLEY_FEDERADO),
+				_eq("U12", 20, ITEM_VOLEY_FEDERADO),
+				_eq("U13", 30, ITEM_VOLEY_FEDERADO),
+				_eq("U14", 40, ITEM_VOLEY_FEDERADO),
+				_eq("U15", 50, ITEM_VOLEY_FEDERADO),
+				_eq("U16", 60, ITEM_VOLEY_FEDERADO),
+				_eq("U18", 70, ITEM_VOLEY_FEDERADO),
+				_eq("U21", 80, ITEM_VOLEY_FEDERADO),
+				_eq("Superior A", 90, ITEM_VOLEY_FEDERADO, 'SUPERIOR "A"'),
+				_eq("Superior B", 100, ITEM_VOLEY_FEDERADO, 'SUPERIOR "B"'),
 			),
 		),
 		GrupoSeed(
 			"Escuela Adolescente",
 			20,
-			item_code=ITEM_VOLEY_ESCUELA_ADOLESCENTE,
-			equipos=(_eq("Escuela Adolescente", 10, ITEM_VOLEY_ESCUELA_ADOLESCENTE),),
+			item_code=ITEM_VOLEY_ESCUELA,
+			equipos=(_eq("Escuela Adolescente", 10, ITEM_VOLEY_ESCUELA),),
 		),
 		GrupoSeed(
 			"Escuelita Minivoley",
 			30,
-			item_code=ITEM_VOLEY_ESCUELITA_MINIVOLEY,
-			equipos=(_eq("Escuelita Minivoley", 10, ITEM_VOLEY_ESCUELITA_MINIVOLEY),),
+			item_code=ITEM_VOLEY_ESCUELA,
+			equipos=(_eq("Escuelita Minivoley", 10, ITEM_VOLEY_ESCUELA),),
 		),
 	),
 )

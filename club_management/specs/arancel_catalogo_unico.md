@@ -31,7 +31,7 @@ And los `ICDPE-ARANCEL-MENSUAL-BOXEO*` quedan disabled (y se borran si no hay SI
 
 Given `Actividad` Futbol / Voley Femenino / Funcional tenían `item` legacy
 When corre el patch de retiro + sync catálogo
-Then `Actividad.item` apunta al canónico (`ICDPE-FUTBOL-TABI-A`, `ICDPE-VOLEY-TIRA-30500`, `ICDPE-FUNCIONAL-1-CLASE`, …).
+Then `Actividad.item` apunta al canónico (`ICDPE-FUTBOL-TABI-A`, `ICDPE-VOLEY-FEDERADO`, `ICDPE-FUNCIONAL-1-CLASE`, …).
 
 ---
 
