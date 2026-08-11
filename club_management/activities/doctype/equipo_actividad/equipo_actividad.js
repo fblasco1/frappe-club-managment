@@ -24,6 +24,16 @@ function club_equipo_actividad_add_actions(frm) {
 	frm.add_custom_button(__("Volver al catálogo"), () => {
 		frappe.set_route("catalogo-actividades");
 	});
+	if (!frm.is_new()) {
+		frm.add_custom_button(__("Nueva bonificación arancel"), () => {
+			frappe.route_options = {
+				equipo_actividad: frm.doc.name,
+				grupo_actividad: frm.doc.grupo_actividad,
+				actividad: frm.doc.actividad,
+			};
+			frappe.new_doc("Bonificacion Arancel");
+		});
+	}
 }
 
 function club_equipo_actividad_arancel_panel(frm) {

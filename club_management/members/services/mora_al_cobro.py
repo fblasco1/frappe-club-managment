@@ -399,7 +399,7 @@ def calcular_detalle_mora_factura(
 
 	if tramo == "ninguno":
 		result["monto_exigido"] = outstanding_grupo
-		return result
+		return _aplicar_bonificacion_detalle(result, invoice_name, socio_name)
 
 	valor_actual = resolve_valor_actual_factura(invoice_name, socio_name)
 	monto_exigido = monto_exigido_con_piso(
@@ -425,6 +425,43 @@ def calcular_detalle_mora_factura(
 			),
 		}
 	)
+	return _aplicar_bonificacion_detalle(result, invoice_name, socio_name)
+
+
+def _aplicar_bonificacion_detalle(
+	result: dict[str, Any],
+	invoice_name: str,
+	socio_name: str,
+) -> dict[str, Any]:
+	"""Resta bonificación de arancel al monto exigido (preview / detalle)."""
+	from club_management.members.services.bonificacion_arancel import (
+		_monto_cn_ya_aplicado,
+		calcular_bonificacion_factura,
+	)
+
+	result.setdefault("monto_bonificacion", 0.0)
+	result.setdefault("aplica_bonificacion", False)
+	result.setdefault("bonificacion_detalle", [])
+	result.setdefault("bonificacion_motivos", [])
+	if not socio_name:
+		return result
+
+	bonif = calcular_bonificacion_factura(invoice_name, socio_name)
+	monto_b = flt(bonif.get("monto_bonificacion"))
+	ya_cn = _monto_cn_ya_aplicado(socio_name, invoice_name)
+	tramo = result.get("tramo") or "ninguno"
+	if tramo == "ninguno":
+		mora_gross = flt(result.get("outstanding_grupo")) + ya_cn
+	else:
+		# Base valor/mora no depende del CN; no sumar ya_cn
+		mora_gross = flt(result.get("monto_exigido"))
+	neto = max(0.0, flt(mora_gross - monto_b, 2))
+	result["monto_exigido_antes_bonif"] = flt(mora_gross, 2)
+	result["monto_bonificacion"] = monto_b
+	result["monto_exigido"] = neto
+	result["aplica_bonificacion"] = monto_b > 0.005
+	result["bonificacion_detalle"] = bonif.get("detalle") or []
+	result["bonificacion_motivos"] = bonif.get("motivos") or []
 	return result
 
 
@@ -456,13 +493,16 @@ def previsualizar_cobro_con_mora(
 		ajustes_estimados += flt(info["monto_ajuste"])
 
 	detalle.sort(key=lambda r: (_periodo_sort_key(r.get("periodo")), r.get("invoice") or ""))
+	total_bonif = sum(flt(r.get("monto_bonificacion")) for r in detalle)
 	return {
 		"sales_invoices": list(seen),
 		"detalle": detalle,
 		"total_exigido": flt(total, 2),
 		"total_ajustes": flt(ajustes_estimados, 2),
+		"total_bonificacion": flt(total_bonif, 2),
 		"posting_date": str(ref),
 		"aplica_mora": ajustes_estimados > 0.005,
+		"aplica_bonificacion": total_bonif > 0.005,
 	}
 
 
@@ -642,12 +682,17 @@ def preparar_facturas_cobro_con_mora(
 	*,
 	posting_date: str | date | None = None,
 ) -> dict[str, Any]:
-	"""Asegura ajustes de mora y devuelve lista expandida + total a cobrar."""
+	"""Asegura ajustes de mora + CN de bonificación; total = outstanding expandido."""
+	from club_management.members.services.bonificacion_arancel import (
+		asegurar_credit_note_bonificacion,
+		calcular_bonificacion_factura,
+	)
+
 	ref = getdate(posting_date or today())
 	expanded: list[str] = []
 	ajustes: list[str] = []
+	credit_notes: list[str] = []
 	detalle: list[dict[str, Any]] = []
-	total = 0.0
 
 	seen: set[str] = set()
 	for name in sales_invoices:
@@ -663,17 +708,29 @@ def preparar_facturas_cobro_con_mora(
 			ajustes.append(info["ajuste"])
 			expanded.append(info["ajuste"])
 
-		# Incluir ajustes previos aún pendientes
 		for row in _ajustes_mora_pendientes(socio_name, invoice_name):
 			if row.name not in expanded:
 				expanded.append(row.name)
 				if row.name not in ajustes:
 					ajustes.append(row.name)
 
-		detalle.append(info)
-		total += flt(info["monto_exigido"])
+		bonif = calcular_bonificacion_factura(invoice_name, socio_name)
+		monto_b = flt(bonif.get("monto_bonificacion"))
+		motivos = ", ".join(bonif.get("motivos") or [])
+		if monto_b > 0.005:
+			cn_info = asegurar_credit_note_bonificacion(
+				invoice_name,
+				monto=monto_b,
+				motivo=motivos,
+				posting_date=ref,
+			)
+			if cn_info.get("credit_note"):
+				credit_notes.append(cn_info["credit_note"])
 
-	# Total a cobrar = outstanding real de la lista expandida (debe igualar la fórmula).
+		info["monto_bonificacion"] = monto_b
+		info["bonificacion_detalle"] = bonif.get("detalle") or []
+		detalle.append(info)
+
 	total_outstanding = 0.0
 	campo = _campo_socio_en(SALES_INVOICE_DOCTYPE)
 	for inv_name in expanded:
@@ -685,6 +742,7 @@ def preparar_facturas_cobro_con_mora(
 	return {
 		"sales_invoices": expanded,
 		"ajustes": ajustes,
+		"credit_notes": credit_notes,
 		"total_exigido": flt(total_outstanding, 2),
 		"detalle": detalle,
 		"posting_date": str(ref),

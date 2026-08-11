@@ -270,6 +270,11 @@ club_management_socio_desk.add_operaciones_buttons = function (frm) {
 	if (estado !== "Baja") {
 		frm.add_custom_button(__("Crear beca"), () => club_management_socio_desk.crear_beca(frm), group);
 		frm.add_custom_button(
+			__("Nueva bonificación arancel"),
+			() => club_management_socio_desk.crear_bonificacion_arancel(frm),
+			group
+		);
+		frm.add_custom_button(
 			__("Corregir número de socio"),
 			() => club_management_socio_desk.dialog_corregir_numero(frm),
 			group
@@ -449,6 +454,11 @@ club_management_socio_desk.nuevo_cargo_extra = function (frm) {
 club_management_socio_desk.crear_beca = function (frm) {
 	frappe.route_options = { socio: frm.doc.name };
 	frappe.new_doc("Beca Socio");
+};
+
+club_management_socio_desk.crear_bonificacion_arancel = function (frm) {
+	frappe.route_options = { socio: frm.doc.name };
+	frappe.new_doc("Bonificacion Arancel");
 };
 
 club_management_socio_desk._vigencia_indicator = function (label) {
@@ -926,8 +936,12 @@ club_management_socio_desk._actualizar_labels_facturas_mora = function (dialog, 
 			info && info.aplica_mora
 				? ` · ${__("con mora")} (+${club_management_socio_desk._fmt_money(info.monto_ajuste)})`
 				: "";
+		const bonif_txt =
+			info && info.aplica_bonificacion
+				? ` · ${__("bonif.")} (−${club_management_socio_desk._fmt_money(info.monto_bonificacion)})`
+				: "";
 		const periodo_txt = periodo ? `${periodo} · ` : "";
-		opt.label = `${periodo_txt}${concepto} — ${opt.value} — ${monto_txt}${mora_txt}`;
+		opt.label = `${periodo_txt}${concepto} — ${opt.value} — ${monto_txt}${mora_txt}${bonif_txt}`;
 		if (opt.$checkbox) {
 			opt.$checkbox.find(".label-area").text(opt.label);
 		}
@@ -938,6 +952,7 @@ club_management_socio_desk._pintar_resumen_mora = function (dialog, preview) {
 	const detalle = preview.detalle || [];
 	const total = flt(preview.total_exigido);
 	const ajustes = flt(preview.total_ajustes);
+	const bonif = flt(preview.total_bonificacion);
 	let html = `<div class="small" style="margin: 0.5rem 0;">`;
 	html += `<p style="margin-bottom:0.4rem;"><b>${__("Total a cobrar")}:</b> ${frappe.utils.escape_html(
 		club_management_socio_desk._fmt_money(total)
@@ -947,18 +962,29 @@ club_management_socio_desk._pintar_resumen_mora = function (dialog, preview) {
 			club_management_socio_desk._fmt_money(ajustes)
 		)} ${__("mora")})</span>`;
 	}
+	if (bonif > 0) {
+		html += ` <span class="text-success" style="white-space:nowrap;">(−${frappe.utils.escape_html(
+			club_management_socio_desk._fmt_money(bonif)
+		)} ${__("bonificación")})</span>`;
+	}
 	html += `</p><ul style="margin:0;padding-left:1.2rem;">`;
 	detalle.forEach((row) => {
 		const periodo = frappe.utils.escape_html(row.periodo || "—");
 		const concepto = frappe.utils.escape_html(row.concepto || row.invoice || "");
 		const exigido = frappe.utils.escape_html(club_management_socio_desk._fmt_money(row.monto_exigido));
+		let extra = "";
 		if (row.aplica_mora && row.composicion) {
-			html += `<li><b>${periodo}</b> ${concepto}: ${exigido}<br/><span class="text-muted">${frappe.utils.escape_html(
-				row.composicion
-			)}</span></li>`;
-		} else {
-			html += `<li><b>${periodo}</b> ${concepto}: ${exigido}</li>`;
+			extra += `<br/><span class="text-muted">${frappe.utils.escape_html(row.composicion)}</span>`;
 		}
+		if (row.aplica_bonificacion && flt(row.monto_bonificacion) > 0) {
+			const motivos = (row.bonificacion_motivos || []).join("; ") || "";
+			extra += `<br/><span class="text-success">${__(
+				"Bonificación arancel"
+			)}: −${frappe.utils.escape_html(
+				club_management_socio_desk._fmt_money(row.monto_bonificacion)
+			)}${motivos ? ` — ${frappe.utils.escape_html(motivos)}` : ""}</span>`;
+		}
+		html += `<li><b>${periodo}</b> ${concepto}: ${exigido}${extra}</li>`;
 	});
 	html += `</ul></div>`;
 	if (dialog.fields_dict.mora_resumen) {

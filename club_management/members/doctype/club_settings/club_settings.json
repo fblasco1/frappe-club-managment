@@ -16,6 +16,7 @@
   "recargo_post_vencimiento_pct",
   "recargo_mes_vencido_pct",
   "item_recargo_mora",
+  "item_bonificacion_arancel",
   "column_break_cobranza",
   "incluir_aranceles_en_deuda_mensual",
   "incluir_cargos_extra_en_deuda_mensual",
@@ -111,6 +112,13 @@
    "label": "Ítem recargo mora",
    "options": "Item",
    "description": "Servicio ERPNext para la línea de recargo / ajuste por mora. Obligatorio para cobrar con mora."
+  },
+  {
+   "fieldname": "item_bonificacion_arancel",
+   "fieldtype": "Link",
+   "label": "Ítem bonificación arancel",
+   "options": "Item",
+   "description": "Servicio ERPNext para la nota de crédito de bonificación de arancel al cobro."
   },
   {
    "fieldname": "column_break_cobranza",

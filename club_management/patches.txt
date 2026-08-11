@@ -75,3 +75,7 @@ club_management.patches.v1_0.fix_funcional_item_groups
 club_management.patches.v1_0.retire_legacy_basquet_arancel_items
 club_management.patches.v1_0.retire_legacy_arancel_mensual_catalog
 club_management.patches.v1_0.consolidate_voley_escuela_federado
+<<<<<<< Updated upstream
+=======
+club_management.patches.v1_0.ensure_item_bonificacion_arancel
+>>>>>>> Stashed changes

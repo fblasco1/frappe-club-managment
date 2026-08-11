@@ -21,6 +21,8 @@ class TestCobroMultiFacturaUi(unittest.TestCase):
 		self.assertIn("_pintar_resumen_mora", text)
 		self.assertIn("_aplicar_preview_mora", text)
 		self.assertIn("_actualizar_labels_facturas_mora", text)
+		self.assertIn("crear_bonificacion_arancel", text)
+		self.assertIn("total_bonificacion", text)
 		# MultiCheck dispara on_change (no onchange).
 		self.assertIn("sales_invoices.df.on_change", text)
 		self.assertIn("_fmt_money", text)
