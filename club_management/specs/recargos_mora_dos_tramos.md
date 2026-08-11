@@ -129,6 +129,26 @@ And la suma de medios coincide con el total a cobrar.
 
 ---
 
+## Scenario: factura con varias líneas (cuota + arancel)
+
+Given una `Sales Invoice` del período con **más de una línea** (p. ej. cuota social + arancel)
+And outstanding del grupo = suma de esas líneas (p. ej. 57.000)
+When se calcula mora en tramo `post_primer` o `post_segundo`
+Then `valor_actual` es la **suma** del valor vigente de **todas** las líneas
+And `monto_exigido` = ese valor × factor del tramo
+And si el valor vigente calculado fuera incompleto, el piso es `outstanding_factura × factor`
+(sin recomponer sobre SI de mora ya creadas; no puede “achicar” la deuda al pasar del día 10 al 11).
+
+---
+
+## Scenario: diálogo Registrar cobro — fecha arriba
+
+Given Secretaría abre **Registrar cobro**
+Then el campo **Fecha de cobro** figura **arriba de todo** (antes de la lista de facturas)
+And al cambiar la fecha se recalcula el total con mora.
+
+---
+
 ## Artefactos
 
 | Pieza | Ubicación |

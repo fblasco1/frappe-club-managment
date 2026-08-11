@@ -25,3 +25,17 @@ class TestCobroMultiFacturaUi(unittest.TestCase):
 		self.assertIn("sales_invoices.df.on_change", text)
 		self.assertIn("_fmt_money", text)
 		self.assertNotIn("frappe.format(monto, { fieldtype: \"Currency\" })", text)
+
+	def test_fecha_cobro_arriba_de_facturas_en_dialogo(self) -> None:
+		"""Spec: `registrar_cobro_fecha.md` — Fecha de cobro arriba de todo."""
+		text = _SOCIO_JS.read_text(encoding="utf-8")
+		marker = "prompt_cobro_multi_factura"
+		start = text.find(marker)
+		self.assertGreater(start, 0)
+		# Primer bloque fields del diálogo Registrar cobro.
+		block = text[start : start + 4500]
+		idx_fecha = block.find('fieldname: "posting_date"')
+		idx_facturas = block.find('fieldname: "sales_invoices"')
+		self.assertGreater(idx_fecha, 0)
+		self.assertGreater(idx_facturas, 0)
+		self.assertLess(idx_fecha, idx_facturas)

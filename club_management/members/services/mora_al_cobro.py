@@ -215,26 +215,75 @@ def _remarks_mora(invoice_origen: str) -> str:
 	return _("Mora al cobro {0}").format(invoice_origen)
 
 
-def resolve_valor_actual_factura(invoice_name: str, socio_name: str) -> float:
-	"""Precio vigente del concepto de la SI (cuota categoría o rate del ítem)."""
-	invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, invoice_name)
-	item_code = ""
-	if invoice.get("items"):
-		item_code = (invoice.items[0].item_code or "").strip()
-
-	monto_cuota, item_cuota = resolve_cuota_social(socio_name)
-	if item_code and item_cuota and item_code == item_cuota:
-		return flt(monto_cuota)
-
-	if item_code and frappe.db.exists("Item", item_code):
-		rate = flt(frappe.db.get_value("Item", item_code, "standard_rate") or 0)
+def resolve_valor_actual_linea(
+	*,
+	item_code: str,
+	qty: float,
+	rate_facturado: float,
+	socio_name: str,
+	item_cuota: str | None,
+	monto_cuota: float,
+) -> float:
+	"""Valor vigente de una línea (qty × rate vigente)."""
+	q = flt(qty) or 1.0
+	code = (item_code or "").strip()
+	if code and item_cuota and code == item_cuota:
+		return flt(monto_cuota) * q
+	if code and frappe.db.exists("Item", code):
+		rate = flt(frappe.db.get_value("Item", code, "standard_rate") or 0)
 		if rate > 0:
-			return rate
+			return rate * q
+	return flt(rate_facturado) * q
 
-	# Fallback: rate facturado (sin revalorización disponible)
-	if invoice.get("items"):
-		return flt(invoice.items[0].rate)
+
+def resolve_valor_actual_factura(invoice_name: str, socio_name: str) -> float:
+	"""Suma del precio vigente de **todas** las líneas de la SI.
+
+	Spec: ``recargos_mora_dos_tramos.md`` (factura multi-línea).
+	"""
+	invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, invoice_name)
+	monto_cuota, item_cuota = resolve_cuota_social(socio_name)
+	total = 0.0
+	for row in invoice.get("items") or []:
+		total += resolve_valor_actual_linea(
+			item_code=row.item_code or "",
+			qty=flt(row.qty),
+			rate_facturado=flt(row.rate),
+			socio_name=socio_name,
+			item_cuota=item_cuota,
+			monto_cuota=flt(monto_cuota),
+		)
+	if total > 0:
+		return flt(total, 2)
 	return flt(invoice.outstanding_amount)
+
+
+def monto_exigido_con_piso(
+	*,
+	valor_actual: float,
+	outstanding_factura: float,
+	tramo: TramoMora,
+	pct_post_primer: float,
+	pct_extra_segundo: float,
+) -> float:
+	"""Aplica % sobre valor vigente; no baja del outstanding de la SI × mismo factor.
+
+	El piso usa solo el outstanding de la factura origen (sin SI de mora ya creadas),
+	para no recomponer mora sobre mora.
+	"""
+	desde_valor = calcular_monto_exigido_mora(
+		valor_actual=valor_actual,
+		tramo=tramo,
+		pct_post_primer=pct_post_primer,
+		pct_extra_segundo=pct_extra_segundo,
+	)
+	desde_out = calcular_monto_exigido_mora(
+		valor_actual=outstanding_factura,
+		tramo=tramo,
+		pct_post_primer=pct_post_primer,
+		pct_extra_segundo=pct_extra_segundo,
+	)
+	return flt(max(desde_valor, desde_out), 2)
 
 
 def _ajustes_mora_pendientes(socio_name: str, invoice_origen: str) -> list[dict[str, Any]]:
@@ -353,8 +402,9 @@ def calcular_detalle_mora_factura(
 		return result
 
 	valor_actual = resolve_valor_actual_factura(invoice_name, socio_name)
-	monto_exigido = calcular_monto_exigido_mora(
+	monto_exigido = monto_exigido_con_piso(
 		valor_actual=valor_actual,
+		outstanding_factura=outstanding,
 		tramo=tramo,
 		pct_post_primer=pct_post,
 		pct_extra_segundo=pct_extra,
@@ -367,7 +417,7 @@ def calcular_detalle_mora_factura(
 			"monto_ajuste": max(0.0, ajuste),
 			"aplica_mora": ajuste > 0.005,
 			"composicion": texto_composicion_mora(
-				valor_actual=valor_actual,
+				valor_actual=max(flt(valor_actual), flt(outstanding)),
 				tramo=tramo,
 				pct_post_primer=pct_post,
 				pct_extra_segundo=pct_extra,
@@ -487,14 +537,15 @@ def asegurar_ajuste_mora_factura(
 		result["monto_exigido"] = outstanding
 		return result
 
+	outstanding_grupo = _outstanding_grupo(invoice_name, socio_name)
 	valor_actual = resolve_valor_actual_factura(invoice_name, socio_name)
-	monto_exigido = calcular_monto_exigido_mora(
+	monto_exigido = monto_exigido_con_piso(
 		valor_actual=valor_actual,
+		outstanding_factura=flt(invoice.outstanding_amount),
 		tramo=tramo,
 		pct_post_primer=pct_post,
 		pct_extra_segundo=pct_extra,
 	)
-	outstanding_grupo = _outstanding_grupo(invoice_name, socio_name)
 	result["monto_exigido"] = monto_exigido
 	result["outstanding_grupo"] = outstanding_grupo
 
@@ -519,7 +570,7 @@ def asegurar_ajuste_mora_factura(
 		"description": _("Mora {0}: {1}").format(
 			periodo,
 			texto_composicion_mora(
-				valor_actual=valor_actual,
+				valor_actual=max(flt(valor_actual), flt(invoice.outstanding_amount)),
 				tramo=tramo,
 				pct_post_primer=pct_post,
 				pct_extra_segundo=pct_extra,

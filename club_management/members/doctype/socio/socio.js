@@ -719,6 +719,13 @@ club_management_socio_desk.prompt_cobro_multi_factura = function (frm, rows) {
 				title: __("Registrar cobro"),
 				fields: [
 					{
+						fieldname: "posting_date",
+						fieldtype: "Date",
+						label: __("Fecha de cobro"),
+						default: frappe.datetime.get_today(),
+						reqd: 1,
+					},
+					{
 						fieldname: "sales_invoices",
 						fieldtype: "MultiCheck",
 						label: __("Facturas a cobrar"),
@@ -759,13 +766,6 @@ club_management_socio_desk.prompt_cobro_multi_factura = function (frm, rows) {
 						fieldtype: "Currency",
 						label: __("Monto medio 2"),
 						default: 0,
-					},
-					{
-						fieldname: "posting_date",
-						fieldtype: "Date",
-						label: __("Fecha de cobro"),
-						default: frappe.datetime.get_today(),
-						reqd: 1,
 					},
 				],
 				primary_action_label: __("Confirmar"),

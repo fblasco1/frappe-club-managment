@@ -120,6 +120,46 @@ class TestMoraValorActualFormula(MembersTestCase):
 			12.0,
 		)
 
+	def test_base_mora_no_baja_del_outstanding(self) -> None:
+		from club_management.members.services.mora_al_cobro import monto_exigido_con_piso
+
+		# Valor solo 1.ª línea (28,5k) vs SI completa 57k → piso = 57k × 1,10
+		self.assertEqual(
+			monto_exigido_con_piso(
+				valor_actual=28500,
+				outstanding_factura=57000,
+				tramo="post_primer",
+				pct_post_primer=10,
+				pct_extra_segundo=5,
+			),
+			62700.0,
+		)
+		self.assertEqual(
+			monto_exigido_con_piso(
+				valor_actual=60000,
+				outstanding_factura=57000,
+				tramo="post_primer",
+				pct_post_primer=10,
+				pct_extra_segundo=5,
+			),
+			66000.0,
+		)
+
+	def test_post_primer_sobre_base_completa_no_achica(self) -> None:
+		"""Día 11: 57k × 1,10 = 62,7k (no 28,5k × 1,10)."""
+		from club_management.members.services.mora_al_cobro import monto_exigido_con_piso
+
+		self.assertEqual(
+			monto_exigido_con_piso(
+				valor_actual=57000,
+				outstanding_factura=57000,
+				tramo="post_primer",
+				pct_post_primer=10,
+				pct_extra_segundo=5,
+			),
+			62700.0,
+		)
+
 	def test_periodo_es_ajuste_mora(self) -> None:
 		self.assertTrue(periodo_es_ajuste_mora(f"03/2026{MORA_SUFFIX}"))
 		self.assertFalse(periodo_es_ajuste_mora("03/2026"))
@@ -355,3 +395,70 @@ class TestMoraValorActualIntegracion(MembersTestCase):
 		self.assertIn("5%", comp)
 		self.assertNotIn("5%×", comp)
 		self.assertEqual(frappe.db.count(SALES_INVOICE_DOCTYPE, {"docstatus": 1}), antes)
+
+	def test_preview_factura_multilinea_dia_11_no_achica(self) -> None:
+		"""Cuota+arancel en una SI: día 10 = outstanding; día 11 = ×1,10 (no solo 1.ª línea)."""
+		from frappe.utils import today
+
+		from club_management.members.services.cobranza_manual import (
+			_campo_periodo_cobro,
+			_campo_socio_en,
+			_default_company,
+			ensure_customer_for_socio,
+			format_periodo_cobro,
+		)
+		from club_management.members.services.mora_al_cobro import calcular_detalle_mora_factura
+
+		socio = self._socio_activo(dni="76001008", email="mora.multilinea@example.com")
+		campo = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+		self.assertTrue(campo)
+		item_group = frappe.db.get_value("Item Group", {"is_group": 0}, "name") or "Products"
+		for code, rate in (("TEST-MORA-CUOTA-ML", 28500), ("TEST-MORA-ARANCEL-ML", 28500)):
+			if not frappe.db.exists("Item", code):
+				frappe.get_doc(
+					{
+						"doctype": "Item",
+						"item_code": code,
+						"item_name": code,
+						"item_group": item_group,
+						"is_stock_item": 0,
+						"is_sales_item": 1,
+						"standard_rate": rate,
+					}
+				).insert(ignore_permissions=True)
+			else:
+				frappe.db.set_value("Item", code, "standard_rate", rate)
+
+		posting = today()
+		payload: dict = {
+			"doctype": SALES_INVOICE_DOCTYPE,
+			"customer": ensure_customer_for_socio(socio.name),
+			"company": _default_company(),
+			"posting_date": posting,
+			"due_date": posting,
+			"set_posting_time": 1,
+			campo: socio.name,
+			"items": [
+				{"item_code": "TEST-MORA-CUOTA-ML", "qty": 1, "rate": 28500, "description": "Cuota social"},
+				{
+					"item_code": "TEST-MORA-ARANCEL-ML",
+					"qty": 1,
+					"rate": 28500,
+					"description": "Arancel actividad",
+				},
+			],
+		}
+		campo_periodo = _campo_periodo_cobro()
+		if campo_periodo:
+			payload[campo_periodo] = format_periodo_cobro("2026-08-01")
+		doc = frappe.get_doc(payload)
+		doc.insert(ignore_permissions=True)
+		doc.submit()
+
+		dia10 = calcular_detalle_mora_factura(doc.name, posting_date="2026-08-10")
+		dia11 = calcular_detalle_mora_factura(doc.name, posting_date="2026-08-11")
+		self.assertEqual(dia10["tramo"], "ninguno")
+		self.assertAlmostEqual(dia10["monto_exigido"], 57000.0, places=2)
+		self.assertEqual(dia11["tramo"], "post_primer")
+		self.assertAlmostEqual(dia11["monto_exigido"], 62700.0, places=2)
+		self.assertGreater(dia11["monto_exigido"], dia10["monto_exigido"])

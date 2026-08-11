@@ -34,8 +34,10 @@ Then error de validación.
 ## Scenario: formulario Socio — diálogo registrar cobro
 
 Given Secretaría abre **Registrar cobro** en formulario `Socio`
+Then el campo **Fecha de cobro** está **arriba de todo** en el diálogo (antes de facturas y medios)
+And puede elegir **Fecha de cobro** (default hoy)
 When confirma el medio de pago
-Then puede elegir **Fecha de cobro** (default hoy).
+Then el cobro usa esa fecha para mora y para el `Payment Entry`.
 
 ---
 
