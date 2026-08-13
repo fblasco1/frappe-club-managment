@@ -11,6 +11,10 @@ from club_management.members.services.cargo_extra_prepago import (
 	list_meses_prepago_cargo,
 	prepagar_cargo_socio,
 )
+from club_management.members.services.cargo_socio import (
+	crear_cargo_extra_socio,
+	facturar_mes_corriente_cargo,
+)
 from club_management.members.services.socio_operaciones_secretaria import (
 	ensure_secretaria_operacion_access,
 )
@@ -46,3 +50,39 @@ def prepagar_cargo(
 	else:
 		parsed = [str(x) for x in periodos]
 	return prepagar_cargo_socio(cargo, periodos=parsed, reference_date=reference_date)
+
+
+@frappe.whitelist()
+def facturar_mes_corriente(cargo: str, reference_date: str | None = None) -> dict:
+	"""Factura el mes corriente de un cargo recurrente para poder cobrarlo."""
+	ensure_secretaria_operacion_access()
+	return facturar_mes_corriente_cargo(cargo, reference_date=reference_date)
+
+
+@frappe.whitelist()
+def crear_cargo_extra(
+	socio: str,
+	titulo: str,
+	tipo_cargo: str,
+	modo_cobro: str,
+	item: str,
+	monto: float,
+	fecha_desde: str | None = None,
+	fecha_hasta: str | None = None,
+	observaciones: str | None = None,
+	facturar_mes_corriente: int = 1,
+) -> dict:
+	"""Crea el cargo extra desde Desk y lo deja cobrable."""
+	ensure_secretaria_operacion_access()
+	return crear_cargo_extra_socio(
+		socio=socio,
+		titulo=titulo,
+		tipo_cargo=tipo_cargo,
+		modo_cobro=modo_cobro,
+		item=item,
+		monto=float(monto or 0),
+		fecha_desde=fecha_desde,
+		fecha_hasta=fecha_hasta,
+		observaciones=observaciones,
+		facturar_mes_corriente=bool(int(facturar_mes_corriente or 0)),
+	)

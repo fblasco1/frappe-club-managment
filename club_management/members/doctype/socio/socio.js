@@ -447,8 +447,180 @@ club_management_socio_desk.load_grupos = function (d) {
 };
 
 club_management_socio_desk.nuevo_cargo_extra = function (frm) {
-	frappe.route_options = { socio: frm.doc.name };
-	frappe.new_doc("Cargo Socio");
+	frappe.call({
+		method: "club_management.members.api.cargo_extra_desk.list_conceptos_cargo_extra",
+		args: { socio: frm.doc.name },
+		freeze: true,
+		callback(r) {
+			if (r.exc) return;
+			const conceptos = r.message || [];
+			if (!conceptos.length) {
+				frappe.msgprint(
+					__("No hay conceptos de cargo extra para este socio (actividades + generales).")
+				);
+				return;
+			}
+			club_management_socio_desk.dialog_nuevo_cargo_extra(frm, conceptos);
+		},
+	});
+};
+
+club_management_socio_desk.dialog_nuevo_cargo_extra = function (frm, conceptos) {
+	const codes = conceptos.map((c) => c.item_code);
+	const by_code = {};
+	conceptos.forEach((c) => {
+		by_code[c.item_code] = c;
+	});
+	const d = new frappe.ui.Dialog({
+		title: __("Nuevo cargo extra"),
+		fields: [
+			{
+				fieldname: "tipo_cargo",
+				fieldtype: "Select",
+				label: __("Tipo de cargo"),
+				options: "Cuota Federativa\nMulta\nViaje\nOtro",
+				default: "Multa",
+				reqd: 1,
+				onchange() {
+					const tipo = d.get_value("tipo_cargo");
+					if (tipo === "Cuota Federativa") {
+						d.set_value("modo_cobro", "Recurrente");
+					} else {
+						d.set_value("modo_cobro", "Unico");
+					}
+					if (!d.get_value("titulo")) {
+						d.set_value("titulo", tipo);
+					}
+				},
+			},
+			{
+				fieldname: "titulo",
+				fieldtype: "Data",
+				label: __("Título"),
+				reqd: 1,
+			},
+			{
+				fieldname: "modo_cobro",
+				fieldtype: "Select",
+				label: __("Modo de cobro"),
+				options: "Unico\nRecurrente",
+				default: "Unico",
+				reqd: 1,
+			},
+			{
+				fieldname: "item",
+				fieldtype: "Link",
+				label: __("Concepto"),
+				options: "Item",
+				reqd: 1,
+				get_query: () => ({ filters: { name: ["in", codes] } }),
+				onchange() {
+					const code = d.get_value("item");
+					const concepto = by_code[code];
+					if (!concepto) return;
+					if (!d.get_value("titulo")) {
+						d.set_value("titulo", concepto.item_name || code);
+					}
+					const rate = flt(concepto.standard_rate);
+					if (rate > 0 && !flt(d.get_value("monto"))) {
+						d.set_value("monto", rate);
+					}
+				},
+			},
+			{
+				fieldname: "monto",
+				fieldtype: "Currency",
+				label: __("Monto"),
+				reqd: 1,
+			},
+			{
+				fieldname: "fecha_desde",
+				fieldtype: "Date",
+				label: __("Vigente desde"),
+				default: frappe.datetime.get_today(),
+				reqd: 1,
+			},
+			{
+				fieldname: "fecha_hasta",
+				fieldtype: "Date",
+				label: __("Vigente hasta"),
+				depends_on: "eval:doc.modo_cobro==='Recurrente'",
+				mandatory_depends_on: "eval:doc.modo_cobro==='Recurrente'",
+			},
+			{
+				fieldname: "facturar_mes_corriente",
+				fieldtype: "Check",
+				label: __("Facturar este mes ahora (para poder cobrarlo)"),
+				default: 1,
+				depends_on: "eval:doc.modo_cobro==='Recurrente'",
+			},
+			{
+				fieldname: "observaciones",
+				fieldtype: "Small Text",
+				label: __("Observaciones"),
+			},
+		],
+		primary_action_label: __("Crear y facturar"),
+		primary_action(values) {
+			if (values.modo_cobro === "Recurrente" && !values.fecha_hasta) {
+				frappe.msgprint(__("Indicá la fecha hasta para cargos recurrentes."));
+				return;
+			}
+			d.hide();
+			frappe.call({
+				method: "club_management.members.api.cargo_extra_desk.crear_cargo_extra",
+				args: {
+					socio: frm.doc.name,
+					titulo: values.titulo,
+					tipo_cargo: values.tipo_cargo,
+					modo_cobro: values.modo_cobro,
+					item: values.item,
+					monto: values.monto,
+					fecha_desde: values.fecha_desde,
+					fecha_hasta: values.fecha_hasta,
+					observaciones: values.observaciones,
+					facturar_mes_corriente: values.facturar_mes_corriente ? 1 : 0,
+				},
+				freeze: true,
+				callback(res) {
+					if (res.exc || !res.message) return;
+					const msg = res.message;
+					frm.reload_doc();
+					const invoices = msg.sales_invoices || (msg.sales_invoice ? [msg.sales_invoice] : []);
+					if (invoices.length) {
+						frappe.confirm(
+							__("Cargo facturado ({0}). ¿Registrar cobro ahora?", [invoices.join(", ")]),
+							() => {
+								frappe.call({
+									method: "club_management.members.api.cobranza_desk.list_facturas_pendientes",
+									args: { socio: frm.doc.name },
+									callback(pend) {
+										if (pend.exc) return;
+										const wanted = new Set(invoices);
+										const rows = (pend.message || []).filter((row) =>
+											wanted.has(row.name)
+										);
+										if (!rows.length) {
+											frappe.msgprint(__("No hay saldo pendiente para cobrar."));
+											return;
+										}
+										club_management_socio_desk.prompt_cobro_multi_factura(frm, rows);
+									},
+								});
+							}
+						);
+					} else {
+						frappe.msgprint(
+							__(
+								"Cargo recurrente creado. Usá «Generar cargo» o abrí el cargo y «Facturar mes corriente» para cobrarlo."
+							)
+						);
+					}
+				},
+			});
+		},
+	});
+	d.show();
 };
 
 club_management_socio_desk.crear_beca = function (frm) {
@@ -1227,6 +1399,7 @@ club_management_socio_desk.render_deuda_pendiente = function (frm) {
 							<th>${__("Período")}</th>
 							<th>${__("Tipo")}</th>
 							<th>${__("Monto")}</th>
+							<th></th>
 						</tr>
 					</thead>
 					<tbody></tbody>
@@ -1245,6 +1418,7 @@ club_management_socio_desk.render_deuda_pendiente = function (frm) {
 							<td>${periodo}</td>
 							<td>${__("Factura")}</td>
 							<td>${monto}</td>
+							<td></td>
 						</tr>
 					`);
 					return;
@@ -1261,6 +1435,7 @@ club_management_socio_desk.render_deuda_pendiente = function (frm) {
 							<td>${idx === 0 ? periodo : ""}</td>
 							<td>${__("Factura")}</td>
 							<td>${monto}</td>
+							<td></td>
 						</tr>
 					`);
 				});
@@ -1268,11 +1443,11 @@ club_management_socio_desk.render_deuda_pendiente = function (frm) {
 
 			cargos.forEach((cargo) => {
 				const monto = frappe.format(cargo.monto, { fieldtype: "Currency" });
-				const tipo =
-					cargo.modo_cobro === "Recurrente"
-						? __("Cargo extra (recurrente, sin facturar en este mes)")
-						: __("Cargo extra — usar «Facturar cargo»");
-				$tbody.append(`
+				const es_recurrente = cargo.modo_cobro === "Recurrente";
+				const tipo = es_recurrente
+					? __("Cargo extra recurrente (sin factura de este mes)")
+					: __("Cargo extra único sin facturar");
+				const $tr = $(`
 					<tr>
 						<td>${frappe.utils.escape_html(cargo.titulo || cargo.name)}</td>
 						<td>—</td>
@@ -1280,6 +1455,51 @@ club_management_socio_desk.render_deuda_pendiente = function (frm) {
 						<td>${monto}</td>
 					</tr>
 				`);
+				const $td = $("<td></td>");
+				const $btn = $(
+					`<button type="button" class="btn btn-xs btn-primary">${
+						es_recurrente ? __("Facturar este mes") : __("Facturar")
+					}</button>`
+				);
+				$btn.on("click", () => {
+					const method = es_recurrente
+						? "club_management.members.api.cargo_extra_desk.facturar_mes_corriente"
+						: "club_management.members.api.cobranza_desk.facturar_cargo_socio";
+					frappe.call({
+						method,
+						args: { cargo: cargo.name },
+						freeze: true,
+						callback(res) {
+							if (res.exc || !res.message) return;
+							frm.reload_doc();
+							const invs =
+								res.message.sales_invoices ||
+								(res.message.sales_invoice ? [res.message.sales_invoice] : []);
+							if (!invs.length) {
+								frappe.msgprint(__("No se generó factura (el período ya estaba facturado)."));
+								return;
+							}
+							frappe.confirm(__("¿Registrar cobro ahora?"), () => {
+								frappe.call({
+									method: "club_management.members.api.cobranza_desk.list_facturas_pendientes",
+									args: { socio: frm.doc.name },
+									callback(pend) {
+										if (pend.exc) return;
+										const wanted = new Set(invs);
+										const rows = (pend.message || []).filter((row) =>
+											wanted.has(row.name)
+										);
+										if (!rows.length) return;
+										club_management_socio_desk.prompt_cobro_multi_factura(frm, rows);
+									},
+								});
+							});
+						},
+					});
+				});
+				$td.append($btn);
+				$tr.append($td);
+				$tbody.append($tr);
 			});
 
 			$panel.empty().append($title, $table);

@@ -32,9 +32,10 @@ Given `Socio` `Activo` con `Customer`
 When Secretaría crea `Cargo Socio` con `modo_cobro = Unico`, monto 15000, ítem válido
 Then se crea automáticamente `Sales Invoice` submitted con una línea
 And `Cargo Socio.estado = Facturado` y `sales_invoice` poblado
+And la factura queda en deuda pendiente y se puede **Registrar cobro**
 And `Socio.saldo_deuda` actualizado.
 
-> Detalle del flujo de conceptos sugeridos y la facturación automática al crear:
+> Detalle del flujo de conceptos sugeridos, diálogo en Socio y cobro:
 > ver `cargo_extra_conceptos_y_facturacion.md`. La acción **Facturar cargo**
 > queda como respaldo para cargos `Pendiente` legados.
 
@@ -77,7 +78,9 @@ Then no ve filas de A (`User Permission` / filtro por socio en API portal futuro
 ## UI Desk
 
 - Formulario `Cargo Socio` en módulo Members.
-- Botón en formulario `Socio`: **Nuevo cargo extra** (abre `Cargo Socio` con `socio` precargado).
+- Botón en formulario `Socio`: **Nuevo cargo extra** (diálogo: crea, factura y
+  ofrece **Registrar cobro**; no deja un cargo huérfano sin factura).
+- En `Cargo Socio` facturado con SI impaga: botón **Registrar cobro**.
 - Lista relacionada en Socio (custom o dashboard).
 
 ---

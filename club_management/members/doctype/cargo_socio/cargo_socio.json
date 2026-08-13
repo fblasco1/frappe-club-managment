@@ -46,6 +46,7 @@
    "reqd": 1
   },
   {
+   "default": "Unico",
    "fieldname": "modo_cobro",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -110,7 +111,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-10 00:00:00",
+ "modified": "2026-08-12 17:30:00",
  "modified_by": "Administrator",
  "module": "Members",
  "name": "Cargo Socio",

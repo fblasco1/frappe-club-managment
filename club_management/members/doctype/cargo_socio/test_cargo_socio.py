@@ -7,11 +7,17 @@ from frappe.exceptions import PermissionError, ValidationError
 
 from club_management.members.services.cargo_socio import (
 	cancelar_cargo_socio,
+	crear_cargo_extra_socio,
 	facturar_cargo_socio,
+	facturar_mes_corriente_cargo,
 )
 from club_management.members.services.cobranza_manual import (
 	SALES_INVOICE_DOCTYPE,
+	_campo_periodo_cobro,
 	erpnext_cobranza_disponible,
+	format_periodo_cobro,
+	item_codes_facturados_en_periodo,
+	list_facturas_pendientes_socio,
 	sync_saldo_deuda_socio,
 )
 from club_management.members.services.cobranza_periodica import generar_deuda_mensual_socio
@@ -86,15 +92,35 @@ class TestCargoSocio(MembersTestCase):
 
 	def test_crear_cargo_unico_se_factura_automaticamente(self) -> None:
 		socio = self._socio_activo(dni="74001001", email="cargo.unico@example.com")
-		name = self._crear_cargo(socio.name)
+		doc = frappe.get_doc(
+			{
+				"doctype": "Cargo Socio",
+				"socio": socio.name,
+				"titulo": "Cuota Federativa Test",
+				"tipo_cargo": "Cuota Federativa",
+				"modo_cobro": "Unico",
+				"item": self._item,
+				"monto": 15_000,
+				"fecha_desde": "2026-06-01",
+				"estado": "Pendiente",
+			}
+		)
+		doc.insert(ignore_permissions=True)
 
-		cargo = frappe.get_doc("Cargo Socio", name)
-		self.assertEqual(cargo.estado, "Facturado")
-		self.assertTrue(cargo.sales_invoice)
-		invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, cargo.sales_invoice)
+		self.assertEqual(doc.estado, "Facturado")
+		self.assertTrue(doc.sales_invoice)
+		invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, doc.sales_invoice)
 		self.assertEqual(invoice.docstatus, 1)
 		self.assertEqual(len(invoice.items), 1)
 		self.assertEqual(invoice.items[0].item_code, self._item)
+		campo_periodo = _campo_periodo_cobro()
+		if campo_periodo:
+			self.assertEqual(
+				invoice.get(campo_periodo),
+				format_periodo_cobro(frappe.utils.today()),
+			)
+		pendientes = list_facturas_pendientes_socio(socio.name)
+		self.assertTrue(any(row["name"] == doc.sales_invoice for row in pendientes))
 		self.assertGreater(sync_saldo_deuda_socio(socio.name), 0)
 
 	def test_crear_cargo_unico_como_secretaria_se_factura(self) -> None:
@@ -191,5 +217,109 @@ class TestCargoSocio(MembersTestCase):
 		try:
 			with self.assertRaises(PermissionError):
 				facturar_cargo_socio(cargo_name)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_crear_cargo_extra_unico_api_devuelve_factura_cobrable(self) -> None:
+		socio = self._socio_activo(dni="74001009", email="cargo.api.unico@example.com")
+		frappe.set_user(self._secretaria)
+		try:
+			result = crear_cargo_extra_socio(
+				socio=socio.name,
+				titulo="Multa API",
+				tipo_cargo="Multa",
+				modo_cobro="Unico",
+				item=self._item,
+				monto=4_000,
+			)
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(result["estado"], "Facturado")
+		self.assertTrue(result["sales_invoice"])
+		pendientes = list_facturas_pendientes_socio(socio.name)
+		self.assertTrue(any(row["name"] == result["sales_invoice"] for row in pendientes))
+
+	def test_crear_cargo_recurrente_facturar_mes_corriente(self) -> None:
+		from frappe.utils import today
+
+		socio = self._socio_activo(dni="74001010", email="cargo.api.rec@example.com")
+		frappe.set_user(self._secretaria)
+		try:
+			result = crear_cargo_extra_socio(
+				socio=socio.name,
+				titulo="Federativa API",
+				tipo_cargo="Cuota Federativa",
+				modo_cobro="Recurrente",
+				item=self._item,
+				monto=5_000,
+				fecha_desde="2026-01-01",
+				fecha_hasta="2026-12-31",
+				facturar_mes_corriente=True,
+			)
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(result["estado"], "Pendiente")
+		self.assertTrue(result["sales_invoices"])
+		periodo = format_periodo_cobro(today())
+		self.assertIn(self._item, item_codes_facturados_en_periodo(socio.name, periodo))
+		pendientes = list_facturas_pendientes_socio(socio.name)
+		self.assertTrue(any(row["name"] in result["sales_invoices"] for row in pendientes))
+
+	def test_facturar_mes_corriente_no_duplica_generar_cargo(self) -> None:
+		from frappe.utils import today
+
+		from club_management.members.services.cobranza_manual import generar_cargo_socio
+
+		socio = self._socio_activo(dni="74001011", email="cargo.nodup@example.com")
+		cargo_name = self._crear_cargo(
+			socio.name,
+			modo_cobro="Recurrente",
+			fecha_desde="2026-01-01",
+			fecha_hasta="2026-12-31",
+		)
+		frappe.set_user(self._secretaria)
+		try:
+			facturar_mes_corriente_cargo(cargo_name)
+			try:
+				invoices = generar_cargo_socio(socio.name, incluir_actividades=False)
+			except frappe.ValidationError:
+				invoices = []
+		finally:
+			frappe.set_user("Administrator")
+
+		periodo = format_periodo_cobro(today())
+		codes_mes = item_codes_facturados_en_periodo(socio.name, periodo)
+		self.assertEqual(len([c for c in codes_mes if c == self._item]), 1)
+		for name in invoices:
+			invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, name)
+			self.assertNotIn(self._item, {row.item_code for row in invoice.items})
+
+	def test_usuario_sin_rol_no_crea_cargo_extra(self) -> None:
+		socio = self._socio_activo(dni="74001012", email="cargo.api.perm@example.com")
+		email = f"socio_{socio.dni}@example.com"
+		if not frappe.db.exists("User", email):
+			frappe.get_doc(
+				{
+					"doctype": "User",
+					"email": email,
+					"first_name": "Socio",
+					"send_welcome_email": 0,
+					"roles": [{"role": "Socio"}],
+				}
+			).insert(ignore_permissions=True)
+
+		frappe.set_user(email)
+		try:
+			with self.assertRaises(PermissionError):
+				crear_cargo_extra_socio(
+					socio=socio.name,
+					titulo="Multa",
+					tipo_cargo="Multa",
+					modo_cobro="Unico",
+					item=self._item,
+					monto=1_000,
+				)
 		finally:
 			frappe.set_user("Administrator")

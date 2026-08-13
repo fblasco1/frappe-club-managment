@@ -219,6 +219,7 @@ def conceptos_cargo_extra_socio(socio_name: str) -> list[dict[str, str]]:
 			{
 				"item_code": code,
 				"item_name": frappe.db.get_value("Item", code, "item_name") or code,
+				"standard_rate": str(frappe.db.get_value("Item", code, "standard_rate") or 0),
 			}
 		)
 	return result

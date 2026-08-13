@@ -40,7 +40,7 @@ class CargoSocio(Document):
 	def after_insert(self) -> None:
 		"""Cargo Único se factura automáticamente al crearse (spec
 		cargo_extra_conceptos_y_facturacion.md). Los Recurrentes entran en la
-		deuda mensual y no se facturan al instante."""
+		deuda mensual; el mes corriente se factura desde el diálogo Desk."""
 		if self.modo_cobro != "Unico" or self.estado != "Pendiente":
 			return
 		if (
@@ -55,7 +55,9 @@ class CargoSocio(Document):
 		)
 
 		if not erpnext_cobranza_disponible():
-			return
+			frappe.throw(_("ERPNext no está disponible para facturar el cargo extra."))
 		from club_management.members.services.cargo_socio import facturar_cargo_socio
 
-		facturar_cargo_socio(self.name)
+		result = facturar_cargo_socio(self.name)
+		self.estado = "Facturado"
+		self.sales_invoice = result["sales_invoice"]
