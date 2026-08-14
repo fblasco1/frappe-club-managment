@@ -591,6 +591,7 @@ class TestMoraExencionFederativaYCargoExtra(MembersTestCase):
 
 	def test_federativa_sin_mora_post_vencimiento(self) -> None:
 		from club_management.finance.setup.icdpe_income_item_groups import LEAF_FEDERATIVAS
+		from club_management.members.services.mora_al_cobro import asegurar_ajuste_mora_factura
 
 		self._ensure_item(self._ITEM_FEDER, "Federativa test", 5000, item_group=LEAF_FEDERATIVAS)
 		socio = self._socio_activo(dni="76002001", email="mora.feder@example.com")
@@ -601,14 +602,15 @@ class TestMoraExencionFederativaYCargoExtra(MembersTestCase):
 		self.assertEqual(detalle["tramo"], "ninguno")
 		self.assertAlmostEqual(flt(detalle["monto_exigido"]), 5000.0, places=2)
 
-		prep = preparar_facturas_cobro_con_mora(
-			socio.name, [invoice], posting_date=self._PAGO_POST
-		)
-		self.assertEqual(prep["ajustes"], [])
-		self.assertAlmostEqual(prep["total_exigido"], 5000.0, places=2)
+		antes = frappe.db.count(SALES_INVOICE_DOCTYPE, {"docstatus": 1})
+		info = asegurar_ajuste_mora_factura(invoice, posting_date=self._PAGO_POST)
+		self.assertIsNone(info.get("ajuste"))
+		self.assertAlmostEqual(flt(info["monto_exigido"]), 5000.0, places=2)
+		self.assertEqual(frappe.db.count(SALES_INVOICE_DOCTYPE, {"docstatus": 1}), antes)
 
 	def test_cargo_extra_sin_mora_post_vencimiento(self) -> None:
 		from club_management.finance.setup.icdpe_income_item_groups import LEAF_CARGOS
+		from club_management.members.services.mora_al_cobro import asegurar_ajuste_mora_factura
 
 		self._ensure_item(self._ITEM_CARGO, "Cargo extra test", 3000, item_group=LEAF_CARGOS)
 		socio = self._socio_activo(dni="76002002", email="mora.cargo@example.com")
@@ -618,8 +620,8 @@ class TestMoraExencionFederativaYCargoExtra(MembersTestCase):
 		self.assertFalse(detalle["aplica_mora"])
 		self.assertAlmostEqual(flt(detalle["monto_exigido"]), 3000.0, places=2)
 
-		prep = preparar_facturas_cobro_con_mora(
-			socio.name, [invoice], posting_date=self._PAGO_POST
-		)
-		self.assertEqual(prep["ajustes"], [])
-		self.assertAlmostEqual(prep["total_exigido"], 3000.0, places=2)
+		antes = frappe.db.count(SALES_INVOICE_DOCTYPE, {"docstatus": 1})
+		info = asegurar_ajuste_mora_factura(invoice, posting_date=self._PAGO_POST)
+		self.assertIsNone(info.get("ajuste"))
+		self.assertAlmostEqual(flt(info["monto_exigido"]), 3000.0, places=2)
+		self.assertEqual(frappe.db.count(SALES_INVOICE_DOCTYPE, {"docstatus": 1}), antes)
