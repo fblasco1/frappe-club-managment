@@ -26,7 +26,9 @@ from club_management.members.services.cuotas_sociales_setup import sync_cuotas_s
 from club_management.members.services.mora_al_cobro import (
 	MORA_SUFFIX,
 	_periodo_sort_key,
+	calcular_detalle_mora_factura,
 	calcular_monto_exigido_mora,
+	concepto_sujeto_a_mora,
 	meses_vencidos_entre,
 	parse_periodo_cobro,
 	periodo_es_ajuste_mora,
@@ -407,27 +409,44 @@ class TestMoraValorActualIntegracion(MembersTestCase):
 			ensure_customer_for_socio,
 			format_periodo_cobro,
 		)
-		from club_management.members.services.mora_al_cobro import calcular_detalle_mora_factura
 
 		socio = self._socio_activo(dni="76001008", email="mora.multilinea@example.com")
 		campo = _campo_socio_en(SALES_INVOICE_DOCTYPE)
 		self.assertTrue(campo)
-		item_group = frappe.db.get_value("Item Group", {"is_group": 0}, "name") or "Products"
-		for code, rate in (("TEST-MORA-CUOTA-ML", 28500), ("TEST-MORA-ARANCEL-ML", 28500)):
+		from club_management.finance.setup.icdpe_income_item_groups import LEAF_CUOTAS
+
+		fallback_group = frappe.db.get_value("Item Group", {"is_group": 0}, "name") or "Products"
+		cuota_group = LEAF_CUOTAS if frappe.db.exists("Item Group", LEAF_CUOTAS) else fallback_group
+		for code, rate, group in (
+			("TEST-MORA-CUOTA-ML", 28500, cuota_group),
+			("TEST-MORA-ARANCEL-ML", 28500, fallback_group),
+		):
 			if not frappe.db.exists("Item", code):
 				frappe.get_doc(
 					{
 						"doctype": "Item",
 						"item_code": code,
 						"item_name": code,
-						"item_group": item_group,
+						"item_group": group,
 						"is_stock_item": 0,
 						"is_sales_item": 1,
 						"standard_rate": rate,
 					}
 				).insert(ignore_permissions=True)
 			else:
+				frappe.db.set_value("Item", code, "item_group", group)
 				frappe.db.set_value("Item", code, "standard_rate", rate)
+		if frappe.db.exists("DocType", "Actividad") and not frappe.db.exists(
+			"Actividad", {"item": "TEST-MORA-ARANCEL-ML"}
+		):
+			frappe.get_doc(
+				{
+					"doctype": "Actividad",
+					"titulo": "Test Mora Arancel ML",
+					"item": "TEST-MORA-ARANCEL-ML",
+					"habilitada": 0,
+				}
+			).insert(ignore_permissions=True)
 
 		posting = today()
 		payload: dict = {
@@ -462,3 +481,145 @@ class TestMoraValorActualIntegracion(MembersTestCase):
 		self.assertEqual(dia11["tramo"], "post_primer")
 		self.assertAlmostEqual(dia11["monto_exigido"], 62700.0, places=2)
 		self.assertGreater(dia11["monto_exigido"], dia10["monto_exigido"])
+
+
+class TestMoraExencionFederativaYCargoExtra(MembersTestCase):
+	"""Federativas y cargos extra no sufren mora (spec recargos_mora_dos_tramos D5)."""
+
+	_GEN = "2026-03-01"
+	_PAGO_POST = "2026-04-15"
+	_ITEM_FEDER = "TEST-CUOTA-FEDERATIVA-MORA"
+	_ITEM_CARGO = "TEST-CARGO-EXTRA-MORA"
+	_ITEM_RECARGO = "TEST-ITEM-MORA-EXENTOS"
+
+	def setUp(self) -> None:
+		super().setUp()
+		if not erpnext_cobranza_disponible():
+			self.skipTest("ERPNext Sales Invoice no instalado")
+		sync_cuotas_sociales_club()
+		settings = frappe.get_single("Club Settings")
+		settings.dia_primer_vencimiento = 10
+		settings.recargo_mes_vencido_pct = 5
+		settings.recargo_post_vencimiento_pct = 10
+		icdpe = frappe.db.get_value(
+			"Company",
+			{"name": ["like", "%Pedro%"]},
+			"name",
+		) or frappe.db.get_value("Company", {}, "name")
+		if icdpe:
+			settings.company = icdpe
+		self._ensure_item(self._ITEM_RECARGO, "Mora test exentos", 0)
+		settings.item_recargo_mora = self._ITEM_RECARGO
+		settings.save(ignore_permissions=True)
+
+	def _ensure_item(self, code: str, name: str, rate: float, *, item_group: str | None = None) -> str:
+		from club_management.finance.setup.icdpe_income_item_groups import (
+			LEAF_CARGOS,
+			LEAF_FEDERATIVAS,
+		)
+
+		if item_group is None:
+			item_group = frappe.db.get_value("Item Group", {}, "name") or "All Item Groups"
+		for candidate in (item_group, LEAF_FEDERATIVAS, LEAF_CARGOS, "All Item Groups"):
+			if candidate and frappe.db.exists("Item Group", candidate):
+				item_group = candidate
+				break
+		if not frappe.db.exists("Item", code):
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": code,
+					"item_name": name,
+					"item_group": item_group,
+					"is_stock_item": 0,
+					"is_sales_item": 1,
+					"standard_rate": rate,
+				}
+			).insert(ignore_permissions=True)
+		else:
+			frappe.db.set_value("Item", code, "item_group", item_group)
+			frappe.db.set_value("Item", code, "standard_rate", rate)
+		return code
+
+	def _socio_activo(self, **kwargs):
+		socio = insert_socio(**kwargs)
+		cambiar_estado(socio.name, "Activo", motivo="Test mora exentos")
+		return socio
+
+	def _factura_concepto(self, socio_name: str, item_code: str, rate: float, periodo: str = "03/2026") -> str:
+		from frappe.utils import today
+
+		from club_management.members.services.cobranza_manual import (
+			_campo_socio_en,
+			_submit_sales_invoice_concepto,
+			ensure_customer_for_socio,
+		)
+
+		campo = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+		customer = ensure_customer_for_socio(socio_name, skip_permission_check=True)
+		# Posting = hoy (ERPNext); el tramo de mora usa `periodo_cobro`, no posting.
+		ref = today()
+		return _submit_sales_invoice_concepto(
+			socio_name=socio_name,
+			customer=customer,
+			campo_socio=campo,
+			periodo=periodo,
+			posting=ref,
+			due=ref,
+			item={
+				"item_code": item_code,
+				"qty": 1,
+				"rate": rate,
+				"description": item_code,
+			},
+		)
+
+	def test_concepto_sujeto_a_mora_clasifica(self) -> None:
+		from club_management.finance.setup.icdpe_income_item_groups import (
+			LEAF_CARGOS,
+			LEAF_FEDERATIVAS,
+		)
+
+		self._ensure_item(self._ITEM_FEDER, "Federativa test", 5000, item_group=LEAF_FEDERATIVAS)
+		self._ensure_item(self._ITEM_CARGO, "Cargo extra test", 3000, item_group=LEAF_CARGOS)
+		self.assertFalse(concepto_sujeto_a_mora(self._ITEM_FEDER))
+		self.assertFalse(concepto_sujeto_a_mora(self._ITEM_CARGO))
+		settings = frappe.get_single("Club Settings")
+		cuota = (settings.item_cuota_social or "").strip()
+		if cuota:
+			self.assertTrue(concepto_sujeto_a_mora(cuota))
+
+	def test_federativa_sin_mora_post_vencimiento(self) -> None:
+		from club_management.finance.setup.icdpe_income_item_groups import LEAF_FEDERATIVAS
+
+		self._ensure_item(self._ITEM_FEDER, "Federativa test", 5000, item_group=LEAF_FEDERATIVAS)
+		socio = self._socio_activo(dni="76002001", email="mora.feder@example.com")
+		invoice = self._factura_concepto(socio.name, self._ITEM_FEDER, 5000)
+
+		detalle = calcular_detalle_mora_factura(invoice, posting_date=self._PAGO_POST)
+		self.assertFalse(detalle["aplica_mora"])
+		self.assertEqual(detalle["tramo"], "ninguno")
+		self.assertAlmostEqual(flt(detalle["monto_exigido"]), 5000.0, places=2)
+
+		prep = preparar_facturas_cobro_con_mora(
+			socio.name, [invoice], posting_date=self._PAGO_POST
+		)
+		self.assertEqual(prep["ajustes"], [])
+		self.assertAlmostEqual(prep["total_exigido"], 5000.0, places=2)
+
+	def test_cargo_extra_sin_mora_post_vencimiento(self) -> None:
+		from club_management.finance.setup.icdpe_income_item_groups import LEAF_CARGOS
+
+		self._ensure_item(self._ITEM_CARGO, "Cargo extra test", 3000, item_group=LEAF_CARGOS)
+		socio = self._socio_activo(dni="76002002", email="mora.cargo@example.com")
+		invoice = self._factura_concepto(socio.name, self._ITEM_CARGO, 3000)
+
+		detalle = calcular_detalle_mora_factura(invoice, posting_date=self._PAGO_POST)
+		self.assertFalse(detalle["aplica_mora"])
+		self.assertAlmostEqual(flt(detalle["monto_exigido"]), 3000.0, places=2)
+
+		prep = preparar_facturas_cobro_con_mora(
+			socio.name, [invoice], posting_date=self._PAGO_POST
+		)
+		self.assertEqual(prep["ajustes"], [])
+		self.assertAlmostEqual(prep["total_exigido"], 3000.0, places=2)

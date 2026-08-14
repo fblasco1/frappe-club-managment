@@ -17,9 +17,23 @@ si pago > 2.º venc. del período        → valor_mes_pago × (1 + 0,15)
 
 **No** se multiplica ningún % por la cantidad de meses de atraso.
 
+### Conceptos sujetos a mora
+
+La mora al cobro aplica **solo** a:
+
+- **Cuota social**
+- **Aranceles de actividad** (ítem enlazado a Actividad / Grupo / Equipo)
+
+**No** aplican interés (ni post día 10 / 1.er vencimiento, ni post 2.º vencimiento / mes vencido):
+
+- **Cuotas federativas** (`Cuotas federativas` / `ICDPE-CUOTA-FEDERATIVA-*`)
+- **Cargos extra** en general (multas, viajes, colonias, eventos, `Cargo Socio`, etc.)
+
+Al cobrar esas facturas el monto exigido = outstanding del grupo (sin SI de ajuste de mora).
+
 **Relacionado:** `flujo_cobranzas.md`, `cobranza_config_club_settings.md`,
 `cobranza_recargo_segundo_vencimiento.md` (job legado), `registrar_cobro_fecha.md`,
-`cobro_multi_factura_medios_mixtos.md`
+`cobro_multi_factura_medios_mixtos.md`, `cargo_extra_socio.md`
 
 ---
 
@@ -47,6 +61,7 @@ si pago > 2.º venc. del período        → valor_mes_pago × (1 + 0,15)
 | **D2** | El 5 % extra aplica solo si `posting_date` es **posterior** al 2.º vencimiento del período (default operativo: **día 20**). Junto con el 10 % suma **15 %**. |
 | **D3** | Post 2.º vencimiento: base = **valor vigente del mes de pago** (revalorización). Ej.: debe abril (valía 11), paga en agosto (vale 13) → `13 × 1,15`. |
 | **D4** | El job legado `recargo_segundo_vencimiento_pct` **no** es la fuente de verdad; la mora se calcula **al cobrar**. |
+| **D5** | Federativas y cargos extra **no** sufren mora (ni tramo post 1.er ni post 2.º vencimiento). |
 
 ---
 
@@ -146,6 +161,26 @@ And si el valor vigente calculado fuera incompleto, el piso es `outstanding_fact
 Given Secretaría abre **Registrar cobro**
 Then el campo **Fecha de cobro** figura **arriba de todo** (antes de la lista de facturas)
 And al cambiar la fecha se recalcula el total con mora.
+
+---
+
+## Scenario: cuota federativa no genera mora
+
+Given factura de cuota federativa período `03/2026` con outstanding = 5000
+When se calcula mora con posting_date posterior al 1.er o al 2.º vencimiento
+Then tramo efectivo = ninguno (concepto exento)
+And `aplica_mora` = false
+And monto exigido = outstanding
+And no se crea SI de ajuste.
+
+---
+
+## Scenario: cargo extra no genera mora
+
+Given factura de cargo extra (p. ej. multa / viaje) período `03/2026`
+When se calcula o prepara cobro con mora tras el día 10 o mes vencido
+Then no aplica recargo
+And monto exigido = outstanding del cargo.
 
 ---
 

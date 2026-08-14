@@ -75,7 +75,7 @@ def _item_cobrable(item_code: str) -> bool:
 	return not data.is_stock_item and not data.disabled
 
 
-def _item_es_arancel_actividad(item_code: str) -> bool:
+def item_es_arancel_actividad(item_code: str) -> bool:
 	"""True si el ítem es arancel mensual de Actividad / Grupo / Equipo."""
 	if not item_code:
 		return False
@@ -83,6 +83,10 @@ def _item_es_arancel_actividad(item_code: str) -> bool:
 		if frappe.db.exists(doctype, {"item": item_code}):
 			return True
 	return False
+
+
+# Compat interno
+_item_es_arancel_actividad = item_es_arancel_actividad
 
 
 def _item_es_concepto_general(item_code: str) -> bool:

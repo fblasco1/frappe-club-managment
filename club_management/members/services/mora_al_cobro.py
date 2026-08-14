@@ -18,6 +18,8 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate, today
 
+from club_management.finance.setup.icdpe_income_item_groups import LEAF_CUOTAS
+from club_management.members.services.cargo_extra_conceptos import item_es_arancel_actividad
 from club_management.members.services.cobranza_manual import (
 	SALES_INVOICE_DOCTYPE,
 	_campo_periodo_cobro,
@@ -35,6 +37,58 @@ MORA_SUFFIX = "-MORA"
 _PERIODO_RE = re.compile(r"^(\d{2})/(\d{4})$")
 
 TramoMora = Literal["ninguno", "post_primer", "post_segundo"]
+
+
+def _item_codes_cuota_social() -> set[str]:
+	"""Ítems de cuota social configurados en Club Settings."""
+	settings = get_club_settings()
+	codes: set[str] = set()
+	base = (getattr(settings, "item_cuota_social", None) or "").strip()
+	if base:
+		codes.add(base)
+	for row in getattr(settings, "cuotas_categoria", None) or []:
+		item = (getattr(row, "item", None) or "").strip()
+		if item:
+			codes.add(item)
+	return codes
+
+
+def concepto_sujeto_a_mora(item_code: str, *, socio_name: str | None = None) -> bool:
+	"""True solo para cuota social y aranceles de actividad.
+
+	Federativas y cargos extra (multas, viajes, colonias, etc.) no sufren mora
+	ni post 1.er vencimiento ni por mes vencido.
+	"""
+	code = (item_code or "").strip()
+	if not code:
+		return False
+	if code in _item_codes_cuota_social():
+		return True
+	if socio_name:
+		_, item_cuota = resolve_cuota_social(socio_name)
+		if item_cuota and code == item_cuota:
+			return True
+	group = frappe.db.get_value("Item", code, "item_group")
+	if group == LEAF_CUOTAS:
+		return True
+	return item_es_arancel_actividad(code)
+
+
+def factura_exenta_de_mora(invoice_name: str) -> bool:
+	"""True si la SI no debe generar interés de mora al cobro.
+
+	Exenta solo si ninguna línea es cuota social ni arancel (p. ej. federativa /
+	cargo extra). Si mezcla conceptos sujetos y no sujetos, aplica mora.
+	"""
+	invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, invoice_name)
+	if not invoice.get("items"):
+		return True
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	socio_name = invoice.get(campo_socio) if campo_socio else None
+	return not any(
+		concepto_sujeto_a_mora((row.item_code or "").strip(), socio_name=socio_name)
+		for row in invoice.items
+	)
 
 
 def periodo_es_ajuste_mora(periodo: str | None) -> bool:
@@ -381,19 +435,27 @@ def calcular_detalle_mora_factura(
 	if periodo_es_ajuste_mora(periodo) or periodo_es_recargo_legado(periodo):
 		return result
 
+	outstanding_grupo = _outstanding_grupo(invoice_name, socio_name)
+	result["outstanding_grupo"] = outstanding_grupo
+	result["meses_vencidos"] = meses_vencidos_entre(periodo, ref)
+
+	if factura_exenta_de_mora(invoice_name):
+		result["monto_exigido"] = outstanding_grupo
+		result["tramo"] = "ninguno"
+		result["paga_despues_dia_vencimiento"] = False
+		result["aplica_mora"] = False
+		return result
+
 	dia_v1 = int(settings.dia_primer_vencimiento or 10)
 	dia_v2 = settings.dia_segundo_vencimiento or "20"
 	pct_extra = result["pct_mes_vencido"]
 	pct_post = result["pct_post_vencimiento"]
-	outstanding_grupo = _outstanding_grupo(invoice_name, socio_name)
 	tramo = resolver_tramo_mora(
 		periodo,
 		ref,
 		dia_primer_vencimiento=dia_v1,
 		dia_segundo_vencimiento=dia_v2,
 	)
-	result["outstanding_grupo"] = outstanding_grupo
-	result["meses_vencidos"] = meses_vencidos_entre(periodo, ref)
 	result["tramo"] = tramo
 	result["paga_despues_dia_vencimiento"] = tramo != "ninguno"
 
@@ -556,6 +618,12 @@ def asegurar_ajuste_mora_factura(
 	if not socio_name or not periodo:
 		return result
 	if periodo_es_ajuste_mora(periodo) or periodo_es_recargo_legado(periodo):
+		return result
+
+	if factura_exenta_de_mora(invoice_name):
+		outstanding = _outstanding_grupo(invoice_name, socio_name)
+		result["outstanding_grupo"] = outstanding
+		result["monto_exigido"] = outstanding
 		return result
 
 	dia_v1 = int(settings.dia_primer_vencimiento or 10)

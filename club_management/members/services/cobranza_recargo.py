@@ -112,6 +112,11 @@ def aplicar_recargo_factura_mensual(
 	if not socio_name or not periodo or periodo.endswith(RECARGO_SUFFIX):
 		return None
 
+	from club_management.members.services.mora_al_cobro import factura_exenta_de_mora
+
+	if factura_exenta_de_mora(invoice_name):
+		return None
+
 	saldo = flt(invoice.outstanding_amount)
 	if saldo <= 0:
 		return None
