@@ -244,7 +244,11 @@ def calcular_deuda_desglose_en_rango(
 	if inscripcion_name:
 		item_arancel = resolve_item_arancel_inscripcion(inscripcion_name)
 		if item_arancel:
-			arancel_codes.add(item_arancel)
+			from club_management.activities.data.voley_aranceles_icdpe import (
+				expand_voley_arancel_item_codes,
+			)
+
+			arancel_codes.update(expand_voley_arancel_item_codes(item_arancel))
 		federativa_codes.update(federativa_item_codes_inscripcion(inscripcion_name))
 
 	cuota = arancel = federativa = 0.0
@@ -389,6 +393,11 @@ def calcular_pagos_arancel_en_rango(
 	if not item_arancel or not erpnext_cobranza_disponible():
 		return 0.0, 0
 
+	from club_management.activities.data.voley_aranceles_icdpe import (
+		expand_voley_arancel_item_codes,
+	)
+
+	item_codes = list(expand_voley_arancel_item_codes(item_arancel))
 	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
 	if not campo_socio:
 		return 0.0, 0
@@ -410,7 +419,7 @@ def calcular_pagos_arancel_en_rango(
 			continue
 		lines = frappe.get_all(
 			"Sales Invoice Item",
-			filters={"parent": invoice.name, "item_code": item_arancel},
+			filters={"parent": invoice.name, "item_code": ["in", item_codes]},
 			fields=["amount"],
 		)
 		arancel_amount = sum(flt(line.amount) for line in lines)

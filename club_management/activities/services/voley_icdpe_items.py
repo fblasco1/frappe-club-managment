@@ -105,14 +105,41 @@ def delete_disabled_legacy_voley_without_refs() -> dict[str, Any]:
 	return {"deleted": deleted, "skipped": skipped}
 
 
+def remape_voley_sales_invoice_items() -> dict[str, Any]:
+	"""Reapunta `Sales Invoice Item.item_code` legacy → ESCUELA / FEDERADO.
+
+	El consolidate anterior remapeaba Links de Actividad/Grupo/Equipo pero no las
+	líneas de factura; por eso Deuda por actividad veía arancel Vóley en $0.
+	"""
+	remapped: list[str] = []
+	for legacy, canonical in VOLEY_LEGACY_TO_CANONICAL.items():
+		if not frappe.db.exists("Item", canonical):
+			continue
+		count = int(frappe.db.count("Sales Invoice Item", {"item_code": legacy}) or 0)
+		if count <= 0:
+			continue
+		item_name = frappe.db.get_value("Item", canonical, "item_name") or canonical
+		frappe.db.sql(
+			"""
+			UPDATE "tabSales Invoice Item"
+			SET item_code = %s, item_name = %s
+			WHERE item_code = %s
+			""",
+			(canonical, item_name, legacy),
+		)
+		remapped.append(f"{legacy}->{canonical}:{count}")
+	return {"remapped": remapped}
+
+
 def consolidate_voley_escuela_federado() -> dict[str, Any]:
-	"""Crea ESCUELA/FEDERADO, remapea, re-seed y retira legacy.
+	"""Crea ESCUELA/FEDERADO, remapea links + facturas, re-seed y retira legacy.
 
 	Spec: ``voley_futbol_aranceles_icdpe.md``.
 	"""
 	sync_arancel_items(VOLEY_ITEM_SPECS)
 	remap_v = remap_voley_legacy_links()
 	remap_a = remape_legacy_arancel_links()
+	remap_si = remape_voley_sales_invoice_items()
 	seed_estructura_actividades_completa(crear_equipos=True)
 	# Re-remap por si el seed dejó algo en legacy (no debería).
 	remap_v2 = remap_voley_legacy_links()
@@ -121,6 +148,7 @@ def consolidate_voley_escuela_federado() -> dict[str, Any]:
 	return {
 		"remap_voley": remap_v,
 		"remap_arancel_mensual": remap_a,
+		"remap_sales_invoice_items": remap_si,
 		"remap_voley_after_seed": remap_v2,
 		"retired": retired,
 		"deleted": deleted,

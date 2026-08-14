@@ -44,3 +44,16 @@ VOLEY_LEGACY_TO_CANONICAL: dict[str, str] = {
 	"ICDPE-ARANCEL-MENSUAL-VOLEY-GENERAL": ITEM_VOLEY_FEDERADO,
 	"ICDPE-ARANCEL-MENSUAL-VOLEY-ESCUELITA": ITEM_VOLEY_ESCUELA,
 }
+
+
+def expand_voley_arancel_item_codes(item_code: str | None) -> set[str]:
+	"""Canónico + legacies equivalentes (para informes con facturas sin remapeo)."""
+	if not item_code:
+		return set()
+	codes = {item_code}
+	canon = VOLEY_LEGACY_TO_CANONICAL.get(item_code, item_code)
+	codes.add(canon)
+	for legacy, target in VOLEY_LEGACY_TO_CANONICAL.items():
+		if target == canon:
+			codes.add(legacy)
+	return codes

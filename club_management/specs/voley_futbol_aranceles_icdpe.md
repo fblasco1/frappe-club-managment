@@ -19,6 +19,21 @@ Solo **dos** aranceles (etiquetado único):
 
 Legacy (`ICDPE-VOLEY-TIRA-*`, `…ESCUELA-ADOLESCENTE`, `…ESCUELITA-MINIVOLEY`) se remapean y deshabilitan.
 
+## Scenario: facturas legacy remapean a canónico
+
+Given líneas de Sales Invoice Item con `ICDPE-VOLEY-TIRA-30500` o `ICDPE-VOLEY-ESCUELITA-MINIVOLEY`
+And la estructura de grupos ya usa `ICDPE-VOLEY-FEDERADO` / `ICDPE-VOLEY-ESCUELA`
+When corre el remapeo de facturas Vóley (patch / consolidate)
+Then esas líneas pasan a `ICDPE-VOLEY-FEDERADO` y `ICDPE-VOLEY-ESCUELA`
+And **Deuda por actividad** clasifica el arancel de Vóley (no queda en $0).
+
+## Scenario: informe acepta equivalencias legacy sin remapeo previo
+
+Given una inscripción cuyo ítem resuelto es `ICDPE-VOLEY-FEDERADO`
+And la factura pendiente aún tiene línea `ICDPE-VOLEY-TIRA-30500`
+When se calcula el desglose de deuda en rango
+Then el monto de esa línea cuenta como **deuda_arancel**.
+
 ## Scenario: vóley federado (tira)
 
 Given `Voley Femenino` / grupo `Tira` con `item = ICDPE-VOLEY-FEDERADO`
