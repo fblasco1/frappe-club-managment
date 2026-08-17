@@ -83,6 +83,36 @@
 			`;
 		},
 
+		render_liquidez(data) {
+			const liq = data.liquidez;
+			if (!liq) return "";
+			const ventana = liq.ventana_dias || 5;
+			const alcanza = liq.liquidez_alcanza
+				? __("Alcanza obligaciones críticas")
+				: __("No alcanza obligaciones críticas");
+			return `
+				<div class="club-tesoreria-kpis">
+					<div class="club-tesoreria-kpi">
+						<div class="club-tesoreria-kpi-label">${frappe.utils.escape_html(
+							__("Liquidez a {0} días", [ventana])
+						)}</div>
+						<div class="club-tesoreria-kpi-value">${frappe.utils.escape_html(
+							liq.liquidez_proyectada_label || ""
+						)}</div>
+						<div class="club-tesoreria-kpi-hint">${frappe.utils.escape_html(alcanza)}</div>
+					</div>
+					<div class="club-tesoreria-kpi">
+						<div class="club-tesoreria-kpi-label">${frappe.utils.escape_html(
+							__("Gastos proyectados (borrador)")
+						)}</div>
+						<div class="club-tesoreria-kpi-value">${frappe.utils.escape_html(
+							liq.gastos_proyectados_pendientes_label || ""
+						)}</div>
+					</div>
+				</div>
+			`;
+		},
+
 		render_row(row) {
 			const estado = row.estado
 				? `<span class="club-tesoreria-badge">${frappe.utils.escape_html(row.estado)}</span>`
@@ -131,6 +161,7 @@
 		render_panel($panel, data) {
 			$panel.html(`
 				${this.render_actions()}
+				${this.render_liquidez(data)}
 				${this.render_list_card(__("PAGOS PENDIENTES"), "📝", data.borradores_pendientes)}
 				${this.render_list_card(__("PAGOS REALIZADOS"), "🧾", data.facturas_pagas)}
 				${this.render_list_card(__("COBRANZA"), "💰", data.cobros_recibidos)}

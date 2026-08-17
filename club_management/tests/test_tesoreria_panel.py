@@ -40,6 +40,23 @@ class TestTesoreriaPanelAcceso(MembersTestCase):
 			frappe.set_user("Administrator")
 		self.assertIn("facturas_pagas", data)
 
+	def test_panel_incluye_liquidez_a_5_dias(self) -> None:
+		"""Día 1: el Tesorero ve liquidez y borradores sin abrir el Script Report."""
+		user = make_tesoreria_user("tesoreria.liq@example.com")
+		frappe.set_user(user)
+		try:
+			data = tesoreria_panel.get_panel_data()
+		finally:
+			frappe.set_user("Administrator")
+
+		liq = data.get("liquidez")
+		self.assertIsInstance(liq, dict)
+		self.assertEqual(liq["ventana_dias"], 5)
+		self.assertIn("liquidez_proyectada", liq)
+		self.assertIn("gastos_proyectados_pendientes", liq)
+		self.assertTrue(liq.get("liquidez_proyectada_label"))
+		self.assertTrue(liq.get("gastos_proyectados_pendientes_label"))
+
 	def test_usuario_sin_rol_no_accede(self) -> None:
 		email = "sinrol.panel@example.com"
 		if not frappe.db.exists("User", email):

@@ -25,6 +25,18 @@ Then obtiene los datos sin error.
 
 ---
 
+## Scenario: tarjeta de liquidez a 5 días (día 1)
+
+Given un usuario con acceso al panel (`Tesoreria` o `Secretaria`)
+When se arma el panel
+Then incluye un resumen `liquidez` con `liquidez_proyectada` y `gastos_proyectados_pendientes`
+And la ventana es de **5** días (`calcular_proyeccion_flujo_fondos`)
+And el cálculo se invoca con `skip_permission_check=True` **después** del gate `ensure_finance_panel_access` (Secretaría ya ve borradores; no se exige rol Tesoreria para el número)
+And si ERPNext no está instalado, `liquidez` es `null` y el panel no falla
+And el workspace muestra esas cifras arriba de las listas, sin abrir el Script Report.
+
+---
+
 ## Scenario: botones de acción a la izquierda
 
 Given el panel de Tesorería

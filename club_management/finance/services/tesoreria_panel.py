@@ -5,9 +5,14 @@ Arma las tres listas del panel con plan de cuenta y centro de costo:
 - Facturas de compra pagas en el último mes.
 - Cobros recibidos en el último mes (cuenta/centro tomados de la factura de venta).
 
+Incluye un resumen de liquidez a 5 días (`calcular_proyeccion_flujo_fondos`)
+para el número de un saque del Tesorero, sin abrir el Script Report.
+
 El acceso está restringido por `ensure_finance_panel_access` (Tesorería/Secretaría).
 Las consultas son de alcance club-wide (no hay datos por-socio), por lo que el
-gate por rol es suficiente para el aislamiento.
+gate por rol es suficiente para el aislamiento. La proyección se calcula con
+`skip_permission_check=True` **después** de ese gate, para que Secretaría
+también vea el número (el Script Report sigue exigiendo Tesoreria).
 """
 
 from __future__ import annotations
@@ -16,6 +21,10 @@ import frappe
 from frappe.utils import add_months, fmt_money, format_date, getdate, nowdate
 
 from club_management.finance.permissions import ensure_finance_panel_access
+from club_management.finance.services.flujo_fondos import (
+	VENTANA_DIAS_DEFAULT,
+	calcular_proyeccion_flujo_fondos,
+)
 
 LIMIT = 5
 
@@ -24,9 +33,34 @@ def get_panel_data() -> dict:
 	"""Devuelve las listas del panel de Tesorería (con gate de acceso)."""
 	ensure_finance_panel_access()
 	return {
+		"liquidez": _liquidez_resumen(),
 		"borradores_pendientes": facturas_compra_borrador(),
 		"facturas_pagas": facturas_compra_pagas_ultimo_mes(),
 		"cobros_recibidos": cobros_recibidos_ultimo_mes(),
+	}
+
+
+def _liquidez_resumen() -> dict | None:
+	"""Liquidez a N días y gastos en borrador. None si ERPNext no está."""
+	if not frappe.db.exists("DocType", "Purchase Invoice"):
+		return None
+	try:
+		proy = calcular_proyeccion_flujo_fondos(
+			ventana_dias=VENTANA_DIAS_DEFAULT,
+			skip_permission_check=True,
+		)
+	except frappe.ValidationError:
+		return None
+	return {
+		"ventana_dias": proy["ventana_dias"],
+		"as_of_date": proy["as_of_date"],
+		"liquidez_proyectada": proy["liquidez_proyectada"],
+		"liquidez_proyectada_label": _money(proy["liquidez_proyectada"]),
+		"gastos_proyectados_pendientes": proy["gastos_proyectados_pendientes"],
+		"gastos_proyectados_pendientes_label": _money(
+			proy["gastos_proyectados_pendientes"]
+		),
+		"liquidez_alcanza": proy["liquidez_alcanza"],
 	}
 
 

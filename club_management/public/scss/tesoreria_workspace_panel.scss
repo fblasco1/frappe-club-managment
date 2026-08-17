@@ -50,6 +50,42 @@ body.club-tesoreria-active-workspace .layout-main .layout-main-section-wrapper,
 	margin-bottom: 1.25rem;
 }
 
+.club-tesoreria-kpis {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 0.75rem;
+	margin-bottom: 1.25rem;
+}
+
+.club-tesoreria-kpi {
+	background: var(--card-bg);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-lg);
+	padding: 1rem 1.25rem;
+}
+
+.club-tesoreria-kpi-label {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+
+.club-tesoreria-kpi-value {
+	margin-top: 0.35rem;
+	font-size: 1.5rem;
+	font-weight: 700;
+	line-height: 1.2;
+	color: var(--text-color);
+}
+
+.club-tesoreria-kpi-hint {
+	margin-top: 0.35rem;
+	font-size: 0.8rem;
+	color: var(--text-muted);
+}
+
 /* Tarjetas de listas */
 .club-tesoreria-list-card {
 	background: var(--card-bg);

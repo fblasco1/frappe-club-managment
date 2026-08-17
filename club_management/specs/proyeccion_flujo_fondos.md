@@ -80,4 +80,5 @@ And el Query Report «Proyeccion Flujo de Fondos» puede completar la carga (dej
 | API | `finance/api/tesoreria_desk.py` |
 | Report | `finance/report/proyeccion_flujo_de_fondos/` |
 | Workspace | `finance/workspace/tesoreria/` |
-| Tests | `tests/test_flujo_fondos.py` |
+| Panel (KPI día 1) | `finance/services/tesoreria_panel.py` + `public/js/tesoreria_workspace_panel.js` |
+| Tests | `tests/test_flujo_fondos.py`, `tests/test_tesoreria_panel.py` |
