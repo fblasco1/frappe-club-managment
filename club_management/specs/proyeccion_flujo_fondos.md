@@ -4,7 +4,8 @@ El Tesorero, el día 1 del mes (o cualquier `as_of_date`), ve si la liquidez pro
 
 **Relacionado:** `rol_tesoreria_permisos.md`, `carga_rapida_ingreso_egreso.md`
 
-**Proyección Cobros Plus:** se asume vencimiento de cuotas sociales el **día 10** del mes (constante documentada; gateway Supervielle fuera de alcance prod).
+**Proyección Cobros Plus:** se asume 1.er vencimiento / ola de cobranza el **día 10** del mes
+(cuota social **y** aranceles deportivos con ese `due_date`). Segundo hito de mora proyectada: **día 20**.
 
 ---
 
@@ -34,12 +35,23 @@ And el semáforo `liquidez_alcanza` es True si `saldo_caja_bancos + cobros_proye
 
 ---
 
-## Scenario: cobros proyectados día 10
+## Scenario: cobros proyectados día 10 (cuota + arancel)
 
-Given Sales Invoices outstanding de cuotas con `due_date` = día 10 del mes de `as_of_date`
+Given Sales Invoices outstanding (cuota y/o arancel) con `due_date` = día 10 del mes de `as_of_date`
 When `as_of_date` es día 1 y la ventana es 5
 Then esos cobros **no** entran en `cobros_proyectados_ventana` (día 10 > día 5)
-And sí aparecen en `cobros_proyectados_mes` (día 10 del mes).
+And sí aparecen en `cobros_proyectados_mes` por el outstanding (sin mora aún).
+
+---
+
+## Scenario: cobros mes post día 10 / día 20 con mora
+
+Given SI outstanding con `due_date` = día 10 del mes
+When `as_of_date` es posterior al día 10 y ≤ día 20
+Then `cobros_proyectados_mes` sigue listando esa ola (aunque `due_date` < `as_of`)
+And el monto se recalcula con el recargo del 1.er vencimiento (`recargo_post_vencimiento_pct`, default 10 %)
+When `as_of_date` es posterior al día 20
+Then el monto incluye además el recargo del 2.º hito (`recargo_mes_vencido_pct`, default 5 %).
 
 ---
 

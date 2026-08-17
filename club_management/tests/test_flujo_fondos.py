@@ -88,6 +88,84 @@ class TestFlujoFondos(MembersTestCase):
 		# Ventana termina día 6; día 10 no está en ventana
 		self.assertEqual(proy["cobros_proyectados_ventana"], proy["cobros_proyectados_ventana"])
 
+	def test_factor_mora_cobros_mes_tramos(self) -> None:
+		from club_management.finance.services.flujo_fondos import _factor_mora_cobros_mes
+
+		due = getdate("2026-09-10")
+		self.assertEqual(
+			_factor_mora_cobros_mes(getdate("2026-09-01"), due_cobros=due),
+			1.0,
+		)
+		self.assertAlmostEqual(
+			_factor_mora_cobros_mes(getdate("2026-09-14"), due_cobros=due),
+			1.1,
+			places=4,
+		)
+		self.assertAlmostEqual(
+			_factor_mora_cobros_mes(getdate("2026-09-21"), due_cobros=due),
+			1.15,
+			places=4,
+		)
+
+	def test_cobros_mes_post_dia_10_recalcula_con_mora(self) -> None:
+		from club_management.finance.services.flujo_fondos import get_cobros_proyectados
+
+		as_of_pre = getdate("2026-09-01")
+		as_of_mid = getdate("2026-09-14")
+		as_of_late = getdate("2026-09-21")
+		due = getdate("2026-09-10")
+		posting = getdate("2026-09-01")
+
+		customer = frappe.db.get_value("Customer", {"disabled": 0}, "name")
+		if not customer:
+			self.skipTest("Customer ausente")
+		item = frappe.db.get_value("Item", {"disabled": 0, "is_sales_item": 1}, "name")
+		if not item:
+			self.skipTest("Item sales ausente")
+
+		# Insert + marcar submitted sin PLE (evita bug GROUP BY de ERPNext/Postgres en submit).
+		si = frappe.get_doc(
+			{
+				"doctype": "Sales Invoice",
+				"company": self.company,
+				"customer": customer,
+				"set_posting_time": 1,
+				"posting_date": posting,
+				"due_date": due,
+				"items": [{"item_code": item, "qty": 1, "rate": 10000}],
+			}
+		)
+		si.insert(ignore_permissions=True)
+		frappe.db.set_value(
+			"Sales Invoice",
+			si.name,
+			{
+				"docstatus": 1,
+				"outstanding_amount": 10000,
+				"grand_total": 10000,
+				"rounded_total": 10000,
+				"status": "Unpaid",
+			},
+			update_modified=False,
+		)
+
+		pre = get_cobros_proyectados(self.company, as_of_date=as_of_pre, ventana_dias=5)
+		mid = get_cobros_proyectados(self.company, as_of_date=as_of_mid, ventana_dias=5)
+		late = get_cobros_proyectados(self.company, as_of_date=as_of_late, ventana_dias=5)
+
+		def _find(payload):
+			return next((r for r in payload["detalle_mes"] if r["name"] == si.name), None)
+
+		row_pre = _find(pre)
+		row_mid = _find(mid)
+		row_late = _find(late)
+		self.assertIsNotNone(row_pre)
+		self.assertIsNotNone(row_mid)
+		self.assertIsNotNone(row_late)
+		self.assertAlmostEqual(row_pre["outstanding_amount"], 10000.0, places=2)
+		self.assertAlmostEqual(row_mid["outstanding_amount"], 11000.0, places=2)
+		self.assertAlmostEqual(row_late["outstanding_amount"], 11500.0, places=2)
+
 	def test_secretaria_permission_error(self) -> None:
 		frappe.set_user(self.secretaria)
 		try:

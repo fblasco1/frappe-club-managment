@@ -12,8 +12,10 @@ from frappe.utils import add_days, flt, getdate
 from club_management.finance.permissions import ensure_tesoreria_access
 from club_management.setup.icdpe_company import resolve_icdpe_company
 
-# Día del mes en que se proyecta la liquidación Cobros Plus / cuotas.
+# Día del mes en que se proyecta la liquidación Cobros Plus / cuotas+aranceles.
 COBROS_PLUS_DIA_MES = 10
+# Segundo hito de mora proyectada en cobros_mes (alineado a tendencia KPI).
+COBROS_SEGUNDO_HITO_DIA = 20
 CONCEPTOS_CRITICOS = frozenset({"Personal", "Estructura"})
 VENTANA_DIAS_DEFAULT = 5
 
@@ -150,6 +152,48 @@ def get_gastos_proyectados_pendientes(
 	}
 
 
+def _due_cobros_plus_date(as_of_date: date, cobros_plus_dia: int = COBROS_PLUS_DIA_MES) -> date:
+	try:
+		return as_of_date.replace(day=cobros_plus_dia)
+	except ValueError:
+		due_cobros = add_days(as_of_date.replace(day=1), 32).replace(day=1)
+		return add_days(due_cobros, -1)
+
+
+def _factor_mora_cobros_mes(
+	as_of_date: date,
+	*,
+	due_cobros: date,
+	segundo_hito_dia: int = COBROS_SEGUNDO_HITO_DIA,
+	pct_post_primer: float = 10.0,
+	pct_post_segundo: float = 5.0,
+) -> float:
+	"""Multiplicador sobre outstanding de la ola día 10 según as_of."""
+	if as_of_date <= due_cobros:
+		return 1.0
+	try:
+		segundo = due_cobros.replace(day=int(segundo_hito_dia))
+	except ValueError:
+		segundo = add_days(due_cobros.replace(day=1), 32).replace(day=1)
+		segundo = add_days(segundo, -1)
+	factor = 1.0 + flt(pct_post_primer) / 100.0
+	if as_of_date > segundo:
+		factor += flt(pct_post_segundo) / 100.0
+	return factor
+
+
+def _pct_mora_from_settings() -> tuple[float, float]:
+	try:
+		from club_management.members.services.cobranza_manual import get_club_settings
+
+		settings = get_club_settings()
+		pct1 = flt(getattr(settings, "recargo_post_vencimiento_pct", None) or 10)
+		pct2 = flt(getattr(settings, "recargo_mes_vencido_pct", None) or 5)
+		return pct1, pct2
+	except Exception:
+		return 10.0, 5.0
+
+
 def get_cobros_proyectados(
 	company: str,
 	*,
@@ -157,52 +201,79 @@ def get_cobros_proyectados(
 	ventana_dias: int,
 	cobros_plus_dia: int = COBROS_PLUS_DIA_MES,
 ) -> dict[str, Any]:
-	"""Sales Invoices outstanding: ventana corta vs día Cobros Plus del mes."""
+	"""Sales Invoices outstanding: ventana corta vs ola día 10 (con mora post venc.)."""
 	hasta_ventana = add_days(as_of_date, ventana_dias)
-	try:
-		due_cobros = as_of_date.replace(day=cobros_plus_dia)
-	except ValueError:
-		# Mes corto: último día del mes
-		due_cobros = add_days(as_of_date.replace(day=1), 32).replace(day=1)
-		due_cobros = add_days(due_cobros, -1)
+	due_cobros = _due_cobros_plus_date(as_of_date, cobros_plus_dia)
+	pct1, pct2 = _pct_mora_from_settings()
+	factor_mes = _factor_mora_cobros_mes(
+		as_of_date,
+		due_cobros=due_cobros,
+		pct_post_primer=pct1,
+		pct_post_segundo=pct2,
+	)
 
-	invoices = frappe.get_all(
+	# Ventana: solo vencimientos futuros/en rango desde as_of.
+	invoices_ventana = frappe.get_all(
 		"Sales Invoice",
 		filters={
 			"company": company,
 			"docstatus": 1,
 			"outstanding_amount": [">", 0],
-			"due_date": [">=", as_of_date],
+			"due_date": ["between", [as_of_date, hasta_ventana]],
 		},
 		fields=["name", "customer", "due_date", "outstanding_amount"],
 		order_by="due_date asc",
 	)
 
-	en_ventana = 0.0
-	en_mes_cobros_plus = 0.0
-	detalle_ventana: list[dict[str, Any]] = []
-	detalle_mes: list[dict[str, Any]] = []
+	# Ola día 10 del mes: incluye vencidas si as_of > 10 (proyección con mora).
+	invoices_mes = frappe.get_all(
+		"Sales Invoice",
+		filters={
+			"company": company,
+			"docstatus": 1,
+			"outstanding_amount": [">", 0],
+			"due_date": due_cobros,
+		},
+		fields=["name", "customer", "due_date", "outstanding_amount"],
+		order_by="name asc",
+	)
 
-	for inv in invoices:
-		due = getdate(inv.due_date)
+	en_ventana = 0.0
+	detalle_ventana: list[dict[str, Any]] = []
+	for inv in invoices_ventana:
 		monto = flt(inv.outstanding_amount)
-		row = {
-			"name": inv.name,
-			"customer": inv.customer,
-			"due_date": str(due),
-			"outstanding_amount": monto,
-		}
-		if as_of_date <= due <= hasta_ventana:
-			en_ventana += monto
-			detalle_ventana.append(row)
-		if due == due_cobros:
-			en_mes_cobros_plus += monto
-			detalle_mes.append(row)
+		en_ventana += monto
+		detalle_ventana.append(
+			{
+				"name": inv.name,
+				"customer": inv.customer,
+				"due_date": str(getdate(inv.due_date)),
+				"outstanding_amount": monto,
+			}
+		)
+
+	en_mes_cobros_plus = 0.0
+	detalle_mes: list[dict[str, Any]] = []
+	for inv in invoices_mes:
+		base = flt(inv.outstanding_amount)
+		monto = round(base * factor_mes, 2)
+		en_mes_cobros_plus += monto
+		detalle_mes.append(
+			{
+				"name": inv.name,
+				"customer": inv.customer,
+				"due_date": str(getdate(inv.due_date)),
+				"outstanding_amount": monto,
+				"outstanding_base": base,
+				"factor_mora": factor_mes,
+			}
+		)
 
 	return {
 		"cobros_proyectados_ventana": en_ventana,
 		"cobros_proyectados_mes": en_mes_cobros_plus,
 		"due_cobros_plus": str(due_cobros),
+		"factor_mora_cobros_mes": factor_mes,
 		"detalle_ventana": detalle_ventana,
 		"detalle_mes": detalle_mes,
 	}
@@ -252,6 +323,7 @@ def calcular_proyeccion_flujo_fondos(
 		"cobros_proyectados_ventana": cobros["cobros_proyectados_ventana"],
 		"cobros_proyectados_mes": cobros["cobros_proyectados_mes"],
 		"due_cobros_plus": cobros["due_cobros_plus"],
+		"factor_mora_cobros_mes": cobros.get("factor_mora_cobros_mes", 1.0),
 		"liquidez_proyectada": liquidez,
 		"liquidez_alcanza": alcanza,
 	}

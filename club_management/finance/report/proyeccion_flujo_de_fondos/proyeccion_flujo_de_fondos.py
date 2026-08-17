@@ -7,7 +7,7 @@ from typing import Any
 
 import frappe
 from frappe import _
-from frappe.utils import cint
+from frappe.utils import cint, flt
 
 from club_management.finance.permissions import ensure_tesoreria_access
 from club_management.finance.services.flujo_fondos import (
@@ -68,7 +68,11 @@ def execute(
 				proyeccion["due_cobros_plus"]
 			),
 			"monto": proyeccion["cobros_proyectados_mes"],
-			"detalle": proyeccion["due_cobros_plus"],
+			"detalle": (
+				_("con mora ×{0}").format(proyeccion.get("factor_mora_cobros_mes", 1))
+				if flt(proyeccion.get("factor_mora_cobros_mes", 1)) > 1
+				else proyeccion["due_cobros_plus"]
+			),
 		},
 	]
 
