@@ -4,6 +4,7 @@
 - Period Closing Voucher: MAX sin ORDER BY inválido en get_value.
 - Cancelación de facturas: `delinked`/`is_cancelled` como smallint, no boolean.
 - Payment Entry: literales de voucher_type y COALESCE en get_negative_outstanding_invoices.
+- Informes financieros: `QueryBuilder.force_index` es no-op (PostgreSQL no admite FORCE INDEX).
 """
 
 from __future__ import annotations
@@ -27,6 +28,23 @@ def apply_patch() -> None:
 	_patch_delink_original_entry()
 	_patch_payment_entry_sql()
 	_patch_held_invoices()
+	_patch_force_index_noop()
+
+
+def _patch_force_index_noop() -> None:
+	"""ERPNext P&L/Cash Flow llama `query.force_index(...)`; PostgreSQL no lo admite."""
+	from pypika.dialects import PostgreSQLQueryBuilder
+	from pypika.queries import QueryBuilder
+
+	if getattr(QueryBuilder, "_club_force_index_pg_patch", False):
+		return
+
+	def _force_index_noop(self, term, *terms):
+		return self
+
+	QueryBuilder.force_index = _force_index_noop
+	PostgreSQLQueryBuilder.force_index = _force_index_noop
+	QueryBuilder._club_force_index_pg_patch = True
 
 
 def _pg_amount_expr(rounded_field: str, grand_field: str) -> str:

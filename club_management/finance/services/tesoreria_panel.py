@@ -25,6 +25,7 @@ from club_management.finance.services.flujo_fondos import (
 	VENTANA_DIAS_DEFAULT,
 	calcular_proyeccion_flujo_fondos,
 )
+from club_management.finance.services.informes_contables import informes_contables_panel
 
 LIMIT = 5
 
@@ -34,6 +35,7 @@ def get_panel_data() -> dict:
 	ensure_finance_panel_access()
 	return {
 		"liquidez": _liquidez_resumen(),
+		"informes_contables": informes_contables_panel(),
 		"borradores_pendientes": facturas_compra_borrador(),
 		"facturas_pagas": facturas_compra_pagas_ultimo_mes(),
 		"cobros_recibidos": cobros_recibidos_ultimo_mes(),

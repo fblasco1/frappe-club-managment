@@ -2,7 +2,7 @@
 
 El club necesita un rol **Tesoreria** con lectura contable y acceso al flujo de fondos, separado de **Secretaria**. Secretaría tiene **acceso operativo** a Finanzas (crear/leer facturas de compra, pagos y proveedores, para cargar la provisión de sueldos y egresos) pero **sin** flujo de fondos ni reportes P&L (GF-6).
 
-**Relacionado:** `carga_rapida_ingreso_egreso.md`, `proyeccion_flujo_fondos.md`
+**Relacionado:** `carga_rapida_ingreso_egreso.md`, `proyeccion_flujo_fondos.md`, `informes_tesoreria_pnl_cashflow.md`
 
 **Fuera de alcance:** HRMS / liquidación nativa de sueldos (ver backlog).
 
@@ -45,7 +45,7 @@ Then incluye `Tesoreria`, `Secretaria` y `System Manager`.
 Given un usuario con rol `Secretaria` (sin `Tesoreria`)
 When abre el workspace de Finanzas
 Then ve los accesos a **Facturas de compra** y **Pagos y cobros**
-And **no** ve el reporte **Proyección de Flujo de Fondos** (el link se filtra por permiso, ya que el reporte requiere rol `Tesoreria`).
+And **no** ve el reporte **Proyección de Flujo de Fondos** ni **Ganancias y Pérdidas** ni **Flujo de Efectivo** (roles `Tesoreria` en esos Report).
 
 ---
 

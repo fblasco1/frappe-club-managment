@@ -37,6 +37,21 @@ And el workspace muestra esas cifras arriba de las listas, sin abrir el Script R
 
 ---
 
+## Scenario: informes P&L y Cash Flow desde el panel (solo Tesorería)
+
+Given un usuario `Tesoreria`
+When se arma el panel
+Then `informes_contables.visible` es True
+And hay botones a **Ganancias y pérdidas**, **Flujo de efectivo** y la proyección a 5 días.
+
+Given un usuario `Secretaria` (sin Tesoreria)
+When se arma el panel
+Then `informes_contables.visible` es False.
+
+Ver `informes_tesoreria_pnl_cashflow.md`.
+
+---
+
 ## Scenario: botones de acción a la izquierda
 
 Given el panel de Tesorería

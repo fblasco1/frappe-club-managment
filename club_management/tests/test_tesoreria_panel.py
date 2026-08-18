@@ -39,6 +39,8 @@ class TestTesoreriaPanelAcceso(MembersTestCase):
 		finally:
 			frappe.set_user("Administrator")
 		self.assertIn("facturas_pagas", data)
+		self.assertTrue(data["informes_contables"]["visible"])
+		self.assertEqual(data["informes_contables"]["ganancias_perdidas"], "Ganancias y Perdidas")
 
 	def test_panel_incluye_liquidez_a_5_dias(self) -> None:
 		"""Día 1: el Tesorero ve liquidez y borradores sin abrir el Script Report."""

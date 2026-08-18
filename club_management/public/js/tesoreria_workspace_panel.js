@@ -83,6 +83,27 @@
 			`;
 		},
 
+		render_informes(data) {
+			const inf = data.informes_contables;
+			if (!inf || !inf.visible) return "";
+			const botones = [
+				[inf.ganancias_perdidas, __("Ganancias y pérdidas")],
+				[inf.flujo_efectivo, __("Flujo de efectivo")],
+				[inf.flujo_operativo, __("Proyección 5 días")],
+			];
+			const html = botones
+				.filter(([report]) => report)
+				.map(
+					([report, label]) => `
+					<button type="button" class="btn btn-default club-tesoreria-informe"
+						data-report="${frappe.utils.escape_html(report)}">
+						${frappe.utils.escape_html(label)}
+					</button>`
+				)
+				.join("");
+			return `<div class="club-tesoreria-actions club-tesoreria-informes">${html}</div>`;
+		},
+
 		render_liquidez(data) {
 			const liq = data.liquidez;
 			if (!liq) return "";
@@ -90,9 +111,14 @@
 			const alcanza = liq.liquidez_alcanza
 				? __("Alcanza obligaciones críticas")
 				: __("No alcanza obligaciones críticas");
+			const inf = data.informes_contables || {};
+			const reportAttr =
+				inf.visible && inf.flujo_operativo
+					? ` data-report="${frappe.utils.escape_html(inf.flujo_operativo)}"`
+					: "";
 			return `
 				<div class="club-tesoreria-kpis">
-					<div class="club-tesoreria-kpi">
+					<div class="club-tesoreria-kpi"${reportAttr}>
 						<div class="club-tesoreria-kpi-label">${frappe.utils.escape_html(
 							__("Liquidez a {0} días", [ventana])
 						)}</div>
@@ -161,6 +187,7 @@
 		render_panel($panel, data) {
 			$panel.html(`
 				${this.render_actions()}
+				${this.render_informes(data)}
 				${this.render_liquidez(data)}
 				${this.render_list_card(__("PAGOS PENDIENTES"), "📝", data.borradores_pendientes)}
 				${this.render_list_card(__("PAGOS REALIZADOS"), "🧾", data.facturas_pagas)}
@@ -172,6 +199,12 @@
 		bind_handlers($panel) {
 			$panel.find(".club-tesoreria-nueva-fc").on("click", () => {
 				frappe.new_doc("Purchase Invoice");
+			});
+			$panel.find(".club-tesoreria-informe, .club-tesoreria-kpi[data-report]").on("click", (e) => {
+				const report = $(e.currentTarget).attr("data-report");
+				if (report) {
+					frappe.set_route("query-report", report);
+				}
 			});
 			$panel.find(".club-tesoreria-row").on("click", (e) => {
 				const $row = $(e.currentTarget);
