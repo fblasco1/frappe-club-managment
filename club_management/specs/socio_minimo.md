@@ -20,6 +20,7 @@ Esta primera entrega del DocType `Socio` cubre el flujo prioritario
 - Datos personales completos (incluida `nacionalidad`).
 - Categoría obligatoria; `Vitalicio` no asignable manualmente.
 - Adjuntos obligatorios (foto, DNI ambas caras, ficha médica validada por MIME/tamaño).
+- Al renovar, el archivo **pisa** al anterior (sin histórico): `almacenamiento_documentacion_socios.md`.
 - Auditoría server-side de transiciones de estado y alta validada.
 - Política de `User`: opcional para menores cuyo email es compartido por su tutor.
 - Login DNI / email para Socios con `User` propio (el número de socio es el `name`
@@ -89,7 +90,8 @@ Quedan **fuera** de Sprint 0 (cubiertos por `socios_categoria_validacion.md`):
 | `foto_perfil`  | Attach Image | **sí** | no              |                                                             |
 | `dni_frente`   | Attach       | **sí** | no              | Copiado desde la Solicitud al validar                       |
 | `dni_dorso`    | Attach       | **sí** | no              | Idem                                                        |
-| `ficha_medica` | Attach       | **sí** | no              | PDF / JPEG / PNG, ≤ 5MB; firmado por profesional médico     |
+| `ficha_medica` | Attach       | **sí** | no              | PDF / JPEG / PNG, ≤ 5MB; al renovar **pisa** el archivo anterior (`almacenamiento_documentacion_socios.md`) |
+| `comprobante_jubilado` | Attach | no | no         | Solo categoría Jubilado; copiado desde la solicitud al validar |
 
 ### Auditoría (todos `read-only` en UI; setean desde server-side)
 
@@ -358,6 +360,18 @@ Given el mismo `Socio`
 When se adjunta un PDF de 1 MB como `ficha_medica`
 Then el archivo se persiste correctamente
 And `ficha_medica` contiene la URL al archivo dentro de `/files/` o `/private/files/`.
+
+---
+
+## Scenario: renovación de ficha o DNI pisa el archivo anterior
+
+Given un `Socio` con `ficha_medica` (o DNI / foto) ya cargada
+When se adjunta un archivo **válido** en el mismo campo
+Then el campo apunta solo al archivo nuevo
+And el `File` anterior se elimina del disco
+And no se conserva un histórico de ese documento.
+
+Ver política de storage y umbral multi-club en `almacenamiento_documentacion_socios.md`.
 
 ---
 
