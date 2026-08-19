@@ -182,6 +182,16 @@ def sync_suscripciones_al_dar_baja_socio(socio_name: str) -> None:
 		)
 
 
+def sync_suscripciones_al_dar_alta_socio(socio_name: str) -> None:
+	try:
+		sync_suscripciones_socio(socio_name)
+	except Exception:
+		frappe.log_error(
+			title=f"Restaurar suscripciones socio — {socio_name}",
+			message=frappe.get_traceback(),
+		)
+
+
 def sync_suscripcion_tras_inscripcion(doc: frappe.model.document.Document, method: str | None = None) -> None:
 	"""Hook DocType `Inscripcion Actividad`."""
 	if doc.get("estado") == "Activa":

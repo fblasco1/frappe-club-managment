@@ -147,6 +147,33 @@ def list_inscripciones_socio_desk(
 	return list_inscripciones_socio(socio_name, incluir_bajas=incluir_bajas)
 
 
+def _marcar_inscripcion_baja(inscripcion_name: str) -> str:
+	"""Pasa una inscripción activa a `Baja` y quita el arancel. Devuelve el socio."""
+	from club_management.members.services.suscripciones_socio import cancel_arancel_inscripcion
+
+	doc = frappe.get_doc(INSCRIPCION_DOCTYPE, inscripcion_name)
+	socio_name = doc.socio
+	if doc.estado != "Activa":
+		return socio_name
+	doc.estado = "Baja"
+	doc.save(ignore_permissions=True)
+	cancel_arancel_inscripcion(inscripcion_name)
+	return socio_name
+
+
+def baja_inscripciones_activas_socio(socio_name: str) -> list[str]:
+	"""Da de baja todas las inscripciones `Activa` del socio (cascada al dar de baja)."""
+	names = frappe.get_all(
+		INSCRIPCION_DOCTYPE,
+		filters={"socio": socio_name, "estado": "Activa"},
+		pluck="name",
+	)
+	for inscripcion_name in names:
+		_marcar_inscripcion_baja(inscripcion_name)
+	sync_socio_actividad_resumen(socio_name)
+	return names
+
+
 def baja_inscripcion_desk(
 	inscripcion_name: str,
 	*,
@@ -168,13 +195,8 @@ def baja_inscripcion_desk(
 			frappe.ValidationError,
 		)
 
-	socio_name = doc.socio
-	doc.estado = "Baja"
-	doc.save(ignore_permissions=True)
+	socio_name = _marcar_inscripcion_baja(inscripcion_name)
 	sync_socio_actividad_resumen(socio_name)
-	from club_management.members.services.suscripciones_socio import cancel_arancel_inscripcion
-
-	cancel_arancel_inscripcion(inscripcion_name)
 
 	return {
 		"status": "ok",

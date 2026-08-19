@@ -8,7 +8,7 @@ import frappe
 from frappe.model.workflow import apply_workflow
 
 from club_management.members.services.cuotas_sociales_setup import sync_cuotas_sociales_club
-from club_management.members.services.socio_operaciones_secretaria import dar_baja_socio
+from club_management.members.services.socio_operaciones_secretaria import dar_alta_socio, dar_baja_socio
 from club_management.members.services.suscripciones_socio import (
 	enroll_socio_cuota_social,
 	suscripciones_habilitadas,
@@ -126,6 +126,32 @@ class TestSuscripcionesSocioIntegracion(MembersTestCase):
 			frappe.set_user("Administrator")
 
 		self.assertEqual(self._subscription_status(sub_name), "Cancelled")
+
+	def test_dar_alta_socio_restaura_suscripcion_cuota(self) -> None:
+		socio = insert_socio(
+			dni="30991610",
+			email="alta.soc@example.com",
+			categoria="Activo",
+			estado="Activo",
+		)
+		enroll_socio_cuota_social(socio.name)
+		customer = self._customer_for_socio(socio.name)
+		assert customer
+		plan_name = frappe.db.get_value(
+			"Subscription Plan", {"item": CUOTA_SOCIAL_ITEM_CODE}, "name"
+		)
+		assert plan_name
+
+		secretaria = make_secretaria_user("sec.alta.soc@example.com")
+		frappe.set_user(secretaria)
+		try:
+			dar_baja_socio(socio.name, motivo="Renuncia")
+			dar_alta_socio(socio.name, motivo="Quiere volver")
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(frappe.db.get_value("Socio", socio.name, "estado"), "Activo")
+		self.assertTrue(self._subscription_for_customer_plan(customer, plan_name))
 
 	def test_erpnext_subscriptions_flag(self) -> None:
 		self.assertTrue(erpnext_subscriptions_disponible())

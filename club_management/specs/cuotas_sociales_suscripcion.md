@@ -23,6 +23,11 @@ Then se crea `Customer` y `Subscription` activa al plan de cuota social del íte
 When el socio pasa a estado `Baja`
 Then se cancelan sus suscripciones de cuota social activas
 
+## Scenario: Alta posterior a baja
+
+When Secretaría da de alta a un socio en `Baja` (`socio_alta_post_baja.md`)
+Then se re-sincroniza la suscripción de cuota social del `Customer`
+
 ## Scenario: Retiro seed aranceles Mayo 2026
 
 When se ejecuta `retire_aranceles_mayo_2026`

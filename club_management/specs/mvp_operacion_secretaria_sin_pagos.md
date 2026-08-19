@@ -47,8 +47,19 @@ When Secretaría ejecuta **Reactivar**
 Then `estado` = `Activo`.
 
 Given un `Socio` `Activo`, `Moroso` o `Suspendido`
+And tiene una o más `Inscripcion Actividad` en estado `Activa`
 When Secretaría ejecuta **Dar de baja** con motivo
-Then `estado` = `Baja`.
+Then `estado` = `Baja`
+And todas esas inscripciones pasan a `Baja`
+And `Socio.actividad` (resumen) queda vacío
+And las inscripciones de **otros** socios no se modifican.
+
+Given un `Socio` `Baja`
+When Secretaría ejecuta **Dar de alta**
+Then `estado` = `Activo`
+And se conserva el mismo `numero_socio`
+And `fecha_alta` se conserva solo si el alta es dentro de los 6 meses posteriores a la baja; si no, se reinicia.
+Ver spec detallada: `socio_alta_post_baja.md`.
 
 ---
 

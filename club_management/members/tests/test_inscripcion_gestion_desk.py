@@ -13,7 +13,7 @@ from club_management.activities.services.inscripcion_socio import (
 	inscribir_socio_selecciones,
 	list_inscripciones_socio_desk,
 )
-from club_management.members.services.socio_operaciones_secretaria import activar_socio_manual
+from club_management.members.services.socio_operaciones_secretaria import activar_socio_manual, dar_baja_socio
 from club_management.members.services.socio_transitions import cambiar_estado
 from club_management.members.test_helpers import MembersTestCase, insert_socio
 
@@ -33,14 +33,14 @@ class TestInscripcionGestionDesk(MembersTestCase):
 				}
 			).insert(ignore_permissions=True)
 
-	def _ensure_zumba(self) -> str:
-		if frappe.db.exists("Actividad", "Zumba"):
-			return "Zumba"
+	def _ensure_actividad(self, titulo: str) -> str:
+		if frappe.db.exists("Actividad", titulo):
+			return titulo
 		doc = frappe.get_doc(
 			{
 				"doctype": "Actividad",
-				"name": "Zumba",
-				"titulo": "Zumba",
+				"name": titulo,
+				"titulo": titulo,
 				"habilitada": 1,
 				"usa_grupos": 0,
 			}
@@ -48,14 +48,19 @@ class TestInscripcionGestionDesk(MembersTestCase):
 		doc.insert(ignore_permissions=True)
 		return doc.name
 
-	def _inscribir_zumba(self, socio_name: str) -> str:
-		zumba = self._ensure_zumba()
-		inscribir_socio_selecciones(socio_name, [{"actividad": zumba}], activar=False)
+	def _ensure_zumba(self) -> str:
+		return self._ensure_actividad("Zumba")
+
+	def _inscribir(self, socio_name: str, actividad: str) -> str:
+		inscribir_socio_selecciones(socio_name, [{"actividad": actividad}], activar=False)
 		return frappe.db.get_value(
 			"Inscripcion Actividad",
-			{"socio": socio_name, "actividad": zumba, "estado": "Activa"},
+			{"socio": socio_name, "actividad": actividad, "estado": "Activa"},
 			"name",
 		)
+
+	def _inscribir_zumba(self, socio_name: str) -> str:
+		return self._inscribir(socio_name, self._ensure_zumba())
 
 	def test_list_inscripciones_activas_por_defecto(self) -> None:
 		socio = insert_socio()
@@ -183,6 +188,30 @@ class TestInscripcionGestionDesk(MembersTestCase):
 		self.assertEqual(socio.estado, "Activo")
 		self.assertEqual(socio.actividad or "", "")
 		self.assertEqual(result["actividad_resumen"], "")
+
+	def test_dar_baja_socio_pasa_inscripciones_activas_a_baja(self) -> None:
+		socio = insert_socio(dni="72001007", email="baja.cascada@example.com")
+		otro = insert_socio(dni="72001008", email="otro.cascada@example.com")
+		cambiar_estado(socio.name, "Activo", motivo="Test")
+		cambiar_estado(otro.name, "Activo", motivo="Test")
+		zumba = self._ensure_zumba()
+		natacion = self._ensure_actividad("Natacion Baja Cascada")
+		ins_a = self._inscribir(socio.name, zumba)
+		ins_b = self._inscribir(socio.name, natacion)
+		ins_otro = self._inscribir(otro.name, zumba)
+
+		frappe.set_user(self._secretaria)
+		try:
+			dar_baja_socio(socio.name, motivo="Renuncia")
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(frappe.db.get_value("Socio", socio.name, "estado"), "Baja")
+		self.assertEqual(frappe.db.get_value("Inscripcion Actividad", ins_a, "estado"), "Baja")
+		self.assertEqual(frappe.db.get_value("Inscripcion Actividad", ins_b, "estado"), "Baja")
+		self.assertEqual(frappe.db.get_value("Inscripcion Actividad", ins_otro, "estado"), "Activa")
+		socio.reload()
+		self.assertEqual(socio.actividad or "", "")
 
 	def test_no_duplicar_inscripcion_activa_equivalente(self) -> None:
 		socio = insert_socio(dni="72001003", email="dup.insc@example.com")

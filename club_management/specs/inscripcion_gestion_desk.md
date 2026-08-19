@@ -26,6 +26,16 @@ And el socio **no** cambia de estado global (permanece `Activo` salvo otra regla
 
 ---
 
+## Scenario: baja del socio cierra todas las inscripciones activas
+
+Given un `Socio` con dos `Inscripcion Actividad` en estado `Activa`
+When Secretaría ejecuta **Dar de baja** sobre el socio
+Then ambas inscripciones pasan a `Baja`
+And `Socio.actividad` queda vacío
+And el socio queda en `estado = Baja`.
+
+---
+
 ## Scenario: no duplicar inscripción activa equivalente
 
 Given ya existe inscripción activa socio + actividad + grupo (+ equipo)

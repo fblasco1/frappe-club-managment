@@ -211,13 +211,18 @@ And el único camino válido para mutar `estado` es la API server-side
 
 ---
 
-## Scenario: `fecha_alta` se setea solo la primera vez que `estado` llega a `Activo`
+## Scenario: `fecha_alta` se setea la primera vez que `estado` llega a `Activo`
 
 Given un `Socio` con `fecha_alta` vacío y `estado` en cualquier valor ≠ `Activo`
 When el flujo server-side transiciona `estado` a `Activo`
 Then `fecha_alta` se setea a la fecha del servidor (hoy) en esa misma transición
-And subsiguientes transiciones desde otros estados a `Activo` **no sobreescriben** `fecha_alta`
-And consultar `fecha_alta` luego siempre devuelve la fecha del primer alta.
+And transiciones posteriores a `Activo` desde estados **distintos de `Baja`** (p. ej. `Moroso`) **no sobreescriben** `fecha_alta`.
+
+Given un `Socio` que vuelve de `Baja` a `Activo`
+When el alta ocurre **dentro de los 6 meses** posteriores a la baja
+Then se conserva `fecha_alta` (misma antigüedad)
+When el alta ocurre **después de más de 6 meses**
+Then `fecha_alta` se reinicia a hoy (ver `socio_alta_post_baja.md`).
 
 ---
 

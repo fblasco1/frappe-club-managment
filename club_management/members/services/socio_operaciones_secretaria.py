@@ -40,6 +40,7 @@ _TRANSICIONES: dict[str, tuple[frozenset[str], str]] = {
 		),
 		"Baja",
 	),
+	"dar_alta": (frozenset({"Baja"}), "Activo"),
 }
 
 
@@ -101,3 +102,12 @@ def dar_baja_socio(socio_name: str, *, motivo: str | None = None) -> str:
 	if not (motivo or "").strip():
 		frappe.throw(_("Indique el motivo de baja."), frappe.ValidationError)
 	return _aplicar_transicion(socio_name, "dar_baja", motivo=motivo)
+
+
+def dar_alta_socio(socio_name: str, *, motivo: str | None = None) -> str:
+	"""`Baja` → `Activo`: el mismo socio vuelve a la membresía."""
+	return _aplicar_transicion(
+		socio_name,
+		"dar_alta",
+		motivo=motivo or "Alta posterior a baja",
+	)

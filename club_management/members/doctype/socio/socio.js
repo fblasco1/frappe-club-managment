@@ -260,6 +260,13 @@ club_management_socio_desk.add_operaciones_buttons = function (frm) {
 			group
 		);
 	}
+	if (estado === "Baja") {
+		frm.add_custom_button(
+			__("Dar de alta"),
+			() => club_management_socio_desk.prompt_motivo(frm, "dar_alta"),
+			group
+		);
+	}
 	if (["Activo", "Moroso", "Suspendido", "Pendiente de Pago", "Pendiente de Inscripción"].includes(estado)) {
 		frm.add_custom_button(
 			__("Dar de baja"),

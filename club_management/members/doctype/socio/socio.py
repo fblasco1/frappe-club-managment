@@ -6,8 +6,8 @@ Implementa las invariantes mínimas del Sprint 0 documentadas en
 - `estado` no es editable directamente desde el formulario; cualquier cambio
   debe pasar por `members.services.socio_transitions.cambiar_estado`, que
   configura el flag `flags.estado_change_authorized` antes de guardar.
-- `fecha_alta` se setea la primera vez que `estado` pasa a `"Activo"` y no
-  vuelve a modificarse.
+- `fecha_alta` se setea la primera vez que `estado` pasa a `"Activo"`.
+  Tras una baja, se conserva si el alta es dentro de 6 meses; si no, se reinicia.
 - Cuando `categoria = "Menor"`, exige `tipo_tutor` y `tutor` (adulto responsable).
   Si además tiene `grupo_familiar`, valida que el tutor sea titular activo del grupo.
 """
