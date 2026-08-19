@@ -12,12 +12,13 @@
 
 
 
-**Última revisión MVP producción:** 2026-07-19 — commit en Hetzner: **`35eb00c`** (informes Desk).  
-**Última actualización backlog:** 2026-07-19 (sesión GF local + flujo egresos borrador/aprobación; gap prod documentado)  
+**Última revisión MVP producción:** 2026-08-19 — commit en Hetzner: **`43b226f`** (validación Adherente/Jubilado en alta pública).  
+**Última actualización backlog:** 2026-08-19 (go-live portal de alta + Tesorería P&L/cash flow).  
 
 **Destino producción:** Hetzner Cloud **CX23** — https://gestion.icdpedroechague.com.ar  
+**Landing (wizard):** https://www.icdpedroechague.com.ar/asociate/inscripcion  
 
-**Gap local → prod (crítico):** en local hay **4 commits** de Gestión Financiera (`60795d0`…`d12f313`) **sin push/deploy**, más un **working tree sin commit** (panel Tesorería, flujo egresos PI, centros de costo). Ver sección «Gap producción» abajo.
+**Gap local → prod:** el go-live de agosto está desplegado. Queda WIP local en `stash@{0}` (`wip leftover KPIs/post-baja`) — **no** incluye post-baja (eso ya está en prod). Ver «Pendiente post go-live 2026-08-19».
 
 
 
@@ -171,7 +172,7 @@ Servicios críticos cobranza: **scheduler**, **queue-long**, **queue-short**, **
 
 
 
-**Fuera de alcance en este go-live (Fase 3+):**
+**Fuera de alcance todavía (no desplegado):**
 
 
 
@@ -179,15 +180,13 @@ Servicios críticos cobranza: **scheduler**, **queue-long**, **queue-short**, **
 
 |------|------|--------|
 
-| Solicitud pública de asociación | `solicitud_asociacion_publica.md` | Operación interna MVP (`secretaria_operacion_interna_mvp.md`) |
+| Inscripción a actividades desde el portal (socio logueado) | `portal_socio_inscripcion.md` | BL-6: el wizard de **alta** ya está en prod; falta el portal post-pago |
 
-| Grupo familiar | `grupo_familiar_minimo.md` | Segunda implementación |
-
-| Pagos online Supervielle | `supervielle_cobros_plus_*.md` | Sin gateway en producción inicial |
-
-| Portal socio / inscripciones web | `activities_modulo.md`, `login_dual.md` | Posterior |
+| Pagos online Supervielle / Cobrand | `supervielle_cobros_plus_*.md` | Alta pública es sin cobro online (`alta_sin_pago_online.md`) |
 
 | Job categoría Vitalicio | `socios_categoria_validacion.md` | Futuro |
+
+| Filtro tendencia KPI + informe pagos del día (WIP stash) | `secretaria_workspace_panel_kpis.md`, `informe_pagos_del_dia.md` | Extraído del stash 2026-08-19; no bloquea operación |
 
 
 
@@ -247,7 +246,12 @@ Servicios críticos cobranza: **scheduler**, **queue-long**, **queue-short**, **
 
 | `registrar_cobro_fecha.md` | [x] | Fecha de cobro en diálogo Secretaría + validación (2026-07-08 `8aed9ef`, tests `b53ed5b`) |
 
-| `portal_socio_inscripcion.md` | [ ] | BL-6 — inscripción post-pago en Vercel + API; reglas deporte vs variante |
+| `portal_alta_grupo_familiar.md` | [x] | **Prod 2026-08-19** — wizard Vercel + API Guest; Adherente/Jubilado server-side (`43b226f`) |
+| `alta_sin_pago_online.md` | [x] | Tras validar, Secretaría cierra con Activar / Omitir pago (sin gateway) |
+| `almacenamiento_documentacion_socios.md` | [x] | Docs vigentes: un File privado por campo; pisa al renovar; clona al Socio (`e94ea02`) |
+| `informes_tesoreria_pnl_cashflow.md` | [x] | P&L + Flujo de efectivo desde panel Tesorería (`b4ed98b`) |
+| `socio_alta_post_baja.md` | [x] | Alta post-baja + cascada de inscripciones (`4dfe560`) |
+| `portal_socio_inscripcion.md` | [ ] | BL-6 — inscripción **post-pago** (socio logueado); distinto del wizard de alta |
 
 | `liquidacion_equipo_deuda_rango.md` | [x] | Reporte deuda por equipo + liquidación manual en rango |
 
@@ -357,9 +361,9 @@ Servicios críticos cobranza: **scheduler**, **queue-long**, **queue-short**, **
 
 | `login_dual.md` | Acceso portal + Desk |
 
-| `grupo_familiar_minimo.md` | Segunda ola funcional |
+| `grupo_familiar_minimo.md` | Alta familiar pública **hecha** (`portal_alta_grupo_familiar.md`); quedan reglas Desk (hermanos, cotitularidad avanzada) |
 
-| Reactivar flujo `Solicitud Asociacion` en workspace | Cuando se retome alta pública |
+| BL-6 `portal_socio_inscripcion.md` | Inscripción a actividades **después** de ser socio |
 
 
 
@@ -749,7 +753,7 @@ print(result)  # facturas_creadas, errores, invoice_names
 
 | BL-9 | **Número de socio manual en alta** | Media | `socio_alta_edicion_secretaria.md` | **Hecho 2026-07-10** — `numero_socio` opcional en JSON/alta guiada/API; validación duplicado (`b53ed5b`). |
 
-| BL-6 | **Portal socio inscripción (Vercel + API)** | Media | `portal_socio_inscripcion.md` | **Pendiente** — frontend en sitio del club (Vercel); Frappe API. Deportes: socio solo actividad; Secretaría asigna tira/equipo al validar alta. Variantes (Funcional, escuelita): socio elige actividad + grupo. |
+| BL-6 | **Portal socio inscripción (Vercel + API)** | Media | `portal_socio_inscripcion.md` | **Pendiente** (post-pago / socio logueado). El **wizard de alta** ya está en prod (`portal_alta_grupo_familiar.md`, 2026-08-19). |
 
 
 
@@ -996,6 +1000,61 @@ Error en producción al **Registrar cobro** desde formulario Socio: `NameError: 
 2. Push a `origin/mvp/secretaria-2026-06` (incluye los 4 commits GF ya locales).
 3. Deploy: `./scripts/prod/deploy-club-management.sh` + smoke Desk (Secretaría + Tesorería).
 4. Post-migrate: confirmar Holiday List AR, permisos PI, CC Cuotas Sociales.
+
+> **Nota 2026-08-19:** GF ya está en producción (panel Tesorería, P&L, cash flow, liquidez 5 días, factores mora 10/20). El «próximo paso» de julio quedó cerrado. Ver sesión 2026-08-19.
+
+---
+
+## Pendiente post go-live 2026-08-19
+
+| # | Tema | Prioridad | Spec / notas |
+|---|------|-----------|--------------|
+| BL-10 | **Wizard de alta pública (landing + Frappe)** | — | **Hecho + prod** — `portal_alta_grupo_familiar.md`, landing `d2cd386`, Frappe `43b226f` |
+| BL-11 | **Adjuntos vigentes / File privado** | — | **Hecho + prod** — `almacenamiento_documentacion_socios.md`, `e94ea02` |
+| BL-12 | **Tesorería P&L + cash flow** | — | **Hecho + prod** — `informes_tesoreria_pnl_cashflow.md`, `b4ed98b` |
+| BL-13 | **Alta post-baja** | — | **Hecho + prod** — `socio_alta_post_baja.md`, `4dfe560` |
+| BL-14 | Filtro tendencia KPI (todos / cuota / arancel / mora) | Media | WIP `stash@{0}` — no bloquea |
+| BL-15 | Informe pagos del día (concepto `Cuota Social · categoría`) | Baja | WIP `stash@{0}` |
+| BL-16 | Liquidación por inscripción (cuota/arancel/federativa) | Baja | WIP `stash@{0}` — validar con caso real |
+| BL-6 | Portal socio inscripción post-pago | Media | Distinto del wizard de alta |
+| — | Smoke humano: 1 Adherente + 1 Jubilado de prueba en prod | Alta | Verificar solicitud en Desk y adjuntos privados |
+| — | UAT Cloudflare / túnel | — | **Cerrado** — túnel apagado; Preview ya no apunta a Frappe local |
+
+---
+
+## Resumen sesión 2026-08-19 — go-live portal + Tesorería
+
+### Qué salió a producción (Hetzner `mvp/secretaria-2026-06`, HEAD `43b226f`)
+
+| Bloque | Commit | Qué |
+|--------|--------|-----|
+| Portal alta familiar | `9385c1b` | `Solicitud Grupo Familiar` + API Guest + wizard |
+| Mora proyección 10/20 | `131aec9` | Factores en flujo de fondos |
+| Liquidez 5 días | `fba539e` | KPI Tesorería |
+| Spec storage | `610cbbf` | Plan docs multi-club |
+| P&L + cash flow | `b4ed98b` | Reportes Desk + panel Tesorería (roles Tesorería) |
+| Adjuntos vigentes | `e94ea02` | Pisa File anterior; clona privados al Socio |
+| Validación Adherente/Jubilado | `43b226f` | Edad, whitelist deportes, comprobante haberes |
+
+**Landing** (`pedro-echague-landing-page` `main` `d2cd386`): wizard en https://www.icdpedroechague.com.ar/asociate/inscripcion  
+Vercel Production: `FRAPPE_BASE_URL` / `FRAPPE_SITE_HOST` = `gestion.icdpedroechague.com.ar`. Túnel UAT apagado.
+
+### Verificación automática
+
+- Tests: `test_alta_grupo_familiar` 18/18, `test_documentacion_socio` 7/7, `test_informes_tesoreria` 7/7, `test_datos_criticos_socio` 6/6.
+- Smoke: `/api/inscripcion/catalogo` 200 — categorías Activo/Menor/Adherente/Jubilado; `actividades_adherente` Fitness/Funcional/Yoga/Crossfit; adjunto `comprobante_jubilado`.
+- Desk: `get_panel_lists` OK (~1091 socios). Rol Tesorería: Carolina Antoliche, Luis Oriolo. Guest upload files: on.
+
+### Qué **no** se desplegó (stash leftover)
+
+Post-baja / botón «Dar de alta» ya estaba en prod (`4dfe560`). El stash restante es KPIs de tendencia, pagos del día y liquidación por equipo.
+
+### Mañana (prioridad)
+
+1. Secretaría: 1 alta de prueba Adherente + 1 Jubilado en el sitio público → revisar en Desk (Pendiente, adjuntos privados).
+2. Tesorería: hard refresh → Ganancias y Pérdidas / Flujo de efectivo / liquidez.
+3. Decidir si extraer BL-14/15/16 del stash a un PR chico.
+
 
 
 
