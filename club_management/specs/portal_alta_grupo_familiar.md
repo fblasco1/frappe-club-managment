@@ -10,11 +10,36 @@ con actividades elegidas dentro del alta y opción explícita «Socio sin activi
 
 ---
 
-## Objetivo
+## Campaña pública `/asociate` (landing)
 
-Que una familia complete **un solo trámite público** y quede cargada como
-titular + familiares, cada uno con **sus propias actividades**, sin que
-Secretaría tenga que unir grupos a mano.
+La página de asociarse **no** es el formulario: es una campaña (tono
+[sumate.estudiantesdelaplata.com](https://sumate.estudiantesdelaplata.com/))
+que explica **por qué** y **cómo** sumarse. El wizard vive en
+`/asociate/inscripcion`.
+
+**Diferencia con Estudiantes:** no hay pago online. El envío de la solicitud
+deja al interesado **pre-asociado**; Secretaría contacta, cobra offline y
+da el **alta definitiva** (`alta_sin_pago_online.md`).
+
+### Scenario: el visitante entiende el proceso sin abrir el formulario
+
+Given un visitante abre `https://www.icdpedroechague.com.ar/asociate`
+When recorre la campaña
+Then ve, en orden, al menos:
+1. Completar la solicitud online (datos + documentación)
+2. Quedar **pre-asociado** (código de seguimiento; aún no es socio activo)
+3. Secretaría revisa y contacta por WhatsApp o en el club
+4. Pago de cuota **fuera de la web** (presencial o transferencia)
+5. Alta definitiva e ingreso a actividades
+And un CTA principal lleva a `/asociate/inscripcion`
+And queda explícito que **no se cobra en el sitio**.
+
+### Scenario: packs individual y familiar
+
+Given el visitante elige cómo sumarse
+When pulsa pack **Individual** o **Familiar**
+Then ambos llevan al mismo wizard (`/asociate/inscripcion`)
+And el pack familiar aclara que puede cargar cónyuge e hijos en el paso «Tu familia».
 
 Hoy el alta pública es **una persona por solicitud** y el vínculo familiar es
 declarativo (`tiene_familiares_socios`, `familiares_existentes_dnis`): Secretaría
@@ -310,6 +335,8 @@ Respuesta: `{"status": "ok", "token_seguimiento": "<hex>", "personas": 2}`.
 | Artefacto | Ubicación |
 |-----------|-----------|
 | Spec | `specs/portal_alta_grupo_familiar.md` |
+| Campaña landing | `pedro-echague-landing-page` `/asociate` (no es el wizard) |
+| Wizard | `/asociate/inscripcion` |
 | DocType padre | `members/doctype/solicitud_grupo_familiar/` |
 | Child table | `members/doctype/actividad_solicitada/` |
 | Servicio | `members/services/alta_grupo_familiar.py` |
