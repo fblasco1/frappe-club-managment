@@ -50,8 +50,13 @@
 			this.page.main.html(`
 				<div class="club-valores-cuota-card">
 					<p class="text-muted club-valores-cuota-intro">
-						${__("Montos mensuales de cuota social por categoría de socio. Los cambios se sincronizan con ERPNext.")}
+						${__("Montos mensuales de cuota social por categoría de socio. Los cambios se sincronizan con ERPNext y con la web pública /socios/cuota.")}
 					</p>
+					<div class="form-group" style="max-width: 16rem;">
+						<label>${__("Vigentes desde")}</label>
+						<input type="date" class="form-control form-control-sm club-cuota-vigente-desde"
+							value="${frappe.utils.escape_html(this._state.vigente_desde || "")}">
+					</div>
 					<div class="table-responsive">
 						<table class="table table-sm club-cuotas-table mb-3">
 							<thead>
@@ -83,9 +88,11 @@
 				});
 			});
 
+			const vigenteDesde = this.page.main.find(".club-cuota-vigente-desde").val() || "";
+
 			frappe.call({
 				method: "club_management.members.api.secretaria_workspace.save_cuotas_sociales",
-				args: { rows },
+				args: { rows, vigente_desde: vigenteDesde },
 				freeze: true,
 				callback: (r) => {
 					if (r.message) {

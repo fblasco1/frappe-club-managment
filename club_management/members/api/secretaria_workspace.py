@@ -87,8 +87,10 @@ def get_cuotas_sociales() -> dict[str, Any]:
 
 
 @frappe.whitelist()
-
-def save_cuotas_sociales(rows: str | list[dict[str, Any]]) -> dict[str, Any]:
+def save_cuotas_sociales(
+	rows: str | list[dict[str, Any]],
+	vigente_desde: str | None = None,
+) -> dict[str, Any]:
 
 	_ensure_secretaria_panel_access()
 
@@ -102,5 +104,5 @@ def save_cuotas_sociales(rows: str | list[dict[str, Any]]) -> dict[str, Any]:
 
 		frappe.throw(frappe._("Formato inválido."))
 
-	return save_cuotas_sociales_payload(payload)
+	return save_cuotas_sociales_payload(payload, vigente_desde=vigente_desde)
 

@@ -43,7 +43,33 @@ Then recibe error de permisos.
 
 ---
 
+## Scenario: landing pública refleja los montos de gestión
+
+Given `Club Settings.cuotas_categoria` con montos por categoría
+And `Club Settings.cuotas_vigente_desde` con una fecha
+When un visitante (Guest) llama `get_valores_cuota` (`allow_guest=True`)
+Then recibe `vigente_desde` y una lista `categorias` con `categoria`, `valor` y `condicion`
+And **no** recibe ítems ERPNext, nombres internos ni otros datos de `Club Settings`
+And el `valor` de cada categoría coincide con el monto guardado en Desk.
+
+When Secretaría guarda un monto distinto en **Valores de Cuota Social**
+And el visitante vuelve a llamar `get_valores_cuota`
+Then el `valor` público de esa categoría es el nuevo monto.
+
+---
+
+## Scenario: Guest no muta cuotas
+
+Given un usuario Guest
+When intenta `save_cuotas_sociales`
+Then recibe error de permisos
+And los montos en `Club Settings` no cambian.
+
+---
+
 ## Notas
 
 - Categorías: `Activo`, `Menor`, `2° Hermano`, `3° Hermano`, `Adherente`, `Jubilado`.
 - La página comparte la navegación superior del club (pestañas Gestión de Socios / Actividades).
+- La web pública `/socios/cuota` (landing) consume `get_valores_cuota`. El texto de **condición** es copy fijo por categoría (no se edita en Desk en esta iteración).
+- El endpoint público no expone PII. No listar categorías con monto ≤ 0.

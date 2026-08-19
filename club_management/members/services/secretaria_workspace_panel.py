@@ -82,10 +82,14 @@ def get_cuotas_sociales_payload() -> dict[str, Any]:
 	return {
 		"item_cuota_social_default": settings.item_cuota_social or "",
 		"cuotas": rows,
+		"vigente_desde": str(getattr(settings, "cuotas_vigente_desde", None) or ""),
 	}
 
 
-def save_cuotas_sociales_payload(rows: list[dict[str, Any]]) -> dict[str, Any]:
+def save_cuotas_sociales_payload(
+	rows: list[dict[str, Any]],
+	vigente_desde: str | None = None,
+) -> dict[str, Any]:
 	"""Persiste montos de cuotas sociales en Club Settings."""
 	settings = frappe.get_single("Club Settings")
 	allowed = set(CUOTAS_CATEGORIAS)
@@ -112,6 +116,9 @@ def save_cuotas_sociales_payload(rows: list[dict[str, Any]]) -> dict[str, Any]:
 				"cuotas_categoria",
 				{"categoria": categoria, "monto": monto, "item": item},
 			)
+
+	if vigente_desde is not None:
+		settings.cuotas_vigente_desde = vigente_desde or None
 
 	settings.save()
 

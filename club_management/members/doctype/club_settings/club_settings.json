@@ -8,6 +8,7 @@
   "item_cuota_social",
   "cuotas_categoria_section",
   "cuotas_categoria",
+  "cuotas_vigente_desde",
   "cobranza_periodica_section",
   "dia_generacion_deuda",
   "dia_primer_vencimiento",
@@ -59,6 +60,12 @@
    "fieldtype": "Table",
    "label": "Cuotas",
    "options": "Cuota Categoria Club"
+  },
+  {
+   "fieldname": "cuotas_vigente_desde",
+   "fieldtype": "Date",
+   "label": "Cuotas vigentes desde",
+   "description": "Fecha que se muestra en la web pública /socios/cuota."
   },
   {
    "fieldname": "cobranza_periodica_section",
