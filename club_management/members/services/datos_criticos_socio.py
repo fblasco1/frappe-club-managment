@@ -72,6 +72,9 @@ def get_datos_criticos_faltantes_socio(socio: dict[str, Any] | frappe.Document) 
 	_append(CONTACT_FIELDS)
 	_append(DOMICILIO_FIELDS)
 	_append(ATTACH_FIELDS)
+	if data.get("categoria") == "Jubilado":
+		if _valor_vacio(data.get("comprobante_jubilado")):
+			faltantes.append({"fieldname": "comprobante_jubilado", "label": _("Comprobante jubilado")})
 	if data.get("categoria") == "Menor":
 		_append(MENOR_FIELDS)
 	return faltantes

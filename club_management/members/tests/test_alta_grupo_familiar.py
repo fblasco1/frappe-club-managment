@@ -64,6 +64,10 @@ class TestAltaGrupoFamiliar(MembersTestCase):
 		self.act_voley = self._ensure_actividad(f"QA Voley {self.sufijo}")
 
 	def _ensure_actividad(self, titulo: str, *, habilitada: int = 1) -> str:
+		existente = frappe.db.get_value("Actividad", {"titulo": titulo}, "name")
+		if existente:
+			frappe.db.set_value("Actividad", existente, "habilitada", habilitada)
+			return existente
 		doc = frappe.get_doc(
 			{
 				"doctype": "Actividad",
@@ -377,3 +381,108 @@ class TestAltaGrupoFamiliar(MembersTestCase):
 	def test_consultar_tramite_con_token_invalido(self) -> None:
 		with self.assertRaises(frappe.DoesNotExistError):
 			_consultar_alta_grupo_impl("token-que-no-existe")
+
+	# ------------------------------------------------------------------
+	# Categoría Adherente / Jubilado
+	# ------------------------------------------------------------------
+
+	def test_adherente_solo_permite_actividades_whitelist(self) -> None:
+		yoga = self._ensure_actividad("Yoga")
+		gym = self._ensure_actividad("Gimnasio Fitness")
+		result = _submit_alta_grupo_impl(
+			{
+				"titular": self._persona(
+					categoria_solicitada="Adherente",
+					actividades=[
+						{"actividad": self.act_basquet},
+						{"actividad": yoga},
+						{"actividad": gym},
+					],
+					sin_actividad=0,
+				),
+				"familiares": [],
+			}
+		)
+		tramite = frappe.db.get_value(
+			TRAMITE_DOCTYPE, {"token_seguimiento": result["token_seguimiento"]}, "name"
+		)
+		doc = frappe.get_doc(SOLICITUD_DOCTYPE, self._solicitudes_del_tramite(tramite)[0]["name"])
+		self.assertEqual(doc.categoria_solicitada, "Adherente")
+		self.assertEqual(int(doc.sin_actividad), 0)
+		acts = sorted(r.actividad for r in doc.actividades_solicitadas)
+		self.assertEqual(acts, sorted([yoga, gym]))
+
+	def test_adherente_sin_deportes_permitidos_queda_sin_actividad(self) -> None:
+		result = _submit_alta_grupo_impl(
+			{
+				"titular": self._persona(
+					categoria_solicitada="Adherente",
+					actividades=[{"actividad": self.act_basquet}],
+					sin_actividad=0,
+				),
+				"familiares": [],
+			}
+		)
+		tramite = frappe.db.get_value(
+			TRAMITE_DOCTYPE, {"token_seguimiento": result["token_seguimiento"]}, "name"
+		)
+		doc = frappe.get_doc(SOLICITUD_DOCTYPE, self._solicitudes_del_tramite(tramite)[0]["name"])
+		self.assertEqual(int(doc.sin_actividad), 1)
+		self.assertEqual(len(doc.actividades_solicitadas), 0)
+
+	def test_jubilado_exige_comprobante(self) -> None:
+		with self.assertRaises(frappe.ValidationError):
+			_submit_alta_grupo_impl(
+				{
+					"titular": self._persona(categoria_solicitada="Jubilado"),
+					"familiares": [],
+				}
+			)
+
+	def test_jubilado_con_comprobante_ok(self) -> None:
+		comprobante = make_test_file(f"qa_jub_{self.sufijo}.pdf", MINIMAL_VALID_PDF)
+		result = _submit_alta_grupo_impl(
+			{
+				"titular": self._persona(
+					categoria_solicitada="Jubilado",
+					comprobante_jubilado=comprobante,
+					sin_actividad=1,
+					actividades=[],
+				),
+				"familiares": [],
+			}
+		)
+		tramite = frappe.db.get_value(
+			TRAMITE_DOCTYPE, {"token_seguimiento": result["token_seguimiento"]}, "name"
+		)
+		doc = frappe.get_doc(SOLICITUD_DOCTYPE, self._solicitudes_del_tramite(tramite)[0]["name"])
+		self.assertEqual(doc.categoria_solicitada, "Jubilado")
+		self.assertTrue(doc.comprobante_jubilado)
+
+	def test_menor_no_puede_ser_jubilado(self) -> None:
+		with self.assertRaises(frappe.ValidationError):
+			_submit_alta_grupo_impl(
+				{
+					"titular": self._persona(
+						fecha_nacimiento=str(minor_birthdate(10)),
+						categoria_solicitada="Jubilado",
+						comprobante_jubilado=make_test_file(
+							f"qa_jub_bad_{self.sufijo}.pdf", MINIMAL_VALID_PDF
+						),
+					),
+					"familiares": [],
+				}
+			)
+
+	def test_catalogo_incluye_adherente_y_comprobante(self) -> None:
+		from club_management.members.api.alta_grupo_publica import get_catalogo_alta
+
+		cat = get_catalogo_alta()
+		self.assertIn("Adherente", cat["categorias"])
+		self.assertIn("Jubilado", cat["categorias"])
+		self.assertNotIn("Cadete", cat["categorias"])
+		self.assertIn("comprobante_jubilado", cat["adjuntos"])
+		self.assertIn("Yoga", cat["actividades_adherente"])
+		self.assertIn("Gimnasio Fitness", cat["actividades_adherente"])
+		self.assertIn("Funcional", cat["actividades_adherente"])
+		self.assertIn("Crossfit", cat["actividades_adherente"])

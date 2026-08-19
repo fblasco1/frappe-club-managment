@@ -17,6 +17,7 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 
 from club_management.members.services.alta_grupo_familiar import (
+	ACTIVIDADES_ADHERENTE,
 	ROLES_VALIDOS,
 	crear_alta_grupo,
 	get_tramite_by_token,
@@ -26,9 +27,15 @@ from club_management.members.services.actividades_portal import list_actividades
 from club_management.members.services.google_places import get_places_config_for_portal
 from club_management.members.validations import validate_ficha_medica_from_url
 
-CATEGORIAS_SOLICITABLES: tuple[str, ...] = ("Activo", "Menor", "Cadete", "Jubilado")
+CATEGORIAS_SOLICITABLES: tuple[str, ...] = ("Activo", "Menor", "Adherente", "Jubilado")
 
-_CAMPOS_ADJUNTOS = ("dni_frente", "dni_dorso", "foto_perfil", "ficha_medica")
+_CAMPOS_ADJUNTOS = (
+	"dni_frente",
+	"dni_dorso",
+	"foto_perfil",
+	"ficha_medica",
+	"comprobante_jubilado",
+)
 
 
 def _parse_payload(data: Any) -> dict[str, Any]:
@@ -127,6 +134,7 @@ def get_catalogo_alta() -> dict[str, Any]:
 		"categorias": list(CATEGORIAS_SOLICITABLES),
 		"roles_grupo": sorted(ROLES_VALIDOS),
 		"adjuntos": list(_CAMPOS_ADJUNTOS),
+		"actividades_adherente": sorted(ACTIVIDADES_ADHERENTE),
 		"places": get_places_config_for_portal(),
 	}
 

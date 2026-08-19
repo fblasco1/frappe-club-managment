@@ -39,6 +39,18 @@ class TestDatosCriticosSocio(MembersTestCase):
 		self.assertIn("Calle", labels)
 		self.assertIn("Ficha médica", labels)
 
+	def test_jubilado_incluye_comprobante_en_faltantes(self) -> None:
+		payload = make_socio_payload(
+			dni="77001007",
+			email="jub.crit@example.com",
+			categoria="Jubilado",
+		)
+		payload.pop("doctype", None)
+		payload["comprobante_jubilado"] = ""
+		faltantes = get_datos_criticos_faltantes_socio(payload)
+		fields = {row["fieldname"] for row in faltantes}
+		self.assertIn("comprobante_jubilado", fields)
+
 	def test_menor_incluye_tutor_en_faltantes(self) -> None:
 		payload = make_socio_payload(
 			dni="77001002",

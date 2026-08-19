@@ -14,6 +14,7 @@ from typing import Any
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import getdate
 
 from club_management.activities.services.actividades_catalog import ensure_actividad_exists
 from club_management.members.services.contacto_domicilio import (
@@ -31,9 +32,24 @@ ROLES_VALIDOS: frozenset[str] = frozenset(
 )
 ROL_FAMILIAR_POR_DEFECTO = "Otro"
 
+CATEGORIAS_ADULTO: frozenset[str] = frozenset({"Activo", "Adherente", "Jubilado"})
+CATEGORIAS_MENOR: frozenset[str] = frozenset({"Menor", "Adherente"})
+CATEGORIA_ADHERENTE = "Adherente"
+CATEGORIA_JUBILADO = "Jubilado"
+CATEGORIA_MENOR = "Menor"
+
+# Actividades permitidas para categoría Adherente (títulos / names del catálogo).
+ACTIVIDADES_ADHERENTE: frozenset[str] = frozenset(
+	{"Gimnasio Fitness", "Funcional", "Yoga", "Crossfit"}
+)
+
 MSG_TITULAR_SIN_VALIDAR = "Validá primero la solicitud del titular del grupo"
 MSG_FALTA_TITULAR = "El trámite requiere los datos del titular."
 MSG_PERSONA_INVALIDA = "Datos de persona inválidos en el trámite."
+MSG_CATEGORIA_EDAD = "La categoría solicitada no corresponde a la edad del solicitante."
+MSG_JUBILADO_SIN_COMPROBANTE = (
+	"Para categoría Jubilado adjuntá el comprobante de jubilación o recibo de haberes."
+)
 
 # El cliente Guest no puede setear estos campos: los gestiona el servidor.
 _CAMPOS_BLOQUEADOS: frozenset[str] = frozenset(
@@ -63,6 +79,83 @@ _CAMPOS_BLOQUEADOS: frozenset[str] = frozenset(
 		"rol_en_grupo",
 	}
 )
+
+
+def _edad_anos(fecha_nacimiento: Any) -> int | None:
+	if not fecha_nacimiento:
+		return None
+	try:
+		nac = getdate(fecha_nacimiento)
+	except Exception:
+		return None
+	hoy = getdate()
+	edad = hoy.year - nac.year
+	if (hoy.month, hoy.day) < (nac.month, nac.day):
+		edad -= 1
+	return edad
+
+
+def _es_menor_por_edad(persona: dict[str, Any]) -> bool:
+	edad = _edad_anos(persona.get("fecha_nacimiento"))
+	return edad is not None and edad < 18
+
+
+def _actividad_permitida_adherente(nombre: str) -> bool:
+	"""Match case-insensitive contra el set permitido (Crossfit / CrossFit)."""
+	clave = nombre.strip().casefold()
+	return any(clave == a.casefold() for a in ACTIVIDADES_ADHERENTE)
+
+
+def _filtrar_actividades_adherente(actividades: Any) -> list[Any]:
+	"""Conserva solo entradas cuya actividad resuelva a una permitida para Adherente."""
+	if not isinstance(actividades, list):
+		return []
+	out: list[Any] = []
+	for entrada in actividades:
+		if isinstance(entrada, str):
+			nombre = entrada
+			resto: dict[str, Any] = {}
+		elif isinstance(entrada, dict):
+			nombre = str(entrada.get("actividad") or "")
+			resto = dict(entrada)
+		else:
+			continue
+		resolved = _resolve_actividad(nombre)
+		if not resolved:
+			continue
+		titulo = frappe.db.get_value(ACTIVIDAD_DOCTYPE, resolved, "titulo") or resolved
+		if not (
+			_actividad_permitida_adherente(resolved) or _actividad_permitida_adherente(str(titulo))
+		):
+			continue
+		if resto:
+			fila = dict(resto)
+			fila["actividad"] = resolved
+			out.append(fila)
+		else:
+			out.append({"actividad": resolved})
+	return out
+
+
+def _validar_categoria_y_adjuntos(persona: dict[str, Any]) -> None:
+	"""Reglas de categoría del portal: edad, Adherente (deportes limitados), Jubilado."""
+	categoria = str(persona.get("categoria_solicitada") or "").strip()
+	edad = _edad_anos(persona.get("fecha_nacimiento"))
+	if edad is None:
+		frappe.throw(_("Fecha de nacimiento inválida."), frappe.ValidationError)
+
+	permitidas = CATEGORIAS_MENOR if edad < 18 else CATEGORIAS_ADULTO
+	if categoria not in permitidas:
+		frappe.throw(_(MSG_CATEGORIA_EDAD), frappe.ValidationError)
+
+	if categoria == CATEGORIA_JUBILADO and not str(persona.get("comprobante_jubilado") or "").strip():
+		frappe.throw(_(MSG_JUBILADO_SIN_COMPROBANTE), frappe.ValidationError)
+
+	if categoria == CATEGORIA_ADHERENTE:
+		filtradas = _filtrar_actividades_adherente(persona.get("actividades"))
+		persona["actividades"] = filtradas
+		if not filtradas and not persona.get("sin_actividad"):
+			persona["sin_actividad"] = 1
 
 
 def _clean_persona_payload(persona: Any) -> dict[str, Any]:
@@ -197,12 +290,22 @@ def _insert_solicitud(
 	enviado_desde_ip: str,
 	titular: dict[str, Any] | None = None,
 ) -> Document:
-	if not es_titular and titular and persona.get("categoria_solicitada") == "Menor":
+	if not es_titular and titular and (
+		persona.get("categoria_solicitada") == CATEGORIA_MENOR or _es_menor_por_edad(persona)
+	):
 		persona = _hidratar_responsable_desde_titular(persona, titular)
+
+	_validar_categoria_y_adjuntos(persona)
 
 	actividades = _build_actividades_rows(persona.get("actividades"))
 	sin_actividad = 1 if persona.get("sin_actividad") else 0
 	if sin_actividad:
+		actividades = []
+	elif (
+		str(persona.get("categoria_solicitada") or "") == CATEGORIA_ADHERENTE
+		and not actividades
+	):
+		sin_actividad = 1
 		actividades = []
 
 	payload = _clean_persona_payload(persona)

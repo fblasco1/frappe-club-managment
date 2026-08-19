@@ -100,6 +100,7 @@ solicitudes ya cargadas.
 | `rol_en_grupo` | Select: `Titular`/`Cónyuge`/`Hijo`/`Padre`/`Madre`/`Otro` | Rol con el que entra al grupo |
 | `actividades_solicitadas` | Table `Actividad Solicitada` | Elección del wizard |
 | `sin_actividad` | Check | «Socio sin actividad» de la UX de Pilar |
+| `comprobante_jubilado` | Attach | Obligatorio si `categoria_solicitada = Jubilado` (comprobante / recibo de haberes) |
 
 ---
 
@@ -131,6 +132,35 @@ Given una persona marca «Socio sin actividad»
 When se crea su solicitud
 Then `sin_actividad = 1` y `actividades_solicitadas` queda vacío
 And la solicitud es válida (no se exige elegir actividad).
+
+---
+
+## Scenario: categoría según edad y Adherente / Jubilado
+
+Given una persona con fecha de nacimiento (edad calculada en el portal y en servidor)
+When elige `categoria_solicitada` en el wizard
+Then las opciones permitidas son:
+- **≥ 18 años:** `Activo` (sugerida), `Adherente`, `Jubilado`
+- **< 18 años:** `Menor` (sugerida), `Adherente`
+And no se acepta `Jubilado` si es menor de 18 ni `Activo` si es menor de 18 ni `Menor` si es mayor de 18.
+And `get_catalogo_alta` expone `categorias` sin `Cadete`, `adjuntos` con `comprobante_jubilado` y `actividades_adherente`.
+
+### Adherente (con o sin mayoría de edad)
+
+Given `categoria_solicitada = Adherente`
+When se crea la solicitud
+Then solo puede solicitar actividades del conjunto permitido:
+`Gimnasio Fitness`, `Funcional`, `Yoga`, `Crossfit`
+And cualquier otra actividad del payload se descarta
+And si no queda ninguna actividad permitida, la solicitud se marca `sin_actividad`
+And un menor Adherente en el trámite familiar sigue hidratando tutor desde el titular.
+
+### Jubilado (≥ 18)
+
+Given `categoria_solicitada = Jubilado`
+When se envía el alta
+Then es obligatorio el adjunto `comprobante_jubilado` (comprobante de jubilación o recibo de haberes, URL `/files/...`)
+And sin ese adjunto el endpoint rechaza con `ValidationError`.
 
 ---
 
