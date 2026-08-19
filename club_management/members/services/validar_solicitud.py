@@ -165,6 +165,10 @@ def _validar_menor_con_tutor_tns_existente(solicitud: Document, tns_name: str) -
 	if not gf.tutor_es_mayor_de_edad(tutor_doc.fecha_nacimiento):
 		frappe.throw(MSG_TUTOR_MENOR_EDAD, frappe.ValidationError)
 
+	from club_management.members.services.documentacion_adjuntos import completar_docs_tutor_si_vacios
+
+	completar_docs_tutor_si_vacios(tutor_doc, solicitud)
+
 	grupo_name = gf.find_active_grupo_for_titular("Tutor No Socio", tns_name)
 	if not grupo_name:
 		frappe.throw(_("Tutor debe ser titular activo de un Grupo Familiar"))
@@ -335,6 +339,7 @@ def _insert_socio_desde_solicitud(
 		"dni_frente": solicitud.dni_frente,
 		"dni_dorso": solicitud.dni_dorso,
 		"ficha_medica": solicitud.ficha_medica,
+		"comprobante_jubilado": solicitud.get("comprobante_jubilado") or "",
 		"tipo_tutor": tipo_tutor,
 		"tutor": tutor,
 		"grupo_familiar": grupo_familiar,
@@ -355,6 +360,9 @@ def _insert_tutor_desde_solicitud(solicitud: Document) -> Document:
 			"fecha_nacimiento": solicitud.fecha_nacimiento_tutor,
 			"genero": solicitud.genero_tutor,
 			**map_tutor_contacto_domicilio_desde_solicitud(solicitud),
+			"foto_perfil": solicitud.get("foto_perfil_tutor") or "",
+			"dni_frente": solicitud.get("dni_frente_tutor") or "",
+			"dni_dorso": solicitud.get("dni_dorso_tutor") or "",
 		}
 	)
 	tutor.insert(ignore_permissions=True)

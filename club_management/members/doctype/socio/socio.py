@@ -88,8 +88,23 @@ class Socio(Document):
 
 	def before_save(self) -> None:
 		from club_management.members.services.datos_criticos_socio import aplicar_edicion_parcial_secretaria
+		from club_management.members.services.documentacion_adjuntos import (
+			CAMPOS_SOCIO,
+			asegurar_adjuntos_privados,
+			pisa_adjuntos_reemplazados,
+		)
 
+		pisa_adjuntos_reemplazados(self, CAMPOS_SOCIO)
+		asegurar_adjuntos_privados(self, CAMPOS_SOCIO)
 		aplicar_edicion_parcial_secretaria(self)
+
+	def after_insert(self) -> None:
+		from club_management.members.services.documentacion_adjuntos import (
+			CAMPOS_SOCIO,
+			vincular_adjuntos_del_doc,
+		)
+
+		vincular_adjuntos_del_doc(self, CAMPOS_SOCIO)
 
 	def _validate_numero_socio_disponible(self) -> None:
 		if not self.is_new() or not self.numero_socio:

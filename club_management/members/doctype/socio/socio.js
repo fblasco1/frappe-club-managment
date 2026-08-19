@@ -118,12 +118,13 @@ club_management_socio_desk._CAMPOS_ALTA_MANUAL = [
 	"dni_frente",
 	"dni_dorso",
 	"ficha_medica",
+	"comprobante_jubilado",
 	"tipo_tutor",
 	"tutor",
 ];
 
 club_management_socio_desk.relax_adjuntos_alta_manual = function (frm) {
-	const adjuntos = ["foto_perfil", "dni_frente", "dni_dorso", "ficha_medica"];
+	const adjuntos = ["foto_perfil", "dni_frente", "dni_dorso", "ficha_medica", "comprobante_jubilado"];
 	for (const fieldname of adjuntos) {
 		frm.set_df_property(fieldname, "reqd", 0);
 		frm.set_df_property(fieldname, "hidden", 1);
@@ -140,7 +141,7 @@ club_management_socio_desk.relax_tutor_alta_manual = function (frm) {
 };
 
 club_management_socio_desk.relax_adjuntos_edicion_secretaria = function (frm) {
-	const adjuntos = ["foto_perfil", "dni_frente", "dni_dorso", "ficha_medica"];
+	const adjuntos = ["foto_perfil", "dni_frente", "dni_dorso", "ficha_medica", "comprobante_jubilado"];
 	for (const fieldname of adjuntos) {
 		frm.set_df_property(fieldname, "reqd", 0);
 		frm.set_df_property(fieldname, "hidden", 0);

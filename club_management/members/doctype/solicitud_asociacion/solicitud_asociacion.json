@@ -60,6 +60,7 @@
   "foto_perfil",
   "column_break_docs",
   "ficha_medica",
+  "comprobante_jubilado",
   "familia_section",
   "solicitud_grupo",
   "rol_en_grupo",
@@ -144,6 +145,7 @@
   { "fieldname": "foto_perfil", "fieldtype": "Attach Image", "label": "Foto de perfil", "reqd": 1 },
   { "fieldname": "column_break_docs", "fieldtype": "Column Break" },
   { "fieldname": "ficha_medica", "fieldtype": "Attach", "label": "Ficha m\u00e9dica", "reqd": 1, "description": "PDF / JPEG / PNG, \u2264 5 MB. Validaci\u00f3n MIME + tama\u00f1o en server-side (Web Form y Desk)." },
+  { "fieldname": "comprobante_jubilado", "fieldtype": "Attach", "label": "Comprobante de jubilaci\u00f3n / recibo de haberes", "mandatory_depends_on": "eval:doc.categoria_solicitada==\"Jubilado\"", "depends_on": "eval:doc.categoria_solicitada==\"Jubilado\"", "description": "Obligatorio para categor\u00eda Jubilado en el alta p\u00fablica." },
 
   { "fieldname": "familia_section", "fieldtype": "Section Break", "label": "Familia y preferencias", "collapsible": 1, "description": "Datos declarativos: el sistema persiste pero no act\u00faa autom\u00e1ticamente sobre ellos en Sprint 1." },
   { "fieldname": "solicitud_grupo", "fieldtype": "Link", "label": "Tr\u00e1mite familiar", "options": "Solicitud Grupo Familiar", "read_only": 1, "in_standard_filter": 1, "description": "Vac\u00edo en altas individuales. Si est\u00e1 seteado, la solicitud lleg\u00f3 en un tr\u00e1mite multi-persona del portal." },
