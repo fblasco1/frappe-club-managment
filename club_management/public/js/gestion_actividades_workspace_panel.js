@@ -853,31 +853,33 @@
 				? `<div class="club-equipos-table">
 					<div class="club-equipos-table-head">
 						<span>${__("Equipo / categoría")}</span>
-						<span>${__("Arancel")}</span>
+						<span>${__("Arancel (propio)")}</span>
 						<span>${__("Acciones")}</span>
 					</div>
 					${equipos
-						.map(
-							(eq) => `
-					<div class="club-equipo-row">
-						<span class="club-equipo-title">${frappe.utils.escape_html(eq.titulo)}</span>
-						<span class="club-equipo-arancel text-muted small">${frappe.utils.escape_html(
-							this.format_arancel_efectivo(eq.arancel)
-						)}</span>
-						<div class="club-node-actions club-node-actions--compact">
-							<button type="button" class="btn btn-default btn-xs club-open-desk"
-								data-doctype="Equipo Actividad" data-name="${frappe.utils.escape_html(eq.name)}"
-								title="${__("Abrir ficha")}">↗</button>
-							<button type="button" class="btn btn-default btn-xs club-edit-equipo"
-								data-name="${frappe.utils.escape_html(eq.name)}"
-								data-titulo="${frappe.utils.escape_html(eq.titulo || "")}"
-								title="${__("Editar")}">✎</button>
-							<button type="button" class="btn btn-warning btn-xs club-disable-equipo"
-								data-name="${frappe.utils.escape_html(eq.name)}"
-								title="${__("Deshabilitar")}">×</button>
+						.map((eq) => {
+							const efectivo = this.format_arancel_efectivo(eq.arancel);
+							return `
+					<div class="club-equipo-row" data-equipo="${frappe.utils.escape_html(eq.name)}">
+						<div class="club-equipo-row-main">
+							<span class="club-equipo-title">${frappe.utils.escape_html(eq.titulo)}</span>
+							<span class="club-equipo-arancel text-muted small" title="${frappe.utils.escape_html(efectivo)}">${frappe.utils.escape_html(efectivo)}</span>
+							<div class="club-node-actions club-node-actions--compact">
+								<button type="button" class="btn btn-default btn-xs club-open-desk"
+									data-doctype="Equipo Actividad" data-name="${frappe.utils.escape_html(eq.name)}"
+									title="${__("Abrir ficha")}">↗</button>
+								<button type="button" class="btn btn-default btn-xs club-edit-equipo"
+									data-name="${frappe.utils.escape_html(eq.name)}"
+									data-titulo="${frappe.utils.escape_html(eq.titulo || "")}"
+									title="${__("Editar")}">✎</button>
+								<button type="button" class="btn btn-warning btn-xs club-disable-equipo"
+									data-name="${frappe.utils.escape_html(eq.name)}"
+									title="${__("Deshabilitar")}">×</button>
+							</div>
 						</div>
-					</div>`
-						)
+						${this.render_arancel_inputs("Equipo Actividad", eq.name, eq.item, eq.rate)}
+					</div>`;
+						})
 						.join("")}
 				</div>`
 				: `<p class="text-muted small mb-0">${__("Sin equipos.")}</p>`;
@@ -922,10 +924,10 @@
 
 		format_arancel_efectivo(arancel) {
 			const data = arancel || {};
-			const origen = data.origen || "Sin arancel";
 			if (!data.item) {
 				return __("Sin arancel");
 			}
+			const origen = data.origen || "Sin arancel";
 			const label = data.item_name || data.item;
 			const rate = Number(data.rate || 0).toLocaleString();
 			return `${label} · $${rate} (${origen})`;
@@ -1054,9 +1056,35 @@
 						? { ...act, item: result.item, rate: result.rate }
 						: act;
 				}
-				const grupos = (act.grupos || []).map((grupo) =>
-					result.doctype === "Grupo Actividad" ? update_row(grupo) : grupo
-				);
+				const grupos = (act.grupos || []).map((grupo) => {
+					if (result.doctype === "Grupo Actividad") {
+						return update_row(grupo);
+					}
+					if (result.doctype !== "Equipo Actividad") {
+						return grupo;
+					}
+					const equipos = (grupo.equipos || []).map((eq) => {
+						if (eq.name !== result.name) {
+							return eq;
+						}
+						const arancel = {
+							item: result.item,
+							item_name: result.item_name || result.item,
+							rate: result.rate,
+							origen: "Equipo",
+							resumen_texto: __(
+								"Arancel efectivo: {0} — ${1} (origen: {2})",
+								[
+									result.item_name || result.item,
+									Number(result.rate || 0).toLocaleString(),
+									__("Equipo"),
+								]
+							),
+						};
+						return { ...eq, item: result.item, rate: result.rate, arancel };
+					});
+					return { ...grupo, equipos };
+				});
 				return { ...act, grupos };
 			});
 		},

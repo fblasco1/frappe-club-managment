@@ -43,6 +43,7 @@ Then `PermissionError`.
 Given un `Equipo Actividad` guardado
 When Secretaría abre el formulario
 Then ve un resumen del arancel **efectivo** (ítem, nombre, monto y origen: Equipo / Grupo / Actividad / Sin arancel)
+And el texto del resumen es **plano** (sin etiquetas HTML visibles; no usar `frappe.format` Currency dentro de `escape_html`)
 And puede usar la acción **Volver al catálogo** para ir a `catalogo-actividades`.
 
 ---

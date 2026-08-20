@@ -111,3 +111,14 @@ And `origen` es `Equipo`, `Grupo`, `Actividad` o `Sin arancel` según la cascada
 And el catálogo Desk muestra ese resumen junto al título del equipo
 And en el formulario Desk de una **Actividad** aparece el dashboard con sus **Grupos / tiras**
 And en el formulario Desk de un **Grupo Actividad** aparece el dashboard con sus **Equipos / categorías**.
+
+---
+
+## Scenario: arancel inline editable en equipo / categoría
+
+Given un `Equipo Actividad` en el catálogo del panel
+When Secretaría asigna ítem y tarifa con `set_arancel` (`doctype` = `Equipo Actividad`)
+Then el campo `item` del equipo se actualiza
+And `Item.standard_rate` y `Item Price` de venta reflejan la tarifa
+And el catálogo muestra inputs de **Ítem arancel** y **Tarifa** en la fila del equipo (igual que actividad/grupo)
+And un resumen de arancel efectivo (origen Equipo / Grupo / Actividad) permanece visible como texto plano, **sin** etiquetas HTML literales.

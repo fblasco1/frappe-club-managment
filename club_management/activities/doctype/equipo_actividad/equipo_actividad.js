@@ -56,14 +56,22 @@ function club_equipo_actividad_arancel_panel(frm) {
 
 function club_equipo_actividad_format_arancel(arancel) {
 	const data = arancel || {};
+	// Preferir texto plano del servidor (evita HTML de Currency + escape_html).
+	if (data.resumen_texto) {
+		return data.resumen_texto;
+	}
 	if (!data.item) {
 		return __("Sin arancel asignado (equipo / grupo / actividad).");
 	}
 	const label = data.item_name || data.item;
-	const rate = frappe.format(data.rate || 0, { fieldtype: "Currency" });
-	return __("Arancel efectivo: {0} — {1} (origen: {2})", [
+	const rateNum = Number(data.rate || 0);
+	const rateLabel = rateNum.toLocaleString(undefined, {
+		minimumFractionDigits: 0,
+		maximumFractionDigits: 2,
+	});
+	return __("Arancel efectivo: {0} — ${1} (origen: {2})", [
 		label,
-		rate,
+		rateLabel,
 		data.origen || __("Sin arancel"),
 	]);
 }

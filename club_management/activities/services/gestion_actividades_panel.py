@@ -156,10 +156,12 @@ def set_arancel(
 	frappe.db.set_value("Item", item_code, "standard_rate", rate_value, update_modified=True)
 	_upsert_item_selling_price(item_code, rate_value)
 
+	item_name = frappe.db.get_value("Item", item_code, "item_name") or item_code
 	return {
 		"doctype": doctype,
 		"name": name,
 		"item": item_code,
+		"item_name": item_name,
 		"rate": rate_value,
 	}
 
@@ -426,17 +428,37 @@ def _format_equipo_row(
 	}
 
 
+def format_arancel_resumen_texto(arancel: dict[str, Any] | None) -> str:
+	"""Texto plano para Desk (sin markup HTML de Currency / formatters)."""
+	data = arancel or {}
+	item = (data.get("item") or "").strip()
+	if not item:
+		return str(frappe._("Sin arancel asignado (equipo / grupo / actividad)."))
+	label = (data.get("item_name") or item).strip()
+	rate = flt(data.get("rate") or 0)
+	origen = (data.get("origen") or "Sin arancel").strip()
+	# Monto como número localizable, nunca HTML.
+	rate_label = f"{rate:,.2f}".rstrip("0").rstrip(".")
+	return str(
+		frappe._("Arancel efectivo: {0} — ${1} (origen: {2})").format(label, rate_label, origen)
+	)
+
+
 def _arancel_payload(item_code: str, origen: str) -> dict[str, Any]:
 	code = (item_code or "").strip()
 	if not code:
-		return {"item": "", "item_name": "", "rate": 0.0, "origen": "Sin arancel"}
+		payload = {"item": "", "item_name": "", "rate": 0.0, "origen": "Sin arancel"}
+		payload["resumen_texto"] = format_arancel_resumen_texto(payload)
+		return payload
 	item_name = frappe.db.get_value("Item", code, "item_name") or code
-	return {
+	payload = {
 		"item": code,
 		"item_name": item_name,
 		"rate": _resolve_item_rate(code),
 		"origen": origen,
 	}
+	payload["resumen_texto"] = format_arancel_resumen_texto(payload)
+	return payload
 
 
 def resolve_arancel_efectivo_from_chain(
@@ -452,7 +474,7 @@ def resolve_arancel_efectivo_from_chain(
 		return _arancel_payload(grupo_item or "", "Grupo")
 	if (actividad_item or "").strip():
 		return _arancel_payload(actividad_item or "", "Actividad")
-	return {"item": "", "item_name": "", "rate": 0.0, "origen": "Sin arancel"}
+	return _arancel_payload("", "Sin arancel")
 
 
 def resolve_arancel_efectivo_equipo(equipo_name: str) -> dict[str, Any]:

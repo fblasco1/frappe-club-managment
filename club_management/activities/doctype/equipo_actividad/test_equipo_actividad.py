@@ -179,3 +179,50 @@ class TestEquipoActividad(MembersTestCase):
 		self.assertEqual(resumen["origen"], "Grupo")
 		self.assertEqual(resumen["rate"], 3200.0)
 		self.assertTrue(resumen.get("item_name"))
+		self.assertIn("resumen_texto", resumen)
+		self.assertNotIn("<", resumen["resumen_texto"])
+		self.assertNotIn(">", resumen["resumen_texto"])
+		self.assertIn("3200", resumen["resumen_texto"].replace(",", "").replace(".", ""))
+
+	def test_format_arancel_resumen_texto_sin_html(self) -> None:
+		from club_management.activities.services.gestion_actividades_panel import (
+			format_arancel_resumen_texto,
+		)
+
+		texto = format_arancel_resumen_texto(
+			{
+				"item": "ICDPE-TEST",
+				"item_name": "ARANCEL MENSUAL - TEST",
+				"rate": 15500.0,
+				"origen": "Equipo",
+			}
+		)
+		self.assertNotIn("<", texto)
+		self.assertNotIn(">", texto)
+		self.assertNotIn("span", texto.lower())
+		self.assertIn("ARANCEL MENSUAL - TEST", texto)
+		self.assertIn("Equipo", texto)
+
+	def test_set_arancel_equipo_actualiza_item_y_rate(self) -> None:
+		from club_management.activities.services.gestion_actividades_panel import set_arancel
+
+		actividad, grupo, equipo = self._ensure_estructura_basquet()
+		item_group = frappe.db.get_value("Item Group", {}, "name") or "All Item Groups"
+		item_code = "TEST-EQ-SET-RATE"
+		if not frappe.db.exists("Item", item_code):
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": item_code,
+					"item_name": "Arancel equipo rate",
+					"item_group": item_group,
+					"is_stock_item": 0,
+					"standard_rate": 1000,
+				}
+			).insert(ignore_permissions=True)
+
+		result = set_arancel(doctype="Equipo Actividad", name=equipo, item=item_code, rate=7777)
+		self.assertEqual(result["item"], item_code)
+		self.assertEqual(result["rate"], 7777.0)
+		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), item_code)
+		self.assertEqual(frappe.db.get_value("Item", item_code, "standard_rate"), 7777.0)

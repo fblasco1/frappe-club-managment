@@ -75,7 +75,8 @@ And no exige tipear `item_code` a mano.
 Given actividad `usa_grupos = 1` con al menos un grupo
 When se muestra en panel
 Then el arancel inline de la **actividad** se oculta (regla actual)
-And cada **grupo** muestra su arancel inline.
+And cada **grupo** muestra su arancel inline
+And cada **equipo / categoría** también muestra inputs de ítem y tarifa (además del resumen efectivo).
 
 ---
 

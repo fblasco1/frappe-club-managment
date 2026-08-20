@@ -199,12 +199,16 @@
 }
 
 .club-equipos-table-head,
-.club-equipo-row {
+.club-equipo-row-main {
 	display: grid;
 	grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) auto;
 	gap: 0.5rem;
 	align-items: center;
 	padding: 0.4rem 0.65rem;
+}
+
+.club-equipo-row {
+	padding: 0;
 }
 
 .club-equipos-table-head {
@@ -217,6 +221,12 @@
 
 .club-equipo-row + .club-equipo-row {
 	border-top: 1px solid var(--border-color);
+}
+
+.club-equipo-row .club-arancel-row {
+	padding: 0 0.65rem 0.55rem;
+	border-top: 1px dashed var(--border-color);
+	margin-top: 0;
 }
 
 .club-equipo-title {
