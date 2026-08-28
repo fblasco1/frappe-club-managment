@@ -124,6 +124,13 @@ class TestGestionActividadesDashboardKpis(MembersTestCase):
 		self.assertIn(actividad, opciones)
 		self.assertEqual(opciones[actividad].get("titulo"), titulo)
 
+	def test_dashboard_infraestructura_enlaza_espacios(self) -> None:
+		payload = get_dashboard_payload(reference_date=self._REFERENCE)
+		infra = payload["infraestructura"]
+		self.assertTrue(infra["disponible"])
+		self.assertEqual(infra["workspace"], "Espacios")
+		self.assertEqual(infra["ruta"], "/desk/ocupacion-espacios")
+
 	def test_ocupacion_por_deporte_ordena_por_cantidad_desc(self) -> None:
 		basquet = self._actividad_sin_grupos("Dash Test Orden Básquet")
 		futbol = self._actividad_sin_grupos("Dash Test Orden Fútbol")

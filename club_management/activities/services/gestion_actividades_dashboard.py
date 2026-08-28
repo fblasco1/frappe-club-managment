@@ -444,7 +444,13 @@ def get_asistencia_semanal_payload(
 
 
 def get_infraestructura_payload() -> dict[str, Any]:
-	return {"disponible": False, "mensaje": frappe._("Próximamente")}
+	"""Enlace al dashboard de ocupación de espacios."""
+	return {
+		"disponible": True,
+		"mensaje": frappe._("Ver ocupación diaria de espacios (planilla 08:00–04:00)"),
+		"workspace": "Espacios",
+		"ruta": "/desk/ocupacion-espacios",
+	}
 
 
 def get_actividades_opciones() -> list[dict[str, str]]:

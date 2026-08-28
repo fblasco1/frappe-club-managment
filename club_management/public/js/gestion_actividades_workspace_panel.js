@@ -558,8 +558,15 @@
 					</div>
 					${listaRows ? `<div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>${__("Actividad")}</th><th>${__("Grupo / equipo")}</th><th>${__("En espera")}</th><th>${__("Desde")}</th></tr></thead><tbody>${listaRows}</tbody></table></div>` : `<p class="text-muted mb-0">${__("No hay socios en lista de espera.")}</p>`}
 				</div>`;
-			const infraHtml = `
-				<div class="club-actividades-chart-card">
+			const infraHtml = infra.disponible
+				? `<div class="club-actividades-chart-card">
+					<h6>${__("Disponibilidad de infraestructura")}</h6>
+					<p class="mb-2">${frappe.utils.escape_html(infra.mensaje || __("Gestionar espacios y ocupación"))}</p>
+					<a class="btn btn-sm btn-primary" href="${frappe.utils.escape_html(infra.ruta || "/desk/espacios")}">
+						${__("Ir a Espacios")}
+					</a>
+				</div>`
+				: `<div class="club-actividades-chart-card">
 					<h6>${__("Disponibilidad de infraestructura")}</h6>
 					<p class="club-actividades-infra-placeholder">${frappe.utils.escape_html(infra.mensaje || __("Próximamente"))}</p>
 				</div>`;

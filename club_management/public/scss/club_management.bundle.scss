@@ -8,6 +8,9 @@
 /* Panel Gestión de Actividades */
 @import "./gestion_actividades_dashboard";
 @import "./club_equipo_report";
+
+/* Dashboard ocupación de espacios */
+@import "./ocupacion_espacios";
 .club-actividades-workspace #editorjs {
 	display: none;
 }

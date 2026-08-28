@@ -137,9 +137,10 @@ And el dashboard del workspace **no** incluye el acordeón del catálogo.
 
 ## Scenario: disponibilidad de infraestructura
 
-Given el módulo de canchas/horarios aún no está modelado
+Given el módulo Spaces (Espacio / Reserva Espacio) está modelado
 When Secretaria consulta el dashboard
-Then la sección de infraestructura muestra estado **próximamente** (`disponible = false`).
+Then la sección de infraestructura muestra `disponible = true`
+And el payload incluye `workspace = Espacios` y ruta Desk `/desk/ocupacion-espacios`.
 
 ---
 

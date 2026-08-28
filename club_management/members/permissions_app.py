@@ -11,4 +11,6 @@ def has_app_permission() -> bool:
 	if frappe.session.user == "Administrator":
 		return True
 	roles = set(frappe.get_roles())
-	return bool(roles.intersection({"Secretaria", "Tesoreria", "System Manager"}))
+	return bool(
+		roles.intersection({"Secretaria", "Tesoreria", "Coordinacion", "System Manager"})
+	)

@@ -1,0 +1,174 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-08-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "fecha",
+  "estado",
+  "section_origen",
+  "espacio_origen",
+  "horario_row",
+  "titulo_origen",
+  "section_destino",
+  "accion",
+  "espacio_destino",
+  "hora_desde",
+  "hora_hasta",
+  "motivo"
+ ],
+ "fields": [
+  {
+   "default": "EXC-.YYYY.-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "EXC-.YYYY.-.#####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "fecha",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Fecha",
+   "reqd": 1
+  },
+  {
+   "default": "Activa",
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Estado",
+   "options": "Activa\nAnulada",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_origen",
+   "fieldtype": "Section Break",
+   "label": "Origen (grilla)"
+  },
+  {
+   "fieldname": "espacio_origen",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Espacio origen",
+   "options": "Espacio",
+   "reqd": 1
+  },
+  {
+   "fieldname": "horario_row",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Fila Horario Entrenamiento",
+   "reqd": 1,
+   "description": "name de la fila child Horario Entrenamiento que se omite ese d\u00eda."
+  },
+  {
+   "fieldname": "titulo_origen",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "T\u00edtulo origen",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_destino",
+   "fieldtype": "Section Break",
+   "label": "Destino (solo este d\u00eda)"
+  },
+  {
+   "default": "Reubicar",
+   "fieldname": "accion",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Acci\u00f3n",
+   "options": "Reubicar\nSuspender",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.accion==\"Reubicar\"",
+   "fieldname": "espacio_destino",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Espacio destino",
+   "options": "Espacio"
+  },
+  {
+   "depends_on": "eval:doc.accion==\"Reubicar\"",
+   "fieldname": "hora_desde",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Hora desde"
+  },
+  {
+   "depends_on": "eval:doc.accion==\"Reubicar\"",
+   "fieldname": "hora_hasta",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Hora hasta"
+  },
+  {
+   "fieldname": "motivo",
+   "fieldtype": "Small Text",
+   "label": "Motivo"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-08-27 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Spaces",
+ "name": "Excepcion Horario Dia",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Coordinacion",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Secretaria",
+   "share": 0,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

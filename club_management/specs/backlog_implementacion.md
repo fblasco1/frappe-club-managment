@@ -13,7 +13,7 @@
 
 
 **Última revisión MVP producción:** 2026-08-19 — commit en Hetzner: **`43b226f`** (validación Adherente/Jubilado en alta pública).  
-**Última actualización backlog:** 2026-08-19 (go-live portal de alta + Tesorería P&L/cash flow).  
+**Última actualización backlog:** 2026-08-27 (módulo Spaces — resumen + pendientes FMV/Excel).  
 
 **Destino producción:** Hetzner Cloud **CX23** — https://gestion.icdpedroechague.com.ar  
 **Landing (wizard):** https://www.icdpedroechague.com.ar/asociate/inscripcion  
@@ -1002,6 +1002,57 @@ Error en producción al **Registrar cobro** desde formulario Socio: `NameError: 
 4. Post-migrate: confirmar Holiday List AR, permisos PI, CC Cuotas Sociales.
 
 > **Nota 2026-08-19:** GF ya está en producción (panel Tesorería, P&L, cash flow, liquidez 5 días, factores mora 10/20). El «próximo paso» de julio quedó cerrado. Ver sesión 2026-08-19.
+
+---
+
+---
+
+## Módulo Gestión de Espacios (Spaces)
+
+**Resumen completo:** `spaces_modulo_resumen.md`  
+**Estado general:** `[~]` MVP+ operativo en Desk (local); **sin deploy prod documentado** al 2026-08-27.  
+**Tests:** ~74 casos en `club_management.spaces.*` — ver resumen del módulo.
+
+### Entregado
+
+| ID | Tema | Spec | Estado |
+|----|------|------|--------|
+| SP-MVP | Catálogo `Espacio` + grilla `Horario Entrenamiento` | `spaces_catalogo_ocupacion.md` | [x] |
+| SP-MVP | `Reserva Espacio` (Confirmada ocupa; tipos abajo) | `spaces_catalogo_ocupacion.md` | [x] |
+| SP-MVP | Alquiler externo Temporal / Recurrente | `spaces_alquiler_externo.md` | [x] |
+| SP-MVP | Planilla Desk 08:00–04:00 (`/desk/ocupacion-espacios`) | `spaces_ocupacion_dashboard.md` | [x] |
+| SP-MVP | Import CSV grilla L–V y sábado | `import_horarios.py` | [x] |
+| SP-MVP | Fixtures FeBAMBA GES (JSON + sync Desk + ventanas partido) | `spaces_fixtures_partidos.md` | [x] |
+| SP-MVP | Superposiciones (rojo) + selector al clic | `spaces_ocupacion_dashboard.md` | [x] |
+| SP-MVP | Excepción día: reubicar / suspender entrenamiento | `spaces_excepcion_horario_dia.md` | [x] |
+| SP-MVP | Suspensión día: reserva/evento sin cancelar base | `spaces_suspension_reserva_dia.md` | [x] |
+| SP-MVP | Eventos sociales CSV → Evento club recurrente | `spaces_evento_club_social.md` | [x] |
+| SP-MVP | Tipos planilla + orden fijo de columnas | `spaces_modulo_resumen.md` | [x] |
+| SP-MVP | Rol `Coordinacion` + workspace Espacios | patches `sync_espacios_*` | [x] |
+
+**Tipos de evento en planilla:** Entrenamiento · Preparacion Fisica · Alquiler externo · Alquiler socio · Evento club · Bloqueo.
+
+**Orden columnas:** Cancha 1 → Cancha 2 → Cancha 3 → Gimnasio Bajo Tribuna → SALON PB → SUM PB → SUBSUELO → SALA ALBAMONTE → PARRILLA/TERRAZA → LA CASONA.
+
+### Pendiente (Spaces)
+
+| ID | Tema | Prioridad | Spec / notas |
+|----|------|-----------|--------------|
+| **SP-1** | **Sincronizar fixtures FMV (Vóley)** | **Alta** | Adaptador en `spaces/fixtures/sources/`; contrato payload + upsert idempotente; botón/cron en planilla. Hoy: solo carga manual. `spaces_fixtures_partidos.md` § otras federaciones. |
+| **SP-2** | **Carga fixtures de ligas desde Excel** | **Alta** | Import Desk: Excel → preview → upsert `Reserva Espacio` (idempotente). Complementa CSV FeBAMBA y grilla Coordinación. |
+| SP-3 | Reservas online socio + externo + comprobante PDF | Media | Épica 1 — `spaces_sprint_gestion.md` |
+| SP-4 | Disponibilidad en vivo (estados que bloquean) | Media | Épica 2 — `spaces_sprint_gestion.md` |
+| SP-5 | Reporte diario PDF/Excel → email coordinador/es | Media | Épica 4 — replicación manual WhatsApp CD |
+| SP-6 | Cobro alquiler (Cobrand / ítems ICDPE-ALQ) | Baja | `spaces_fases_futuras.md` |
+| SP-7 | Portal socio — reserva espacios alquilables | Baja | `spaces_fases_futuras.md` |
+| SP-8 | Deploy prod Hetzner + smoke planilla/fixtures | Media | Tras validación Coordinación en dev |
+
+### Próximo paso sugerido (Spaces)
+
+1. **SP-1 FMV:** definir fuente (API, Excel periódico o export web) → spec Given/When/Then → adaptador + tests.
+2. **SP-2 Excel ligas:** plantilla Excel acordada con Coordinación → import Desk con informe de errores.
+3. Validar en dev con Coordinación un viernes con cena vitalicios + partido FeBAMBA + superposición.
+4. Deploy a prod cuando CD apruebe planilla operativa.
 
 ---
 
