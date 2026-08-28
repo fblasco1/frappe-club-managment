@@ -17,10 +17,23 @@ ESPACIOS_SEED: tuple[tuple[str, str, int], ...] = (
 
 
 def ensure_espacios_catalogo() -> list[str]:
-	"""Crea los espacios del catálogo si no existen. Devuelve nombres creados o ya existentes."""
+	"""Crea o alinea los espacios del catálogo. Devuelve nombres creados o ya existentes."""
 	names: list[str] = []
 	for titulo, tipo, alquilable in ESPACIOS_SEED:
 		if frappe.db.exists("Espacio", titulo):
+			doc = frappe.get_doc("Espacio", titulo)
+			changed = False
+			if doc.tipo != tipo:
+				doc.tipo = tipo
+				changed = True
+			if int(doc.alquilable or 0) != alquilable:
+				doc.alquilable = alquilable
+				changed = True
+			if int(doc.habilitado or 0) != 1:
+				doc.habilitado = 1
+				changed = True
+			if changed:
+				doc.save(ignore_permissions=True)
 			names.append(titulo)
 			continue
 		doc = frappe.get_doc(
