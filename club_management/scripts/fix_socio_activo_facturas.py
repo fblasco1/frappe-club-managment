@@ -7,6 +7,7 @@ from frappe.utils import flt
 
 from club_management.members.services.cargo_extra_conceptos import item_es_arancel_actividad
 from club_management.ops.consolidate_cuota_social_item import _sync_ple_invoice
+from club_management.scripts.bulk_io import ensure_bulk_apply_allowed
 
 CUOTA_ITEM = "ICDPE-CUOTA-SOCIAL"
 TARIFA_ACTIVO = 31000.0
@@ -281,8 +282,7 @@ def run(
 	dry_run: bool = False,
 	confirm: str = "",
 ) -> dict:
-	if not dry_run and confirm != "local-dev":
-		frappe.throw("Pase confirm='local-dev' para aplicar en local.")
+	ensure_bulk_apply_allowed(dry_run=dry_run, confirm=confirm)
 
 	targets = socios or ["10745", "6864"]
 	out: dict = {"socios": {}, "dry_run": dry_run}
@@ -423,8 +423,7 @@ def run_correccion_categorias_lote(
 	confirm: str = "",
 ) -> dict:
 	"""Corrige socios Activo facturados como Menor + saldo a favor 12043 (2° Hermano)."""
-	if not dry_run and confirm != "local-dev":
-		frappe.throw("Pase confirm='local-dev' para aplicar.")
+	ensure_bulk_apply_allowed(dry_run=dry_run, confirm=confirm)
 
 	out: dict = {"dry_run": dry_run, "activos": [], "segundo_hermano": None}
 	for socio in SOCIOS_CATEGORIA_ACTIVO:
@@ -481,8 +480,7 @@ def run_saldo_pendiente_julio_11482_11512(
 	confirm: str = "",
 ) -> dict:
 	"""Aplica pago parcial ($2.000) contra factura jul/2026 (resto cuota mes anterior)."""
-	if not dry_run and confirm != "local-dev":
-		frappe.throw("Pase confirm='local-dev' para aplicar.")
+	ensure_bulk_apply_allowed(dry_run=dry_run, confirm=confirm)
 
 	from club_management.members.services.cobranza_manual import registrar_cobro_parcial_factura
 
@@ -586,8 +584,7 @@ def run_ajuste_jul_activo_tarifa_vieja(
 	confirm: str = "",
 ) -> dict:
 	"""Jul/2026 facturado a $29.000 + mora $4.350 → tarifa Activo $31.000 + mora $4.650."""
-	if not dry_run and confirm != "local-dev":
-		frappe.throw("Pase confirm='local-dev' para aplicar.")
+	ensure_bulk_apply_allowed(dry_run=dry_run, confirm=confirm)
 
 	out: list[dict] = []
 	for socio in SOCIOS_JUL_TARIFA_VIEJA:
@@ -619,8 +616,7 @@ def run_realign_ple_jul_activo_35650(
 	confirm: str = "",
 ) -> dict:
 	"""Corrige PLE (grand_total, no outstanding) en jul/2026 + mora de los 4 socios."""
-	if not dry_run and confirm != "local-dev":
-		frappe.throw("Pase confirm='local-dev' para aplicar.")
+	ensure_bulk_apply_allowed(dry_run=dry_run, confirm=confirm)
 
 	fixed: list[dict] = []
 	for socio in SOCIOS_JUL_TARIFA_VIEJA:
@@ -674,8 +670,7 @@ def run_cobro_residual_jul_activo_35650(
 	confirm: str = "",
 ) -> dict:
 	"""Imputa el resto ($2.300) tras parche tarifa jul/2026 para cobros informe $35.650."""
-	if not dry_run and confirm != "local-dev":
-		frappe.throw("Pase confirm='local-dev' para aplicar.")
+	ensure_bulk_apply_allowed(dry_run=dry_run, confirm=confirm)
 
 	from club_management.members.services.cobranza_manual import registrar_cobro_parcial_factura
 

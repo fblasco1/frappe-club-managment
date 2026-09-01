@@ -14,6 +14,7 @@ from club_management.ops.consolidate_cuota_social_item import (
 	CANONICAL_ITEM,
 	_sync_ple_invoice,
 )
+from club_management.scripts.bulk_io import ensure_bulk_apply_allowed
 
 TARIFAS_VIGENTES: dict[str, float] = {
 	"Activo": 31000.0,
@@ -96,8 +97,7 @@ def run(
 	limit: int | None = None,
 ) -> dict:
 	"""Alinea líneas ICDPE-CUOTA-SOCIAL impagas a resolve_cuota_social del socio."""
-	if not dry_run and confirm != "local-dev":
-		frappe.throw("Pase confirm='local-dev' para aplicar.")
+	ensure_bulk_apply_allowed(dry_run=dry_run, confirm=confirm)
 
 	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
 	if not campo_socio:

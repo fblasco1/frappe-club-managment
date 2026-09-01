@@ -5,6 +5,8 @@ from __future__ import annotations
 import frappe
 from frappe.utils import flt
 
+from club_management.scripts.bulk_io import ensure_bulk_apply_allowed
+
 CANONICAL_ITEM = "ICDPE-CUOTA-SOCIAL"
 LEGACY_ITEM = "CLUB-Cuota-Social-Base"
 CANONICAL_NAME = "Cuota social"
@@ -128,8 +130,7 @@ def _migrate_references(*, dry_run: bool) -> dict[str, int]:
 
 
 def run(*, dry_run: bool = False, confirm: str = "") -> dict:
-	if not dry_run and confirm != "local-dev":
-		frappe.throw("Pase confirm='local-dev' para aplicar.")
+	ensure_bulk_apply_allowed(dry_run=dry_run, confirm=confirm)
 
 	if not frappe.db.exists("Item", CANONICAL_ITEM):
 		frappe.throw(f"Falta el ítem {CANONICAL_ITEM}. Ejecute setup ICDPE.")
@@ -171,3 +172,12 @@ def run(*, dry_run: bool = False, confirm: str = "") -> dict:
 		"ple_sync": ple_sync,
 		"after": after,
 	}
+
+
+def run_sync_ple(*, dry_run: bool = False, confirm: str = "") -> dict:
+	"""Solo corrige PLE desincronizado en SI de cuota social (sin migrar ítems legacy)."""
+	ensure_bulk_apply_allowed(dry_run=dry_run, confirm=confirm)
+	result = sync_ple_cuota_mismatch(dry_run=dry_run)
+	if not dry_run:
+		frappe.db.commit()
+	return result

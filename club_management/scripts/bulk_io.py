@@ -13,21 +13,42 @@ from frappe.utils import flt, getdate
 
 SOCIO_DOCTYPE = "Socio"
 PROD_SITE_MARK = "icdpedroechague.com.ar"
+CONFIRM_LOCAL = "local-dev"
+CONFIRM_PROD = "APPLY_PROD"
+
+
+def is_production_site(site: str | None = None) -> bool:
+	"""True si el site actual es producción ICDPE."""
+	name = site if site is not None else str(getattr(frappe.local, "site", "") or "")
+	return PROD_SITE_MARK in name
+
+
+def ensure_bulk_apply_allowed(*, dry_run: bool, confirm: str = "") -> None:
+	"""Gate apply masivo: local → `local-dev`; prod → `APPLY_PROD`. Dry-run siempre OK."""
+	if dry_run:
+		return
+	token = (confirm or "").strip()
+	if is_production_site():
+		if token != CONFIRM_PROD:
+			frappe.throw(
+				_(
+					"Apply bloqueado en {0}. Para producción: confirm='{1}'."
+				).format(frappe.local.site, CONFIRM_PROD),
+				frappe.ValidationError,
+			)
+		return
+	if token != CONFIRM_LOCAL:
+		frappe.throw(
+			_("Apply bloqueado en {0}. Para local: confirm='{1}'.").format(
+				frappe.local.site, CONFIRM_LOCAL
+			),
+			frappe.ValidationError,
+		)
 
 
 def ensure_not_production(*, dry_run: bool, confirm: str = "") -> None:
-	"""Impide apply accidental contra el site de producción."""
-	if dry_run:
-		return
-	site = str(getattr(frappe.local, "site", "") or "")
-	if PROD_SITE_MARK in site and confirm != "APPLY_PROD":
-		frappe.throw(
-			_(
-				"Carga masiva apply bloqueada en {0}. "
-				"Para producción explícito: confirm='APPLY_PROD'."
-			).format(site),
-			frappe.ValidationError,
-		)
+	"""Alias de `ensure_bulk_apply_allowed` (cargas masivas / ops)."""
+	ensure_bulk_apply_allowed(dry_run=dry_run, confirm=confirm)
 
 
 def cell(row: dict[str, Any], *keys: str) -> str:

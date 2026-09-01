@@ -182,4 +182,62 @@ And se puede persistir un JSON de log en `log_path`.
 |-------|-----------|
 | Spec | este archivo |
 | Script | `scripts/bulk_payments.py` |
+| Pipeline prod | `scripts/cobranza_informe_prod_pipeline.py` |
 | Tests | `tests/test_bulk_payments.py` |
+
+---
+
+## Scenario: gate apply producción
+
+Given el site es `gestion.icdpedroechague.com.ar`
+When se ejecuta apply (`dry_run=False`) sin confirmación
+Then falla con ValidationError
+And exige `confirm='APPLY_PROD'`.
+
+---
+
+## Scenario: gate apply local
+
+Given el site es `dev.localhost`
+When se ejecuta apply sin confirmación
+Then falla con ValidationError
+And exige `confirm='local-dev'`.
+
+---
+
+## Pipeline producción (informe Excel)
+
+Given el informe `Cobranza 01 a 28-08.xlsx` en el servidor
+And backup reciente de la base de producción
+When se ejecuta `cobranza_informe_prod_pipeline.run` con `dry_run=True`
+Then corre en simulación: parche tarifas, sync PLE, refacturas, altas/facturas CTO COMP, dos dry-run apply
+And no crea Payment Entry.
+
+When el dry-run final muestra ≤10 `monto_discordante` (casos manuales acordados)
+And Francisco confirma apply
+Then `dry_run=False`, `confirm='APPLY_PROD'` imputa cobranzas
+And persiste log en `log_dir/pipeline_summary.json`.
+
+Pasos manuales post-apply: **28 filas** no imputables — ver `docs/club/cobranza-informe-manual-prod.md`:
+
+- **10** `monto_discordante` (Cuota Social Menor)
+- **17** `socio_no_encontrado`
+- **1** `fecha_invalida`
+
+Comando prod (dry-run):
+
+```text
+bench --site gestion.icdpedroechague.com.ar execute \\
+  club_management.scripts.cobranza_informe_prod_pipeline.run \\
+  --kwargs '{"csv_path": "/tmp/Cobranza 01 a 28-08.xlsx", "dry_run": true, "log_dir": "/tmp/cobranza_pipeline"}'
+```
+
+Apply (solo tras OK dry-run + backup):
+
+```text
+bench --site gestion.icdpedroechague.com.ar execute \\
+  club_management.scripts.cobranza_informe_prod_pipeline.run \\
+  --kwargs '{"csv_path": "/tmp/Cobranza 01 a 28-08.xlsx", "dry_run": false, "confirm": "APPLY_PROD", "log_dir": "/tmp/cobranza_pipeline"}'
+```
+
+Prep datos sin apply: `skip_apply=True` con el mismo `confirm`.

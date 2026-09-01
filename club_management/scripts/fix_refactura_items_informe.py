@@ -5,6 +5,8 @@ from __future__ import annotations
 import frappe
 from frappe.utils import flt
 
+from club_management.scripts.bulk_io import ensure_bulk_apply_allowed
+
 from club_management.activities.data.otras_actividades_aranceles_icdpe import (
 	ITEM_BOXEO_2_CLASES,
 	ITEM_BOXEO_3_CLASES,
@@ -162,8 +164,7 @@ def fix_socio_11844_boxeo(*, dry_run: bool = False) -> dict:
 
 
 def run_refactura_lote(*, dry_run: bool = False, confirm: str = "") -> dict:
-	if not dry_run and confirm != "local-dev":
-		frappe.throw("Pase confirm='local-dev' para aplicar.")
+	ensure_bulk_apply_allowed(dry_run=dry_run, confirm=confirm)
 
 	from club_management.integrations.payment_ledger_postgres import apply_patch
 
