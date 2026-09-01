@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from typing import Any
 
@@ -21,6 +22,9 @@ from club_management.members.services.socio_operaciones_secretaria import (
 SOCIO_DOCTYPE = "Socio"
 CUSTOMER_DOCTYPE = "Customer"
 SALES_INVOICE_DOCTYPE = "Sales Invoice"
+
+# Ítems compartidos por varios cargos extra (dedup por título + período, no solo item_code).
+ITEMS_CARGO_EXTRA_POR_TITULO = frozenset({"ICDPE-CARGO-VARIOS"})
 
 
 def erpnext_cobranza_disponible() -> bool:
@@ -102,6 +106,65 @@ def item_codes_facturados_en_periodo(socio_name: str, periodo_cobro: str) -> set
 			if item_code:
 				codes.add(item_code)
 	return codes
+
+
+def _normalize_cargo_text(text: str) -> str:
+	return re.sub(r"\s+", " ", (text or "").strip()).upper()
+
+
+def item_usa_deduplicacion_por_titulo(item_code: str) -> bool:
+	return item_code in ITEMS_CARGO_EXTRA_POR_TITULO
+
+
+def cargo_extra_linea_facturada_en_periodo(
+	socio_name: str,
+	periodo_cobro: str,
+	titulo: str,
+) -> bool:
+	"""True si ya hay línea de SI del período para ese título de cargo extra."""
+	if not (titulo or "").strip():
+		return False
+
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	if not campo_socio:
+		return False
+
+	filters: dict[str, Any] = {campo_socio: socio_name, "docstatus": ["!=", 2]}
+	campo_periodo = _campo_periodo_cobro()
+	if campo_periodo:
+		filters[campo_periodo] = periodo_cobro
+	else:
+		filters["remarks"] = ["like", f"%{periodo_cobro}%"]
+
+	from club_management.scripts.informe_concepto_cobranza import (
+		cuotas_complementarias_equivalentes,
+		es_cuota_complementaria,
+	)
+
+	usar_fuzzy_cto = es_cuota_complementaria(titulo)
+	titulo_norm = _normalize_cargo_text(titulo)
+	sufijo = f"({periodo_cobro})".upper()
+
+	for invoice_name in frappe.get_all(SALES_INVOICE_DOCTYPE, filters=filters, pluck="name"):
+		for desc in frappe.get_all(
+			"Sales Invoice Item",
+			filters={"parent": invoice_name},
+			pluck="description",
+		):
+			if not desc:
+				continue
+			if usar_fuzzy_cto:
+				if cuotas_complementarias_equivalentes(titulo, desc):
+					return True
+				continue
+			desc_norm = _normalize_cargo_text(desc)
+			if desc_norm in {f"{titulo_norm} {sufijo}", f"{titulo_norm}{sufijo}"}:
+				return True
+			if desc_norm.endswith(sufijo) and desc_norm.startswith(titulo_norm):
+				return True
+			if desc_norm == titulo_norm:
+				return True
+	return False
 
 
 def resolve_cuota_social(socio_name: str) -> tuple[float, str | None]:
@@ -236,7 +299,7 @@ def build_invoice_items_for_socio(
 
 	company = _default_company()
 	items: list[dict[str, Any]] = []
-	seen: set[str] = set()
+	seen: set[str | tuple[str, str]] = set()
 
 	def _append_item(item_code: str, rate: float, description: str) -> None:
 		if not item_code or flt(rate) <= 0:
@@ -283,7 +346,34 @@ def build_invoice_items_for_socio(
 
 	if incluir_cargos_extra:
 		for row in _cargos_extra_items_for_socio(socio_name, reference_date=reference_date):
-			_append_item(row["item_code"], row["rate"], row.get("description") or _("Cargo extra"))
+			item_code = row["item_code"]
+			titulo = row.get("description") or ""
+			rate = flt(row["rate"])
+			if not item_code or rate <= 0:
+				continue
+			if excluir_ya_facturados and item_usa_deduplicacion_por_titulo(item_code):
+				if cargo_extra_linea_facturada_en_periodo(socio_name, periodo, titulo):
+					continue
+			elif excluir_ya_facturados and item_code in ya_facturados:
+				continue
+			seen_key: str | tuple[str, str] = (
+				(item_code, _normalize_cargo_text(titulo))
+				if item_usa_deduplicacion_por_titulo(item_code)
+				else item_code
+			)
+			if seen_key in seen:
+				continue
+			seen.add(seen_key)
+			linea = {
+				"item_code": item_code,
+				"qty": 1,
+				"rate": rate,
+				"description": titulo or _("Cargo extra"),
+			}
+			cost_center = resolve_cost_center_item(item_code, company)
+			if cost_center:
+				linea["cost_center"] = cost_center
+			items.append(linea)
 	return items
 
 
@@ -592,6 +682,8 @@ def _payment_entry_para_asignaciones(
 	*,
 	mode_of_payment: str,
 	posting_date: date,
+	reference_no: str | None = None,
+	auto_submit: bool = True,
 ) -> str:
 	"""Crea un PE (un medio) con una o más referencias a SI."""
 	from club_management.members.services.modos_pago_desk import validar_modo_pago_desk
@@ -639,7 +731,9 @@ def _payment_entry_para_asignaciones(
 		frappe.throw(_("El monto del cobro debe ser mayor a cero."), frappe.ValidationError)
 	pe.paid_amount = total
 	pe.received_amount = total
-	if not pe.reference_no:
+	if reference_no:
+		pe.reference_no = str(reference_no).strip()[:140]
+	elif not pe.reference_no:
 		pe.reference_no = _reference_no_cobro(invoice_names)
 	# Detalle completo fuera del campo Data(140).
 	detalle = ", ".join(invoice_names)
@@ -648,7 +742,8 @@ def _payment_entry_para_asignaciones(
 		nota = _("Facturas: {0}").format(detalle)
 		pe.remarks = f"{existente}\n{nota}".strip() if existente else nota
 	pe.insert(ignore_permissions=True)
-	pe.submit()
+	if auto_submit:
+		pe.submit()
 	return pe.name
 
 
@@ -658,6 +753,8 @@ def registrar_cobro_compuesto(
 	medios: list[dict[str, Any]],
 	*,
 	posting_date: str | date | None = None,
+	reference_no: str | None = None,
+	auto_submit: bool = True,
 ) -> dict[str, Any]:
 	"""Cobra una o más SI enteras con uno o varios medios (simple o mixto)."""
 	from club_management.integrations.payment_ledger_postgres import apply_patch
@@ -744,6 +841,8 @@ def registrar_cobro_compuesto(
 			asignaciones,
 			mode_of_payment=str(row["mode_of_payment"]),
 			posting_date=fecha_cobro,
+			reference_no=reference_no,
+			auto_submit=auto_submit,
 		)
 		payment_entries.append(pe_name)
 
@@ -754,6 +853,64 @@ def registrar_cobro_compuesto(
 	return {
 		"status": "ok",
 		"payment_entries": payment_entries,
+		"saldo_deuda": saldo,
+	}
+
+
+def registrar_cobro_parcial_factura(
+	socio_name: str,
+	sales_invoice: str,
+	amount: float,
+	*,
+	mode_of_payment: str,
+	posting_date: str | date | None = None,
+	reference_no: str | None = None,
+	auto_submit: bool = True,
+) -> dict[str, Any]:
+	"""Cobra un monto parcial contra una SI (p. ej. una línea del informe por concepto)."""
+	from club_management.integrations.payment_ledger_postgres import apply_patch
+
+	apply_patch()
+	if not erpnext_cobranza_disponible():
+		frappe.throw(_("ERPNext no está disponible para cobranza."), frappe.ValidationError)
+
+	ensure_secretaria_operacion_access()
+	monto = flt(amount, 2)
+	if monto <= 0:
+		frappe.throw(_("El monto debe ser mayor a cero."), frappe.ValidationError)
+
+	fecha_cobro = getdate(posting_date or today())
+	if fecha_cobro > getdate(today()):
+		frappe.throw(_("La fecha de cobro no puede ser posterior a hoy."), frappe.ValidationError)
+
+	campo = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	if not frappe.db.exists(SALES_INVOICE_DOCTYPE, sales_invoice):
+		frappe.throw(_("Factura no encontrada: {0}").format(sales_invoice), frappe.DoesNotExistError)
+
+	invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, sales_invoice)
+	if campo and invoice.get(campo) != socio_name:
+		frappe.throw(_("La factura {0} no pertenece a este socio.").format(sales_invoice), frappe.ValidationError)
+
+	outstanding = flt(invoice.outstanding_amount)
+	if outstanding <= 0:
+		frappe.throw(_("La factura {0} no tiene saldo pendiente.").format(sales_invoice), frappe.ValidationError)
+	if monto - outstanding > 0.005:
+		frappe.throw(
+			_("El monto ({0}) supera el saldo pendiente ({1}).").format(monto, outstanding),
+			frappe.ValidationError,
+		)
+
+	pe_name = _payment_entry_para_asignaciones(
+		[(sales_invoice, monto)],
+		mode_of_payment=mode_of_payment,
+		posting_date=fecha_cobro,
+		reference_no=reference_no,
+		auto_submit=auto_submit,
+	)
+	saldo = sync_saldo_deuda_socio(socio_name)
+	return {
+		"status": "ok",
+		"payment_entries": [pe_name],
 		"saldo_deuda": saldo,
 	}
 

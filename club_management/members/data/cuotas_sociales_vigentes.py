@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 # Ítem ERPNext único para suscripción / facturación de cuota social.
-CUOTA_SOCIAL_ITEM_CODE = "CLUB-Cuota-Social-Base"
+CUOTA_SOCIAL_ITEM_CODE = "ICDPE-CUOTA-SOCIAL"
 CUOTA_SOCIAL_PLAN_NAME = "Plan Cuota Social Base"
 
-# Montos operativos (planilla Mayo 2026 — solo cuotas sociales).
+# Montos operativos vigentes (ago 2026).
 CUOTAS_SOCIALES_VIGENTES: tuple[tuple[str, float], ...] = (
-	("Activo", 29_000.0),
-	("Menor", 26_500.0),
-	("2° Hermano", 25_500.0),
-	("3° Hermano", 22_000.0),
-	("Adherente", 17_500.0),
+	("Activo", 31_000.0),
+	("Menor", 28_500.0),
+	("2° Hermano", 27_500.0),
+	("3° Hermano", 23_500.0),
+	("Adherente", 19_500.0),
 	("Jubilado", 5_500.0),
 )

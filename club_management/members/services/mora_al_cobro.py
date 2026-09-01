@@ -527,6 +527,116 @@ def _aplicar_bonificacion_detalle(
 	return result
 
 
+def calcular_exigido_linea_factura(
+	invoice_name: str,
+	item_code: str,
+	socio_name: str,
+	*,
+	posting_date: str | date | None = None,
+) -> dict[str, Any]:
+	"""Monto exigido de **una** línea (informe por concepto), con mora si aplica."""
+	settings = get_club_settings()
+	ref = getdate(posting_date or today())
+	campo_periodo = _campo_periodo_cobro()
+	invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, invoice_name)
+	periodo = (invoice.get(campo_periodo) if campo_periodo else None) or ""
+	code = (item_code or "").strip()
+
+	line = next(
+		(row for row in (invoice.get("items") or []) if (row.item_code or "").strip() == code),
+		None,
+	)
+	if not line:
+		return {
+			"invoice": invoice_name,
+			"item_code": code,
+			"periodo": periodo,
+			"monto_exigido": 0.0,
+			"aplica_mora": False,
+			"tramo": "ninguno",
+		}
+
+	monto_cuota, item_cuota = resolve_cuota_social(socio_name)
+	valor_linea = resolve_valor_actual_linea(
+		item_code=code,
+		qty=flt(line.qty),
+		rate_facturado=flt(line.rate),
+		socio_name=socio_name,
+		item_cuota=item_cuota,
+		monto_cuota=flt(monto_cuota),
+	)
+	line_base = flt(line.amount)
+
+	result: dict[str, Any] = {
+		"invoice": invoice_name,
+		"item_code": code,
+		"periodo": periodo,
+		"valor_actual": valor_linea,
+		"line_base": line_base,
+		"tramo": "ninguno",
+		"aplica_mora": False,
+		"monto_exigido": line_base,
+	}
+
+	if not periodo or periodo_es_ajuste_mora(periodo) or periodo_es_recargo_legado(periodo):
+		return result
+
+	if not concepto_sujeto_a_mora(code, socio_name=socio_name):
+		return result
+
+	dia_v1 = int(settings.dia_primer_vencimiento or 10)
+	dia_v2 = settings.dia_segundo_vencimiento or "20"
+	pct_extra = flt(settings.recargo_mes_vencido_pct if settings.recargo_mes_vencido_pct is not None else 5)
+	pct_post = flt(
+		settings.recargo_post_vencimiento_pct if settings.recargo_post_vencimiento_pct is not None else 10
+	)
+	tramo = resolver_tramo_mora(
+		periodo,
+		ref,
+		dia_primer_vencimiento=dia_v1,
+		dia_segundo_vencimiento=dia_v2,
+	)
+	result["tramo"] = tramo
+	if tramo == "ninguno":
+		result["monto_exigido"] = flt(valor_linea, 2)
+		return result
+
+	monto_exigido = calcular_monto_exigido_mora(
+		valor_actual=valor_linea,
+		tramo=tramo,
+		pct_post_primer=pct_post,
+		pct_extra_segundo=pct_extra,
+	)
+	result.update(
+		{
+			"monto_exigido": flt(monto_exigido, 2),
+			"aplica_mora": True,
+			"composicion": texto_composicion_mora(
+				valor_actual=valor_linea,
+				tramo=tramo,
+				pct_post_primer=pct_post,
+				pct_extra_segundo=pct_extra,
+				monto_exigido=monto_exigido,
+			),
+		}
+	)
+
+	from club_management.members.services.bonificacion_arancel import calcular_bonificacion_factura
+
+	if code != (item_cuota or "").strip():
+		bonif = calcular_bonificacion_factura(invoice_name, socio_name)
+		monto_b = flt(bonif.get("monto_bonificacion"))
+		if monto_b > 0.005 and flt(bonif.get("monto_arancel")) > 0:
+			# Prorratear bonificación si la factura tiene más de un arancel.
+			share = flt(line_base / flt(bonif.get("monto_arancel")), 6)
+			descuento = flt(monto_b * share, 2)
+			result["monto_bonificacion"] = descuento
+			result["monto_exigido"] = max(0.0, flt(result["monto_exigido"] - descuento, 2))
+			result["aplica_bonificacion"] = descuento > 0.005
+
+	return result
+
+
 def previsualizar_cobro_con_mora(
 	socio_name: str,
 	sales_invoices: list[str],
@@ -751,6 +861,9 @@ def preparar_facturas_cobro_con_mora(
 	posting_date: str | date | None = None,
 ) -> dict[str, Any]:
 	"""Asegura ajustes de mora + CN de bonificación; total = outstanding expandido."""
+	from club_management.integrations.payment_ledger_postgres import apply_patch
+
+	apply_patch()
 	from club_management.members.services.bonificacion_arancel import (
 		asegurar_credit_note_bonificacion,
 		calcular_bonificacion_factura,
