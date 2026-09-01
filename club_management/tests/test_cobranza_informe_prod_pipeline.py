@@ -70,3 +70,44 @@ class TestCobranzaInformeProdPipeline(FrappeTestCase):
 					)
 		finally:
 			frappe.local.site = original
+
+	def test_prep_only_aplica_subpasos_sin_simular(self) -> None:
+		with tempfile.TemporaryDirectory() as tmp:
+			csv = Path(tmp) / "informe.xlsx"
+			csv.write_bytes(b"")
+			with patch(
+				"club_management.scripts.cobranza_informe_prod_pipeline.run_fix_tarifas",
+				return_value={"parcheadas": 1},
+			) as mock_tarifas, patch(
+				"club_management.scripts.cobranza_informe_prod_pipeline.ensure_bulk_apply_allowed",
+			), patch(
+				"club_management.scripts.cobranza_informe_prod_pipeline.run_sync_ple",
+				return_value={"fixed_count": 0},
+			), patch(
+				"club_management.scripts.cobranza_informe_prod_pipeline.run_fix_refactura",
+				return_value={"parcheadas": 0},
+			), patch(
+				"club_management.scripts.cobranza_informe_prod_pipeline.run_alta_cargo",
+				return_value={"creados": 0},
+			), patch(
+				"club_management.scripts.cobranza_informe_prod_pipeline.run_facturar_cto",
+				return_value={"facturados": 0},
+			), patch(
+				"club_management.scripts.cobranza_informe_prod_pipeline.run_facturar_cuota_comp",
+				return_value={"facturados": 0},
+			), patch(
+				"club_management.scripts.cobranza_informe_prod_pipeline.run_bulk_payments",
+				return_value={"procesadas": 0, "inconsistencias": []},
+			), patch(
+				"club_management.scripts.cobranza_informe_prod_pipeline.run_facturar_sin_factura",
+				return_value={"facturados_periodo": 0},
+			):
+				result = run_pipeline(
+					csv_path=str(csv),
+					dry_run=False,
+					skip_apply=True,
+					confirm="APPLY_PROD",
+					log_dir=str(Path(tmp) / "logs"),
+				)
+			mock_tarifas.assert_called_once_with(dry_run=False, confirm="APPLY_PROD")
+			self.assertTrue(result["apply"].get("skipped"))

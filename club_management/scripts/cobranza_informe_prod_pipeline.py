@@ -60,16 +60,14 @@ def run(
 	skip_apply: bool = False,
 ) -> dict[str, Any]:
 	"""Ejecuta el pipeline completo. `dry_run=True` simula todos los pasos."""
-	step_dry = dry_run or skip_apply
-	if not dry_run and not skip_apply:
-		ensure_bulk_apply_allowed(dry_run=False, confirm=confirm)
-	elif not dry_run and skip_apply:
+	step_dry = dry_run
+	if not dry_run:
 		ensure_bulk_apply_allowed(dry_run=False, confirm=confirm)
 
 	base = Path(log_dir)
 	base.mkdir(parents=True, exist_ok=True)
 	periodos = list(periodos_cto_comp or DEFAULT_PERIODOS_CTO)
-	sub_confirm = confirm if not step_dry else ""
+	sub_confirm = confirm if not dry_run else ""
 
 	results: dict[str, Any] = {"csv_path": csv_path, "dry_run": dry_run, "skip_apply": skip_apply}
 
