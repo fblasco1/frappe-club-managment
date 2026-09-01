@@ -130,6 +130,8 @@ def refactura_item_en_factura(
 def _cancelar_payment_entry(name: str, *, dry_run: bool) -> dict:
 	if dry_run:
 		return {"payment_entry": name, "action": "would_cancel"}
+	if not frappe.db.exists("Payment Entry", name):
+		return {"payment_entry": name, "action": "skip", "reason": "no_existe"}
 	from club_management.integrations.payment_ledger_postgres import apply_patch
 
 	apply_patch()
@@ -145,6 +147,10 @@ def fix_socio_11844_boxeo(*, dry_run: bool = False) -> dict:
 	invoice = "ACC-SINV-2026-02276"
 	pes = ("ACC-PAY-2026-02166", "ACC-PAY-2026-02168")
 	out: dict = {"invoice": invoice, "payment_entries": [], "refactura": None}
+	if not frappe.db.exists(SALES_INVOICE_DOCTYPE, invoice):
+		out["action"] = "skip"
+		out["reason"] = "sin_factura"
+		return out
 	for pe_name in pes:
 		out["payment_entries"].append(_cancelar_payment_entry(pe_name, dry_run=dry_run))
 	if not dry_run:
