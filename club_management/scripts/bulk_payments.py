@@ -41,6 +41,7 @@ from club_management.scripts.bulk_io import (
 )
 from club_management.scripts.informe_concepto_cobranza import (
 	buscar_linea_factura_concepto,
+	concepto_linea_saldada_en_periodo,
 	es_cuota_complementaria,
 	linea_cuota_complementaria_en_periodo,
 )
@@ -616,6 +617,34 @@ def _print_resumen(stats: BulkPaymentsStats, *, dry_run: bool, csv_path: str) ->
 	print("=" * 72 + "\n")
 
 
+def _reservar_facturas_si_saldadas(
+	reservadas: set[str],
+	invoice_names: list[str],
+	monto_aplicado: float,
+	*,
+	dry_run: bool,
+	saldo_simulado: dict[str, float],
+) -> None:
+	"""Reserva la SI solo cuando el saldo (real o simulado) queda en cero."""
+	restante_pago = flt(monto_aplicado, 2)
+	for invoice_name in invoice_names:
+		if dry_run:
+			actual = saldo_simulado.get(
+				invoice_name,
+				flt(frappe.db.get_value(SALES_INVOICE_DOCTYPE, invoice_name, "outstanding_amount"), 2),
+			)
+			take = min(actual, restante_pago) if restante_pago > 0 else 0.0
+			nuevo = flt(actual - take, 2)
+			saldo_simulado[invoice_name] = nuevo
+			restante_pago = flt(restante_pago - take, 2)
+			if nuevo <= 0.005:
+				reservadas.add(invoice_name)
+			continue
+		outstanding = flt(frappe.db.get_value(SALES_INVOICE_DOCTYPE, invoice_name, "outstanding_amount"), 2)
+		if outstanding <= 0.005:
+			reservadas.add(invoice_name)
+
+
 def run(
 	*,
 	csv_path: str,
@@ -638,6 +667,7 @@ def run(
 	stats = BulkPaymentsStats(total_filas=len(rows))
 	applied = 0
 	reservadas: set[str] = set()
+	saldo_simulado: dict[str, float] = {}
 
 	for idx, raw in enumerate(rows, start=2):
 		if limit is not None and (stats.procesadas + stats.simuladas + stats.ya_procesado) >= limit:
@@ -704,20 +734,29 @@ def run(
 			)
 			if err == "concepto_sin_factura":
 				if es_cuota_complementaria(concepto_fila):
-					if linea_cuota_complementaria_en_periodo(
+					pagada = bool(
+						linea_cuota_complementaria_en_periodo(
+							socio_name,
+							periodo_fila,
+							concepto_fila,
+							solo_impagas=False,
+							reservadas=set(),
+						)
+					)
+				else:
+					pagada = concepto_linea_saldada_en_periodo(
 						socio_name,
 						periodo_fila,
 						concepto_fila,
-						solo_impagas=False,
-						reservadas=reservadas,
-					):
-						_add_error(stats, idx, "ya_saldada", socio=socio_name, **base)
-					else:
-						_add_error(stats, idx, "sin_factura_impaga", socio=socio_name, **base)
-				else:
-					todas = facturas_periodo(socio_name, periodo_fila)
-					codigo = "ya_saldada" if todas else "sin_factura_impaga"
-					_add_error(stats, idx, codigo, socio=socio_name, **base)
+						monto_abonado=monto,
+					)
+				_add_error(
+					stats,
+					idx,
+					"ya_saldada" if pagada else "sin_factura_impaga",
+					socio=socio_name,
+					**base,
+				)
 				continue
 		else:
 			invoices = [n for n in facturas_impagas_periodo(socio_name, periodo_fila) if n not in reservadas]
@@ -754,7 +793,13 @@ def run(
 			stats.simuladas += 1
 			stats.monto_total += exigido
 			stats.facturas_saldadas.extend(elegidas)
-			reservadas.update(elegidas)
+			_reservar_facturas_si_saldadas(
+				reservadas,
+				elegidas,
+				monto if item_code_match else exigido,
+				dry_run=True,
+				saldo_simulado=saldo_simulado,
+			)
 			continue
 
 		if len(elegidas) == 1 and item_code_match:
@@ -810,7 +855,13 @@ def run(
 		stats.monto_total += exigido
 		stats.facturas_saldadas.extend(elegidas)
 		stats.payment_entries.extend(result.get("payment_entries") or [])
-		reservadas.update(elegidas)
+		_reservar_facturas_si_saldadas(
+			reservadas,
+			elegidas,
+			monto if item_code_match else exigido,
+			dry_run=False,
+			saldo_simulado=saldo_simulado,
+		)
 		applied += 1
 		if commit_every and applied % commit_every == 0 and not getattr(frappe.flags, "in_test", False):
 			frappe.db.commit()

@@ -32,6 +32,29 @@ class TestInformeConceptoCobranzaHelpers(MembersTestCase):
 		codes = resolver_item_codes_concepto("PRE-MINI B U9")
 		self.assertEqual(codes, ("ICDPE-BASQUET-MASCULINO-MINIBASQUET",))
 
+	def test_resolver_premini_a_y_mini_a_minibasquet_no_escuelita(self) -> None:
+		self.assertEqual(
+			resolver_item_codes_concepto("PRE-MINI A U9"),
+			("ICDPE-BASQUET-MASCULINO-MINIBASQUET",),
+		)
+		self.assertEqual(
+			resolver_item_codes_concepto("MINI A U11"),
+			("ICDPE-BASQUET-MASCULINO-MINIBASQUET",),
+		)
+		self.assertEqual(
+			resolver_item_codes_concepto("INFA A U13"),
+			("ICDPE-BASQUET-MASCULINO-MINIBASQUET",),
+		)
+		self.assertEqual(
+			resolver_item_codes_concepto("CADETES A U15"),
+			("ICDPE-BASQUET-MASCULINO-FORMATIVAS-AZUL",),
+		)
+		self.assertEqual(
+			resolver_item_codes_concepto("JUVENILES A U17"),
+			("ICDPE-BASQUET-MASCULINO-FORMATIVAS-AZUL",),
+		)
+		self.assertNotIn("ICDPE-BASQUET-ESCUELITA", resolver_item_codes_concepto("PRE-MINI A U9"))
+
 	def test_resolver_adicional_basquet(self) -> None:
 		codes = resolver_item_codes_concepto("Adicional Basquet Escuelita")
 		self.assertIn("ICDPE-BASQUET-ESCUELITA", codes)

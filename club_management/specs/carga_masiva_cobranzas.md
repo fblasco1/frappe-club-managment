@@ -95,8 +95,10 @@ And no se duplica el cobro.
 
 Given el socio no tiene SI impagas del período
 When se procesa un cobro
-Then inconsistencia `sin_factura_impaga` (o `ya_saldada` si hay SI del período en cero)
+Then inconsistencia `sin_factura_impaga` (o `ya_saldada` si hay SI del período en cero **con la línea de ese concepto**)
 And no se crea PE.
+
+`ya_saldada` **no** se usa solo porque exista otra factura del período (p. ej. cuota ya cobrada): si el concepto del informe no está en ninguna SI, el código es `sin_factura_impaga`.
 
 ---
 
@@ -150,6 +152,17 @@ And el excedente se registra como saldo a favor del socio.
 
 ---
 
+## Scenario: dos conceptos contra la misma SI multi-línea
+
+Given una SI del período con cuota social + arancel (p. ej. $28.500 + $28.500)
+And el informe trae primero «Cuota Social Menor» $28.500 y después «PRE-MINI A U9» $29.000
+When se aplica la carga masiva
+Then ambos cobros se imputan a la **misma** SI (parcial + parcial)
+And la SI queda saldada (o con excedente ≤ $500 como saldo a favor)
+And **no** se reserva la factura completa tras el primer renglón: solo se reserva cuando `outstanding` llega a 0.
+
+---
+
 ## Scenario: boxeo informe 3 veces
 
 Given el informe dice «BOXEO 3 VECES»
@@ -182,6 +195,7 @@ And se puede persistir un JSON de log en `log_path`.
 |-------|-----------|
 | Spec | este archivo |
 | Script | `scripts/bulk_payments.py` |
+| Reimputación arancel omitido | `scripts/reapply_informe_arancel_omitido.py` |
 | Pipeline prod | `scripts/cobranza_informe_prod_pipeline.py` |
 | Tests | `tests/test_bulk_payments.py` |
 

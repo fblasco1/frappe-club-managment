@@ -94,7 +94,14 @@ And el monto exigido es $83.333 (sin mora).
 | ARTISTICA 1 CLASE | `ICDPE-GIMNASIA-ARTISTICA-1-CLASE` |
 | Cuota Social * | ítem de cuota según categoría en el texto del informe |
 
-Equipos / etiquetas de tira (U17 FLEX, …): alias de arancel mensual.
+Equipos / etiquetas de tira (U17 FLEX, PRE-MINI A/B U9, …): alias de arancel mensual.
+
+**PRE-MINI A U9** = tira **U9 Azul** → `ICDPE-BASQUET-MASCULINO-MINIBASQUET` (no Escuelita).
+**MINI A U11** = **U11 Azul** → el mismo ítem Minibasquet.
+**INFA A / Infantiles A U13** = **U13 Azul** → Minibasquet.
+**CADETES A U15 / JUVENILES A U17 / LIGA APROX A U21** = tira **Azul** → `ICDPE-BASQUET-MASCULINO-FORMATIVAS-AZUL`.
+Tira B = Amarillo (Minibasquet U9–U13 o Formativas Amarilla U15+).
+«Adicional Basquet Escuelita» es el único concepto que va a `ICDPE-BASQUET-ESCUELITA`.
 
 ### Cuota Complementaria (`CTO COMP …`)
 

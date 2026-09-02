@@ -63,7 +63,7 @@ _ARANCEL_EQUIPO_ALIAS: dict[str, tuple[str, ...]] = {
 		"ICDPE-BASQUET-MASCULINO-FORMATIVAS-AZUL",
 		"ICDPE-BASQUET-MASCULINO-FORMATIVAS-FLEX",
 	),
-	"JUVENILES A U17": ("ICDPE-BASQUET-MASCULINO-FORMATIVAS-AZUL", "ICDPE-BASQUET-MASCULINO-FORMATIVAS-FLEX"),
+	"JUVENILES A U17": ("ICDPE-BASQUET-MASCULINO-FORMATIVAS-AZUL",),
 	"JUVENILES B U17": ("ICDPE-BASQUET-MASCULINO-FORMATIVAS-AMARILLA",),
 	"CADETES A U15": ("ICDPE-BASQUET-MASCULINO-FORMATIVAS-AZUL",),
 	"CADETES B U15": ("ICDPE-BASQUET-MASCULINO-FORMATIVAS-AMARILLA",),
@@ -71,7 +71,7 @@ _ARANCEL_EQUIPO_ALIAS: dict[str, tuple[str, ...]] = {
 	"INFA A U13": ("ICDPE-BASQUET-MASCULINO-MINIBASQUET",),
 	"MINI A U11": ("ICDPE-BASQUET-MASCULINO-MINIBASQUET",),
 	"MINI B U11": ("ICDPE-BASQUET-MASCULINO-MINIBASQUET",),
-	"PRE-MINI A U9": ("ICDPE-BASQUET-ESCUELITA",),
+	"PRE-MINI A U9": ("ICDPE-BASQUET-MASCULINO-MINIBASQUET",),
 	"PRE-MINI B U9": ("ICDPE-BASQUET-MASCULINO-MINIBASQUET",),
 	"LIGA APROX A U21": ("ICDPE-BASQUET-MASCULINO-FORMATIVAS-AZUL",),
 	"LIGA APROX B U21": ("ICDPE-BASQUET-MASCULINO-FORMATIVAS-AMARILLA",),
@@ -285,6 +285,7 @@ def resolver_item_codes_concepto(
 		return fed
 
 	if norm in _ARANCEL_EQUIPO_ALIAS:
+		# Tira A = Azul / Minibasquet; no mezclar Escuelita (otro equipo).
 		return _ARANCEL_EQUIPO_ALIAS[norm]
 
 	if norm.startswith("EXPEDIENTE FEBAMBA") or norm == "FEBAMBA":
@@ -296,6 +297,157 @@ def resolver_item_codes_concepto(
 			return por_inscripcion
 
 	return ()
+
+
+_REF_INF_CONCEPTO_RE = re.compile(
+	r"INF-\d+-[^-]+-\d{2}/\d{4}-[\d.]+-(.+)$",
+	re.I,
+)
+
+
+def concepto_desde_comprobante(reference_no: str | None, remarks: str | None = None) -> str:
+	"""Extrae el concepto del informe desde `reference_no` INF-… (no remarks de ERPNext)."""
+	ref = (reference_no or "").strip()
+	if not ref.upper().startswith("INF-"):
+		return ""
+	match = _REF_INF_CONCEPTO_RE.search(ref.replace("\n", " "))
+	if match:
+		return (match.group(1) or "").strip()
+	return ""
+
+
+def concepto_informe_desde_pe(reference_no: str | None, remarks: str | None = None) -> str:
+	"""Concepto del informe asociado al PE (vacío si no es cobro masivo INF-…)."""
+	return concepto_desde_comprobante(reference_no, remarks)
+
+
+def _cobros_imputados_por_linea(invoice_name: str) -> list[dict[str, Any]]:
+	"""Asigna cada PE a la línea del concepto (cuota ≠ arancel); no prorratea."""
+	lines = frappe.get_all(
+		"Sales Invoice Item",
+		filters={"parent": invoice_name},
+		fields=["name", "idx", "item_code", "description", "amount"],
+		order_by="idx asc",
+	)
+	restante = [flt(row.amount, 2) for row in lines]
+	imputado_concepto = [0.0] * len(lines)
+	refs = frappe.get_all(
+		"Payment Entry Reference",
+		filters={
+			"reference_doctype": SALES_INVOICE_DOCTYPE,
+			"reference_name": invoice_name,
+			"parenttype": "Payment Entry",
+		},
+		fields=["parent", "allocated_amount"],
+	)
+	if not refs:
+		return [
+			{
+				"item_code": row.item_code,
+				"description": row.description,
+				"amount": flt(row.amount, 2),
+				"imputado": 0.0,
+				"restante": flt(row.amount, 2),
+			}
+			for row in lines
+		]
+
+	pe_names = list({row.parent for row in refs})
+	pe_meta = {
+		pe.name: pe
+		for pe in frappe.get_all(
+			"Payment Entry",
+			filters={"name": ["in", pe_names], "docstatus": 1},
+			fields=["name", "reference_no", "remarks"],
+		)
+	}
+	for ref in refs:
+		pe = pe_meta.get(ref.parent)
+		if not pe:
+			continue
+		take = flt(ref.allocated_amount, 2)
+		if take <= 0.005:
+			continue
+		concepto = concepto_desde_comprobante(pe.reference_no, pe.remarks)
+		if es_cuota_complementaria(concepto):
+			for idx, row in enumerate(lines):
+				if take <= 0.005:
+					break
+				if not cuotas_complementarias_equivalentes(concepto, row.get("description")):
+					continue
+				use = min(restante[idx], take)
+				if use <= 0.005:
+					continue
+				restante[idx] = flt(restante[idx] - use, 2)
+				imputado_concepto[idx] = flt(imputado_concepto[idx] + use, 2)
+				take = flt(take - use, 2)
+			for idx, _row in enumerate(lines):
+				if take <= 0.005:
+					break
+				use = min(restante[idx], take)
+				if use <= 0.005:
+					continue
+				restante[idx] = flt(restante[idx] - use, 2)
+				take = flt(take - use, 2)
+			continue
+		codes = resolver_item_codes_concepto(concepto) if concepto else ()
+		if codes:
+			for idx, row in enumerate(lines):
+				if take <= 0.005:
+					break
+				if (row.item_code or "").strip() not in codes:
+					continue
+				use = min(restante[idx], take)
+				if use <= 0.005:
+					continue
+				restante[idx] = flt(restante[idx] - use, 2)
+				imputado_concepto[idx] = flt(imputado_concepto[idx] + use, 2)
+				take = flt(take - use, 2)
+			# Sobra (mora / redondeo): baja el saldo de la SI, no cuenta como otro concepto.
+			for idx, _row in enumerate(lines):
+				if take <= 0.005:
+					break
+				use = min(restante[idx], take)
+				if use <= 0.005:
+					continue
+				restante[idx] = flt(restante[idx] - use, 2)
+				take = flt(take - use, 2)
+			continue
+		for idx, _row in enumerate(lines):
+			if take <= 0.005:
+				break
+			use = min(restante[idx], take)
+			if use <= 0.005:
+				continue
+			restante[idx] = flt(restante[idx] - use, 2)
+			imputado_concepto[idx] = flt(imputado_concepto[idx] + use, 2)
+			take = flt(take - use, 2)
+
+	out: list[dict[str, Any]] = []
+	for idx, (row, rest) in enumerate(zip(lines, restante, strict=True)):
+		monto = flt(row.amount, 2)
+		out.append(
+			{
+				"item_code": row.item_code,
+				"description": row.description,
+				"amount": monto,
+				"imputado": flt(imputado_concepto[idx], 2),
+				"restante": rest,
+			}
+		)
+	return out
+
+
+def monto_cobrado_de_items(invoice_name: str, item_codes: list[str] | tuple[str, ...]) -> float:
+	"""Suma imputada a esos ítems según concepto del PE (0 si el cobro fue cuota)."""
+	wanted = {str(code).strip() for code in (item_codes or []) if str(code).strip()}
+	if not wanted:
+		return 0.0
+	total = 0.0
+	for row in _cobros_imputados_por_linea(invoice_name):
+		if (row.get("item_code") or "").strip() in wanted:
+			total += flt(row.get("imputado"), 2)
+	return flt(total, 2)
 
 
 def _lineas_factura(invoice_name: str) -> list[dict[str, Any]]:
@@ -337,6 +489,25 @@ def _linea_coincide_febamba(line: dict[str, Any], monto: float, invoice_name: st
 	return abs(monto - amt) <= 1.0 and amt > 0
 
 
+def _es_concepto_arancel_equipo(concepto: str | None) -> bool:
+	norm = normalizar_concepto_informe(concepto)
+	if not norm or es_cuota_complementaria(norm):
+		return False
+	if "FED" in norm or "FEDER" in norm:
+		return False
+	if "CUOTA SOCIAL" in norm:
+		return False
+	if norm in _ARANCEL_EQUIPO_ALIAS:
+		return True
+	return bool(
+		re.search(
+			r"(PRE-?MINI|MINI [AB]|INFANTIL|INFA |CADETE|JUVENIL|LIGA APROX)",
+			norm,
+			re.I,
+		)
+	)
+
+
 def buscar_linea_factura_concepto(
 	socio_name: str,
 	periodo: str,
@@ -344,8 +515,9 @@ def buscar_linea_factura_concepto(
 	*,
 	monto_abonado: float = 0.0,
 	reservadas: set[str] | None = None,
+	solo_impagas: bool = True,
 ) -> tuple[str, str, float] | None:
-	"""Encuentra `(invoice_name, item_code, monto_linea)` impaga para el concepto."""
+	"""Encuentra `(invoice_name, item_code, monto_linea)` para el concepto."""
 	reservadas = reservadas or set()
 	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
 	if not campo_socio:
@@ -361,13 +533,13 @@ def buscar_linea_factura_concepto(
 			socio_name,
 			periodo,
 			concepto,
-			solo_impagas=True,
+			solo_impagas=solo_impagas,
 			reservadas=reservadas,
 		)
 		if match:
 			return match
 
-	invoices = _facturas_socio_periodo(socio_name, periodo, solo_impagas=True)
+	invoices = _facturas_socio_periodo(socio_name, periodo, solo_impagas=solo_impagas)
 
 	for invoice_name in invoices:
 		if invoice_name in reservadas:
@@ -380,7 +552,6 @@ def buscar_linea_factura_concepto(
 				code = (line.get("item_code") or "").strip()
 				return invoice_name, code, flt(line.get("amount"))
 
-	# Fallback: descripción de línea contiene texto del concepto
 	if norm:
 		for invoice_name in invoices:
 			if invoice_name in reservadas:
@@ -391,7 +562,48 @@ def buscar_linea_factura_concepto(
 					code = (line.get("item_code") or "").strip()
 					return invoice_name, code, flt(line.get("amount"))
 
+	if _es_concepto_arancel_equipo(concepto):
+		candidatas: list[tuple[str, dict[str, Any]]] = []
+		for invoice_name in invoices:
+			if invoice_name in reservadas:
+				continue
+			for line in _lineas_factura(invoice_name):
+				desc = normalizar_concepto_informe(line.get("description"))
+				code = (line.get("item_code") or "").strip()
+				if desc == "ARANCEL ACTIVIDAD" or code.startswith("ICDPE-BASQUET"):
+					candidatas.append((invoice_name, line))
+		if candidatas:
+			if monto_abonado:
+				candidatas.sort(key=lambda row: abs(flt(row[1].get("amount")) - flt(monto_abonado)))
+			inv, line = candidatas[0]
+			amt = flt(line.get("amount"))
+			if not monto_abonado or abs(amt - flt(monto_abonado)) <= 501.0:
+				code = (line.get("item_code") or "").strip()
+				return inv, code, amt
+
 	return None
+
+
+def concepto_linea_saldada_en_periodo(
+	socio_name: str,
+	periodo: str,
+	concepto: str | None,
+	*,
+	monto_abonado: float = 0.0,
+) -> bool:
+	"""True si el concepto ya está en una SI del período con outstanding 0."""
+	match = buscar_linea_factura_concepto(
+		socio_name,
+		periodo,
+		concepto,
+		monto_abonado=monto_abonado,
+		reservadas=set(),
+		solo_impagas=False,
+	)
+	if not match:
+		return False
+	outstanding = flt(frappe.db.get_value(SALES_INVOICE_DOCTYPE, match[0], "outstanding_amount"))
+	return outstanding <= 0.005
 
 
 def buscar_cargo_pendiente_cuota_complementaria(

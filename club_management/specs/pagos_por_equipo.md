@@ -67,12 +67,23 @@ Then ve `liquidacion_entrenador` = 8.000 (80 % del arancel pagado).
 
 ---
 
-## Scenario: pago parcial proporcional
+## Scenario: cobro de cuota no cuenta como arancel
 
 Given factura con cuota social y arancel en la misma factura
-And el socio pagó el 50 % del total de la factura
+And un `Payment Entry` imputado al concepto «Cuota Social …»
+When se calcula el arancel pagado del equipo
+Then el importe de arancel cobrado es **0** (no se prorratea el pago de cuota)
+And un excedente de mora sobre la cuota tampoco se cuenta como arancel.
+
+---
+
+## Scenario: cobro de tira imputado al arancel
+
+Given la misma SI mixta
+And un `Payment Entry` con referencia de informe «PRE-MINI A U9» / «MINI A U11» / «CADETES A U15» (tira Azul)
 When se calcula el arancel pagado
-Then se asigna el 50 % del monto de la línea de arancel (proporcional).
+Then se asigna el monto imputado a la línea de arancel (Minibasquet o Formativas Azul)
+And no se reduce la línea de cuota social
 
 ---
 

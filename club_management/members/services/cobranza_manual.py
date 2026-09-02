@@ -496,20 +496,20 @@ def sync_saldo_deuda_socio(socio_name: str) -> float:
 
 
 def _lineas_factura_pendiente(invoice_name: str) -> list[dict[str, Any]]:
-	rows = frappe.get_all(
-		"Sales Invoice Item",
-		filters={"parent": invoice_name},
-		fields=["item_code", "description", "amount"],
-		order_by="`tabSales Invoice Item`.idx asc",
-	)
+	"""Líneas aún impagas: descuenta cobros por concepto del comprobante (no prorratea)."""
+	from club_management.scripts.informe_concepto_cobranza import _cobros_imputados_por_linea
+
 	lineas: list[dict[str, Any]] = []
-	for row in rows:
-		concepto = (row.description or row.item_code or "").strip()
+	for row in _cobros_imputados_por_linea(invoice_name):
+		restante = flt(row.get("restante"), 2)
+		if restante <= 0.005:
+			continue
+		concepto = (row.get("description") or row.get("item_code") or "").strip()
 		lineas.append(
 			{
 				"concepto": concepto or _("Concepto"),
-				"item_code": row.item_code,
-				"monto": flt(row.amount),
+				"item_code": row.get("item_code"),
+				"monto": restante,
 			}
 		)
 	return lineas

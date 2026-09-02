@@ -19,6 +19,7 @@ from club_management.members.services.modos_pago_desk import DESK_MODOS_PAGO_COB
 from club_management.members.services.socio_operaciones_secretaria import (
 	ensure_secretaria_operacion_access,
 )
+from club_management.scripts.informe_concepto_cobranza import concepto_informe_desde_pe
 
 
 def _label_medio(mode: str) -> str:
@@ -67,7 +68,16 @@ def get_informe_pagos_del_dia(fecha: str | date | None = None) -> dict[str, Any]
 	pe_rows = frappe.get_all(
 		"Payment Entry",
 		filters={"docstatus": 1, "posting_date": dia, "payment_type": "Receive"},
-		fields=["name", "posting_date", "mode_of_payment", "paid_amount", "received_amount", "party"],
+		fields=[
+			"name",
+			"posting_date",
+			"mode_of_payment",
+			"paid_amount",
+			"received_amount",
+			"party",
+			"reference_no",
+			"remarks",
+		],
 		order_by="creation asc",
 	)
 	if not pe_rows:
@@ -197,6 +207,18 @@ def get_informe_pagos_del_dia(fecha: str | date | None = None) -> dict[str, Any]
 			inv_socio = None
 			if campo_socio:
 				inv_socio = invoice_meta.get(ref.reference_name, {}).get(campo_socio)
+			concepto_pe = concepto_informe_desde_pe(pe.reference_no, pe.remarks)
+			if concepto_pe:
+				_add_concepto(concepto_pe, allocated)
+				_append_linea(
+					socio_id=inv_socio,
+					concepto=concepto_pe,
+					mode=mode,
+					amount=allocated,
+					payment_entry=pe.name,
+					sales_invoice=ref.reference_name,
+				)
+				continue
 			inv_lineas = lineas_by_inv.get(ref.reference_name) or []
 			line_total = sum(flt(l["amount"]) for l in inv_lineas)
 			if not inv_lineas or line_total <= 0:

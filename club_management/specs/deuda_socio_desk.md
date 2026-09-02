@@ -50,7 +50,8 @@ And al confirmar con un solo medio, el cobro usa ese total (sin error de “no c
 Given un `Socio` con facturas ERPNext impagas y/o cargos extra pendientes
 When Secretaría abre el formulario `Socio`
 Then ve una sección **Deuda pendiente** con el total (`saldo_deuda`)
-And una tabla con conceptos: facturas submitteadas con saldo (líneas) y cargos `Cargo Socio` pendientes sin facturar.
+And una tabla con conceptos: facturas submitteadas con saldo (líneas **aún impagas**) y cargos `Cargo Socio` pendientes sin facturar.
+And si la SI está paga en forma parcial, las líneas se netean con el **concepto del comprobante** (`reference_no` INF-…): un cobro de cuota social no deja la cuota en deuda ni se muestra como arancel; un cobro de tira (PRE-MINI / MINI / Cadetes…) cubre el arancel.
 And la sincronización de `saldo_deuda` **no** actualiza `Socio.modified` (evita conflicto al guardar otros campos).
 
 ---

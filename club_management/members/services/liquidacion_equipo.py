@@ -413,23 +413,16 @@ def calcular_pagos_arancel_en_rango(
 	)
 	total = 0.0
 	count = 0
+	from club_management.scripts.informe_concepto_cobranza import monto_cobrado_de_items
+
 	for invoice in invoices:
 		paid = flt(invoice.grand_total) - flt(invoice.outstanding_amount)
 		if paid <= 0:
 			continue
-		lines = frappe.get_all(
-			"Sales Invoice Item",
-			filters={"parent": invoice.name, "item_code": ["in", item_codes]},
-			fields=["amount"],
-		)
-		arancel_amount = sum(flt(line.amount) for line in lines)
-		if arancel_amount <= 0:
+		cobrado = monto_cobrado_de_items(invoice.name, item_codes)
+		if cobrado <= 0.005:
 			continue
-		grand_total = flt(invoice.grand_total)
-		if grand_total <= 0:
-			continue
-		paid_ratio = min(paid / grand_total, 1.0)
-		total += arancel_amount * paid_ratio
+		total += cobrado
 		count += 1
 	return total, count
 

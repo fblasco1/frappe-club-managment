@@ -89,6 +89,20 @@ class TestBulkPaymentsHelpers(MembersTestCase):
 		self.assertEqual(map_medio_pago("Cheque"), "Cheque")
 		self.assertIsNone(map_medio_pago("trueque"))
 
+	def test_premini_a_es_u9_azul_minibasquet_no_escuelita(self) -> None:
+		from club_management.scripts.informe_concepto_cobranza import (
+			concepto_desde_comprobante,
+			resolver_item_codes_concepto,
+		)
+
+		codes = resolver_item_codes_concepto("PRE-MINI A U9")
+		self.assertEqual(codes, ("ICDPE-BASQUET-MASCULINO-MINIBASQUET",))
+		self.assertNotIn("ICDPE-BASQUET-ESCUELITA", codes)
+		self.assertEqual(
+			concepto_desde_comprobante("INF-2710-10800-08/2026-29000.0-PRE-MINI A U9"),
+			"PRE-MINI A U9",
+		)
+
 	def test_parse_monto_y_fecha(self) -> None:
 		self.assertEqual(parse_monto("12.500,50"), 12500.50)
 		self.assertEqual(str(parse_fecha("15/08/2026")), "2026-08-15")
@@ -184,11 +198,13 @@ class TestBulkPaymentsRun(MembersTestCase):
 				csv_path=path,
 				dry_run=False,
 				periodo="08/2026",
+				confirm="local-dev",
 			)
 			again = run_bulk_payments(
 				csv_path=path,
 				dry_run=False,
 				periodo="08/2026",
+				confirm="local-dev",
 			)
 		finally:
 			frappe.set_user("Administrator")
@@ -325,3 +341,119 @@ class TestBulkPaymentsRun(MembersTestCase):
 
 		self.assertEqual(result["simuladas"], 1, result.get("inconsistencias"))
 		self.assertEqual(result["inconsistencias"], [])
+
+	def _ensure_item(self, code: str, rate: float) -> str:
+		if frappe.db.exists("Item", code):
+			return code
+		item_group = frappe.db.get_value("Item Group", {}, "name") or "All Item Groups"
+		frappe.get_doc(
+			{
+				"doctype": "Item",
+				"item_code": code,
+				"item_name": code,
+				"item_group": item_group,
+				"is_stock_item": 0,
+				"is_sales_item": 1,
+				"standard_rate": rate,
+			}
+		).insert(ignore_permissions=True)
+		return code
+
+	def _factura_cuota_y_arancel(
+		self,
+		*,
+		dni: str,
+		email: str,
+		item_arancel: str,
+		rate_cuota: float = 28500,
+		rate_arancel: float = 28500,
+		desc_arancel: str = "Arancel actividad",
+	) -> tuple[str, str]:
+		from club_management.members.services.cobranza_manual import (
+			SALES_INVOICE_DOCTYPE,
+			_campo_periodo_cobro,
+			_campo_socio_en,
+			_default_company,
+			ensure_customer_for_socio,
+		)
+
+		socio = insert_socio(dni=dni, email=email)
+		cambiar_estado(socio.name, "Activo", motivo="Test bulk multilinea")
+		self._ensure_item(item_arancel, rate_arancel)
+		item_cuota = frappe.db.get_value("Club Settings", None, "item_cuota_social") or "ICDPE-CUOTA-SOCIAL"
+		if not frappe.db.exists("Item", item_cuota):
+			self._ensure_item(item_cuota, rate_cuota)
+		campo = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+		campo_periodo = _campo_periodo_cobro()
+		payload: dict = {
+			"doctype": SALES_INVOICE_DOCTYPE,
+			"customer": ensure_customer_for_socio(socio.name),
+			"company": _default_company(),
+			"posting_date": "2026-08-01",
+			"due_date": "2026-08-01",
+			"set_posting_time": 1,
+			campo: socio.name,
+			"items": [
+				{"item_code": item_cuota, "qty": 1, "rate": rate_cuota, "description": "Cuota social"},
+				{
+					"item_code": item_arancel,
+					"qty": 1,
+					"rate": rate_arancel,
+					"description": desc_arancel,
+				},
+			],
+		}
+		if campo_periodo:
+			payload[campo_periodo] = "08/2026"
+		doc = frappe.get_doc(payload)
+		doc.insert(ignore_permissions=True)
+		doc.submit()
+		return socio.name, doc.name
+
+	def test_cuota_y_premini_misma_factura_multilinea(self) -> None:
+		"""Cuota + PRE-MINI A no reserva la SI completa; imputa el arancel (minibasquet)."""
+		socio_name, invoice_name = self._factura_cuota_y_arancel(
+			dni="88904111",
+			email="bulk.premini@example.com",
+			item_arancel="ICDPE-BASQUET-MASCULINO-MINIBASQUET",
+		)
+		path = _write_csv(
+			"nro_socio,monto_abonado,fecha_pago,medio_pago,referencia_comprobante,concepto,periodo",
+			f"{socio_name},28500,2026-08-03,Efectivo,REC-CUOTA-88904111,Cuota Social Menor,08/2026",
+			f"{socio_name},29000,2026-08-03,Efectivo,REC-PREMINI-88904111,PRE-MINI A U9,08/2026",
+		)
+		frappe.set_user(self._secretaria)
+		try:
+			result = run_bulk_payments(
+				csv_path=path,
+				dry_run=False,
+				periodo="08/2026",
+				confirm="local-dev",
+			)
+		finally:
+			frappe.set_user("Administrator")
+			Path(path).unlink(missing_ok=True)
+
+		self.assertEqual(result["procesadas"], 2, result.get("inconsistencias"))
+		self.assertEqual(result["inconsistencias"], [])
+		self.assertEqual(flt(frappe.db.get_value("Sales Invoice", invoice_name, "outstanding_amount")), 0)
+
+	def test_concepto_sin_linea_no_es_ya_saldada_por_otra_factura(self) -> None:
+		socio_name, _invoice_name = self._factura_cuota_y_arancel(
+			dni="88904112",
+			email="bulk.yasald@example.com",
+			item_arancel="ICDPE-BASQUET-MASCULINO-MINIBASQUET",
+		)
+		path = _write_csv(
+			"nro_socio,monto_abonado,fecha_pago,medio_pago,referencia_comprobante,concepto,periodo",
+			f"{socio_name},2000,2026-08-03,Efectivo,REC-FED-88904112,C FED U9/U11 MASC/FEM,08/2026",
+		)
+		frappe.set_user(self._secretaria)
+		try:
+			result = run_bulk_payments(csv_path=path, dry_run=True, periodo="08/2026")
+		finally:
+			frappe.set_user("Administrator")
+			Path(path).unlink(missing_ok=True)
+
+		self.assertTrue(result["inconsistencias"])
+		self.assertEqual(result["inconsistencias"][0]["codigo"], "sin_factura_impaga")
