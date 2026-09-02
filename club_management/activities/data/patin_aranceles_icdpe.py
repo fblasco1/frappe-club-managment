@@ -20,37 +20,37 @@ PATIN_ITEM_SPECS: tuple[ArancelItemSpec, ...] = (
 	ArancelItemSpec(
 		ITEM_PATIN_AVANZADO,
 		format_arancel_mensual_item_name("PATIN ARTISTICO", "AVANZADO"),
-		42000.0,
+		47500.0,
 		CC_PATIN,
 	),
 	ArancelItemSpec(
 		ITEM_PATIN_INTERMEDIO,
 		format_arancel_mensual_item_name("PATIN ARTISTICO", "INTERMEDIO"),
-		36000.0,
+		41500.0,
 		CC_PATIN,
 	),
 	ArancelItemSpec(
 		ITEM_PATIN_MINI,
 		format_arancel_mensual_item_name("PATIN ARTISTICO", "MINI"),
-		20500.0,
+		26000.0,
 		CC_PATIN,
 	),
 	ArancelItemSpec(
 		ITEM_PATIN_TEENS,
 		format_arancel_mensual_item_name("PATIN ARTISTICO", "TEENS"),
-		20500.0,
+		26000.0,
 		CC_PATIN,
 	),
 	ArancelItemSpec(
 		ITEM_PATIN_DANZA,
 		format_arancel_mensual_item_name("PATIN ARTISTICO", "DANZA"),
-		29500.0,
+		35000.0,
 		CC_PATIN,
 	),
 	ArancelItemSpec(
 		ITEM_PATIN_ADULTO,
 		format_arancel_mensual_item_name("PATIN ARTISTICO", "ADULTO"),
-		26500.0,
+		30000.0,
 		CC_PATIN,
 	),
 )
