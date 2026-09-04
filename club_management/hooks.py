@@ -5,6 +5,9 @@ app_description = "ERP for Sports Clubs"
 app_email = "francisco.o.blasco@gmail.com"
 app_license = "mit"
 
+# Parche scheduler PostgreSQL al cargar hooks (también en `bench schedule`).
+import club_management.integrations.scheduler_postgres  # noqa: F401, E402
+
 # Apps
 # ------------------
 
@@ -208,8 +211,15 @@ scheduler_events = {
 # Overriding Methods
 # ------------------------------
 #
-before_request = ["club_management.integrations.payment_ledger_postgres.apply_patch"]
-on_session_creation = ["club_management.integrations.payment_ledger_postgres.apply_patch"]
+before_request = [
+	"club_management.integrations.payment_ledger_postgres.apply_patch",
+	"club_management.integrations.scheduler_postgres.apply_patch",
+]
+on_session_creation = [
+	"club_management.integrations.payment_ledger_postgres.apply_patch",
+	"club_management.integrations.scheduler_postgres.apply_patch",
+]
+before_job = ["club_management.integrations.scheduler_postgres.apply_patch"]
 
 override_whitelisted_methods = {
 	"frappe.desk.doctype.number_card.number_card.get_result": (

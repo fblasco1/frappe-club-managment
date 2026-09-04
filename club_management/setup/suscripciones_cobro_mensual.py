@@ -45,8 +45,8 @@ class ClubFeeItemSpec:
 
 
 CLUB_CUOTA_SOCIAL_ITEM = ClubFeeItemSpec(
-	item_code="CLUB-Cuota-Social-Base",
-	item_name="Cuota Social Base",
+	item_code="ICDPE-CUOTA-SOCIAL",
+	item_name="Cuota social",
 	initial_rate=29_000.0,
 	plan_name="Plan Cuota Social Base",
 )

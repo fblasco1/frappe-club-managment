@@ -80,10 +80,19 @@ Then el título refleja el entrenamiento deportivo y los vínculos.
 
 ---
 
-## Scenario: horario hasta debe ser mayor que desde
+## Scenario: horario que cruza medianoche
 
-Given una fila de `Horario Entrenamiento` con `hora_desde = 19:00` y `hora_hasta = 18:00`
-When se valida el `Espacio`
+Given una fila de `Horario Entrenamiento` con `hora_desde = 22:00` y `hora_hasta = 01:00`
+When se valida el `Espacio` o una `Reserva Espacio` Confirmada
+Then se guarda sin error
+And el bloque ocupa la franja nocturna hasta la madrugada del día calendario siguiente (planilla 08:00→04:00).
+
+---
+
+## Scenario: horario con duración cero
+
+Given una fila con `hora_desde = 19:00` y `hora_hasta = 19:00`
+When se valida
 Then se lanza `ValidationError`.
 
 ---

@@ -93,7 +93,8 @@ class TestInformePagosDelDia(MembersTestCase):
 		return doc.name
 
 	def test_informe_en_listado_gestion_socios(self) -> None:
-		self.assertIn("Pagos del dia", CLUB_DESK_REPORTS)
+		self.assertIn("Recaudacion por concepto", CLUB_DESK_REPORTS)
+		self.assertNotIn("Pagos del dia", CLUB_DESK_REPORTS)
 
 	def test_informe_del_dia_totales_medio_y_concepto(self) -> None:
 		socio = insert_socio(dni="99330001", email="informe.dia@example.com")

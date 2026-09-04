@@ -14,11 +14,7 @@
 			report_type: "Script Report",
 			ref_doctype: "Inscripcion Actividad",
 		},
-		"Deuda por actividad": {
-			report_type: "Script Report",
-			ref_doctype: "Actividad",
-		},
-		"Pagos del dia": {
+		"Recaudacion por concepto": {
 			report_type: "Script Report",
 			ref_doctype: "Payment Entry",
 		},
@@ -69,22 +65,21 @@
 			child: 1,
 		},
 		{
-			label: __("Deuda por actividad"),
+			label: __("Recaudación"),
 			type: "Link",
 			link_type: "Report",
-			link_to: "Deuda por actividad",
-			icon: "table",
-			child: 1,
-		},
-		{
-			label: __("Pagos del dia"),
-			type: "Link",
-			link_type: "Report",
-			link_to: "Pagos del dia",
+			link_to: "Recaudacion por concepto",
 			icon: "table",
 			child: 1,
 		},
 	];
+
+	function item_key(item) {
+		if (item.link_type === "Report" || item.link_type === "DocType" || item.link_type === "Page") {
+			return `${item.link_type}:${item.link_to}`;
+		}
+		return `label:${item.label}`;
+	}
 
 	function withReportMeta(items) {
 		return (items || []).map((item) => {
@@ -102,9 +97,15 @@
 		if (!existing?.length) {
 			return enriched;
 		}
-		const labels = new Set(enriched.map((item) => item.label));
-		const missing = withReportMeta(canonical).filter((item) => !labels.has(item.label));
-		return enriched.concat(missing);
+		const keys = new Set(enriched.map((item) => item_key(item)));
+		const legacyReportLinks = new Set([
+			"Report:Deuda por actividad",
+			"Report:Pagos del dia",
+		]);
+		const filtered = enriched.filter((item) => !legacyReportLinks.has(item_key(item)));
+		const filteredKeys = new Set(filtered.map((item) => item_key(item)));
+		const missing = withReportMeta(canonical).filter((item) => !filteredKeys.has(item_key(item)));
+		return filtered.concat(missing);
 	}
 
 	club_management.secretaria_sidebar.ensure_boot = function () {

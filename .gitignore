@@ -63,3 +63,8 @@ club_management/finance/workspace/tesorería/
 
 # Aider AI Chat
 .aider*
+
+# Artefactos locales de conciliación / pipelines
+tmp_/
+tmp_*/
+**/tmp_*/

@@ -189,15 +189,147 @@ And se puede persistir un JSON de log en `log_path`.
 
 ---
 
+## Importer consolidado con invariante de no-pérdida (`cobranzas_bulk_importer`)
+
+Reemplaza el pipeline multi-script para el CSV consolidado del mes
+(`nro_socio, monto_abonado, fecha_pago, medio_pago, periodo, concepto, referencia_comprobante`).
+Resuelve facturación e imputación **fila por fila, inline** (sin pasos previos de
+facturación por script separado) y garantiza que ninguna fila se descarte sin registro.
+
+### Scenario: CARNET excluido
+
+Given una fila con concepto `CARNET`
+When se procesa
+Then el estado es `excluido_carnet`
+And no se crea Payment Entry
+And el log incluye `nro_socio`, `socio` y `monto_csv`.
+
+### Scenario: invariante de no-pérdida
+
+Given un CSV de N filas con suma total T
+When se ejecuta `cobranzas_bulk_importer.run` (dry-run o apply)
+Then el log de auditoría tiene exactamente N registros
+And la suma de `monto_csv` del log es exactamente T
+And cada registro tiene un estado terminal explícito.
+
+### Estados terminales
+
+| Estado | Significado |
+|--------|-------------|
+| `imputado` | PE creado y aplicado a la línea del concepto |
+| `imputado_con_facturacion` | Se emitió SI de una línea para el concepto faltante y se cobró |
+| `imputado_con_saldo_favor` | Se imputó hasta el outstanding y el excedente quedó a favor (`-SF`) |
+| `ya_imputado` | Idempotencia: PE existente con la referencia INF de la fila |
+| `error_socio_no_encontrado` | `nro_socio`/`dni` sin match en `Socio` |
+| `excluido_carnet` | Fila CARNET: no se imputa; queda en log de revisión manual |
+| `excluido_adelantado` | Período posterior al mes de cobro: se resetea el PE/SI si existían; no se reimputa |
+| `error_concepto_sin_mapeo` | `resolver_item_codes_concepto` vacío (no CTO COMP) |
+| `error_facturacion` | Falló la emisión de la SI del concepto |
+| `error_cobro` | ValidationError al registrar el PE |
+
+No existe skip silencioso: `ya_procesado` del importer legado se registra como `ya_imputado`.
+
+### Scenario: el CSV manda el monto
+
+Given una fila con `monto_abonado` M y línea de factura del concepto con outstanding O < M
+When se aplica el cobro
+Then se imputa O a la SI (más la SI de mora vinculada del concepto si existe)
+And el resto (M − imputado) queda como saldo a favor con referencia `…-SF`
+And `monto_imputado + saldo_favor = M` en el log.
+
+### Scenario: auto-facturación inline por concepto
+
+Given una fila cuyo concepto no tiene línea en ninguna SI del período
+And el concepto resuelve a un `item_code` (arancel de inscripción, cuota por categoría,
+  federativa o cargo)
+When se aplica
+Then se emite una SI de una línea (`item_code`) con `periodo_cobro` de la fila
+And el **rate es la base sin mora** (`monto_csv / (1 + mora_pct/100)`, o tarifa
+  congelada de patín agosto si aplica)
+And la mora se genera al cobro (SI de mora vinculada), no embebida en el rate
+And se cobra contra esa SI en la misma corrida
+And el estado es `imputado_con_facturacion`.
+
+Para CTO COMP se factura vía cargo socio (`prepagar_cargo_socio`), creando el
+cargo si no existe.
+
+### Scenario: apply post-reset sin reconciliar
+
+Given el universo del CSV fue cancelado (`reset_cobranzas_csv`)
+When `apply_prod_agosto` (o `run` con `reconcile=False`, `auto_facturar=True`)
+Then no busca PE previos para “corregir”
+And factura e imputa cada fila elegible una sola vez.
+
+### Scenario: mora sobre valor facturado
+
+Given una línea de arancel facturada a $28.500 con tarifa vigente distinta
+And `fecha_pago` en tramo `post_primer` (día 11–20 del mes del período)
+When el importer calcula la mora esperada
+Then usa base **facturada** ($28.500 × 1,10 = $31.350), no el valor vigente
+And si el `monto_abonado` difiere de la mora esperada se registra `diferencia_mora`
+  en el log pero **se imputa igual** el monto del CSV.
+
+Tramos (`mora_al_cobro.resolver_tramo_mora`, sobre el mes del `periodo`):
+día 1–10 sin mora; 11–20 +10 %; 21+ (incluye período vencido pagado en mes
+posterior) +15 %. Período adelantado (mes futuro) sin mora.
+
+### Scenario: idempotencia determinista por fila
+
+Given la referencia `INF-{fila}-{socio}-{periodo}-{monto}-{concepto}` de una fila ya aplicada
+When se re-ejecuta el importer sobre el mismo CSV
+Then la fila queda `ya_imputado` sin crear PE nuevo
+And los totales del log no cambian.
+
+### Scenario: modo reconciliador
+
+Given un PE existente imputado a la SI del concepto con referencia INF **incorrecta**
+  (fila/concepto mal etiquetados) pero mismo socio, período, monto y fecha
+When se ejecuta con `reconcile=True`
+Then se corrige `reference_no` del PE a la referencia canónica de la fila
+And la fila queda `ya_imputado` (con nota `referencia_corregida`)
+And no se duplica el cobro.
+
+### Scenario: log de auditoría fila a fila
+
+Given una corrida
+When termina
+Then existe `<csv>.auditoria.csv` con columnas
+  `fila, nro_socio, socio, fecha_pago, periodo, concepto, monto_csv, estado,
+  item_code, sales_invoice, sales_invoice_emitida, payment_entry, monto_imputado,
+  mora_pct_esperado, mora_monto, sales_invoice_mora, saldo_favor, mensaje`
+And un `<csv>.resumen.json` con conteos por estado y totales de control
+  (total CSV, total imputado, total saldo a favor, total en error).
+
+### Scenario: cuadratura contable
+
+Given el CSV consolidado de agosto 2026 (2.562 filas, $52.115.308,00)
+When corre `verificar_cuadratura_cobranzas.run` sobre el log de auditoría
+Then valida filas = 2.562 y `Σ monto_csv` = $52.115.308,00
+And `Σ monto_imputado + Σ saldo_favor + Σ monto en error + Σ excluido_carnet` = `Σ monto_csv`
+And reporta el detalle de filas en estado de error (si las hay).
+
+---
+
+## Reset limpio (agosto 2026)
+
+Cuando los PE/SI quedaron partidos por parches, no se repara socio a socio:
+ver spec `reset_cobranzas_csv.md` (cancela universo del CSV, incluye julio
+cobrado en agosto y cargos extra; no toca SI `09/2026` mensual).
+
+---
+
 ## Artefactos
 
 | Pieza | Ubicación |
 |-------|-----------|
 | Spec | este archivo |
-| Script | `scripts/bulk_payments.py` |
+| Script legado | `scripts/bulk_payments.py` |
+| Importer consolidado | `scripts/cobranzas_bulk_importer.py` |
+| Diagnóstico read-only | `scripts/diagnostico_cobranzas_csv.py` |
+| Verificador de cuadratura | `scripts/verificar_cuadratura_cobranzas.py` |
 | Reimputación arancel omitido | `scripts/reapply_informe_arancel_omitido.py` |
-| Pipeline prod | `scripts/cobranza_informe_prod_pipeline.py` |
-| Tests | `tests/test_bulk_payments.py` |
+| Pipeline prod (legado) | `scripts/cobranza_informe_prod_pipeline.py` |
+| Tests | `tests/test_bulk_payments.py`, `tests/test_cobranzas_bulk_importer.py` |
 
 ---
 

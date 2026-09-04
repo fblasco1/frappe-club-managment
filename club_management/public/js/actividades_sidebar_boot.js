@@ -14,10 +14,6 @@
 			report_type: "Script Report",
 			ref_doctype: "Inscripcion Actividad",
 		},
-		"Deuda por actividad": {
-			report_type: "Script Report",
-			ref_doctype: "Actividad",
-		},
 	};
 
 	const SIDEBAR_ITEMS = [
@@ -82,14 +78,6 @@
 			type: "Link",
 			link_type: "Report",
 			link_to: "Deuda por equipo",
-			icon: "table",
-			child: 1,
-		},
-		{
-			label: __("Deuda por actividad"),
-			type: "Link",
-			link_type: "Report",
-			link_to: "Deuda por actividad",
 			icon: "table",
 			child: 1,
 		},

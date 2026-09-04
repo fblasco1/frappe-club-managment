@@ -248,3 +248,65 @@ class TestDeudaSocioDesk(MembersTestCase):
 
 		self.assertEqual(monto_cobrado_de_items(invoice.name, [item_arancel]), 0.0)
 		self.assertEqual(monto_cobrado_de_items(invoice.name, [item_cuota]), 28500.0)
+
+	def test_mora_arancel_cuenta_en_imputacion_pagos_equipo(self) -> None:
+		from club_management.members.services.cobranza_manual import (
+			SALES_INVOICE_DOCTYPE,
+			_campo_periodo_cobro,
+			_campo_socio_en,
+			_default_company,
+			ensure_customer_for_socio,
+			registrar_cobro_parcial_factura,
+		)
+		from club_management.members.services.liquidacion_equipo import calcular_pagos_arancel_en_rango
+		from club_management.scripts.informe_concepto_cobranza import monto_cobrado_de_items
+
+		socio = self._socio_activo(dni="75001007", email="deuda.mora.arancel@example.com")
+		item_arancel = self._ensure_item("TEST-ARANCEL-MORA", 28_500)
+		sync_cuotas_sociales_club()
+		item_cuota = frappe.db.get_value("Club Settings", None, "item_cuota_social") or "ICDPE-CUOTA-SOCIAL"
+		if not frappe.db.exists("Item", item_cuota):
+			item_cuota = self._ensure_item(item_cuota, 28_500)
+		campo = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+		campo_periodo = _campo_periodo_cobro()
+		payload: dict = {
+			"doctype": SALES_INVOICE_DOCTYPE,
+			"customer": ensure_customer_for_socio(socio.name),
+			"company": _default_company(),
+			"posting_date": "2026-08-01",
+			"due_date": "2026-08-01",
+			"set_posting_time": 1,
+			campo: socio.name,
+			"items": [
+				{"item_code": item_cuota, "qty": 1, "rate": 28500, "description": "Cuota social"},
+				{"item_code": item_arancel, "qty": 1, "rate": 28500, "description": "Arancel actividad"},
+			],
+		}
+		if campo_periodo:
+			payload[campo_periodo] = "08/2026"
+		invoice = frappe.get_doc(payload)
+		invoice.insert(ignore_permissions=True)
+		invoice.submit()
+
+		frappe.set_user(self._secretaria)
+		try:
+			registrar_cobro_parcial_factura(
+				socio.name,
+				invoice.name,
+				31350,
+				mode_of_payment="Cash",
+				posting_date="2026-08-12",
+				reference_no="INF-99-75001007-08/2026-31350.0-INFA A U13",
+			)
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(monto_cobrado_de_items(invoice.name, [item_arancel]), 31350.0)
+		pagos, count = calcular_pagos_arancel_en_rango(
+			socio.name,
+			fecha_desde="2026-08-01",
+			fecha_hasta="2026-08-31",
+			item_arancel=item_arancel,
+		)
+		self.assertEqual(count, 1)
+		self.assertEqual(pagos, 31350.0)

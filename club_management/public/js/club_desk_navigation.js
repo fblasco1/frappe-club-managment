@@ -70,6 +70,8 @@
 
 		"Pagos por equipo",
 
+		"Recaudacion por concepto",
+
 		"Deuda por actividad",
 
 		"Pagos del dia",
@@ -84,9 +86,7 @@
 
 		"Pagos por equipo",
 
-		"Deuda por actividad",
-
-		"Pagos del dia",
+		"Recaudacion por concepto",
 
 	]);
 

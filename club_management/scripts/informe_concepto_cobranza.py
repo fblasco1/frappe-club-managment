@@ -103,8 +103,9 @@ _ARANCEL_EQUIPO_ALIAS: dict[str, tuple[str, ...]] = {
 	"CADETE U15 FEM": ("ICDPE-BASQUET-ESCUELITA",),
 	"JUVENILES U17 FEM": ("ICDPE-BASQUET-ESCUELITA",),
 	"U21 FEM": ("ICDPE-BASQUET-ESCUELITA",),
-	# Vóley federado (equipo Superior B en padrón).
-	"SUPERIOR B": ("ICDPE-VOLEY-FEDERADO",),
+	# Básquet masculino tira Amarillo / SUPERIOR (concepto del informe de cobranza).
+	# No confundir con el equipo de vóley «Superior B» del padrón de actividades.
+	"SUPERIOR B": ("BASQUET / SUPERIOR / AMARILLO",),
 }
 
 _CUOTA_CATEGORIA_KEYWORDS: tuple[tuple[str, str], ...] = (

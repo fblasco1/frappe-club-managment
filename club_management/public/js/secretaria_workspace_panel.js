@@ -16,6 +16,7 @@
 
 		_refresh_timer: null,
 		_selected_tendencia_month: null,
+		_selected_tendencia_vista: "total",
 		_$panel: null,
 
 
@@ -33,12 +34,44 @@
 			return `${this.get_tendencia_month_value()}-01`;
 		},
 
+		get_tendencia_vista() {
+			return this._selected_tendencia_vista || "total";
+		},
+
 		render_tendencia_month_input(selectedMonth) {
 			return `
 				<label class="club-secretaria-trend-month">
 					<span class="text-muted small">${__("Mes")}</span>
 					<input type="month" class="form-control form-control-sm club-secretaria-trend-month-input"
 						value="${frappe.utils.escape_html(selectedMonth)}" />
+				</label>
+			`;
+		},
+
+		render_tendencia_vista_select(tendencia) {
+			const vistas = tendencia?.vistas || [
+				{ value: "total", label: __("Total") },
+				{ value: "cuota", label: __("Cuotas sociales") },
+				{ value: "arancel", label: __("Aranceles") },
+				{ value: "cto_comp", label: __("CTO COMP") },
+				{ value: "federativa", label: __("Federativas") },
+				{ value: "otro", label: __("Otros conceptos") },
+			];
+			const selected = this.get_tendencia_vista();
+			const options = vistas
+				.map((opt) => {
+					const value = frappe.utils.escape_html(opt.value);
+					const label = frappe.utils.escape_html(opt.label);
+					const sel = opt.value === selected ? " selected" : "";
+					return `<option value="${value}"${sel}>${label}</option>`;
+				})
+				.join("");
+			return `
+				<label class="club-secretaria-cobrabilidad-filter club-secretaria-trend-vista">
+					<span class="text-muted small">${__("Vista")}</span>
+					<select class="form-control form-control-sm club-secretaria-trend-vista-select">
+						${options}
+					</select>
 				</label>
 			`;
 		},
@@ -152,14 +185,90 @@
 			return `<span class="club-secretaria-altas-bajas">+${altas} / -${bajas}</span>`;
 		},
 
-		render_cobrabilidad_breakdown(cuotas) {
+		get_cobrabilidad_slice(recaudacion, vista, detalle) {
+			const empty = {
+				emitido: 0,
+				recaudado: 0,
+				saldo_por_cobrar: 0,
+				porcentaje: 0,
+				recaudado_label: frappe.format(0, { fieldtype: "Currency" }),
+				saldo_por_cobrar_label: frappe.format(0, { fieldtype: "Currency" }),
+			};
+			const rec = recaudacion || {};
+			if (vista === "total") {
+				return rec.total || empty;
+			}
+			if (vista === "cuota") {
+				const base = rec.cuotas_sociales || empty;
+				if (!detalle) {
+					return base;
+				}
+				const row = (base.por_categoria || []).find((item) => item.categoria === detalle);
+				return row || empty;
+			}
+			if (vista === "arancel") {
+				const base = rec.aranceles || empty;
+				if (!detalle) {
+					return base;
+				}
+				const row = (base.por_actividad || []).find((item) => item.actividad === detalle);
+				return row || empty;
+			}
+			const conceptBlock = rec[vista] || empty;
+			if (!detalle) {
+				return conceptBlock;
+			}
+			const conceptRow = (conceptBlock.por_concepto || []).find(
+				(item) => item.concepto === detalle
+			);
+			return conceptRow || empty;
+		},
+
+		get_cobrabilidad_detalle_options(recaudacion, vista) {
+			const rec = recaudacion || {};
+			if (vista === "total") {
+				return [];
+			}
+			if (vista === "cuota") {
+				return (rec.cuotas_sociales?.por_categoria || []).map((row) => ({
+					value: row.categoria,
+					label: row.categoria,
+				}));
+			}
+			if (vista === "arancel") {
+				return (rec.aranceles?.por_actividad || []).map((row) => ({
+					value: row.actividad,
+					label: row.actividad,
+				}));
+			}
+			const block = rec[vista];
+			return (block?.por_concepto || []).map((row) => ({
+				value: row.concepto,
+				label: row.concepto,
+			}));
+		},
+
+		get_cobrabilidad_report_link(cobranza, vista) {
+			const byVista = cobranza?.report_by_vista || {};
+			return (
+				byVista[vista] ||
+				cobranza?.rendicion_completa_report ||
+				cobranza?.recaudado_cuotas_report ||
+				null
+			);
+		},
+
+		render_cobrabilidad_metrics(slice, cobranza, vista) {
+			const data = slice || {};
 			const cobrado =
-				cuotas?.recaudado_label ||
-				frappe.format(cuotas?.recaudado || 0, { fieldtype: "Currency" });
+				data.recaudado_label ||
+				frappe.format(data.recaudado || 0, { fieldtype: "Currency" });
 			const pendiente =
-				cuotas?.saldo_por_cobrar_label ||
-				frappe.format(cuotas?.saldo_por_cobrar ?? 0, { fieldtype: "Currency" });
+				data.saldo_por_cobrar_label ||
+				frappe.format(data.saldo_por_cobrar ?? 0, { fieldtype: "Currency" });
+			const reportLink = this.get_cobrabilidad_report_link(cobranza, vista);
 			return `
+				<div class="club-secretaria-kpi-value club-secretaria-kpi-value--pct">${data.porcentaje ?? 0}%</div>
 				<div class="club-secretaria-kpi-breakdown">
 					<div class="club-secretaria-kpi-breakdown-row">
 						<span>${__("Total cobrado")}:</span>
@@ -170,17 +279,128 @@
 						<strong>${frappe.utils.escape_html(pendiente)}</strong>
 					</div>
 				</div>
+				<div class="club-secretaria-kpi-footer">
+					${this.render_report_link_btn(reportLink)}
+				</div>
+			`;
+		},
+
+		render_cobrabilidad_detalle_select(recaudacion, vista, detalle) {
+			const options = this.get_cobrabilidad_detalle_options(recaudacion, vista);
+			if (!options.length) {
+				return "";
+			}
+			const rows = [
+				`<option value="">${frappe.utils.escape_html(__("Todas"))}</option>`,
+				...options.map(
+					(opt) =>
+						`<option value="${frappe.utils.escape_html(opt.value)}"${
+							opt.value === detalle ? " selected" : ""
+						}>${frappe.utils.escape_html(opt.label)}</option>`
+				),
+			].join("");
+			return `
+				<label class="club-secretaria-cobrabilidad-filter">
+					<span class="text-muted small">${__("Detalle")}</span>
+					<select class="form-control form-control-sm club-secretaria-cobrabilidad-detalle">
+						${rows}
+					</select>
+				</label>
+			`;
+		},
+
+		update_cobrabilidad_card($card) {
+			if (!$card?.length) {
+				return;
+			}
+			let recaudacion = {};
+			try {
+				recaudacion = JSON.parse($card.attr("data-recaudacion") || "{}");
+			} catch {
+				recaudacion = {};
+			}
+			const cobranza = JSON.parse($card.attr("data-cobranza") || "{}");
+			const vista = $card.find(".club-secretaria-cobrabilidad-vista").val() || "total";
+			const detalle = $card.find(".club-secretaria-cobrabilidad-detalle").val() || "";
+			const slice = this.get_cobrabilidad_slice(recaudacion, vista, detalle);
+			$card.find(".club-secretaria-cobrabilidad-metrics").html(
+				this.render_cobrabilidad_metrics(slice, cobranza, vista)
+			);
+			const $detalleWrap = $card.find(".club-secretaria-cobrabilidad-detalle-wrap");
+			const detalleHtml = this.render_cobrabilidad_detalle_select(recaudacion, vista, detalle);
+			if (detalleHtml) {
+				$detalleWrap.html(detalleHtml).show();
+			} else {
+				$detalleWrap.empty().hide();
+			}
+		},
+
+		render_cobrabilidad_card(metricas) {
+			const recaudacion = metricas.recaudacion || {};
+			const verMas = metricas.ver_mas || {};
+			const cobranza = verMas.cobranza || {};
+			const periodo = cobranza.periodo || recaudacion.periodo || "";
+			const vistas = recaudacion.cobrabilidad_vistas || [
+				{ value: "total", label: __("Total") },
+				{ value: "cuota", label: __("Cuotas sociales") },
+				{ value: "arancel", label: __("Aranceles") },
+			];
+			const vistaOptions = vistas
+				.map(
+					(opt) =>
+						`<option value="${frappe.utils.escape_html(opt.value)}">${frappe.utils.escape_html(
+							opt.label
+						)}</option>`
+				)
+				.join("");
+			const slice = this.get_cobrabilidad_slice(recaudacion, "total", "");
+			const recaudacionJson = JSON.stringify(recaudacion).replace(/'/g, "&#39;");
+			const cobranzaJson = JSON.stringify(cobranza).replace(/'/g, "&#39;");
+
+			return `
+				<div class="club-secretaria-kpi-card club-secretaria-kpi-card--cobrabilidad"
+					data-recaudacion='${recaudacionJson.replace(/"/g, "&quot;")}'
+					data-cobranza='${cobranzaJson.replace(/"/g, "&quot;")}'>
+					<div class="club-secretaria-cobrabilidad-header">
+						<div>
+							<p class="club-secretaria-kpi-title">${__("Tasa de cobrabilidad del mes")}</p>
+							<span class="text-muted small">${__("Mes")} ${frappe.utils.escape_html(periodo)}</span>
+						</div>
+						<label class="club-secretaria-cobrabilidad-filter">
+							<span class="text-muted small">${__("Vista")}</span>
+							<select class="form-control form-control-sm club-secretaria-cobrabilidad-vista">
+								${vistaOptions}
+							</select>
+						</label>
+					</div>
+					<div class="club-secretaria-cobrabilidad-detalle-wrap" style="display:none"></div>
+					<div class="club-secretaria-cobrabilidad-metrics">
+						${this.render_cobrabilidad_metrics(slice, cobranza, "total")}
+					</div>
+				</div>
+			`;
+		},
+
+		render_report_link_btn(link) {
+			if (!link?.report) {
+				return "";
+			}
+			const filters_json = JSON.stringify(link.filters || {}).replace(/'/g, "&#39;");
+			return `
+				<button type="button" class="btn btn-link btn-sm club-secretaria-ver-report px-0"
+					data-report="${frappe.utils.escape_html(link.report)}"
+					data-filters="${filters_json.replace(/"/g, "&quot;")}">
+					${__("Ver informe")}
+				</button>
 			`;
 		},
 
 		render_kpi_cards(metricas) {
 			const socios = metricas.socios || {};
-			const recaudacion = metricas.recaudacion || {};
-			const verMas = metricas.ver_mas || {};
-			const cuotas = recaudacion.cuotas_sociales || {};
 			const morososDeudaLabel =
 				socios.morosos_deuda_label ||
 				frappe.format(socios.morosos_deuda || 0, { fieldtype: "Currency" });
+			const verMas = metricas.ver_mas || {};
 
 			return `
 				<div class="club-secretaria-kpi-grid">
@@ -192,12 +412,7 @@
 							${this.render_ver_mas_btn(verMas.socios_total_doctype, verMas.socios_total_filters)}
 						</div>
 					</div>
-					<div class="club-secretaria-kpi-card">
-						<p class="club-secretaria-kpi-title">${__("Tasa de cobrabilidad del mes")}</p>
-						<div class="club-secretaria-kpi-value club-secretaria-kpi-value--pct">${cuotas.porcentaje ?? 0}%</div>
-						<span class="text-muted small">${__("Mes")} ${frappe.utils.escape_html(recaudacion.periodo || "")}</span>
-						${this.render_cobrabilidad_breakdown(cuotas)}
-					</div>
+					${this.render_cobrabilidad_card(metricas)}
 					<div class="club-secretaria-kpi-card">
 						<p class="club-secretaria-kpi-title">${__("Altas vs bajas (mes)")}</p>
 						<div class="club-secretaria-kpi-value club-secretaria-kpi-value--ratio">
@@ -244,8 +459,13 @@
 				? `<div class="club-secretaria-charts-row club-secretaria-charts-row--trend">
 					<div class="club-secretaria-chart-card club-secretaria-chart-card--wide">
 						<div class="club-secretaria-chart-header">
-							<h6>${__("Tendencia de recaudación")}</h6>
-							${this.render_tendencia_month_input(this.get_tendencia_month_value())}
+							<div class="club-secretaria-chart-header-title">
+								<h6>${__("Tendencia de recaudación")}</h6>
+							</div>
+							<div class="club-secretaria-chart-header-filters">
+								${this.render_tendencia_vista_select(tendencia)}
+								${this.render_tendencia_month_input(this.get_tendencia_month_value())}
+							</div>
 						</div>
 						<div class="club-secretaria-chart-trend"></div>
 					</div>
@@ -380,7 +600,10 @@
 			$trend.html(`<div class="text-muted small py-3">${__("Cargando gráfico…")}</div>`);
 			frappe.call({
 				method: "club_management.members.api.secretaria_workspace.get_tendencia_recaudacion",
-				args: { tendencia_reference_date: this.tendencia_reference_date() },
+				args: {
+					tendencia_reference_date: this.tendencia_reference_date(),
+					vista: this.get_tendencia_vista(),
+				},
 				callback: (r) => {
 					this.mount_trend_chart($trend, r.message || {});
 				},
@@ -562,9 +785,34 @@
 				}
 			});
 
+			$panel.find(".club-secretaria-trend-vista-select").on("change", (e) => {
+				this._selected_tendencia_vista = e.currentTarget.value || "total";
+				this.refresh_tendencia_chart($panel);
+			});
+
 			$panel.find(".club-secretaria-ver-mas").on("click", (e) => {
 				const $btn = $(e.currentTarget);
 				this.open_list($btn.attr("data-doctype"), $btn.attr("data-filters"));
+			});
+
+			$panel.find(".club-secretaria-ver-report").on("click", (e) => {
+				const $btn = $(e.currentTarget);
+				this.open_report($btn.attr("data-report"), $btn.attr("data-filters"));
+			});
+
+			$panel.on("change", ".club-secretaria-cobrabilidad-vista", (e) => {
+				const $card = $(e.currentTarget).closest(".club-secretaria-kpi-card--cobrabilidad");
+				$card.find(".club-secretaria-cobrabilidad-detalle").val("");
+				this.update_cobrabilidad_card($card);
+			});
+
+			$panel.on("change", ".club-secretaria-cobrabilidad-detalle", (e) => {
+				const $card = $(e.currentTarget).closest(".club-secretaria-kpi-card--cobrabilidad");
+				this.update_cobrabilidad_card($card);
+			});
+
+			$panel.find(".club-secretaria-kpi-card--cobrabilidad").each((_, el) => {
+				this.update_cobrabilidad_card($(el));
 			});
 
 			$panel.find(".club-secretaria-nuevo-socio").on("click", () => {
@@ -633,6 +881,32 @@
 			frappe.set_route("List", doctype);
 		},
 
+		parse_report_filters(raw) {
+			if (raw == null || raw === "") {
+				return {};
+			}
+			if (typeof raw === "object" && !Array.isArray(raw)) {
+				return raw;
+			}
+			if (typeof raw === "string") {
+				try {
+					const parsed = JSON.parse(raw);
+					return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+				} catch {
+					return {};
+				}
+			}
+			return {};
+		},
+
+		open_report(reportName, rawFilters) {
+			if (!reportName) {
+				return;
+			}
+			frappe.route_options = this.parse_report_filters(rawFilters);
+			frappe.set_route("query-report", reportName);
+		},
+
 
 
 		refresh() {
@@ -673,6 +947,7 @@
 				method: "club_management.members.api.secretaria_workspace.get_panel_lists",
 				args: {
 					tendencia_reference_date: this.tendencia_reference_date(),
+					tendencia_vista: this.get_tendencia_vista(),
 				},
 
 				callback: (r) => {

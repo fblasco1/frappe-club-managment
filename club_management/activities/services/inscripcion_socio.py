@@ -251,6 +251,7 @@ def inscribir_socio_selecciones(
 	selecciones: list[dict[str, Any]],
 	*,
 	activar: bool = True,
+	fecha_inscripcion: str | None = None,
 ) -> list[str]:
 	"""Crea inscripciones desde selecciones `{actividad, grupo?, equipo?}`."""
 	labels: list[str] = []
@@ -307,7 +308,7 @@ def inscribir_socio_selecciones(
 				"grupo_actividad": grupo_name,
 				"equipo_actividad": equipo_name,
 				"estado": "Activa",
-				"fecha_inscripcion": today(),
+				"fecha_inscripcion": fecha_inscripcion or today(),
 			}
 		)
 		doc.insert(ignore_permissions=True)

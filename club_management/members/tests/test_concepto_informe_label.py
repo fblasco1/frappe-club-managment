@@ -43,6 +43,15 @@ class TestConceptoInformeLabel(MembersTestCase):
 		)
 		self.assertEqual(label, "Adicional Basquet Escuelita")
 
+	def test_arancel_actividad_no_se_etiqueta_como_cuota_por_categoria(self) -> None:
+		label = etiqueta_concepto_informe_desde_linea_si(
+			"ICDPE-BASQUET-MASCULINO-MINIBASQUET",
+			"Arancel actividad",
+			categoria_socio="Menor",
+		)
+		self.assertEqual(label, "Arancel actividad")
+		self.assertNotEqual(label, "Cuota Social Menor")
+
 	def test_feder_voley_desde_item(self) -> None:
 		label = etiqueta_concepto_informe_desde_linea_si(
 			"ICDPE-CUOTA-FEDERATIVA-voley",

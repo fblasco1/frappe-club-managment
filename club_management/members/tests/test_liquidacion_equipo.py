@@ -47,6 +47,9 @@ class TestLiquidacionEquipo(MembersTestCase):
 
 	def setUp(self) -> None:
 		super().setUp()
+		from club_management.integrations.payment_ledger_postgres import apply_patch
+
+		apply_patch()
 		self._today_patch = patch("frappe.utils.today", return_value=self._FROZEN_TODAY)
 		self._today_patch.start()
 		if not erpnext_cobranza_disponible():
@@ -150,6 +153,7 @@ class TestLiquidacionEquipo(MembersTestCase):
 		socio_name: str,
 		posting_date: str,
 		items: list[dict],
+		periodo: str | None = None,
 	) -> str:
 		campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
 		customer = ensure_customer_for_socio(socio_name, skip_permission_check=True)
@@ -157,17 +161,22 @@ class TestLiquidacionEquipo(MembersTestCase):
 		now = getdate(self._FROZEN_TODAY)
 		if posting < now:
 			posting = now
-		invoice = frappe.get_doc(
-			{
-				"doctype": SALES_INVOICE_DOCTYPE,
-				"customer": customer,
-				"company": _default_company(),
-				"posting_date": posting,
-				"due_date": posting,
-				campo_socio: socio_name,
-				"items": items,
-			}
-		)
+		payload = {
+			"doctype": SALES_INVOICE_DOCTYPE,
+			"customer": customer,
+			"company": _default_company(),
+			"posting_date": posting,
+			"due_date": posting,
+			campo_socio: socio_name,
+			"items": items,
+		}
+		if periodo:
+			from club_management.members.services.cobranza_manual import _campo_periodo_cobro
+
+			campo_periodo = _campo_periodo_cobro()
+			if campo_periodo:
+				payload[campo_periodo] = periodo
+		invoice = frappe.get_doc(payload)
 		invoice.set_posting_time = 1
 		invoice.insert(ignore_permissions=True)
 		invoice.submit()
@@ -493,6 +502,124 @@ class TestLiquidacionEquipo(MembersTestCase):
 			1,
 		)
 
+	def _cobrar_factura(
+		self,
+		socio_name: str,
+		invoice_name: str,
+		monto: float,
+		posting_date: str,
+		*,
+		reference_no: str | None = None,
+	) -> None:
+		from club_management.integrations.payment_ledger_postgres import apply_patch
+		from club_management.members.services.cobranza_manual import registrar_cobro_parcial_factura
+
+		apply_patch()
+		registrar_cobro_parcial_factura(
+			socio_name,
+			invoice_name,
+			monto,
+			mode_of_payment="Cash",
+			posting_date=posting_date,
+			reference_no=reference_no,
+			auto_submit=True,
+		)
+
+	def test_pe_abril_sobre_factura_marzo_cuenta_en_rango_abril(self) -> None:
+		"""Spec «rango por fecha de cobro»: PE de abril sobre SI de marzo entra en abril."""
+		socio = self._socio_activo(dni="74001020", email="liq.pe.abril@example.com")
+		self._inscribir(socio.name)
+		invoice = self._crear_factura_items(
+			socio.name,
+			"2026-03-20",
+			[{"item_code": ARANCEL_ITEM_CODE, "qty": 1, "rate": 5000}],
+		)
+		self._cobrar_factura(socio.name, invoice, 5000, "2026-04-05")
+
+		pagos_abril, count_abril = calcular_pagos_arancel_en_rango(
+			socio.name,
+			fecha_desde=self._ABRIL_DESDE,
+			fecha_hasta=self._ABRIL_HASTA,
+			item_arancel=ARANCEL_ITEM_CODE,
+		)
+		pagos_marzo, _count_marzo = calcular_pagos_arancel_en_rango(
+			socio.name,
+			fecha_desde=self._MARZO_DESDE,
+			fecha_hasta=self._MARZO_HASTA,
+			item_arancel=ARANCEL_ITEM_CODE,
+		)
+		self.assertEqual(pagos_abril, 5000.0)
+		self.assertEqual(count_abril, 1)
+		self.assertEqual(pagos_marzo, 0.0)
+
+	def test_dos_equipos_mismo_item_distinto_pct_no_duplica(self) -> None:
+		"""Mismo ítem en dos equipos con % distinto: importe una sola vez, % mayor."""
+		frappe.db.set_value("Equipo Actividad", self._equipo, "pct_liquidacion_entrenador", 70)
+		equipo_c = frappe.get_doc(
+			{
+				"doctype": "Equipo Actividad",
+				"grupo_actividad": self._grupo,
+				"titulo": "U15 Compartido Liq",
+				"habilitada": 1,
+				"item": ARANCEL_ITEM_CODE,
+				"pct_liquidacion_entrenador": 90,
+			}
+		).insert(ignore_permissions=True).name
+		socio = self._socio_activo(dni="74001021", email="liq.compartido@example.com")
+		self._inscribir(socio.name, equipo=self._equipo)
+		self._inscribir(socio.name, equipo=equipo_c)
+		invoice = self._crear_factura_items(
+			socio.name,
+			"2026-03-20",
+			[{"item_code": ARANCEL_ITEM_CODE, "qty": 1, "rate": 10000}],
+		)
+		self._cobrar_factura(socio.name, invoice, 10000, "2026-03-21")
+
+		rows = get_pagos_por_equipo_data(
+			{
+				"equipos_actividad": [self._equipo, equipo_c],
+				"fecha_desde": self._MARZO_DESDE,
+				"fecha_hasta": self._MARZO_HASTA,
+				"incluir_saldo_cero": 0,
+			}
+		)
+		row = next(item for item in rows if item["socio"] == socio.name)
+		self.assertEqual(row["pagos_en_rango"], 10000.0)
+		self.assertEqual(row["liquidacion_entrenador"], 9000.0)
+		self.assertEqual(row["pct_entrenador"], 90.0)
+		self.assertEqual(row["cantidad_pagos"], 1)
+
+	def test_periodos_cobrados_visibles_en_fila(self) -> None:
+		socio = self._socio_activo(dni="74001022", email="liq.periodos@example.com")
+		self._inscribir(socio.name)
+		invoice = self._crear_factura_items(
+			socio.name,
+			"2026-03-20",
+			[{"item_code": ARANCEL_ITEM_CODE, "qty": 1, "rate": 5000}],
+			periodo="03/2026",
+		)
+		self._cobrar_factura(socio.name, invoice, 5000, "2026-03-21")
+		rows = get_pagos_por_equipo_data(self._filtros_equipo())
+		row = next(item for item in rows if item["socio"] == socio.name)
+		self.assertIn("03/2026", row.get("periodos_cobrados") or "")
+
+	def test_total_arancel_cobrado_en_rango_incluye_cobro(self) -> None:
+		from club_management.members.services.liquidacion_equipo import (
+			total_arancel_cobrado_en_rango,
+		)
+
+		socio = self._socio_activo(dni="74001023", email="liq.total@example.com")
+		self._inscribir(socio.name)
+		invoice = self._crear_factura_items(
+			socio.name,
+			"2026-03-20",
+			[{"item_code": ARANCEL_ITEM_CODE, "qty": 1, "rate": 5000}],
+		)
+		antes = total_arancel_cobrado_en_rango(self._MARZO_DESDE, self._MARZO_HASTA)
+		self._cobrar_factura(socio.name, invoice, 5000, "2026-03-21")
+		despues = total_arancel_cobrado_en_rango(self._MARZO_DESDE, self._MARZO_HASTA)
+		self.assertAlmostEqual(despues - antes, 5000.0, places=2)
+
 
 class TestLiquidacionEquipoDesk(MembersTestCase):
 	_MARZO_DESDE = "2026-03-01"
@@ -501,6 +628,9 @@ class TestLiquidacionEquipoDesk(MembersTestCase):
 
 	def setUp(self) -> None:
 		super().setUp()
+		from club_management.integrations.payment_ledger_postgres import apply_patch
+
+		apply_patch()
 		self._today_patch = patch("frappe.utils.today", return_value=self._FROZEN_TODAY)
 		self._today_patch.start()
 		if not erpnext_cobranza_disponible():

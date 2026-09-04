@@ -24,6 +24,10 @@ from club_management.members.services.cobranza_periodica import (
 	_campo_periodo_cobro,
 	format_periodo_cobro,
 )
+from club_management.members.services.concepto_informe_label import (
+	agrupacion_tipo_concepto,
+	etiqueta_concepto_informe_desde_linea_si,
+)
 
 SOCIO_DOCTYPE = "Socio"
 ESTADOS_EXCLUIDOS_TOTAL = frozenset({"Baja"})
@@ -33,6 +37,15 @@ PAYMENT_ENTRY_REFERENCE_DOCTYPE = "Payment Entry Reference"
 RECARGO_SUFFIX = "-REC"
 
 CATEGORIAS_GRAFICO = ("Activo", "Menor", "Adherente", "Jubilado", "Vitalicio")
+CATEGORIAS_CUOTA_INFORME = CATEGORIAS_GRAFICO
+COBRABILIDAD_VISTAS = (
+	("total", "Total"),
+	("cuota", "Cuotas sociales"),
+	("arancel", "Aranceles"),
+	("cto_comp", "CTO COMP"),
+	("federativa", "Federativas"),
+	("otro", "Otros conceptos"),
+)
 CATEGORIAS_HERMANO = frozenset({"2° Hermano", "3° Hermano"})
 _EDAD_MAYORIA = 18
 
@@ -209,15 +222,53 @@ def _dia_en_mes_periodo(
 	return period_last.day
 
 
+def _clasificar_linea_vista(
+	item_code: str,
+	description: str | None,
+	*,
+	cuota_items: set[str],
+	arancel_map: dict[str, str],
+	categoria_socio: str | None = None,
+) -> str:
+	"""Vista de cobrabilidad/tendencia: cuota | arancel | cto_comp | federativa | otro."""
+	etiqueta = etiqueta_concepto_informe_desde_linea_si(
+		item_code,
+		description,
+		categoria_socio=categoria_socio,
+	)
+	tipo = agrupacion_tipo_concepto(etiqueta)
+	es_arancel = bool(arancel_map.get(item_code)) or tipo == "Arancel"
+	es_cuota = (tipo == "Cuota" or item_code in cuota_items) and not es_arancel
+	if es_cuota:
+		return "cuota"
+	if es_arancel:
+		return "arancel"
+	if tipo == "CTO COMP":
+		return "cto_comp"
+	if tipo == "Federativa":
+		return "federativa"
+	return "otro"
+
+
+def _linea_entra_en_vista(vista: str, linea_vista: str) -> bool:
+	vista_norm = (vista or "total").strip().lower()
+	if vista_norm in ("", "total"):
+		return True
+	return linea_vista == vista_norm
+
+
 def get_recaudacion_tendencia_payload(
 	*,
 	reference_date: str | date | None = None,
+	vista: str = "total",
 ) -> dict[str, Any]:
-	"""Serie diaria acumulada: deuda pendiente vs recaudado (cuotas sociales) en un mes."""
+	"""Serie diaria acumulada deuda vs recaudado, filtrable por vista (como cobrabilidad)."""
 	ref = getdate(reference_date or today())
 	first = get_first_day(ref)
 	last = get_last_day(ref)
 	periodo = format_periodo_cobro(ref)
+	vista_norm = (vista or "total").strip().lower() or "total"
+	vistas = [{"value": value, "label": label} for value, label in COBRABILIDAD_VISTAS]
 	dias: list[dict[str, Any]] = [
 		{"dia": day, "label": str(day), "emitido_dia": 0.0, "recaudado_dia": 0.0}
 		for day in range(1, last.day + 1)
@@ -228,6 +279,8 @@ def get_recaudacion_tendencia_payload(
 		"reference_date": str(first),
 		"dias": dias,
 		"disponible": False,
+		"vista": vista_norm,
+		"vistas": vistas,
 	}
 	if not erpnext_cobranza_disponible():
 		_finalize_tendencia_dias(dias)
@@ -241,15 +294,26 @@ def get_recaudacion_tendencia_payload(
 
 	settings = get_club_settings()
 	cuota_items = _cuota_item_codes(settings)
+	arancel_map = _arancel_item_actividad_map()
 	emit_day = int(settings.dia_generacion_deuda or 1)
 	invoices = frappe.get_all(
 		SALES_INVOICE_DOCTYPE,
 		filters={campo_periodo: periodo, "docstatus": 1},
-		fields=["name", "posting_date", "grand_total"],
+		fields=["name", "posting_date", "grand_total", campo_socio],
 	)
 	if not invoices:
 		_finalize_tendencia_dias(dias)
 		return {**payload, "dias": dias, "disponible": True}
+
+	socio_ids = {row.get(campo_socio) for row in invoices if row.get(campo_socio)}
+	socio_categorias: dict[str, str | None] = {}
+	if socio_ids:
+		for socio in frappe.get_all(
+			SOCIO_DOCTYPE,
+			filters={"name": ["in", list(socio_ids)]},
+			fields=["name", "categoria"],
+		):
+			socio_categorias[socio.name] = socio.categoria
 
 	lines_by_parent = _invoice_lines_by_parent([row.name for row in invoices])
 	invoice_by_name = {row.name: row for row in invoices}
@@ -263,8 +327,17 @@ def get_recaudacion_tendencia_payload(
 		)
 		if day is None:
 			continue
+		categoria_socio = socio_categorias.get(invoice.get(campo_socio))
 		for line in lines_by_parent.get(invoice.name, []):
-			if (line.get("item_code") or "") not in cuota_items:
+			item_code = line.get("item_code") or ""
+			linea_vista = _clasificar_linea_vista(
+				item_code,
+				line.get("description"),
+				cuota_items=cuota_items,
+				arancel_map=arancel_map,
+				categoria_socio=categoria_socio,
+			)
+			if not _linea_entra_en_vista(vista_norm, linea_vista):
 				continue
 			by_day[day]["emitido_dia"] += flt(line.get("amount"))
 
@@ -290,22 +363,32 @@ def get_recaudacion_tendencia_payload(
 				fields=["name", "posting_date"],
 			)
 		}
-		for ref in pe_names:
-			pe = pe_by_name.get(ref.parent)
-			invoice = invoice_by_name.get(ref.reference_name)
+		for ref_row in pe_names:
+			pe = pe_by_name.get(ref_row.parent)
+			invoice = invoice_by_name.get(ref_row.reference_name)
 			if not pe or not invoice:
 				continue
 			grand_total = flt(invoice.grand_total)
 			if grand_total <= 0:
 				continue
-			cuota_total = sum(
+			categoria_socio = socio_categorias.get(invoice.get(campo_socio))
+			relevant_total = sum(
 				flt(line.get("amount"))
 				for line in lines_by_parent.get(invoice.name, [])
-				if (line.get("item_code") or "") in cuota_items
+				if _linea_entra_en_vista(
+					vista_norm,
+					_clasificar_linea_vista(
+						line.get("item_code") or "",
+						line.get("description"),
+						cuota_items=cuota_items,
+						arancel_map=arancel_map,
+						categoria_socio=categoria_socio,
+					),
+				)
 			)
-			if cuota_total <= 0:
+			if relevant_total <= 0:
 				continue
-			cuota_paid = flt(ref.allocated_amount) * (cuota_total / grand_total)
+			paid = flt(ref_row.allocated_amount) * (relevant_total / grand_total)
 			day = _dia_en_mes_periodo(
 				pe.posting_date,
 				period_first=first,
@@ -314,7 +397,7 @@ def get_recaudacion_tendencia_payload(
 			)
 			if day is None:
 				continue
-			by_day[day]["recaudado_dia"] += cuota_paid
+			by_day[day]["recaudado_dia"] += paid
 
 	_finalize_tendencia_dias(dias)
 	return {**payload, "dias": dias, "disponible": True}
@@ -435,7 +518,7 @@ def _invoice_lines_by_parent(invoice_names: list[str]) -> dict[str, list[dict[st
 	rows = frappe.get_all(
 		SALES_INVOICE_ITEM_DOCTYPE,
 		filters={"parent": ["in", invoice_names], "docstatus": ["<", 2]},
-		fields=["parent", "item_code", "amount"],
+		fields=["parent", "item_code", "description", "amount"],
 	)
 	grouped: dict[str, list[dict[str, Any]]] = {}
 	for row in rows:
@@ -455,90 +538,259 @@ def _cuotas_sociales_kpi_payload(*, emitido: float, recaudado: float) -> dict[st
 	}
 
 
-def get_recaudacion_mes_payload(*, reference_date: str | date | None = None) -> dict[str, Any]:
-	"""Recaudación de cuotas y aranceles del período MM/YYYY."""
-	ref = getdate(reference_date or today())
-	periodo = format_periodo_cobro(ref)
-	empty = {
+def _kpi_slice_payload(*, emitido: float, recaudado: float) -> dict[str, Any]:
+	return _cuotas_sociales_kpi_payload(emitido=emitido, recaudado=recaudado)
+
+
+def _categoria_cuota_desde_etiqueta(etiqueta: str) -> str:
+	prefix = "Cuota Social "
+	if etiqueta.startswith(prefix):
+		categoria = etiqueta[len(prefix) :].strip()
+		if categoria in CATEGORIAS_CUOTA_INFORME:
+			return categoria
+	return "General"
+
+
+def _accumulate_totals(
+	buckets: dict[str, dict[str, float]],
+	key: str,
+	*,
+	emitido: float,
+	recaudado: float,
+) -> None:
+	row = buckets.setdefault(key, {"emitido": 0.0, "recaudado": 0.0})
+	row["emitido"] += emitido
+	row["recaudado"] += recaudado
+
+
+def _rows_from_buckets(buckets: dict[str, dict[str, float]], *, label_key: str) -> list[dict[str, Any]]:
+	rows: list[dict[str, Any]] = []
+	for key in sorted(buckets):
+		emitido = buckets[key]["emitido"]
+		recaudado = buckets[key]["recaudado"]
+		rows.append(
+			{
+				label_key: key,
+				**_kpi_slice_payload(emitido=emitido, recaudado=recaudado),
+			}
+		)
+	return rows
+
+
+def _cobrabilidad_vistas_payload() -> list[dict[str, str]]:
+	return [{"value": value, "label": label} for value, label in COBRABILIDAD_VISTAS]
+
+
+def _empty_recaudacion_payload(periodo: str) -> dict[str, Any]:
+	empty_kpi = _kpi_slice_payload(emitido=0.0, recaudado=0.0)
+	return {
 		"periodo": periodo,
-		"cuotas_sociales": _cuotas_sociales_kpi_payload(emitido=0.0, recaudado=0.0),
-		"aranceles": {"porcentaje": 0.0, "emitido": 0.0, "recaudado": 0.0, "por_actividad": []},
+		"total": dict(empty_kpi),
+		"cuotas_sociales": {**empty_kpi, "por_categoria": []},
+		"aranceles": {**empty_kpi, "por_actividad": []},
+		"cto_comp": {**empty_kpi, "por_concepto": []},
+		"federativa": {**empty_kpi, "por_concepto": []},
+		"otros": {**empty_kpi, "por_concepto": []},
+		"cobrabilidad_vistas": _cobrabilidad_vistas_payload(),
 		"disponible": False,
 	}
+
+
+def get_recaudacion_mes_payload(*, reference_date: str | date | None = None) -> dict[str, Any]:
+	"""Recaudación del período MM/YYYY con desglose para la card de cobrabilidad."""
+	ref = getdate(reference_date or today())
+	periodo = format_periodo_cobro(ref)
+	empty = _empty_recaudacion_payload(periodo)
 	if not erpnext_cobranza_disponible():
 		return empty
 
 	campo_periodo = _campo_periodo_cobro()
-	if not campo_periodo or not _campo_socio_en(SALES_INVOICE_DOCTYPE):
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	if not campo_periodo or not campo_socio:
 		return empty
 
 	settings = get_club_settings()
 	cuota_items = _cuota_item_codes(settings)
 	arancel_map = _arancel_item_actividad_map()
 
+	invoice_fields = ["name", "grand_total", "outstanding_amount", campo_socio]
 	invoices = frappe.get_all(
 		SALES_INVOICE_DOCTYPE,
 		filters={campo_periodo: periodo, "docstatus": 1},
-		fields=["name", "grand_total", "outstanding_amount"],
+		fields=invoice_fields,
 	)
+	if not invoices:
+		return {**empty, "disponible": True}
+
+	socio_ids = {row.get(campo_socio) for row in invoices if row.get(campo_socio)}
+	socio_categorias: dict[str, str | None] = {}
+	if socio_ids:
+		for socio in frappe.get_all(
+			SOCIO_DOCTYPE,
+			filters={"name": ["in", list(socio_ids)]},
+			fields=["name", "categoria"],
+		):
+			socio_categorias[socio.name] = socio.categoria
+
 	lines_by_parent = _invoice_lines_by_parent([row.name for row in invoices])
 
+	total_emitido = 0.0
+	total_recaudado = 0.0
 	cuota_emitido = 0.0
 	cuota_recaudado = 0.0
 	arancel_emitido = 0.0
 	arancel_recaudado = 0.0
-	actividad_emitido: dict[str, float] = {}
-	actividad_recaudado: dict[str, float] = {}
+	otros_emitido = 0.0
+	otros_recaudado = 0.0
+	cto_comp_emitido = 0.0
+	cto_comp_recaudado = 0.0
+	federativa_emitido = 0.0
+	federativa_recaudado = 0.0
+	categoria_buckets: dict[str, dict[str, float]] = {}
+	actividad_buckets: dict[str, dict[str, float]] = {}
+	cto_comp_buckets: dict[str, dict[str, float]] = {}
+	federativa_buckets: dict[str, dict[str, float]] = {}
+	otros_buckets: dict[str, dict[str, float]] = {}
 
 	for invoice in invoices:
 		grand_total = flt(invoice.grand_total)
 		if grand_total <= 0:
 			continue
 		paid_ratio = max(flt(invoice.grand_total) - flt(invoice.outstanding_amount), 0) / grand_total
+		categoria_socio = socio_categorias.get(invoice.get(campo_socio))
 		for line in lines_by_parent.get(invoice.name, []):
 			amount = flt(line.amount)
 			if amount <= 0:
 				continue
-			item_code = line.item_code or ""
 			paid = amount * paid_ratio
-			if item_code in cuota_items:
+			item_code = line.item_code or ""
+			etiqueta = etiqueta_concepto_informe_desde_linea_si(
+				item_code,
+				line.description,
+				categoria_socio=categoria_socio,
+			)
+			tipo = agrupacion_tipo_concepto(etiqueta)
+			actividad_arancel = arancel_map.get(item_code)
+			es_arancel = bool(actividad_arancel) or tipo == "Arancel"
+			es_cuota = (tipo == "Cuota" or item_code in cuota_items) and not es_arancel
+
+			total_emitido += amount
+			total_recaudado += paid
+
+			if es_cuota:
 				cuota_emitido += amount
 				cuota_recaudado += paid
+				categoria = _categoria_cuota_desde_etiqueta(etiqueta)
+				_accumulate_totals(
+					categoria_buckets,
+					categoria,
+					emitido=amount,
+					recaudado=paid,
+				)
 				continue
-			actividad = arancel_map.get(item_code)
-			if not actividad:
-				continue
-			arancel_emitido += amount
-			arancel_recaudado += paid
-			actividad_emitido[actividad] = actividad_emitido.get(actividad, 0.0) + amount
-			actividad_recaudado[actividad] = actividad_recaudado.get(actividad, 0.0) + paid
 
-	por_actividad = []
-	for actividad in sorted(actividad_emitido):
-		emitido = actividad_emitido[actividad]
-		recaudado = actividad_recaudado.get(actividad, 0.0)
-		por_actividad.append(
-			{
-				"actividad": actividad,
-				"emitido": emitido,
-				"recaudado": recaudado,
-				"porcentaje": _pct(recaudado, emitido),
-			}
-		)
+			if es_arancel:
+				arancel_emitido += amount
+				arancel_recaudado += paid
+				actividad = actividad_arancel or etiqueta
+				_accumulate_totals(
+					actividad_buckets,
+					actividad,
+					emitido=amount,
+					recaudado=paid,
+				)
+				continue
+
+			if tipo == "CTO COMP":
+				cto_comp_emitido += amount
+				cto_comp_recaudado += paid
+				_accumulate_totals(cto_comp_buckets, etiqueta, emitido=amount, recaudado=paid)
+				continue
+			if tipo == "Federativa":
+				federativa_emitido += amount
+				federativa_recaudado += paid
+				_accumulate_totals(federativa_buckets, etiqueta, emitido=amount, recaudado=paid)
+				continue
+
+			otros_emitido += amount
+			otros_recaudado += paid
+			_accumulate_totals(otros_buckets, etiqueta, emitido=amount, recaudado=paid)
+
+	def _concept_rows(buckets: dict[str, dict[str, float]], *, tipo: str) -> list[dict[str, Any]]:
+		rows: list[dict[str, Any]] = []
+		for concepto in sorted(buckets):
+			emitido = buckets[concepto]["emitido"]
+			recaudado = buckets[concepto]["recaudado"]
+			rows.append(
+				{
+					"tipo": tipo,
+					"concepto": concepto,
+					**_kpi_slice_payload(emitido=emitido, recaudado=recaudado),
+				}
+			)
+		return rows
 
 	return {
 		"periodo": periodo,
 		"disponible": True,
-		"cuotas_sociales": _cuotas_sociales_kpi_payload(
-			emitido=cuota_emitido,
-			recaudado=cuota_recaudado,
-		),
-		"aranceles": {
-			"emitido": arancel_emitido,
-			"recaudado": arancel_recaudado,
-			"porcentaje": _pct(arancel_recaudado, arancel_emitido),
-			"por_actividad": por_actividad,
+		"total": _kpi_slice_payload(emitido=total_emitido, recaudado=total_recaudado),
+		"cuotas_sociales": {
+			**_kpi_slice_payload(emitido=cuota_emitido, recaudado=cuota_recaudado),
+			"por_categoria": _rows_from_buckets(categoria_buckets, label_key="categoria"),
 		},
+		"aranceles": {
+			**_kpi_slice_payload(emitido=arancel_emitido, recaudado=arancel_recaudado),
+			"por_actividad": _rows_from_buckets(actividad_buckets, label_key="actividad"),
+		},
+		"cto_comp": {
+			**_kpi_slice_payload(emitido=cto_comp_emitido, recaudado=cto_comp_recaudado),
+			"por_concepto": _concept_rows(cto_comp_buckets, tipo="CTO COMP"),
+		},
+		"federativa": {
+			**_kpi_slice_payload(emitido=federativa_emitido, recaudado=federativa_recaudado),
+			"por_concepto": _concept_rows(federativa_buckets, tipo="Federativa"),
+		},
+		"otros": {
+			**_kpi_slice_payload(emitido=otros_emitido, recaudado=otros_recaudado),
+			"por_concepto": _concept_rows(otros_buckets, tipo="Otro"),
+		},
+		"cobrabilidad_vistas": _cobrabilidad_vistas_payload(),
+	}
+
+
+def get_cobranza_panel_links(*, reference_date: str | date | None = None) -> dict[str, Any]:
+	"""Enlaces Desk para la card de cobrabilidad (spec informe_rendicion fase 3)."""
+	ref = getdate(reference_date or today())
+	first = get_first_day(ref)
+	last = get_last_day(ref)
+	periodo = format_periodo_cobro(ref)
+	base_filters = {
+		"fecha_desde": str(first),
+		"fecha_hasta": str(last),
+		"periodo_cobro": periodo,
+	}
+
+	def _report_link(**extra: Any) -> dict[str, Any]:
+		return {
+			"report": "Recaudacion por concepto",
+			"filters": {**base_filters, **extra},
+		}
+
+	return {
+		"periodo": periodo,
+		"report_by_vista": {
+			"total": _report_link(),
+			"cuota": _report_link(solo_cuotas_sociales=1),
+			"arancel": _report_link(agrupacion="Arancel"),
+			"cto_comp": _report_link(agrupacion="CTO COMP"),
+			"federativa": _report_link(agrupacion="Federativa"),
+			"otro": _report_link(agrupacion="Otro"),
+		},
+		"recaudado_cuotas_report": _report_link(solo_cuotas_sociales=1),
+		"recaudado_aranceles_report": _report_link(agrupacion="Arancel"),
+		"rendicion_completa_report": _report_link(),
+		"saldo_cuotas_socios_doctype": SOCIO_DOCTYPE,
+		"saldo_cuotas_socios_filters": [["Socio", "saldo_deuda", ">", 0]],
 	}
 
 
@@ -546,6 +798,7 @@ def get_panel_metricas_payload(
 	*,
 	reference_date: str | date | None = None,
 	tendencia_reference_date: str | date | None = None,
+	tendencia_vista: str | None = None,
 ) -> dict[str, Any]:
 	ref = getdate(reference_date or today())
 	tendencia_ref = getdate(tendencia_reference_date or ref)
@@ -554,7 +807,10 @@ def get_panel_metricas_payload(
 	return {
 		"socios": socios,
 		"recaudacion": recaudacion,
-		"tendencia_recaudacion": get_recaudacion_tendencia_payload(reference_date=tendencia_ref),
+		"tendencia_recaudacion": get_recaudacion_tendencia_payload(
+			reference_date=tendencia_ref,
+			vista=tendencia_vista or "total",
+		),
 		"medios_pago": get_medios_pago_payload(reference_date=ref),
 		"ver_mas": {
 			"socios_morosos_doctype": SOCIO_DOCTYPE,
@@ -567,5 +823,6 @@ def get_panel_metricas_payload(
 			"solicitudes_filters": [
 				["Solicitud Asociacion", "workflow_state", "in", ["Pendiente", "Requiere Corrección"]]
 			],
+			"cobranza": get_cobranza_panel_links(reference_date=ref),
 		},
 	}

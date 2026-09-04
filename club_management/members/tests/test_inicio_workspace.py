@@ -78,11 +78,10 @@ class TestInicioWorkspace(FrappeTestCase):
 		)
 
 	def test_informes_club_no_estan_en_pestanas_superiores(self) -> None:
-		self.assertEqual(len(CLUB_DESK_REPORTS), 4)
+		self.assertEqual(len(CLUB_DESK_REPORTS), 3)
 		self.assertIn("Deuda por equipo", CLUB_DESK_REPORTS)
 		self.assertIn("Pagos por equipo", CLUB_DESK_REPORTS)
-		self.assertIn("Deuda por actividad", CLUB_DESK_REPORTS)
-		self.assertIn("Pagos del dia", CLUB_DESK_REPORTS)
+		self.assertIn("Recaudacion por concepto", CLUB_DESK_REPORTS)
 		nav_workspaces = {workspace for _label, workspace in CLUB_DESK_NAV_TABS}
 		for report_name in CLUB_DESK_REPORTS:
 			self.assertNotIn(report_name, nav_workspaces)

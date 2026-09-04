@@ -42,15 +42,29 @@ def _as_time(value: Any) -> time:
 	return get_time(value)
 
 
+def _minutes_of_day(value: Any) -> int:
+	t = _as_time(value)
+	return t.hour * 60 + t.minute
+
+
+def _interval_minutes(start: Any, end: Any) -> tuple[int, int]:
+	"""Minutos [desde, hasta) en un mismo día; si hasta <= desde, cruza medianoche."""
+	start_min = _minutes_of_day(start)
+	end_min = _minutes_of_day(end)
+	if end_min <= start_min:
+		end_min += 24 * 60
+	return start_min, end_min
+
+
 def intervals_overlap(start_a: Any, end_a: Any, start_b: Any, end_b: Any) -> bool:
 	"""Solape estricto [a,b) vs [c,d): extremos iguales no solapan."""
-	a0, a1 = _as_time(start_a), _as_time(end_a)
-	b0, b1 = _as_time(start_b), _as_time(end_b)
+	a0, a1 = _interval_minutes(start_a, end_a)
+	b0, b1 = _interval_minutes(start_b, end_b)
 	return a0 < b1 and b0 < a1
 
 
 def validate_time_range(hora_desde: Any, hora_hasta: Any) -> None:
-	if _as_time(hora_desde) >= _as_time(hora_hasta):
+	if _as_time(hora_desde) == _as_time(hora_hasta):
 		frappe.throw(_("hora_hasta debe ser mayor que hora_desde"), frappe.ValidationError)
 
 

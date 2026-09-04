@@ -52,6 +52,7 @@ def _ensure_secretaria_panel_access() -> None:
 def get_panel_lists(
 	reference_date: str | None = None,
 	tendencia_reference_date: str | None = None,
+	tendencia_vista: str | None = None,
 ) -> dict[str, Any]:
 
 	"""Listas preview (máx. 5) para el workspace Secretaría."""
@@ -61,14 +62,21 @@ def get_panel_lists(
 	return get_panel_lists_payload(
 		reference_date=reference_date,
 		tendencia_reference_date=tendencia_reference_date,
+		tendencia_vista=tendencia_vista,
 	)
 
 
 @frappe.whitelist()
-def get_tendencia_recaudacion(tendencia_reference_date: str | None = None) -> dict[str, Any]:
+def get_tendencia_recaudacion(
+	tendencia_reference_date: str | None = None,
+	vista: str | None = None,
+) -> dict[str, Any]:
 	"""Serie diaria de recaudación para el gráfico (sin recargar todo el panel)."""
 	_ensure_secretaria_panel_access()
-	return get_recaudacion_tendencia_payload(reference_date=tendencia_reference_date)
+	return get_recaudacion_tendencia_payload(
+		reference_date=tendencia_reference_date,
+		vista=vista or "total",
+	)
 
 
 @frappe.whitelist()

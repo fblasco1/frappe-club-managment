@@ -56,6 +56,17 @@ And la sincronización de `saldo_deuda` **no** actualiza `Socio.modified` (evita
 
 ---
 
+## Scenario: detalle de deuda — mora huérfana post-migración
+
+Given un `Socio` con SI base **Paid** y SI ajuste `*-MORA` impaga creada por error
+  (p. ej. posting en septiembre sin PE)
+When Secretaría ve **Detalle de deuda**
+Then esa mora aparece como saldo (correcto contablemente mientras exista)
+And el script `cancelar_mora_huerfana_socio` puede cancelarla si el origen está Paid
+  y no tiene Payment Entry asociado.
+
+---
+
 ## Scenario: cargar panel de deuda no invalida el formulario
 
 Given Secretaría abrió el formulario `Socio` y editó campos (p. ej. nombre)

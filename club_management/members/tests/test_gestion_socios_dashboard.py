@@ -193,6 +193,125 @@ class TestGestionSociosDashboardRecaudacion(MembersTestCase):
 		self.assertGreater(last["recaudado"], 0)
 		self.assertEqual(last["deuda"], 0)
 
+	def test_tendencia_incluye_cuotas_y_aranceles(self) -> None:
+		"""Spec: vista Total suma cuotas + aranceles; filtros por vista aíslan cada tipo."""
+		from club_management.activities.services.inscripcion_socio import (
+			inscribir_socio_selecciones,
+		)
+		from club_management.members.data.cuotas_sociales_vigentes import CUOTA_SOCIAL_ITEM_CODE
+		from frappe.utils import flt
+
+		settings = frappe.get_single("Club Settings")
+		settings.incluir_aranceles_en_deuda_mensual = 1
+		settings.save(ignore_permissions=True)
+
+		actividad = "Tendencia Natación KPI"
+		socio = insert_socio(dni="74003011", email="tend.ar@example.com", categoria="Activo")
+		cambiar_estado(socio.name, "Activo", motivo="Test tendencia arancel")
+		if not frappe.db.exists("Actividad", actividad):
+			frappe.get_doc(
+				{"doctype": "Actividad", "titulo": actividad, "habilitada": 1, "usa_grupos": 0}
+			).insert(ignore_permissions=True)
+		item_code = f"AR-TEND-{frappe.generate_hash(length=6)}"
+		item_group = frappe.db.get_value("Item Group", {}, "name") or "All Item Groups"
+		frappe.get_doc(
+			{
+				"doctype": "Item",
+				"item_code": item_code,
+				"item_name": f"Arancel {actividad}",
+				"item_group": item_group,
+				"is_stock_item": 0,
+				"is_sales_item": 1,
+				"standard_rate": 5_000,
+			}
+		).insert(ignore_permissions=True)
+		frappe.db.set_value("Actividad", actividad, "item", item_code)
+		inscribir_socio_selecciones(socio.name, [{"actividad": actividad}])
+		generar_deuda_mensual_socio(socio.name, reference_date=self._REFERENCE)
+
+		campo_socio = "socio" if frappe.get_meta(SALES_INVOICE_DOCTYPE).has_field("socio") else "custom_socio"
+		invoice_name = frappe.db.get_value(
+			SALES_INVOICE_DOCTYPE,
+			{campo_socio: socio.name, "docstatus": 1},
+			"name",
+		)
+		self.assertTrue(invoice_name)
+		self.assertTrue(
+			frappe.db.exists("Sales Invoice Item", {"parent": invoice_name, "item_code": item_code})
+		)
+		arancel_amt = flt(
+			frappe.db.get_value(
+				"Sales Invoice Item",
+				{"parent": invoice_name, "item_code": item_code},
+				"amount",
+			)
+		)
+		cuota_amt = flt(
+			frappe.db.get_value(
+				"Sales Invoice Item",
+				{"parent": invoice_name, "item_code": CUOTA_SOCIAL_ITEM_CODE},
+				"amount",
+			)
+			or 0
+		)
+		# Si la cuota usa otro item de categoría, sumar todas las líneas no-arancel de cuota
+		if cuota_amt <= 0:
+			cuota_amt = sum(
+				flt(r.amount)
+				for r in frappe.get_all(
+					"Sales Invoice Item",
+					filters={"parent": invoice_name},
+					fields=["item_code", "amount"],
+				)
+				if r.item_code != item_code
+			)
+		esperado_emitido = flt(cuota_amt + arancel_amt, 2)
+		self.assertGreater(arancel_amt, 0)
+
+		data = get_recaudacion_tendencia_payload(reference_date=self._REFERENCE)
+		self.assertEqual(data["vista"], "total")
+		self.assertTrue(any(v["value"] == "arancel" for v in data.get("vistas") or []))
+		# Día 1 (emisión): emitido acumulado = deuda + recaudado (aún 0 de cobro nuestro)
+		day1 = data["dias"][0]
+		emitido_total = flt(day1["deuda"] + day1["recaudado"], 2)
+		self.assertGreaterEqual(emitido_total, esperado_emitido)
+
+		data_arancel = get_recaudacion_tendencia_payload(
+			reference_date=self._REFERENCE, vista="arancel"
+		)
+		self.assertEqual(data_arancel["vista"], "arancel")
+		day1_ar = data_arancel["dias"][0]
+		emitido_arancel = flt(day1_ar["deuda"] + day1_ar["recaudado"], 2)
+		self.assertGreaterEqual(emitido_arancel, arancel_amt)
+		self.assertLess(emitido_arancel, emitido_total)
+
+		data_cuota = get_recaudacion_tendencia_payload(
+			reference_date=self._REFERENCE, vista="cuota"
+		)
+		self.assertEqual(data_cuota["vista"], "cuota")
+		day1_cu = data_cuota["dias"][0]
+		emitido_cuota = flt(day1_cu["deuda"] + day1_cu["recaudado"], 2)
+		self.assertGreaterEqual(emitido_cuota, cuota_amt)
+		self.assertLess(emitido_cuota, emitido_total)
+
+		# La cuota de arancel de esta SI figura como deuda pendiente en la vista arancel
+		last_ar_before = data_arancel["dias"][-1]
+		self.assertGreaterEqual(flt(last_ar_before["deuda"], 2), arancel_amt)
+
+		registrar_cobro_manual(socio.name, invoice_name, mode_of_payment="Cash")
+		data_paid = get_recaudacion_tendencia_payload(reference_date=self._REFERENCE)
+		last = data_paid["dias"][-1]
+		self.assertGreaterEqual(flt(last["recaudado"], 2), esperado_emitido)
+
+		data_ar_paid = get_recaudacion_tendencia_payload(
+			reference_date=self._REFERENCE, vista="arancel"
+		)
+		last_ar_after = data_ar_paid["dias"][-1]
+		self.assertLessEqual(
+			flt(last_ar_after["deuda"], 2),
+			flt(last_ar_before["deuda"] - arancel_amt, 2) + 0.01,
+		)
+
 	def test_mora_1_3_monto_label_pesos(self) -> None:
 		data = get_mora_1_3_meses_payload()
 		self.assertEqual(data["monto_label"], format_monto_ar(data["monto"]))

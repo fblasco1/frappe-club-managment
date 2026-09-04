@@ -79,6 +79,11 @@ class TestInformeConceptoCobranzaHelpers(MembersTestCase):
 		codes = resolver_item_codes_concepto("U17 FLEX")
 		self.assertIn("ICDPE-BASQUET-MASCULINO-FORMATIVAS-FLEX", codes)
 
+	def test_resolver_superior_b_basquet_amarillo_no_voley(self) -> None:
+		codes = resolver_item_codes_concepto("SUPERIOR B")
+		self.assertEqual(codes, ("BASQUET / SUPERIOR / AMARILLO",))
+		self.assertNotIn("ICDPE-VOLEY-FEDERADO", codes)
+
 	def test_resolver_funcional_gap(self) -> None:
 		codes = resolver_item_codes_concepto("FUNCIONAL GAP")
 		self.assertIn("ICDPE-FUNCIONAL-1-CLASE", codes)

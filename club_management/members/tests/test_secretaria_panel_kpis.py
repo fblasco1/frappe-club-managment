@@ -66,7 +66,7 @@ class TestSecretariaPanelKpis(MembersTestCase):
 	def test_panel_payload_incluye_metricas_sin_lista_morosos(self) -> None:
 		data = get_panel_lists_payload()
 		self.assertIn("metricas", data)
-		self.assertIn("cuotas_sociales", data)
+		self.assertIn("cuotas_sociales", data["metricas"]["recaudacion"])
 		self.assertIn("solicitudes_pendientes", data)
 		self.assertNotIn("socios_morosos", data)
 		self.assertIn("morosos", data["metricas"]["socios"])
@@ -81,7 +81,7 @@ class TestSecretariaPanelKpis(MembersTestCase):
 
 
 class TestSecretariaPanelRecaudacion(MembersTestCase):
-	_REFERENCE = "2026-06-01"
+	_REFERENCE = "2099-06-01"
 
 	def setUp(self) -> None:
 		super().setUp()
@@ -161,10 +161,37 @@ class TestSecretariaPanelRecaudacion(MembersTestCase):
 		self.assertIn("saldo_por_cobrar_label", cuotas)
 
 	def test_recaudacion_aranceles_por_actividad(self) -> None:
+		from club_management.activities.services.inscripcion_socio import (
+			resolve_item_arancel_inscripcion,
+		)
+
 		actividad = "KPI Natación"
-		self._socio_con_deuda(dni="73102002", email="rec.ar@example.com", actividad=actividad)
+		socio = self._socio_con_deuda(dni="73102002", email="rec.ar@example.com", actividad=actividad)
+		inscripcion = frappe.db.get_value(
+			"Inscripcion Actividad",
+			{"socio": socio.name, "actividad": actividad},
+			"name",
+		)
+		self.assertTrue(inscripcion)
+		item_code = resolve_item_arancel_inscripcion(inscripcion)
+		self.assertTrue(item_code)
+		campo_socio = "socio" if frappe.get_meta(SALES_INVOICE_DOCTYPE).has_field("socio") else "custom_socio"
+		invoice_name = frappe.db.get_value(
+			SALES_INVOICE_DOCTYPE,
+			{campo_socio: socio.name, "docstatus": 1},
+			"name",
+		)
+		self.assertTrue(invoice_name)
+		self.assertTrue(
+			frappe.db.exists(
+				"Sales Invoice Item",
+				{"parent": invoice_name, "item_code": item_code},
+			)
+		)
 		data = get_recaudacion_mes_payload(reference_date=self._REFERENCE)
 		self.assertTrue(data["disponible"])
 		self.assertGreater(data["aranceles"]["emitido"], 0)
 		actividades = {row["actividad"] for row in data["aranceles"]["por_actividad"]}
 		self.assertIn(actividad, actividades)
+		self.assertIn("total", data)
+		self.assertIn("cobrabilidad_vistas", data)

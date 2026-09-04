@@ -53,13 +53,16 @@ And **Ver más** abre `Socio` filtrado a `Moroso`.
 
 ## Scenario: gráfico tendencia de recaudación
 
-Given facturación y cobros de cuotas sociales en un mes calendario
+Given facturación y cobros en un mes calendario
 When Secretaria consulta el dashboard
 Then ve un gráfico de línea con dos series acumuladas por **día del mes** (1 … último día):
-  **Deuda del mes** (línea roja) = emitido acumulado − recaudado acumulado (baja al abonarse)
-  **Recaudado** (línea verde) = cobros acumulados del mes (sube con cada pago)
+  **Deuda del mes** (línea roja) = emitido acumulado − recaudado acumulado
+  **Recaudado** (línea verde) = cobros acumulados del mes
+And un **dropdown de vista** (igual que cobrabilidad): Total, Cuotas sociales, Aranceles, CTO COMP, Federativas, Otros conceptos
+And por defecto la vista es **Total**
+And al filtrar por una vista la serie solo incluye líneas de ese tipo
 And puede elegir el **mes** a visualizar con un selector (por defecto el mes en curso)
-And al cambiar el mes solo se actualiza el gráfico de tendencia (sin recargar todo el panel)
+And al cambiar el mes o la vista solo se actualiza el gráfico de tendencia (sin recargar todo el panel)
 And el resto de KPIs del panel siguen referidos al mes en curso salvo el gráfico de tendencia.
 
 ---

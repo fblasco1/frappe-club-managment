@@ -1,8 +1,36 @@
 (function () {
 	const layout = club_management.equipo_report.settings;
+	const AGRUPACION_EQUIPO = "Equipo";
+	const AGRUPACION_ACTIVIDAD = "Actividad";
+
+	const equipoOnlyFilters = [
+		"actividad",
+		"grupo_actividad",
+		"equipo_actividad",
+		"equipos_actividad",
+		"incluir_saldo_cero",
+	];
+
+	function sync_deuda_filter_visibility(report) {
+		const agrupacion = report.get_filter_value("agrupacion") || AGRUPACION_EQUIPO;
+		const isEquipo = agrupacion === AGRUPACION_EQUIPO;
+		equipoOnlyFilters.forEach((fieldname) => {
+			report.toggle_filter_display(fieldname, isEquipo);
+		});
+	}
 
 	frappe.query_reports["Deuda por equipo"] = {
 		filters: [
+			{
+				fieldname: "agrupacion",
+				label: __("Agrupar por"),
+				fieldtype: "Select",
+				options: `${AGRUPACION_EQUIPO}\n${AGRUPACION_ACTIVIDAD}`,
+				default: AGRUPACION_EQUIPO,
+				on_change() {
+					sync_deuda_filter_visibility(frappe.query_report);
+				},
+			},
 			{
 				fieldname: "actividad",
 				label: __("Actividad"),
@@ -90,7 +118,11 @@
 		get_datatable_options: layout.get_datatable_options,
 		after_datatable_render: layout.after_datatable_render,
 		onload(report) {
+			sync_deuda_filter_visibility(report);
 			club_management.equipo_report.enhance_page(report);
+			if ((report.get_filter_value("agrupacion") || AGRUPACION_EQUIPO) !== AGRUPACION_EQUIPO) {
+				return;
+			}
 			report.page.add_inner_button(__("Liquidar rango del socio"), () => {
 				const filters = frappe.query_report.get_values();
 				frappe.prompt(

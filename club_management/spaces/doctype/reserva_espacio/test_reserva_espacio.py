@@ -73,6 +73,18 @@ class TestReservaEspacio(MembersTestCase):
 		name = self._reserva(espacio, estado="Confirmada", motivo="OK")
 		self.assertTrue(frappe.db.exists("Reserva Espacio", name))
 
+	def test_reserva_cruza_medianoche(self) -> None:
+		espacio = insert_espacio("Salon Reserva Noche", tipo="Salon")
+		name = self._reserva(
+			espacio,
+			hora_desde="22:00:00",
+			hora_hasta="01:00:00",
+			motivo="Fiesta",
+		)
+		doc = frappe.get_doc("Reserva Espacio", name)
+		self.assertEqual(str(doc.hora_desde)[:5], "22:00")
+		self.assertEqual(str(doc.hora_hasta)[:5], "01:00")
+
 	def test_tipos_internos_validos(self) -> None:
 		espacio = insert_espacio("Salon Tipos Test")
 		for tipo in ("Alquiler socio", "Evento club", "Bloqueo"):

@@ -186,11 +186,11 @@ And no quedan lotes a medias (sin `commit` intermedio fuera de test).
 
 Given SI de ajuste `*-MORA` / remarks `Mora al cobro …` con `outstanding > 0`
 And la SI origen está **Paid** o **Cancelled**
-And no hay Payment Entry **submitted** contra esa mora
 When `cancelar_mora_huerfanas` (dry-run o apply con confirm)
-Then lista / cancela esas SI
-And **no** cancela mora con origen aún impago ni con PE submitted
-And opcionalmente filtra por `socio`.
+Then si **no** hay PE submitted → cancela la SI de mora
+And si hay PE parcial submitted → emite Credit Note por el outstanding residual
+And **no** toca mora con origen aún impago
+And opcionalmente filtra por `socio` o por set de socios imputados (CSV).
 
 ---
 

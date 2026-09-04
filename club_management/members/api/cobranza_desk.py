@@ -224,3 +224,20 @@ def facturar_cargo_socio(cargo: str) -> dict[str, str | float]:
 @frappe.whitelist()
 def cancelar_cargo_socio(cargo: str) -> dict[str, str]:
 	return _cancelar_cargo_socio(cargo)
+
+
+@frappe.whitelist()
+def export_recaudacion_por_concepto(
+	filters: str | dict | None = None,
+	file_format: str = "Excel",
+) -> None:
+	"""Descarga Excel/PDF de rendición (modelo Secretaría / Comisión Directiva)."""
+	from frappe.desk.utils import provide_binary_file
+
+	from club_management.members.services.recaudacion_por_concepto_export import build_export_bytes
+
+	ensure_secretaria_operacion_access()
+	filename, content = build_export_bytes(filters, file_format=file_format or "Excel")
+	extension = "pdf" if filename.lower().endswith(".pdf") else "xlsx"
+	stem = filename[: -len(extension) - 1] if filename.lower().endswith(f".{extension}") else filename
+	provide_binary_file(stem, extension, content)

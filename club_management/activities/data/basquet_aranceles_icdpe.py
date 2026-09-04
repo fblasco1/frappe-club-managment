@@ -13,6 +13,15 @@ ITEM_FORMATIVAS_AMARILLA = "ICDPE-BASQUET-MASCULINO-FORMATIVAS-AMARILLA"
 ITEM_FORMATIVAS_FLEX = "ICDPE-BASQUET-MASCULINO-FORMATIVAS-FLEX"
 ITEM_ESCUELITA = "ICDPE-BASQUET-ESCUELITA"
 ITEM_FEMENINO_SUP = "ICDPE-BASQUET-FEMENINO-SUP"
+# Ítem Desk del equipo «Basquet / Masculino / Amarillo / SUPERIOR» (tarifa informe).
+ITEM_MASCULINO_SUPERIOR_AMARILLO = "BASQUET / SUPERIOR / AMARILLO"
+
+# Facturas históricas del concepto «SUPERIOR B» se emitieron por error como vóley federado.
+_BASQUET_SUPERIOR_HISTORICAL_ALIASES: dict[str, frozenset[str]] = {
+	ITEM_MASCULINO_SUPERIOR_AMARILLO: frozenset(
+		{ITEM_MASCULINO_SUPERIOR_AMARILLO, "ICDPE-VOLEY-FEDERADO"}
+	),
+}
 
 BASQUET_ITEM_RATES: dict[str, float] = {
 	ITEM_MINIBASQUET: 28500.0,
@@ -70,3 +79,22 @@ BASQUET_ITEM_SPECS: tuple[BasquetItemSpec, ...] = (
 		BASQUET_COST_CENTER,
 	),
 )
+
+
+def expand_basquet_arancel_item_codes(item_code: str | None) -> set[str]:
+	"""Canónico + alias históricos para informes de pagos por equipo."""
+	if not item_code:
+		return set()
+	aliases = _BASQUET_SUPERIOR_HISTORICAL_ALIASES.get(item_code)
+	if aliases:
+		return set(aliases)
+	return {item_code}
+
+
+def expand_arancel_item_codes_for_pagos(item_code: str | None) -> set[str]:
+	"""Une expansión vóley + básquet para imputación de arancel cobrado."""
+	from club_management.activities.data.voley_aranceles_icdpe import (
+		expand_voley_arancel_item_codes,
+	)
+
+	return expand_voley_arancel_item_codes(item_code) | expand_basquet_arancel_item_codes(item_code)

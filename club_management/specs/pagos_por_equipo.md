@@ -87,6 +87,77 @@ And no se reduce la línea de cuota social
 
 ---
 
+## Scenario: mora del arancel cuenta en Pagos por equipo
+
+Given arancel de tira con tarifa $28.500
+And cobro del informe «INFA A U13» por $31.350 (mora 10 % incluida) en agosto
+When Secretaría ejecuta **Pagos por equipo** con rango agosto y fecha de **cobro**
+Then `pagos_en_rango` del socio incluye **$31.350** (base + mora)
+And no solo $28.500 de la línea de factura.
+
+---
+
+## Scenario: rango por fecha de cobro
+
+Given factura de julio con arancel impago
+And cobro del arancel en agosto según informe
+When el reporte filtra agosto por fecha de **Payment Entry**
+Then el arancel cobrado en agosto aparece en el reporte
+And no queda excluido por `posting_date` de la factura de julio.
+
+---
+
+## Scenario: dos equipos con el mismo ítem y distinto porcentaje
+
+Given socio con inscripciones activas en E1 (70 %) y E2 (90 %)
+And ambos equipos resuelven al **mismo** `item_arancel`
+When se calcula la liquidación del socio
+Then el arancel cobrado se cuenta **una sola vez**
+And se liquida con el % del equipo por el que entró al filtro (no se duplica el importe)
+And si ambos equipos están en el filtro se usa el % de la inscripción con equipo asignado.
+
+---
+
+## Scenario: cantidad de pagos sin duplicar facturas
+
+Given socio con dos inscripciones que comparten `item_arancel`
+And una única factura con arancel cobrado en el rango
+When se arma la fila del reporte
+Then `cantidad_pagos` = 1 (facturas únicas, no suma por inscripción).
+
+---
+
+## Scenario: períodos cobrados visibles
+
+Given cobros en agosto de aranceles con `periodo_cobro` 07/2026 y 08/2026
+When Secretaría ejecuta el reporte con rango agosto
+Then la fila del socio muestra `periodos_cobrados` = «07/2026, 08/2026»
+And el total `pagos_en_rango` incluye ambos cobros.
+
+---
+
+## Scenario: conciliación contra el CSV consolidado
+
+Given el CSV consolidado del mes con subtotal de aranceles deportivos
+When se ejecuta `total_arancel_cobrado_en_rango(fecha_desde, fecha_hasta)` (sin filtro de equipo)
+Then devuelve el total de arancel imputado por fecha de PE en el rango
+And ese total se cruza contra el subtotal de aranceles del CSV en el
+  verificador de cuadratura.
+
+---
+
+## Scenario: SUPERIOR B (básquet Amarillo) con factura histórica mal etiquetada
+
+Given socio inscripto en `Basquet / Masculino / Amarillo / SUPERIOR`
+And el ítem del equipo es `BASQUET / SUPERIOR / AMARILLO`
+And el cobro del informe «SUPERIOR B» quedó facturado como `ICDPE-VOLEY-FEDERADO` (mapeo legacy erróneo)
+And un `Payment Entry` en agosto imputa ese arancel
+When Secretaría ejecuta **Pagos por equipo** filtrando ese equipo en agosto
+Then la fila del socio muestra el importe cobrado del arancel Superior
+And el concepto «SUPERIOR B» del informe resuelve a `BASQUET / SUPERIOR / AMARILLO`.
+
+---
+
 ## Scenario: acceso restringido
 
 Given un usuario sin rol `Secretaria` ni `System Manager`

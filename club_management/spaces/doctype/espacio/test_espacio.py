@@ -101,10 +101,28 @@ class TestEspacio(MembersTestCase):
 					{
 						"dia_semana": "Martes",
 						"hora_desde": "19:00:00",
-						"hora_hasta": "18:00:00",
+						"hora_hasta": "19:00:00",
 					}
 				],
 			)
+
+	def test_horario_cruza_medianoche(self) -> None:
+		name = insert_espacio(
+			"Salon Noche Test",
+			tipo="Salon",
+			horarios=[
+				{
+					"dia_semana": "Viernes",
+					"hora_desde": "22:00:00",
+					"hora_hasta": "01:00:00",
+					"tipo_sesion": "Entrenamiento",
+					"titulo": "Fiesta nocturna",
+				}
+			],
+		)
+		doc = frappe.get_doc("Espacio", name)
+		self.assertEqual(str(doc.horarios[0].hora_desde)[:5], "22:00")
+		self.assertEqual(str(doc.horarios[0].hora_hasta)[:5], "01:00")
 
 	def test_vinculo_equipo_coherente(self) -> None:
 		act, grupo, equipo = ensure_actividad_tree(

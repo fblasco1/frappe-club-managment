@@ -1175,8 +1175,17 @@ def _origen_mora_cerrado(origen: str) -> bool:
 	return int(st.docstatus) == 2 or flt(st.outstanding_amount) <= 0.005
 
 
-def inventariar_mora_huerfanas(*, socio_name: str | None = None) -> list[dict[str, Any]]:
-	"""SI mora impagas cuyo origen está cerrado y sin PE submitted."""
+def inventariar_mora_huerfanas(
+	*,
+	socio_name: str | None = None,
+	socios: set[str] | frozenset[str] | None = None,
+) -> list[dict[str, Any]]:
+	"""SI mora con outstanding cuyo origen está cerrado.
+
+	Incluye:
+	- mora sin PE → candidata a cancelar
+	- mora con PE parcial → candidata a Credit Note por el residual
+	"""
 	from club_management.members.services.mora_al_cobro import periodo_es_ajuste_mora
 
 	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
@@ -1196,6 +1205,9 @@ def inventariar_mora_huerfanas(*, socio_name: str | None = None) -> list[dict[st
 	)
 	huerfanas: list[dict[str, Any]] = []
 	for row in rows:
+		socio = (row.get(campo_socio) or "").strip()
+		if socios is not None and socio not in socios:
+			continue
 		periodo = (row.get(campo_periodo) or "").strip()
 		remarks = row.remarks or ""
 		es_mora = periodo_es_ajuste_mora(periodo) or remarks.startswith("Mora al cobro")
@@ -1204,69 +1216,156 @@ def inventariar_mora_huerfanas(*, socio_name: str | None = None) -> list[dict[st
 		origen = _origen_desde_remarks_mora(remarks)
 		if not _origen_mora_cerrado(origen):
 			continue
-		if _mora_tiene_pe_submitted(row.name):
-			continue
+		tiene_pe = _mora_tiene_pe_submitted(row.name)
 		huerfanas.append(
 			{
 				"name": row.name,
-				"socio": row.get(campo_socio),
+				"socio": socio,
 				"periodo": periodo,
 				"outstanding": flt(row.outstanding_amount),
 				"posting_date": str(row.posting_date),
 				"origen": origen,
 				"remarks": remarks,
+				"tiene_pe": tiene_pe,
+				"accion": "credit_note" if tiene_pe else "cancel",
 			}
 		)
 	return huerfanas
 
 
+def _credit_note_mora_residual(invoice_name: str, monto: float) -> str:
+	"""CN por outstanding residual de una SI de mora (idempotente por remarks)."""
+	from frappe.utils import add_to_date, get_datetime, now_datetime
+
+	monto = flt(monto, 2)
+	if monto <= 0.005:
+		return ""
+
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, invoice_name)
+	socio_name = invoice.get(campo_socio) if campo_socio else None
+	remarks_cn = f"CN mora huérfana {invoice_name}"
+	if campo_socio and socio_name:
+		existente = frappe.db.exists(
+			SALES_INVOICE_DOCTYPE,
+			{
+				campo_socio: socio_name,
+				"docstatus": 1,
+				"is_return": 1,
+				"return_against": invoice_name,
+				"remarks": remarks_cn,
+			},
+		)
+		if existente:
+			return str(existente)
+
+	origen_row = (invoice.get("items") or [None])[0]
+	if not origen_row:
+		frappe.throw(_("Mora {0} sin líneas para CN.").format(invoice_name))
+
+	company = invoice.company or _default_company()
+	item_line: dict[str, Any] = {
+		"item_code": origen_row.item_code,
+		"qty": -1.0,
+		"rate": monto,
+		"description": _("Regularización mora huérfana {0}").format(invoice_name),
+		"sales_invoice_item": origen_row.name,
+	}
+	preferred_cc = origen_row.get("cost_center") or resolve_cost_center_item(
+		origen_row.item_code, company
+	)
+	if preferred_cc:
+		item_line["cost_center"] = preferred_cc
+
+	posting_cn = getdate(invoice.posting_date)
+	payload: dict[str, Any] = {
+		"doctype": SALES_INVOICE_DOCTYPE,
+		"customer": invoice.customer,
+		"company": company,
+		"is_return": 1,
+		"return_against": invoice_name,
+		"update_outstanding_for_self": 0,
+		"posting_date": posting_cn,
+		"due_date": posting_cn,
+		"set_posting_time": 1,
+		"disable_rounded_total": 1,
+		"remarks": remarks_cn,
+		"items": [item_line],
+	}
+	origen_ts = get_datetime(invoice.get("posting_date"))
+	if invoice.meta.has_field("posting_time") and invoice.get("posting_time"):
+		try:
+			origen_ts = get_datetime(f"{invoice.posting_date} {invoice.posting_time}")
+		except Exception:
+			origen_ts = get_datetime(invoice.posting_date)
+	cn_ts = add_to_date(origen_ts, seconds=5)
+	payload["posting_time"] = cn_ts.strftime("%H:%M:%S") if getdate(cn_ts) == posting_cn else "00:00:01"
+	if campo_socio and socio_name:
+		payload[campo_socio] = socio_name
+	campo_periodo = _campo_periodo_cobro()
+	if campo_periodo and invoice.get(campo_periodo):
+		payload[campo_periodo] = invoice.get(campo_periodo)
+
+	cn = frappe.get_doc(payload)
+	cn.flags.ignore_permissions = True
+	cn.insert(ignore_permissions=True)
+	cn.submit()
+	return cn.name
+
+
 def cancelar_mora_huerfanas(
 	*,
 	socio_name: str | None = None,
+	socios: set[str] | frozenset[str] | None = None,
 	dry_run: bool = True,
 	confirm: str = "",
 	commit_every: int = 25,
 ) -> dict[str, Any]:
-	"""Cancela mora huérfanas (site-wide o por socio)."""
+	"""Limpia mora huérfana: cancel si sin PE; CN residual si hay PE parcial."""
 	from club_management.integrations.payment_ledger_postgres import apply_patch
 
 	apply_patch()
 	_ensure_purge_allowed(dry_run=dry_run, confirm=confirm)
-	candidatas = inventariar_mora_huerfanas(socio_name=socio_name)
+	candidatas = inventariar_mora_huerfanas(socio_name=socio_name, socios=socios)
 	in_test = bool(getattr(frappe.flags, "in_test", False))
-	canceladas: list[dict[str, Any]] = []
+	hechos: list[dict[str, Any]] = []
 	errores: list[dict[str, Any]] = []
 
 	print(f"==> Mora huérfanas candidatas={len(candidatas)} dry_run={dry_run}")
-	for i, row in enumerate(candidatas, start=1):
+	for row in candidatas:
+		accion = row.get("accion") or "cancel"
 		if dry_run:
-			canceladas.append({**row, "dry_run": True})
+			hechos.append({**row, "dry_run": True})
 			continue
 		try:
-			doc = frappe.get_doc(SALES_INVOICE_DOCTYPE, row["name"])
-			doc.flags.ignore_permissions = True
-			doc.cancel()
-			canceladas.append(row)
-			if commit_every and not in_test and len(canceladas) % commit_every == 0:
+			if accion == "credit_note":
+				cn = _credit_note_mora_residual(row["name"], flt(row["outstanding"]))
+				hechos.append({**row, "credit_note": cn})
+			else:
+				doc = frappe.get_doc(SALES_INVOICE_DOCTYPE, row["name"])
+				doc.flags.ignore_permissions = True
+				doc.cancel()
+				hechos.append({**row, "cancelada": True})
+			if commit_every and not in_test and len(hechos) % commit_every == 0:
 				frappe.db.commit()
-				print(f"  mora canceladas={len(canceladas)}/{len(candidatas)}")
+				print(f"  mora limpiadas={len(hechos)}/{len(candidatas)}")
 		except Exception as exc:  # noqa: BLE001
 			if not in_test:
 				frappe.db.rollback()
-			errores.append({"name": row["name"], "error": str(exc)[:280]})
+			errores.append({"name": row["name"], "accion": accion, "error": str(exc)[:280]})
 
 	if not dry_run and commit_every and not in_test:
 		frappe.db.commit()
 
-	total = flt(sum(flt(r.get("outstanding")) for r in canceladas), 2)
+	total = flt(sum(flt(r.get("outstanding")) for r in hechos), 2)
 	result = {
 		"dry_run": dry_run,
 		"socio": socio_name or "",
 		"candidatas_count": len(candidatas),
-		"canceladas_count": len(canceladas),
+		"canceladas_count": len(hechos),
 		"errores_count": len(errores),
 		"total_outstanding": total,
-		"canceladas": canceladas if dry_run or len(canceladas) <= 200 else canceladas[:200],
+		"canceladas": hechos if dry_run or len(hechos) <= 200 else hechos[:200],
 		"errores": errores[:50],
 	}
 	Path("/tmp/purga_mora_huerfanas.json").write_text(
@@ -1274,7 +1373,7 @@ def cancelar_mora_huerfanas(
 	)
 	print(
 		f"  mora fin: candidatas={len(candidatas)} "
-		f"canceladas={len(canceladas)} errores={len(errores)} total=${total:,.2f}"
+		f"limpiadas={len(hechos)} errores={len(errores)} total=${total:,.2f}"
 	)
 	return result
 

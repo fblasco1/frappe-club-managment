@@ -129,16 +129,80 @@ Given vóley, futsal, etc. sin conector aún
 When no hay adaptador habilitado
 Then solo carga manual / CSV; la UI no promete sync automático.
 
-### Scenario (pendiente): sync FMV — Vóley
+### Scenario: sync FMV — Vóley (Echagüe club 420)
 
-Given una fuente FMV acordada (API, export periódico o Excel oficial)
-When Coordinación ejecuta «Sincronizar FMV» o corre el job programado
-Then se upsertean partidos locales como `Reserva Espacio` Confirmada
-And `origen_fixture = fmv_voley` (o clave estable acordada) + `id_externo_fixture`
+Given el fixture público de ICDPE en FMV:
+`https://metrovoley.com.ar/clubs/420/matches`
+And un extractor externo (repo tipo `formativas_ges`, **no** dentro de `club_management`)
+publica `outputs/echague/fixture_fmv_voley.json` con el contrato de abajo
+When Coordinación ejecuta «Sincronizar FMV» o corre el job programado (08:00 / 20:00 ART)
+Then se upsertean partidos **locales** como `Reserva Espacio` Confirmada
+And `origen_fixture = fmv_voley` + `id_externo_fixture` = ID numérico del partido en metrovoley
+And filas visitante (Echagüe de visita) **no** ocupan espacios del club
 And el reporte lista filas omitidas y superposiciones
 And la planilla refleja los partidos el día correspondiente.
 
-**Estado:** spec detallada + adaptador — **pendiente (SP-1)**.
+**Fuente web (referencia operativa):**
+
+| Campo | Valor |
+|-------|-------|
+| URL club | `https://metrovoley.com.ar/clubs/420/matches` |
+| `club_id` FMV | `420` |
+| Detalle partido | `https://metrovoley.com.ar/matches/{id}` |
+
+**Mapeo espacio (acordado con Coordinación):**
+
+| Condición (equipo / categoría FMV) | Espacio SICLUB |
+|-----------------------------------|----------------|
+| Equipo exacto `SUPERIOR ECHAGÜE` (sin sufijo B) | **Cancha 1** |
+| Equipo `SUPERIOR ECHAGÜE B` | **Cancha 2** |
+| Resto de partidos locales en Portela | **Cancha 2** (default vóley) |
+
+- El extractor puede enviar `espacio` ya resuelto; si viene vacío, SICLUB aplica la tabla anterior
+  según `equipo` / `categoria` + `tira` del payload.
+- Normalización de nombre: comparar case-insensitive, colapsar espacios, ignorar acentos opcionales
+  (`ECHAGUE` ≈ `ECHAGÜE`).
+
+**Ventana horaria vóley (propuesta inicial):**
+
+| Tipo | Entrada en calor | Duración |
+|------|------------------|----------|
+| Formativas (Sub 13, Sub 15, …) | 0 | 90 min |
+| Superiores / DH | 30 min | 90 min |
+| Resto | 0 | 90 min |
+
+**Contrato JSON (envelope, análogo FeBAMBA):**
+
+```json
+{
+  "version": 1,
+  "source": "fmv_voley",
+  "generated_at": "2026-08-28T20:00:00-03:00",
+  "club": "PEDRO ECHAGUE",
+  "club_id_fmv": 420,
+  "partidos": [
+    {
+      "source": "fmv_voley",
+      "external_id": "753076",
+      "fecha": "2026-08-28",
+      "hora": "21:00",
+      "categoria": "Sub 15",
+      "tira": "Nivel E",
+      "equipo": "SUB 15 ECHAGÜE",
+      "rival": "SHOLEM B",
+      "localia": "Local",
+      "direccion": "Portela 836, CABA",
+      "espacio": null
+    }
+  ]
+}
+```
+
+- Campo nuevo opcional `equipo`: nombre del plantel en FMV (para reglas Cancha 1 vs 2).
+- Upsert clave: `(origen_fixture, id_externo_fixture)`.
+
+**Estado:** spec detallada — **lista**; adaptador `fmv_voley.py` en SICLUB — **pendiente**;
+extractor externo [`fmv_voley_ges`](https://github.com/fblasco1/fmv_voley_ges) — **implementado**.
 
 ### Scenario (pendiente): import fixtures de ligas desde Excel
 
@@ -148,6 +212,27 @@ Then se validan filas, se mapean espacios y se upsertean reservas idempotentemen
 And un informe lista errores/omitidos sin duplicar Confirmada existente.
 
 **Estado:** plantilla + parser — **pendiente (SP-2)**.
+
+---
+
+## Fuente concreta: fmv_voley_ges → JSON
+
+| Pieza | Detalle |
+|-------|---------|
+| Repo | `github.com/fblasco1/fmv_voley_ges` (local: `../fmv_voley_ges`) |
+| Action | `Sync fixture FMV Echagüe` (`sync_echague.yml`) |
+| Schedule | 08:00 y 20:00 ART |
+| Script | `analysis/sync_fixture_echague.py` |
+| Fuente web | `https://metrovoley.com.ar/clubs/420/matches` (Inertia `data-page`) |
+| Destino | `outputs/echague/fixture_fmv_voley.json` + CSV |
+| Club filter | `club_id_fmv = 420` |
+| Idempotencia | `external_id` = ID interno FMV (`match.id`) |
+
+**URL canónica para SICLUB (tras push a main):**
+
+```text
+https://raw.githubusercontent.com/fblasco1/fmv_voley_ges/main/outputs/echague/fixture_fmv_voley.json
+```
 
 ---
 

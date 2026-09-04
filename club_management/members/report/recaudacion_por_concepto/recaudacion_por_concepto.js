@@ -21,6 +21,17 @@ function sync_recaudacion_filter_visibility(report) {
 	report.toggle_filter_display("medio_pago", !isPagosDia);
 }
 
+function export_recaudacion_rendicion(report, file_format) {
+	const filters = report.get_values ? report.get_values() : report.get_filter_values();
+	open_url_post(
+		"/api/method/club_management.members.api.cobranza_desk.export_recaudacion_por_concepto",
+		{
+			filters: JSON.stringify(filters || {}),
+			file_format: file_format,
+		}
+	);
+}
+
 frappe.query_reports["Recaudacion por concepto"] = {
 	filters: [
 		{
@@ -80,5 +91,11 @@ frappe.query_reports["Recaudacion por concepto"] = {
 	],
 	onload(report) {
 		sync_recaudacion_filter_visibility(report);
+		report.page.add_inner_button(__("Exportar Excel"), () => {
+			export_recaudacion_rendicion(report, "Excel");
+		});
+		report.page.add_inner_button(__("Exportar PDF"), () => {
+			export_recaudacion_rendicion(report, "PDF");
+		});
 	},
 };

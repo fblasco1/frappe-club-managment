@@ -9,7 +9,10 @@ from club_management.spaces.availability import (
 	assert_no_overlap_with_occupancy,
 	dia_semana_de_fecha,
 	get_occupancy,
+	intervals_overlap,
+	validate_time_range,
 )
+from club_management.spaces.services.ocupacion_dashboard import get_ocupacion_dashboard_payload
 from club_management.spaces.helpers import insert_espacio
 
 
@@ -49,6 +52,51 @@ class TestAvailability(MembersTestCase):
 					"estado": "Confirmada",
 				}
 			).insert(ignore_permissions=True)
+
+	def test_horario_cruza_medianoche_se_guarda(self) -> None:
+		espacio = insert_espacio(
+			"Salon Madrugada Reserva",
+			tipo="Salon",
+		)
+		frappe.get_doc(
+			{
+				"doctype": "Reserva Espacio",
+				"espacio": espacio,
+				"fecha": "2026-09-05",
+				"hora_desde": "22:00:00",
+				"hora_hasta": "01:00:00",
+				"tipo": "Evento club",
+				"estado": "Confirmada",
+				"motivo": "Evento nocturno",
+			}
+		).insert(ignore_permissions=True)
+		slots = get_occupancy(espacio, "2026-09-05")
+		self.assertTrue(any(s.get("motivo") == "Evento nocturno" for s in slots))
+
+	def test_intervals_overlap_con_medianoche(self) -> None:
+		self.assertTrue(intervals_overlap("22:00:00", "01:00:00", "23:00:00", "23:30:00"))
+		self.assertFalse(intervals_overlap("22:00:00", "01:00:00", "10:00:00", "11:00:00"))
+		validate_time_range("22:00:00", "01:00:00")
+
+	def test_planilla_muestra_evento_nocturno(self) -> None:
+		espacio = insert_espacio("Salon Planilla Noche", tipo="Salon")
+		frappe.get_doc(
+			{
+				"doctype": "Reserva Espacio",
+				"espacio": espacio,
+				"fecha": "2026-09-05",
+				"hora_desde": "22:00:00",
+				"hora_hasta": "01:00:00",
+				"tipo": "Evento club",
+				"estado": "Confirmada",
+				"motivo": "Cena larga",
+			}
+		).insert(ignore_permissions=True)
+		payload = get_ocupacion_dashboard_payload(fecha="2026-09-05")
+		bloques = [b for b in payload["bloques"] if b["espacio"] == espacio]
+		self.assertEqual(len(bloques), 1)
+		self.assertEqual(bloques[0]["inicio"], "22:00")
+		self.assertEqual(bloques[0]["fin"], "01:00")
 
 	def test_occupancy_incluye_grilla_y_reserva(self) -> None:
 		espacio = insert_espacio(

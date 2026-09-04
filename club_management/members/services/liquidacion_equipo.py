@@ -244,11 +244,11 @@ def calcular_deuda_desglose_en_rango(
 	if inscripcion_name:
 		item_arancel = resolve_item_arancel_inscripcion(inscripcion_name)
 		if item_arancel:
-			from club_management.activities.data.voley_aranceles_icdpe import (
-				expand_voley_arancel_item_codes,
+			from club_management.activities.data.basquet_aranceles_icdpe import (
+				expand_arancel_item_codes_for_pagos,
 			)
 
-			arancel_codes.update(expand_voley_arancel_item_codes(item_arancel))
+			arancel_codes.update(expand_arancel_item_codes_for_pagos(item_arancel))
 		federativa_codes.update(federativa_item_codes_inscripcion(inscripcion_name))
 
 	cuota = arancel = federativa = 0.0
@@ -382,6 +382,61 @@ def calcular_pagos_en_rango(
 	)
 
 
+def _facturas_con_pe_en_rango(socio_name: str, fecha_desde: str, fecha_hasta: str) -> list[str]:
+	"""Facturas del socio con al menos un PE en el rango (fecha de cobro)."""
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	if not campo_socio:
+		return []
+	return frappe.db.sql_list(
+		f"""
+		SELECT DISTINCT per.reference_name
+		FROM `tabPayment Entry Reference` per
+		INNER JOIN `tabPayment Entry` pe ON pe.name = per.parent AND pe.docstatus = 1
+		INNER JOIN `tabSales Invoice` si ON si.name = per.reference_name AND si.docstatus = 1
+		WHERE per.reference_doctype = %s
+		  AND pe.posting_date BETWEEN %s AND %s
+		  AND si.`{campo_socio}` = %s
+		ORDER BY per.reference_name
+		""",
+		(SALES_INVOICE_DOCTYPE, getdate(fecha_desde), getdate(fecha_hasta), socio_name),
+	)
+
+
+def _pagos_arancel_detalle(
+	socio_name: str,
+	*,
+	fecha_desde: str,
+	fecha_hasta: str,
+	item_arancel: str | None,
+) -> list[tuple[str, float]]:
+	"""Facturas con arancel cobrado en rango: `[(invoice, cobrado), …]`."""
+	if not item_arancel or not erpnext_cobranza_disponible():
+		return []
+
+	from club_management.activities.data.basquet_aranceles_icdpe import (
+		expand_arancel_item_codes_for_pagos,
+	)
+	from club_management.scripts.informe_concepto_cobranza import monto_cobrado_de_items_en_rango
+
+	item_codes = list(expand_arancel_item_codes_for_pagos(item_arancel))
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	if not campo_socio:
+		return []
+
+	detalle: list[tuple[str, float]] = []
+	for invoice_name in _facturas_con_pe_en_rango(socio_name, fecha_desde, fecha_hasta):
+		cobrado = monto_cobrado_de_items_en_rango(
+			invoice_name,
+			item_codes,
+			fecha_desde=fecha_desde,
+			fecha_hasta=fecha_hasta,
+		)
+		if cobrado <= 0.005:
+			continue
+		detalle.append((invoice_name, flt(cobrado, 2)))
+	return detalle
+
+
 def calcular_pagos_arancel_en_rango(
 	socio_name: str,
 	*,
@@ -389,42 +444,28 @@ def calcular_pagos_arancel_en_rango(
 	fecha_hasta: str,
 	item_arancel: str | None,
 ) -> tuple[float, int]:
-	"""Importe cobrado de líneas de factura que coinciden con el ítem de arancel."""
-	if not item_arancel or not erpnext_cobranza_disponible():
-		return 0.0, 0
-
-	from club_management.activities.data.voley_aranceles_icdpe import (
-		expand_voley_arancel_item_codes,
+	"""Importe cobrado de arancel según PE en rango (incluye mora del concepto)."""
+	detalle = _pagos_arancel_detalle(
+		socio_name,
+		fecha_desde=fecha_desde,
+		fecha_hasta=fecha_hasta,
+		item_arancel=item_arancel,
 	)
+	total = flt(sum(cobrado for _inv, cobrado in detalle), 2)
+	return total, len(detalle)
 
-	item_codes = list(expand_voley_arancel_item_codes(item_arancel))
-	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
-	if not campo_socio:
-		return 0.0, 0
 
-	invoices = frappe.get_all(
+def _periodos_de_facturas(invoice_names: set[str]) -> list[str]:
+	campo_periodo = _campo_periodo_cobro()
+	if not campo_periodo or not invoice_names:
+		return []
+	rows = frappe.get_all(
 		SALES_INVOICE_DOCTYPE,
-		filters={
-			campo_socio: socio_name,
-			"docstatus": 1,
-			"posting_date": ["between", [getdate(fecha_desde), getdate(fecha_hasta)]],
-		},
-		fields=["name", "grand_total", "outstanding_amount"],
+		filters={"name": ["in", list(invoice_names)]},
+		fields=[campo_periodo],
 	)
-	total = 0.0
-	count = 0
-	from club_management.scripts.informe_concepto_cobranza import monto_cobrado_de_items
-
-	for invoice in invoices:
-		paid = flt(invoice.grand_total) - flt(invoice.outstanding_amount)
-		if paid <= 0:
-			continue
-		cobrado = monto_cobrado_de_items(invoice.name, item_codes)
-		if cobrado <= 0.005:
-			continue
-		total += cobrado
-		count += 1
-	return total, count
+	periodos = {str(row.get(campo_periodo) or "").strip() for row in rows}
+	return sorted(p for p in periodos if p and not p.endswith("-MORA"))
 
 
 def _calcular_liquidacion_entrenador_inscripciones(
@@ -432,32 +473,97 @@ def _calcular_liquidacion_entrenador_inscripciones(
 	socio_name: str,
 	fecha_desde: str,
 	fecha_hasta: str,
-) -> tuple[float, float, float]:
-	"""Retorna (pagos_en_rango, liquidacion_entrenador, pct_promedio_ponderado)."""
-	pagos_total = 0.0
-	liquidacion_total = 0.0
-	processed_items: set[str] = set()
+) -> tuple[float, float, float, set[str], list[str]]:
+	"""Retorna (pagos, liquidación, pct ponderado, facturas únicas, períodos cobrados).
+
+	El importe de cada ítem de arancel se cuenta una sola vez aunque el socio
+	tenga varias inscripciones que compartan el ítem; en ese caso se liquida
+	con el mayor % entre las inscripciones del filtro (determinista).
+	"""
+	pct_por_item: dict[str, float] = {}
 	for ins in inscripciones:
 		item_arancel = resolve_item_arancel_inscripcion(ins.name)
-		if not item_arancel or item_arancel in processed_items:
+		if not item_arancel:
 			continue
-		processed_items.add(item_arancel)
 		pct = resolve_pct_liquidacion_entrenador(
 			equipo_actividad=ins.equipo_actividad,
 			grupo_actividad=ins.grupo_actividad,
 		)
-		pagos, _count = calcular_pagos_arancel_en_rango(
+		if item_arancel not in pct_por_item or pct > pct_por_item[item_arancel]:
+			pct_por_item[item_arancel] = pct
+
+	pagos_total = 0.0
+	liquidacion_total = 0.0
+	facturas: set[str] = set()
+	for item_arancel, pct in pct_por_item.items():
+		detalle = _pagos_arancel_detalle(
 			socio_name,
 			fecha_desde=fecha_desde,
 			fecha_hasta=fecha_hasta,
 			item_arancel=item_arancel,
 		)
+		pagos = flt(sum(cobrado for _inv, cobrado in detalle), 2)
 		if pagos <= 0:
 			continue
 		pagos_total += pagos
 		liquidacion_total += pagos * (pct / 100.0)
+		facturas.update(inv for inv, _cobrado in detalle)
 	pct_efectivo = (liquidacion_total / pagos_total * 100.0) if pagos_total > 0 else 0.0
-	return round(pagos_total, 2), round(liquidacion_total, 2), round(pct_efectivo, 1)
+	periodos = _periodos_de_facturas(facturas)
+	return (
+		round(pagos_total, 2),
+		round(liquidacion_total, 2),
+		round(pct_efectivo, 1),
+		facturas,
+		periodos,
+	)
+
+
+def total_arancel_cobrado_en_rango(fecha_desde: str, fecha_hasta: str) -> float:
+	"""Total de arancel deportivo imputado por fecha de PE en el rango (sin filtro de equipo).
+
+	Conciliación contra el subtotal de aranceles del CSV consolidado
+	(spec `pagos_por_equipo.md`).
+	"""
+	if not erpnext_cobranza_disponible():
+		return 0.0
+
+	from club_management.activities.data.basquet_aranceles_icdpe import (
+		expand_arancel_item_codes_for_pagos,
+	)
+	from club_management.scripts.informe_concepto_cobranza import monto_cobrado_de_items_en_rango
+
+	arancel_codes: set[str] = set()
+	for doctype in ("Actividad", "Grupo Actividad", "Equipo Actividad"):
+		for code in frappe.get_all(
+			doctype, filters={"item": ["!=", ""]}, pluck="item"
+		):
+			if code:
+				arancel_codes.update(expand_arancel_item_codes_for_pagos(code))
+	if not arancel_codes:
+		return 0.0
+
+	invoice_names = frappe.db.sql_list(
+		"""
+		SELECT DISTINCT per.reference_name
+		FROM `tabPayment Entry Reference` per
+		INNER JOIN `tabPayment Entry` pe ON pe.name = per.parent AND pe.docstatus = 1
+		INNER JOIN `tabSales Invoice` si ON si.name = per.reference_name AND si.docstatus = 1
+		WHERE per.reference_doctype = %s
+		  AND pe.posting_date BETWEEN %s AND %s
+		""",
+		(SALES_INVOICE_DOCTYPE, getdate(fecha_desde), getdate(fecha_hasta)),
+	)
+	codes = list(arancel_codes)
+	total = 0.0
+	for invoice_name in invoice_names:
+		total += monto_cobrado_de_items_en_rango(
+			invoice_name,
+			codes,
+			fecha_desde=fecha_desde,
+			fecha_hasta=fecha_hasta,
+		)
+	return flt(total, 2)
 
 
 def get_pagos_por_equipo_data(filters: dict[str, Any] | frappe._dict) -> list[dict[str, Any]]:
@@ -485,20 +591,17 @@ def get_pagos_por_equipo_data(filters: dict[str, Any] | frappe._dict) -> list[di
 		if not socio:
 			continue
 
-		pagos_en_rango, liquidacion_entrenador, pct_entrenador = _calcular_liquidacion_entrenador_inscripciones(
+		(
+			pagos_en_rango,
+			liquidacion_entrenador,
+			pct_entrenador,
+			facturas,
+			periodos,
+		) = _calcular_liquidacion_entrenador_inscripciones(
 			ins_list,
 			socio_name,
 			str(filters.fecha_desde),
 			str(filters.fecha_hasta),
-		)
-		cantidad = sum(
-			calcular_pagos_en_rango(
-				socio_name,
-				str(filters.fecha_desde),
-				str(filters.fecha_hasta),
-				inscripcion_name=ins.name,
-			)[1]
-			for ins in ins_list
 		)
 		if not int(filters.get("incluir_saldo_cero") or 0) and pagos_en_rango <= 0:
 			continue
@@ -517,7 +620,8 @@ def get_pagos_por_equipo_data(filters: dict[str, Any] | frappe._dict) -> list[di
 				"pagos_en_rango": pagos_en_rango,
 				"pct_entrenador": pct_entrenador,
 				"liquidacion_entrenador": liquidacion_entrenador,
-				"cantidad_pagos": cantidad,
+				"cantidad_pagos": len(facturas),
+				"periodos_cobrados": ", ".join(periodos),
 			}
 		)
 
@@ -568,6 +672,12 @@ def get_pagos_report_columns() -> list[dict[str, Any]]:
 			"fieldname": "cantidad_pagos",
 			"fieldtype": "Int",
 			"width": 150,
+		},
+		{
+			"label": _("Períodos cobrados"),
+			"fieldname": "periodos_cobrados",
+			"fieldtype": "Data",
+			"width": 140,
 		},
 	]
 

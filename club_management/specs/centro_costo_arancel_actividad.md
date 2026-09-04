@@ -30,13 +30,23 @@ And la línea de la cuota social imputa al centro de costo «Cuotas Sociales».
 
 ---
 
-## Scenario: la cuota social imputa a su centro de costo propio
+## Scenario: no cruzar arancel con línea CTO COMP
 
-Given el centro de costo «Cuotas Sociales» configurado en el `Item Default` de la cuota social
-And un socio activo
-When se genera la factura mensual de la cuota
-Then la línea de la cuota tiene `cost_center = "Cuotas Sociales - <abbr>"`
-And el `GL Entry` del ingreso de la cuota tiene ese mismo centro de costo.
+Given una SI del período con línea `ICDPE-CARGO-VARIOS` descripción `CTO COMP FUTBOL FAFI/TABI`
+And una fila CSV con concepto `FUTBOL FAFI` (arancel)
+When `buscar_linea_factura_concepto`
+Then **no** matchea esa línea CTO COMP
+And el importer auto-factura el ítem `ICDPE-FUTBOL-FAFI`.
+
+---
+
+## Scenario: resolve_cost_center_item no devuelve grupos
+
+Given un ítem sin `selling_cost_center` o con centro de costo `is_group=1` (p. ej. `Main - ICDPE`)
+When `resolve_cost_center_item`
+Then no devuelve un Cost Center grupo
+And usa el de la empresa si es hoja, o `None`.
+
 
 ---
 

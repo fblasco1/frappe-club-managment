@@ -104,6 +104,8 @@ Equipos / etiquetas de tira (U17 FLEX, PRE-MINI A/B U9, …): alias de arancel m
 **CADETES A U15 / JUVENILES A U17 / LIGA APROX A U21** = tira **Azul** → `ICDPE-BASQUET-MASCULINO-FORMATIVAS-AZUL`.
 Tira B = Amarillo (Minibasquet U9–U13 o Formativas Amarilla U15+).
 «Adicional Basquet Escuelita» es el único concepto que va a `ICDPE-BASQUET-ESCUELITA`.
+**SUPERIOR B** (concepto del informe de cobranza) = equipo **Basquet / Masculino / Amarillo / SUPERIOR**
+→ ítem `BASQUET / SUPERIOR / AMARILLO` (no confundir con el equipo de vóley «Superior B» del padrón).
 
 ### Cuota Complementaria (`CTO COMP …`)
 

@@ -17,29 +17,36 @@ La página de asociarse **no** es el formulario: es una campaña (tono
 que explica **por qué** y **cómo** sumarse. El wizard vive en
 `/asociate/inscripcion`.
 
-**Diferencia con Estudiantes:** no hay pago online. El envío de la solicitud
-deja al interesado **pre-asociado**; Secretaría contacta, cobra offline y
-da el **alta definitiva** (`alta_sin_pago_online.md`).
+**Diferencia con Estudiantes:** el envío deja al interesado **pre-asociado**;
+Secretaría contacta y da el **alta definitiva** (`alta_sin_pago_online.md`).
+El detalle de que el pago no se hace en el sitio vive solo en **Dudas rápidas**.
 
 ### Scenario: el visitante entiende el proceso sin abrir el formulario
 
 Given un visitante abre `https://www.icdpedroechague.com.ar/asociate`
 When recorre la campaña
 Then ve, en orden, al menos:
-1. Completar la solicitud online (datos + documentación)
+1. Completar la solicitud (datos + documentación)
 2. Quedar **pre-asociado** (código de seguimiento; aún no es socio activo)
 3. Secretaría revisa y contacta por WhatsApp o en el club
-4. Pago de cuota **fuera de la web** (presencial o transferencia)
-5. Alta definitiva e ingreso a actividades
-And un CTA principal lleva a `/asociate/inscripcion`
-And queda explícito que **no se cobra en el sitio**.
+4. Alta definitiva
+And un CTA único lleva a `/asociate/inscripcion`.
 
-### Scenario: packs individual y familiar
+### Scenario: un solo formulario, individual o familiar
 
-Given el visitante elige cómo sumarse
-When pulsa pack **Individual** o **Familiar**
-Then ambos llevan al mismo wizard (`/asociate/inscripcion`)
-And el pack familiar aclara que puede cargar cónyuge e hijos en el paso «Tu familia».
+Given el visitante quiere asociarse solo o con su familia
+When pulsa el CTA de la campaña
+Then un único botón lleva al wizard (`/asociate/inscripcion`)
+And se aclara que el grupo familiar se carga en el mismo trámite
+And se destaca el descuento de cuota social a partir del segundo integrante.
+
+---
+
+## Objetivo
+
+Que una familia complete **un solo trámite público** y quede cargada como
+titular + familiares, cada uno con **sus propias actividades**, sin que
+Secretaría tenga que unir grupos a mano.
 
 Hoy el alta pública es **una persona por solicitud** y el vínculo familiar es
 declarativo (`tiene_familiares_socios`, `familiares_existentes_dnis`): Secretaría

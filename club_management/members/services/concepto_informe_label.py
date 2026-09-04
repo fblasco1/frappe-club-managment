@@ -77,14 +77,7 @@ def _etiqueta_cuota_social(
 			return "Cuota Social Menor"
 		return f"Cuota Social {cat}"
 
-	if categoria_socio:
-		cat = _CATEGORIA_CUOTA_INFORME.get(categoria_socio.strip(), categoria_socio.strip())
-		return f"Cuota Social {cat}"
-
 	code = (item_code or "").strip()
-	if code and code == CUOTA_SOCIAL_ITEM_CODE:
-		return "Cuota Social"
-
 	norm = normalizar_concepto_informe(text)
 	if "CUOTA SOCIAL" in norm or norm.startswith("CARNET"):
 		for keyword, categoria in (
@@ -96,6 +89,13 @@ def _etiqueta_cuota_social(
 		):
 			if keyword in norm:
 				return f"Cuota Social {categoria}"
+
+	if code and code == CUOTA_SOCIAL_ITEM_CODE:
+		if categoria_socio:
+			cat = _CATEGORIA_CUOTA_INFORME.get(categoria_socio.strip(), categoria_socio.strip())
+			return f"Cuota Social {cat}"
+		return "Cuota Social"
+
 	return None
 
 

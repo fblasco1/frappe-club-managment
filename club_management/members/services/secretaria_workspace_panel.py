@@ -132,12 +132,14 @@ def get_panel_lists_payload(
 	*,
 	reference_date: str | None = None,
 	tendencia_reference_date: str | None = None,
+	tendencia_vista: str | None = None,
 ) -> dict[str, Any]:
 	"""Payload completo para el panel (métricas + solicitudes)."""
 	return {
 		"metricas": get_panel_metricas_payload(
 			reference_date=reference_date,
 			tendencia_reference_date=tendencia_reference_date,
+			tendencia_vista=tendencia_vista,
 		),
 		"solicitudes_pendientes": get_solicitudes_pendientes_preview(),
 		"recordatorio_sueldos": get_recordatorio_provision_sueldos_payload(

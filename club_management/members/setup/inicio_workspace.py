@@ -19,6 +19,11 @@ CLUB_DESK_NAV_TABS: list[tuple[str, str]] = [
 CLUB_DESK_REPORTS: tuple[str, ...] = (
 	"Deuda por equipo",
 	"Pagos por equipo",
+	"Recaudacion por concepto",
+)
+
+# Informes retirados del menú (unificados por filtros en los de arriba).
+CLUB_DESK_REPORTS_LEGACY: tuple[str, ...] = (
 	"Deuda por actividad",
 	"Pagos del dia",
 )
