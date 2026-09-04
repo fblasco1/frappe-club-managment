@@ -533,8 +533,14 @@ def calcular_exigido_linea_factura(
 	socio_name: str,
 	*,
 	posting_date: str | date | None = None,
+	base: str = "vigente",
 ) -> dict[str, Any]:
-	"""Monto exigido de **una** línea (informe por concepto), con mora si aplica."""
+	"""Monto exigido de **una** línea (informe por concepto), con mora si aplica.
+
+	`base="vigente"` (default) calcula sobre el valor actual del ítem/cuota;
+	`base="facturado"` calcula sobre el importe facturado de la línea
+	(spec carga_masiva_cobranzas.md, importer consolidado).
+	"""
 	settings = get_club_settings()
 	ref = getdate(posting_date or today())
 	campo_periodo = _campo_periodo_cobro()
@@ -557,15 +563,18 @@ def calcular_exigido_linea_factura(
 		}
 
 	monto_cuota, item_cuota = resolve_cuota_social(socio_name)
-	valor_linea = resolve_valor_actual_linea(
-		item_code=code,
-		qty=flt(line.qty),
-		rate_facturado=flt(line.rate),
-		socio_name=socio_name,
-		item_cuota=item_cuota,
-		monto_cuota=flt(monto_cuota),
-	)
 	line_base = flt(line.amount)
+	if base == "facturado":
+		valor_linea = line_base
+	else:
+		valor_linea = resolve_valor_actual_linea(
+			item_code=code,
+			qty=flt(line.qty),
+			rate_facturado=flt(line.rate),
+			socio_name=socio_name,
+			item_cuota=item_cuota,
+			monto_cuota=flt(monto_cuota),
+		)
 
 	result: dict[str, Any] = {
 		"invoice": invoice_name,
@@ -810,14 +819,16 @@ def asegurar_ajuste_mora_factura(
 	if cost_center:
 		item_line["cost_center"] = cost_center
 
-	# Asiento del ajuste: fecha de hoy (la fórmula usa `ref` = fecha de cobro).
-	posting_si = getdate(today())
+	# Asiento del ajuste: misma fecha de cobro (`ref`), no `today()`.
+	# En migración histórica `ref` es agosto; en cobranza en vivo coincide con hoy.
+	posting_si = ref
 	payload: dict[str, Any] = {
 		"doctype": SALES_INVOICE_DOCTYPE,
 		"customer": invoice.customer,
 		"company": company,
 		"posting_date": posting_si,
 		"due_date": posting_si,
+		"set_posting_time": 1,
 		"disable_rounded_total": 1,
 		"remarks": _remarks_mora(invoice_name),
 		"items": [item_line],

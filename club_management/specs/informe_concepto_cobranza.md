@@ -93,6 +93,8 @@ And el monto exigido es $83.333 (sin mora).
 | AVANZADO 3 | `ICDPE-PATIN-AVANZADO` |
 | ARTISTICA 1 CLASE | `ICDPE-GIMNASIA-ARTISTICA-1-CLASE` |
 | Cuota Social * | ítem de cuota según categoría en el texto del informe |
+| Cuota Social Menor Hijo 2º | categoría **2° Hermano** (mismo ítem de cuota) |
+| Cuota Social Menor Hijo 3 | categoría **3° Hermano** (mismo ítem de cuota) |
 
 Equipos / etiquetas de tira (U17 FLEX, PRE-MINI A/B U9, …): alias de arancel mensual.
 

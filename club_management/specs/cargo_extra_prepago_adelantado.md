@@ -77,6 +77,18 @@ Then `PermissionError`.
 
 ---
 
+## Scenario: idempotencia por título cuando el ítem es compartido
+
+Given dos `Cargo Socio` recurrentes del mismo socio, mismo ítem `ICDPE-CARGO-VARIOS`
+And títulos distintos (`CTO COMP VOLEY` y `CTO COMP BASQ TIRA A/B/FLEX`)
+And ya existe SI de `08/2026` con línea «CTO COMP VOLEY (08/2026)»
+When Secretaría prepaga el cargo de basquet para `08/2026`
+Then se crea una SI nueva con la línea del título de basquet
+And el prepago del cargo de vóley para `08/2026` se omite (idempotencia por título)
+And **no** se bloquea basquet solo porque el ítem compartido ya apareció en el período.
+
+---
+
 ## UI Desk
 
 - En formulario `Cargo Socio` (y/o desde `Socio`): botón

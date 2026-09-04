@@ -98,6 +98,10 @@ class TestHistorialPagosSocio(MembersTestCase):
 		self.assertEqual(rows[0]["mode_of_payment"], "Cash")
 		self.assertAlmostEqual(flt(rows[0]["paid_amount"]), 3000.0)
 		self.assertIn(si, rows[0]["sales_invoices"])
+		self.assertTrue(rows[0].get("concepto"))
+		self.assertIn("detalle", rows[0])
+		self.assertTrue(rows[0]["detalle"].get("facturas"))
+		self.assertEqual(rows[0]["detalle"]["facturas"][0]["name"], si)
 
 	def test_historial_no_cruza_otro_socio(self) -> None:
 		a = insert_socio(dni="99220002", email="hist.a@example.com")
@@ -113,6 +117,115 @@ class TestHistorialPagosSocio(MembersTestCase):
 		finally:
 			frappe.set_user("Administrator")
 		self.assertEqual(rows_b, [])
+
+	def test_historial_concepto_arancel_usa_item_name(self) -> None:
+		from club_management.members.services.cobranza_manual import (
+			_default_company,
+			ensure_customer_for_socio,
+		)
+
+		socio = insert_socio(dni="99220004", email="hist.arancel@example.com")
+		cambiar_estado(socio.name, "Activo", motivo="Test hist arancel")
+		item_code = "TEST-HIST-ARANCEL-BASQUET"
+		item_name = "ARANCEL MENSUAL - BASQUET/MASCULINO/MINIBASQUET"
+		if not frappe.db.exists("Item", item_code):
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": item_code,
+					"item_name": item_name,
+					"item_group": frappe.db.get_value("Item Group", {"is_group": 0}, "name")
+					or "Products",
+					"stock_uom": "Nos",
+					"is_sales_item": 1,
+					"is_stock_item": 0,
+					"standard_rate": 28500,
+				}
+			).insert(ignore_permissions=True)
+		else:
+			frappe.db.set_value("Item", item_code, "item_name", item_name, update_modified=False)
+
+		campo = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+		doc = frappe.get_doc(
+			{
+				"doctype": SALES_INVOICE_DOCTYPE,
+				"customer": ensure_customer_for_socio(socio.name),
+				"company": _default_company(),
+				"posting_date": today(),
+				"due_date": today(),
+				"set_posting_time": 1,
+				campo: socio.name,
+				"items": [
+					{
+						"item_code": item_code,
+						"qty": 1,
+						"rate": 28500,
+						"description": "Arancel actividad",
+					}
+				],
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		doc.submit()
+		sync_saldo_deuda_socio(socio.name)
+
+		frappe.set_user(self._secretaria)
+		try:
+			registrar_cobro_manual(socio.name, doc.name, mode_of_payment="Cash")
+			rows = list_historial_pagos_socio(socio.name)
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertTrue(rows)
+		self.assertEqual(rows[0]["concepto"], item_name)
+		self.assertEqual(rows[0]["detalle"]["facturas"][0]["concepto"], item_name)
+
+	def test_historial_concepto_cuota_social_con_categoria(self) -> None:
+		from club_management.members.data.cuotas_sociales_vigentes import CUOTA_SOCIAL_ITEM_CODE
+		from club_management.members.services.cobranza_manual import (
+			_default_company,
+			ensure_customer_for_socio,
+		)
+
+		socio = insert_socio(dni="99220005", email="hist.cuota@example.com")
+		cambiar_estado(socio.name, "Activo", motivo="Test hist cuota")
+		frappe.db.set_value("Socio", socio.name, "categoria", "Activo", update_modified=False)
+		self._ensure_item(CUOTA_SOCIAL_ITEM_CODE, 31000)
+
+		campo = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+		doc = frappe.get_doc(
+			{
+				"doctype": SALES_INVOICE_DOCTYPE,
+				"customer": ensure_customer_for_socio(socio.name),
+				"company": _default_company(),
+				"posting_date": today(),
+				"due_date": today(),
+				"set_posting_time": 1,
+				campo: socio.name,
+				"items": [
+					{
+						"item_code": CUOTA_SOCIAL_ITEM_CODE,
+						"qty": 1,
+						"rate": 31000,
+						"description": "Cuota social",
+					}
+				],
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		doc.submit()
+		sync_saldo_deuda_socio(socio.name)
+
+		frappe.set_user(self._secretaria)
+		try:
+			registrar_cobro_manual(socio.name, doc.name, mode_of_payment="Cash")
+			rows = list_historial_pagos_socio(socio.name)
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertTrue(rows)
+		self.assertEqual(rows[0]["concepto"], "CUOTA SOCIAL ACTIVO")
+		self.assertEqual(rows[0]["detalle"]["facturas"][0]["concepto"], "CUOTA SOCIAL ACTIVO")
 
 
 if __name__ == "__main__":

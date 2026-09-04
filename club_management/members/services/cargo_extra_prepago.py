@@ -19,10 +19,10 @@ from club_management.members.services.cobranza_manual import (
 	_campo_socio_en,
 	_default_company,
 	_submit_sales_invoice_concepto,
+	cargo_extra_linea_facturada_en_periodo,
 	ensure_customer_for_socio,
 	erpnext_cobranza_disponible,
 	format_periodo_cobro,
-	item_codes_facturados_en_periodo,
 	reference_date_desde_periodo,
 	resolve_cost_center_item,
 	sync_saldo_deuda_socio,
@@ -64,7 +64,7 @@ def list_meses_prepago_cargo(
 	rows: list[dict[str, Any]] = []
 	for month_start in _iter_primeros_de_mes(inicio, fin):
 		periodo = format_periodo_cobro(month_start)
-		ya = doc.item in item_codes_facturados_en_periodo(doc.socio, periodo)
+		ya = cargo_extra_linea_facturada_en_periodo(doc.socio, periodo, doc.titulo)
 		rows.append(
 			{
 				"periodo": periodo,
@@ -138,7 +138,7 @@ def prepagar_cargo_socio(
 				_("El período {0} está fuera de la vigencia del cargo.").format(periodo),
 				frappe.ValidationError,
 			)
-		if doc.item in item_codes_facturados_en_periodo(doc.socio, periodo):
+		if cargo_extra_linea_facturada_en_periodo(doc.socio, periodo, doc.titulo):
 			omitidos.append(periodo)
 			continue
 
@@ -166,7 +166,7 @@ def prepagar_cargo_socio(
 	pendientes = [
 		r["periodo"]
 		for r in list_meses_prepago_cargo(cargo_name, reference_date=hoy)
-		if doc.item not in item_codes_facturados_en_periodo(doc.socio, r["periodo"])
+		if not r["ya_facturado"]
 	]
 	if not pendientes and doc.estado == "Pendiente":
 		doc.estado = "Facturado"

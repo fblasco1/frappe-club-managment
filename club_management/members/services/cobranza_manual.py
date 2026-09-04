@@ -228,18 +228,23 @@ def resolve_cost_center_item(item_code: str, company: str | None = None) -> str 
 	Los ingresos por arancel de actividad deben imputar al centro de costo de la
 	actividad (definido en el ítem), no al de la empresa. Devuelve `None` si el
 	ítem no define un centro de costo (ERPNext resuelve el default).
+	Nunca devuelve un Cost Center grupo (`is_group=1`); si el ítem apunta a uno,
+	cae al de la empresa cuando es hoja.
 	"""
 	if not item_code:
 		return None
 	company = company or _default_company()
-	return (
-		frappe.db.get_value(
-			"Item Default",
-			{"parent": item_code, "company": company},
-			"selling_cost_center",
-		)
-		or None
+	cc = frappe.db.get_value(
+		"Item Default",
+		{"parent": item_code, "company": company},
+		"selling_cost_center",
 	)
+	if cc and not int(frappe.db.get_value("Cost Center", cc, "is_group") or 0):
+		return cc
+	company_cc = frappe.db.get_value("Company", company, "cost_center") if company else None
+	if company_cc and not int(frappe.db.get_value("Cost Center", company_cc, "is_group") or 0):
+		return company_cc
+	return None
 
 
 def _cargos_extra_items_for_socio(
@@ -947,6 +952,66 @@ def get_ultima_fecha_pago_socio(socio_name: str) -> str | None:
 	return str(rows[0]["posting_date"])
 
 
+_GENERIC_CONCEPTO_SI = frozenset(
+	{
+		"arancel actividad",
+		"arancel",
+		"cuota social",
+		"concepto",
+	}
+)
+
+
+def label_concepto_historial(
+	item_code: str | None,
+	description: str | None,
+	*,
+	categoria_socio: str | None = None,
+	item_name: str | None = None,
+) -> str:
+	"""Etiqueta legible para historial de pagos (Desk Socio).
+
+	- Cuota social → ``CUOTA SOCIAL {CATEGORIA}``
+	- Arancel / resto → ``Item.item_name`` (p. ej. ARANCEL MENSUAL - …), no genéricos.
+	"""
+	from club_management.members.data.cuotas_sociales_vigentes import CUOTA_SOCIAL_ITEM_CODE
+
+	code = (item_code or "").strip()
+	desc = (description or "").strip()
+	name = (item_name or "").strip()
+	desc_l = desc.lower()
+	name_l = name.lower()
+
+	es_cuota = code in {CUOTA_SOCIAL_ITEM_CODE, "CLUB-Cuota-Social-Base"} or (
+		"cuota social" in desc_l or "cuota social" in name_l
+	)
+	es_feder = "feder" in desc_l or "feder" in name_l or "c fed" in desc_l
+	if es_cuota and not es_feder:
+		cat = (categoria_socio or "").strip()
+		if not cat:
+			for keyword, categoria in (
+				("JUBILADO", "Jubilado"),
+				("ADHERENTE", "Adherente"),
+				("2° HERMANO", "2° Hermano"),
+				("3° HERMANO", "3° Hermano"),
+				("MENOR", "Menor"),
+				("ACTIVO", "Activo"),
+				("VITALICIO", "Vitalicio"),
+			):
+				if keyword in (desc + " " + name).upper():
+					cat = categoria
+					break
+		if cat:
+			return f"CUOTA SOCIAL {cat.upper()}"
+		return "CUOTA SOCIAL"
+
+	if name:
+		return name
+	if desc and desc_l not in _GENERIC_CONCEPTO_SI:
+		return desc
+	return desc or code or _("Concepto")
+
+
 def list_historial_pagos_socio(socio_name: str, *, limit: int = 50) -> list[dict[str, Any]]:
 	"""Historial de Payment Entry del socio (más recientes primero)."""
 	if not socio_name or not erpnext_cobranza_disponible():
@@ -983,14 +1048,86 @@ def list_historial_pagos_socio(socio_name: str, *, limit: int = 50) -> list[dict
 	pe_rows = frappe.get_all(
 		"Payment Entry",
 		filters={"name": ["in", list(by_pe.keys())], "docstatus": 1},
-		fields=["name", "posting_date", "mode_of_payment", "paid_amount", "received_amount"],
+		fields=["name", "posting_date", "mode_of_payment", "paid_amount", "received_amount", "reference_no"],
 		order_by="posting_date desc, creation desc",
 		limit=limit,
 	)
+	campo_periodo = _campo_periodo_cobro()
+	si_meta_fields = ["name", "grand_total", "outstanding_amount", "remarks", "posting_date"]
+	if campo_periodo:
+		si_meta_fields.append(campo_periodo)
+
+	si_names_all = sorted({r.reference_name for rows in by_pe.values() for r in rows})
+	si_by_name = {
+		row.name: row
+		for row in frappe.get_all(
+			SALES_INVOICE_DOCTYPE,
+			filters={"name": ["in", si_names_all]},
+			fields=si_meta_fields,
+		)
+	}
+
+	from club_management.members.services.mora_al_cobro import periodo_es_ajuste_mora
+
+	categoria_socio = frappe.db.get_value(SOCIO_DOCTYPE, socio_name, "categoria") or ""
+
+	# Prefetch líneas SI + nombres de ítem
+	si_items_by_parent: dict[str, list[Any]] = {}
+	item_codes: set[str] = set()
+	for si_name in si_names_all:
+		items = frappe.get_all(
+			"Sales Invoice Item",
+			filters={"parent": si_name},
+			fields=["description", "item_code", "amount"],
+			order_by="idx asc",
+		)
+		si_items_by_parent[si_name] = items
+		for it in items:
+			if it.item_code:
+				item_codes.add(it.item_code)
+	item_name_by_code: dict[str, str] = {}
+	if item_codes:
+		for row in frappe.get_all(
+			"Item",
+			filters={"name": ["in", list(item_codes)]},
+			fields=["name", "item_name"],
+		):
+			item_name_by_code[row.name] = row.item_name or ""
+
 	result: list[dict[str, Any]] = []
 	for pe in pe_rows:
 		ref_rows = by_pe.get(pe.name, [])
-		si_names = sorted({r.reference_name for r in ref_rows})
+		facturas_detalle: list[dict[str, Any]] = []
+		for r in ref_rows:
+			si = si_by_name.get(r.reference_name)
+			if not si:
+				continue
+			items = si_items_by_parent.get(si.name) or []
+			first = items[0] if items else None
+			concepto_si = label_concepto_historial(
+				first.item_code if first else None,
+				(first.description if first else None) or si.remarks,
+				categoria_socio=categoria_socio,
+				item_name=item_name_by_code.get(first.item_code if first else "") or None,
+			)
+			periodo_si = (si.get(campo_periodo) or "").strip() if campo_periodo else ""
+			facturas_detalle.append(
+				{
+					"name": si.name,
+					"periodo_cobro": periodo_si,
+					"concepto": concepto_si,
+					"grand_total": flt(si.grand_total),
+					"outstanding_amount": flt(si.outstanding_amount),
+					"allocated_amount": flt(r.allocated_amount),
+					"es_mora": periodo_es_ajuste_mora(periodo_si)
+					or str(si.remarks or "").startswith("Mora al cobro"),
+				}
+			)
+
+		principal = next((f for f in facturas_detalle if not f["es_mora"]), None)
+		if not principal and facturas_detalle:
+			principal = facturas_detalle[0]
+
 		amount = flt(pe.paid_amount or pe.received_amount)
 		result.append(
 			{
@@ -998,7 +1135,17 @@ def list_historial_pagos_socio(socio_name: str, *, limit: int = 50) -> list[dict
 				"posting_date": pe.posting_date,
 				"mode_of_payment": pe.mode_of_payment,
 				"paid_amount": amount,
-				"sales_invoices": si_names,
+				"concepto": (principal or {}).get("concepto") or "",
+				"periodo": (principal or {}).get("periodo_cobro") or "",
+				"sales_invoices": sorted({f["name"] for f in facturas_detalle}),
+				"detalle": {
+					"payment_entry": pe.name,
+					"posting_date": pe.posting_date,
+					"mode_of_payment": pe.mode_of_payment,
+					"paid_amount": amount,
+					"reference_no": pe.reference_no or "",
+					"facturas": facturas_detalle,
+				},
 			}
 		)
 	return result

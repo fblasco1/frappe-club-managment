@@ -144,3 +144,57 @@ class TestInformeConceptoCobranzaHelpers(MembersTestCase):
 			normalizar_clave_cuota_complementaria("CTO COMP BASQUE TIRA A/B/FLEX (08/2026)"),
 			"CTO COMP BASQ TIRA A/B/FLEX",
 		)
+
+	def test_futbol_fafi_no_matchea_linea_cto_comp(self) -> None:
+		"""Substring «FUTBOL FAFI» no debe tomar la SI de CTO COMP del mismo período."""
+		import frappe
+		from club_management.integrations.payment_ledger_postgres import apply_patch
+		from club_management.members.services.cobranza_manual import (
+			SALES_INVOICE_DOCTYPE,
+			_campo_periodo_cobro,
+			_campo_socio_en,
+			_default_company,
+			ensure_customer_for_socio,
+			erpnext_cobranza_disponible,
+		)
+		from club_management.members.services.socio_transitions import cambiar_estado
+		from club_management.members.test_helpers import insert_socio
+		from club_management.scripts.informe_concepto_cobranza import buscar_linea_factura_concepto
+
+		if frappe.db.db_type != "postgres" or not erpnext_cobranza_disponible():
+			self.skipTest("ERPNext/PostgreSQL requerido")
+		if not frappe.db.exists("Item", "ICDPE-CARGO-VARIOS"):
+			self.skipTest("Sin ICDPE-CARGO-VARIOS")
+		apply_patch()
+
+		socio = insert_socio(dni="88906001", email="fafi.cto@example.com")
+		cambiar_estado(socio.name, "Activo", motivo="Test fafi vs cto")
+		campo = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+		campo_periodo = _campo_periodo_cobro()
+		payload = {
+			"doctype": SALES_INVOICE_DOCTYPE,
+			"customer": ensure_customer_for_socio(socio.name),
+			"company": _default_company(),
+			"posting_date": "2026-08-01",
+			"due_date": "2026-08-01",
+			"set_posting_time": 1,
+			campo: socio.name,
+			"items": [
+				{
+					"item_code": "ICDPE-CARGO-VARIOS",
+					"qty": 1,
+					"rate": 8400,
+					"description": "CTO COMP FUTBOL FAFI/TABI (08/2026)",
+				}
+			],
+		}
+		if campo_periodo:
+			payload[campo_periodo] = "08/2026"
+		inv = frappe.get_doc(payload)
+		inv.insert(ignore_permissions=True)
+		inv.submit()
+
+		match = buscar_linea_factura_concepto(
+			socio.name, "08/2026", "FUTBOL FAFI", monto_abonado=16800.0, solo_impagas=True
+		)
+		self.assertIsNone(match)

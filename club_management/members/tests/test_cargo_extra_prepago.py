@@ -72,12 +72,12 @@ class TestCargoExtraPrepago(MembersTestCase):
 		cambiar_estado(socio.name, "Activo", motivo="Test prepago cargo")
 		return socio
 
-	def _crear_recurrente(self, socio_name: str) -> str:
+	def _crear_recurrente(self, socio_name: str, *, titulo: str | None = None) -> str:
 		doc = frappe.get_doc(
 			{
 				"doctype": "Cargo Socio",
 				"socio": socio_name,
-				"titulo": "Cuota Federativa Prepago",
+				"titulo": titulo or "Cuota Federativa Prepago",
 				"tipo_cargo": "Cuota Federativa",
 				"modo_cobro": "Recurrente",
 				"item": self._ITEM,
@@ -150,3 +150,17 @@ class TestCargoExtraPrepago(MembersTestCase):
 		self.assertEqual(len(first["sales_invoices"]), 1)
 		self.assertEqual(second["sales_invoices"], [])
 		self.assertIn("08/2026", second["omitidos"])
+
+	def test_dos_cargos_mismo_item_distinto_titulo_mismo_periodo(self) -> None:
+		"""ICDPE-CARGO-VARIOS compartido: dedup por título, no solo por item_code."""
+		socio = self._socio_activo(dni="78001007", email="prepago.shared@example.com")
+		cargo_voley = self._crear_recurrente(socio.name, titulo="CTO COMP VOLEY")
+		cargo_basq = self._crear_recurrente(socio.name, titulo="CTO COMP BASQ TIRA A/B/FLEX")
+
+		first = prepagar_cargo_socio(cargo_voley, periodos=["08/2026"], reference_date=self._HOY)
+		second = prepagar_cargo_socio(cargo_basq, periodos=["08/2026"], reference_date=self._HOY)
+
+		self.assertEqual(len(first["sales_invoices"]), 1)
+		self.assertEqual(len(second["sales_invoices"]), 1)
+		self.assertNotEqual(first["sales_invoices"][0], second["sales_invoices"][0])
+		self.assertIn(self._ITEM, item_codes_facturados_en_periodo(socio.name, "08/2026"))

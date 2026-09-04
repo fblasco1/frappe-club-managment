@@ -1565,9 +1565,10 @@ club_management_socio_desk.render_historial_pagos = function (frm) {
 			);
 			const resumen = rows
 				.map((row) => {
-					const monto = frappe.format(row.paid_amount, { fieldtype: "Currency" });
-					const facturas = (row.sales_invoices || []).join(", ");
-					return `${row.posting_date} | ${row.mode_of_payment || "-"} | ${monto} | ${facturas} | ${row.payment_entry}`;
+					const medio = row.mode_of_payment || "-";
+					const concepto = row.concepto || "-";
+					const periodo = row.periodo || "-";
+					return `${row.posting_date} | ${medio} | ${concepto} | ${periodo} | ${row.payment_entry}`;
 				})
 				.join("\n");
 			$btn.on("click", () => {
@@ -1581,31 +1582,93 @@ club_management_socio_desk.render_historial_pagos = function (frm) {
 						<tr>
 							<th>${__("Fecha")}</th>
 							<th>${__("Medio")}</th>
-							<th>${__("Monto")}</th>
-							<th>${__("Facturas")}</th>
-							<th>${__("Pago")}</th>
+							<th>${__("Concepto")}</th>
+							<th>${__("Período")}</th>
+							<th></th>
 						</tr>
 					</thead>
 					<tbody></tbody>
 				</table>
 			`);
 			const $tbody = $table.find("tbody");
-			rows.forEach((row) => {
-				const monto = frappe.format(row.paid_amount, { fieldtype: "Currency" });
-				const facturas = frappe.utils.escape_html((row.sales_invoices || []).join(", "));
-				$tbody.append(`
+			rows.forEach((row, idx) => {
+				const $tr = $(`
 					<tr>
 						<td>${frappe.utils.escape_html(String(row.posting_date || ""))}</td>
 						<td>${frappe.utils.escape_html(row.mode_of_payment || "")}</td>
-						<td>${monto}</td>
-						<td>${facturas}</td>
-						<td><a href="/app/payment-entry/${encodeURIComponent(row.payment_entry)}">${frappe.utils.escape_html(
-							row.payment_entry
-						)}</a></td>
+						<td>${frappe.utils.escape_html(row.concepto || "")}</td>
+						<td>${frappe.utils.escape_html(row.periodo || "")}</td>
+						<td class="text-right"></td>
 					</tr>
 				`);
+				const $detalleBtn = $(
+					`<button type="button" class="btn btn-xs btn-default">${__("Ver detalle")}</button>`
+				);
+				$detalleBtn.on("click", () => {
+					club_management_socio_desk.show_historial_pago_detalle(row);
+				});
+				$tr.find("td").last().append($detalleBtn);
+				$tbody.append($tr);
 			});
 			$panel.empty().append($title, $btn, $table);
 		},
 	});
+};
+
+club_management_socio_desk.show_historial_pago_detalle = function (row) {
+	const detalle = row.detalle || {};
+	const facturas = detalle.facturas || [];
+	const pe = detalle.payment_entry || row.payment_entry || "";
+	const monto = frappe.format(detalle.paid_amount || row.paid_amount || 0, {
+		fieldtype: "Currency",
+	});
+	let facturasHtml = `<p class="text-muted">${__("Sin facturas asociadas.")}</p>`;
+	if (facturas.length) {
+		const rowsHtml = facturas
+			.map((f) => {
+				const alloc = frappe.format(f.allocated_amount || 0, { fieldtype: "Currency" });
+				const total = frappe.format(f.grand_total || 0, { fieldtype: "Currency" });
+				const label = f.es_mora ? ` <span class="badge badge-warning">${__("Mora")}</span>` : "";
+				return `<tr>
+					<td><a href="/app/sales-invoice/${encodeURIComponent(f.name)}">${frappe.utils.escape_html(
+						f.name
+					)}</a>${label}</td>
+					<td>${frappe.utils.escape_html(f.periodo_cobro || "—")}</td>
+					<td>${frappe.utils.escape_html(f.concepto || "")}</td>
+					<td>${total}</td>
+					<td>${alloc}</td>
+				</tr>`;
+			})
+			.join("");
+		facturasHtml = `
+			<table class="table table-bordered table-sm">
+				<thead>
+					<tr>
+						<th>${__("Factura")}</th>
+						<th>${__("Período")}</th>
+						<th>${__("Concepto")}</th>
+						<th>${__("Total")}</th>
+						<th>${__("Imputado")}</th>
+					</tr>
+				</thead>
+				<tbody>${rowsHtml}</tbody>
+			</table>`;
+	}
+
+	const d = new frappe.ui.Dialog({
+		title: __("Detalle del pago"),
+		size: "large",
+		fields: [{ fieldtype: "HTML", fieldname: "body" }],
+	});
+	d.fields_dict.body.$wrapper.html(`
+		<p class="mb-2">
+			<strong>${__("Pago")}:</strong>
+			<a href="/app/payment-entry/${encodeURIComponent(pe)}">${frappe.utils.escape_html(pe)}</a>
+			&nbsp;·&nbsp; ${frappe.utils.escape_html(String(detalle.posting_date || row.posting_date || ""))}
+			&nbsp;·&nbsp; ${frappe.utils.escape_html(detalle.mode_of_payment || row.mode_of_payment || "")}
+			&nbsp;·&nbsp; ${monto}
+		</p>
+		${facturasHtml}
+	`);
+	d.show();
 };
