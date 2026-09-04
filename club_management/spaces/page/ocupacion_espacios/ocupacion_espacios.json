@@ -1,0 +1,25 @@
+{
+ "content": null,
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "module": "Spaces",
+ "name": "ocupacion-espacios",
+ "page_name": "ocupacion-espacios",
+ "roles": [
+  {
+   "role": "Coordinacion"
+  },
+  {
+   "role": "Secretaria"
+  },
+  {
+   "role": "Tesoreria"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "standard": "Yes",
+ "title": "Ocupación de espacios"
+}

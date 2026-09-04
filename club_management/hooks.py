@@ -166,6 +166,12 @@ scheduler_events = {
 		"club_management.members.jobs.cobranza_periodica.run_recargos_si_corresponde",
 		"club_management.members.jobs.moroso_automatico.run_evaluar_morosos_si_corresponde",
 	],
+	"cron": {
+		# 08:00 y 20:00 ART (UTC-3) — alineado al cron formativas_ges
+		"0 11,23 * * *": [
+			"club_management.spaces.fixtures.sources.febamba_ges.sync_febamba_ges_scheduled",
+		],
+	},
 }
 
 # scheduler_events = {

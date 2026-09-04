@@ -2,6 +2,7 @@
 # Patches added in this section will be executed before doctypes are migrated
 # Read docs to understand patches: https://docs.frappe.io/framework/user/en/database-migrations
 club_management.patches.v1_0.migrate_solicitud_rechazada_to_correccion
+club_management.patches.v1_0.ensure_spaces_module
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
@@ -77,3 +78,11 @@ club_management.patches.v1_0.retire_legacy_arancel_mensual_catalog
 club_management.patches.v1_0.consolidate_voley_escuela_federado
 club_management.patches.v1_0.ensure_item_bonificacion_arancel
 club_management.patches.v1_0.remape_voley_invoice_items_to_canonical
+club_management.patches.v1_0.ensure_role_coordinacion
+club_management.patches.v1_0.sync_espacios_workspace
+club_management.patches.v1_0.sync_espacios_ocupacion_page
+club_management.patches.v1_0.seed_espacios_catalogo
+club_management.patches.v1_0.import_horarios_lunes_viernes
+club_management.patches.v1_0.fix_gimnasio_cancha_mapping
+club_management.patches.v1_0.import_horarios_sabado
+club_management.patches.v1_0.sync_planilla_tipos_evento

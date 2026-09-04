@@ -1,0 +1,102 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-08-20 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "dia_semana",
+  "hora_desde",
+  "hora_hasta",
+  "tipo_sesion",
+  "actividad",
+  "grupo_actividad",
+  "equipo_actividad",
+  "etiqueta",
+  "titulo"
+ ],
+ "fields": [
+  {
+   "fieldname": "dia_semana",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "D\u00eda de la semana",
+   "options": "Lunes\nMartes\nMiercoles\nJueves\nViernes\nSabado\nDomingo",
+   "reqd": 1
+  },
+  {
+   "fieldname": "hora_desde",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Hora desde",
+   "reqd": 1
+  },
+  {
+   "fieldname": "hora_hasta",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Hora hasta",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tipo_sesion",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Tipo de sesi\u00f3n",
+   "options": "Preparacion Fisica\nEntrenamiento",
+   "reqd": 1,
+   "description": "Qu\u00e9 hace el grupo en este espacio: preparaci\u00f3n f\u00edsica o entrenamiento."
+  },
+  {
+   "fieldname": "actividad",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Actividad",
+   "options": "Actividad",
+   "description": "Deporte / disciplina (B\u00e1squet, V\u00f3ley, F\u00fatbol, etc.)."
+  },
+  {
+   "fieldname": "grupo_actividad",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Grupo / Tira",
+   "options": "Grupo Actividad"
+  },
+  {
+   "fieldname": "equipo_actividad",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Equipo",
+   "options": "Equipo Actividad"
+  },
+  {
+   "fieldname": "etiqueta",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Etiqueta",
+   "description": "Texto libre (p. ej. grupo/tira/profesor) cuando no hay v\u00ednculos completos."
+  },
+  {
+   "fieldname": "titulo",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "T\u00edtulo",
+   "read_only": 1,
+   "description": "Se arma solo: Tipo \u2014 Actividad / Grupo / Equipo."
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-21 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Spaces",
+ "name": "Horario Entrenamiento",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
