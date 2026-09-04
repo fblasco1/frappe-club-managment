@@ -109,7 +109,8 @@ class TestRecaudacionPorConcepto(MembersTestCase):
 		return doc.name
 
 	def test_reporte_en_listado_gestion_socios(self) -> None:
-		self.assertIn("Recaudacion por concepto", CLUB_DESK_REPORTS)
+		self.assertIn("Cobranza por fechas", CLUB_DESK_REPORTS)
+		self.assertNotIn("Recaudacion por concepto", CLUB_DESK_REPORTS)
 		self.assertNotIn("Pagos del dia", CLUB_DESK_REPORTS)
 
 	def test_vista_pagos_del_dia_usa_columnas_diarias(self) -> None:

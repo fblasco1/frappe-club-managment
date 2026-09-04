@@ -17,7 +17,6 @@ from club_management.members.services.concepto_informe_label import agrupacion_t
 from club_management.members.services.modos_pago_desk import DESK_MODOS_PAGO_COBRANZA
 from club_management.members.services.recibo_pago import get_recibo_config
 from club_management.members.services.recaudacion_por_concepto import (
-	VISTA_PAGOS_DIA,
 	get_informe_recaudacion_por_concepto,
 )
 
@@ -33,26 +32,19 @@ def _label_medio(mode: str) -> str:
 
 
 def filters_for_export(filters: dict[str, Any] | str | None) -> dict[str, Any]:
-	"""Normaliza filtros Desk (incluye vista Pagos del día → un solo día)."""
+	"""Normaliza filtros Desk (incluye legado `fecha` / vista Pagos del día)."""
 	raw: dict[str, Any]
 	if isinstance(filters, str):
 		raw = frappe.parse_json(filters) or {}
 	else:
 		raw = dict(filters or {})
 
-	if (raw.get("vista") or "") == VISTA_PAGOS_DIA:
-		fecha = raw.get("fecha") or raw.get("fecha_desde") or today()
-		return {
-			"fecha_desde": fecha,
-			"fecha_hasta": fecha,
-			"periodo_cobro": (raw.get("periodo_cobro") or "").strip(),
-			"agrupacion": (raw.get("agrupacion") or "").strip(),
-			"solo_cuotas_sociales": bool(raw.get("solo_cuotas_sociales")),
-			"medio_pago": (raw.get("medio_pago") or "").strip(),
-		}
+	fecha = raw.get("fecha")
+	fecha_desde = raw.get("fecha_desde") or fecha or today()
+	fecha_hasta = raw.get("fecha_hasta") or fecha or fecha_desde
 	return {
-		"fecha_desde": raw.get("fecha_desde") or today(),
-		"fecha_hasta": raw.get("fecha_hasta") or today(),
+		"fecha_desde": fecha_desde,
+		"fecha_hasta": fecha_hasta,
 		"periodo_cobro": (raw.get("periodo_cobro") or "").strip(),
 		"agrupacion": (raw.get("agrupacion") or "").strip(),
 		"solo_cuotas_sociales": bool(raw.get("solo_cuotas_sociales")),

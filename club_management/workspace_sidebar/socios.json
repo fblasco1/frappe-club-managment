@@ -59,8 +59,8 @@
    "icon": "table",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Deuda por equipo",
-   "link_to": "Deuda por equipo",
+   "label": "Cobranza por fechas",
+   "link_to": "Cobranza por fechas",
    "link_type": "Report",
    "show_arrow": 0,
    "type": "Link"
@@ -88,21 +88,9 @@
    "link_type": "Report",
    "show_arrow": 0,
    "type": "Link"
-  },
-  {
-   "child": 1,
-   "collapsible": 1,
-   "icon": "table",
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Pagos del dia",
-   "link_to": "Pagos del dia",
-   "link_type": "Report",
-   "show_arrow": 0,
-   "type": "Link"
   }
  ],
- "modified": "2026-07-28 19:39:04.323468",
+ "modified": "2026-09-04 18:05:22.806330",
  "modified_by": "Administrator",
  "module": "Members",
  "name": "Socios",

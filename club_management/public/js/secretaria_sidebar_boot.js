@@ -6,17 +6,17 @@
 	const SIDEBAR_KEY = "secretaría";
 
 	const REPORT_META = {
-		"Deuda por equipo": {
+		"Cobranza por fechas": {
 			report_type: "Script Report",
-			ref_doctype: "Inscripcion Actividad",
+			ref_doctype: "Payment Entry",
 		},
 		"Pagos por equipo": {
 			report_type: "Script Report",
 			ref_doctype: "Inscripcion Actividad",
 		},
-		"Recaudacion por concepto": {
+		"Deuda por actividad": {
 			report_type: "Script Report",
-			ref_doctype: "Payment Entry",
+			ref_doctype: "Actividad",
 		},
 	};
 
@@ -49,10 +49,10 @@
 			indent: 1,
 		},
 		{
-			label: __("Deuda por equipo"),
+			label: __("Cobranza por fechas"),
 			type: "Link",
 			link_type: "Report",
-			link_to: "Deuda por equipo",
+			link_to: "Cobranza por fechas",
 			icon: "table",
 			child: 1,
 		},
@@ -65,10 +65,10 @@
 			child: 1,
 		},
 		{
-			label: __("Recaudación"),
+			label: __("Deuda por actividad"),
 			type: "Link",
 			link_type: "Report",
-			link_to: "Recaudacion por concepto",
+			link_to: "Deuda por actividad",
 			icon: "table",
 			child: 1,
 		},
@@ -99,7 +99,8 @@
 		}
 		const keys = new Set(enriched.map((item) => item_key(item)));
 		const legacyReportLinks = new Set([
-			"Report:Deuda por actividad",
+			"Report:Deuda por equipo",
+			"Report:Recaudacion por concepto",
 			"Report:Pagos del dia",
 		]);
 		const filtered = enriched.filter((item) => !legacyReportLinks.has(item_key(item)));

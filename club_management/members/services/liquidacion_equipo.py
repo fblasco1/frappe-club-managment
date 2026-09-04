@@ -791,17 +791,31 @@ def get_pagos_report_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]
 def get_deuda_por_actividad_report_columns() -> list[dict[str, Any]]:
 	return [
 		{
+			"label": _("Nivel"),
+			"fieldname": "nivel",
+			"fieldtype": "Data",
+			"width": 260,
+		},
+		{
 			"label": _("Actividad"),
 			"fieldname": "actividad",
 			"fieldtype": "Link",
 			"options": "Actividad",
-			"width": 180,
+			"width": 160,
 		},
 		{
-			"label": _("Deuda cuota social"),
-			"fieldname": "deuda_cuota_social",
-			"fieldtype": "Currency",
-			"width": 140,
+			"label": _("Grupo / tira"),
+			"fieldname": "grupo_actividad",
+			"fieldtype": "Link",
+			"options": "Grupo Actividad",
+			"width": 160,
+		},
+		{
+			"label": _("Equipo / categoría"),
+			"fieldname": "equipo_actividad",
+			"fieldtype": "Link",
+			"options": "Equipo Actividad",
+			"width": 180,
 		},
 		{
 			"label": _("Deuda aranceles"),
@@ -810,34 +824,30 @@ def get_deuda_por_actividad_report_columns() -> list[dict[str, Any]]:
 			"width": 140,
 		},
 		{
-			"label": _("Deuda cuota federativa"),
-			"fieldname": "deuda_cuota_federativa",
-			"fieldtype": "Currency",
-			"width": 150,
-		},
-		{
-			"label": _("Deuda total"),
-			"fieldname": "deuda_total",
-			"fieldtype": "Currency",
-			"width": 130,
-		},
-		{
 			"label": _("Socios deudores"),
 			"fieldname": "socios_deudores",
 			"fieldtype": "Int",
 			"width": 120,
 		},
 		{
-			"label": _("Prom. meses deuda"),
-			"fieldname": "promedio_meses_deuda",
-			"fieldtype": "Float",
-			"width": 130,
+			"label": _("indent"),
+			"fieldname": "indent",
+			"fieldtype": "Int",
+			"width": 0,
+			"hidden": 1,
 		},
 	]
 
 
+def _titulo_doc(doctype: str, name: str) -> str:
+	if not name:
+		return ""
+	titulo = frappe.db.get_value(doctype, name, "titulo")
+	return str(titulo or name)
+
+
 def get_deuda_por_actividad_data(filters: dict[str, Any] | frappe._dict) -> list[dict[str, Any]]:
-	"""Filas del Script Report «Deuda por actividad»."""
+	"""Deuda de aranceles por actividad con subtotales grupo/equipo."""
 	if not erpnext_cobranza_disponible():
 		frappe.throw(_("La consulta de deuda requiere ERPNext (Sales Invoice)."), frappe.ValidationError)
 
@@ -849,80 +859,125 @@ def get_deuda_por_actividad_data(filters: dict[str, Any] | frappe._dict) -> list
 	if getdate(fecha_hasta) < getdate(fecha_desde):
 		frappe.throw(_("La fecha hasta debe ser posterior o igual a la fecha desde."), frappe.ValidationError)
 
-	actividades = frappe.get_all("Actividad", filters={"habilitada": 1}, pluck="name")
-	rows: list[dict[str, Any]] = []
-	for actividad in actividades:
-		socios_ins = _inscripciones_por_socio(
-			{
-				"actividad": actividad,
-				"fecha_desde": fecha_desde,
-				"fecha_hasta": fecha_hasta,
-			}
+	ins_filters: dict[str, Any] = {"estado": "Activa"}
+	if filters.get("actividad"):
+		ins_filters["actividad"] = filters.actividad
+
+	inscripciones = frappe.get_all(
+		"Inscripcion Actividad",
+		filters=ins_filters,
+		fields=["name", "socio", "actividad", "grupo_actividad", "equipo_actividad"],
+	)
+	if not inscripciones:
+		return []
+
+	# (actividad, grupo, equipo) -> acumulado
+	buckets: dict[tuple[str, str, str], dict[str, Any]] = {}
+	for ins in inscripciones:
+		if frappe.db.get_value(SOCIO_DOCTYPE, ins.socio, "estado") == "Baja":
+			continue
+		desglose = calcular_deuda_desglose_en_rango(
+			ins.socio,
+			str(fecha_desde),
+			str(fecha_hasta),
+			inscripcion_name=ins.name,
 		)
-		if not socios_ins:
+		deuda_arancel = flt(desglose.get("deuda_arancel"))
+		if deuda_arancel <= 0:
 			continue
+		key = (
+			str(ins.actividad or ""),
+			str(ins.grupo_actividad or ""),
+			str(ins.equipo_actividad or ""),
+		)
+		bucket = buckets.setdefault(
+			key,
+			{"deuda_arancel": 0.0, "socios": set()},
+		)
+		bucket["deuda_arancel"] += deuda_arancel
+		bucket["socios"].add(ins.socio)
 
-		totales = {
-			"deuda_cuota_social": 0.0,
-			"deuda_arancel": 0.0,
-			"deuda_cuota_federativa": 0.0,
-			"deuda_total": 0.0,
-		}
-		meses_deuda: list[int] = []
-		socios_deudores = 0
-		for socio_name, ins_list in socios_ins.items():
-			if frappe.db.get_value(SOCIO_DOCTYPE, socio_name, "estado") == "Baja":
-				continue
-			ins = _inscripcion_principal(ins_list)
-			desglose = calcular_deuda_desglose_en_rango(
-				socio_name,
-				str(fecha_desde),
-				str(fecha_hasta),
-				inscripcion_name=ins.name,
+	if not buckets:
+		return []
+
+	tree: dict[str, dict[str, dict[str, dict[str, Any]]]] = {}
+	for (actividad, grupo, equipo), stats in buckets.items():
+		tree.setdefault(actividad, {}).setdefault(grupo, {})[equipo] = stats
+
+	rows: list[dict[str, Any]] = []
+	total_arancel = 0.0
+	total_socios: set[str] = set()
+
+	for actividad in sorted(tree.keys()):
+		act_arancel = 0.0
+		act_socios: set[str] = set()
+		act_label = _titulo_doc("Actividad", actividad) or actividad
+
+		for grupo in sorted(tree[actividad].keys()):
+			grupo_arancel = 0.0
+			grupo_socios: set[str] = set()
+			grupo_label = _titulo_doc("Grupo Actividad", grupo) if grupo else _("Sin grupo / tira")
+
+			for equipo in sorted(tree[actividad][grupo].keys()):
+				stats = tree[actividad][grupo][equipo]
+				equipo_label = (
+					_titulo_doc("Equipo Actividad", equipo) if equipo else _("Sin equipo / categoría")
+				)
+				deuda = round(flt(stats["deuda_arancel"]), 2)
+				socios = set(stats["socios"])
+				rows.append(
+					{
+						"nivel": equipo_label,
+						"actividad": actividad,
+						"grupo_actividad": grupo or "",
+						"equipo_actividad": equipo or "",
+						"deuda_arancel": deuda,
+						"socios_deudores": len(socios),
+						"indent": 2,
+					}
+				)
+				grupo_arancel += deuda
+				grupo_socios |= socios
+
+			rows.append(
+				{
+					"nivel": _("Subtotal {0}").format(grupo_label),
+					"actividad": actividad,
+					"grupo_actividad": grupo or "",
+					"equipo_actividad": "",
+					"deuda_arancel": round(grupo_arancel, 2),
+					"socios_deudores": len(grupo_socios),
+					"indent": 1,
+				}
 			)
-			if desglose["deuda_en_rango"] <= 0:
-				continue
-			socios_deudores += 1
-			meses_deuda.append(int(desglose["cantidad_meses_deuda"]))
-			totales["deuda_cuota_social"] += desglose["deuda_cuota_social"]
-			totales["deuda_arancel"] += desglose["deuda_arancel"]
-			totales["deuda_cuota_federativa"] += desglose["deuda_cuota_federativa"]
-			totales["deuda_total"] += desglose["deuda_en_rango"]
+			act_arancel += grupo_arancel
+			act_socios |= grupo_socios
 
-		if socios_deudores <= 0:
-			continue
-
-		promedio = round(sum(meses_deuda) / socios_deudores, 1) if meses_deuda else 0.0
 		rows.append(
 			{
+				"nivel": _("Subtotal {0}").format(act_label),
 				"actividad": actividad,
-				"deuda_cuota_social": round(totales["deuda_cuota_social"], 2),
-				"deuda_arancel": round(totales["deuda_arancel"], 2),
-				"deuda_cuota_federativa": round(totales["deuda_cuota_federativa"], 2),
-				"deuda_total": round(totales["deuda_total"], 2),
-				"socios_deudores": socios_deudores,
-				"promedio_meses_deuda": promedio,
+				"grupo_actividad": "",
+				"equipo_actividad": "",
+				"deuda_arancel": round(act_arancel, 2),
+				"socios_deudores": len(act_socios),
+				"indent": 0,
 			}
 		)
+		total_arancel += act_arancel
+		total_socios |= act_socios
 
-	rows.sort(key=lambda row: (-flt(row["deuda_total"]), row["actividad"]))
-	total_row = {
-		"actividad": _("Total"),
-		"deuda_cuota_social": _sum_currency(rows, "deuda_cuota_social"),
-		"deuda_arancel": _sum_currency(rows, "deuda_arancel"),
-		"deuda_cuota_federativa": _sum_currency(rows, "deuda_cuota_federativa"),
-		"deuda_total": _sum_currency(rows, "deuda_total"),
-		"socios_deudores": sum(int(row["socios_deudores"]) for row in rows),
-		"promedio_meses_deuda": 0.0,
-	}
-	if rows:
-		total_meses = sum(
-			flt(row["promedio_meses_deuda"]) * int(row["socios_deudores"]) for row in rows
-		)
-		total_deudores = sum(int(row["socios_deudores"]) for row in rows)
-		if total_deudores:
-			total_row["promedio_meses_deuda"] = round(total_meses / total_deudores, 1)
-	rows.append(total_row)
+	rows.append(
+		{
+			"nivel": _("Total"),
+			"actividad": "",
+			"grupo_actividad": "",
+			"equipo_actividad": "",
+			"deuda_arancel": round(total_arancel, 2),
+			"socios_deudores": len(total_socios),
+			"indent": 0,
+		}
+	)
 	return rows
 
 

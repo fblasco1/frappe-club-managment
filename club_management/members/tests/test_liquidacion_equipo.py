@@ -373,19 +373,65 @@ class TestLiquidacionEquipo(MembersTestCase):
 	def test_deuda_club_por_actividad_totaliza(self) -> None:
 		socio = self._socio_activo(dni="74001018", email="club.act@example.com")
 		self._inscribir(socio.name)
-		self._crear_factura(socio.name, "2026-03-20", 12000)
+		self._crear_factura_items(
+			socio.name,
+			"2026-03-20",
+			[{"item_code": ARANCEL_ITEM_CODE, "qty": 1, "rate": 5000}],
+		)
+		# Cuota social sola no debe alimentar el informe (solo aranceles)
+		socio_cuota = self._socio_activo(dni="74001019", email="club.cuota@example.com")
+		self._inscribir(socio_cuota.name)
+		self._crear_factura(socio_cuota.name, "2026-03-20", 12000)
+
+		equipo_b = (
+			frappe.get_doc(
+				{
+					"doctype": "Equipo Actividad",
+					"grupo_actividad": self._grupo,
+					"titulo": "U17 Masculino Liq",
+					"habilitada": 1,
+					"item": ARANCEL_ITEM_CODE,
+				}
+			)
+			.insert(ignore_permissions=True)
+			.name
+		)
+		socio_b = self._socio_activo(dni="74001020", email="club.act.b@example.com")
+		self._inscribir(socio_b.name, equipo=equipo_b)
+		self._crear_factura_items(
+			socio_b.name,
+			"2026-03-20",
+			[{"item_code": ARANCEL_ITEM_CODE, "qty": 1, "rate": 7000}],
+		)
+
 		rows = get_deuda_por_actividad_data(
 			{
 				"fecha_desde": self._MARZO_DESDE,
 				"fecha_hasta": self._MARZO_HASTA,
+				"actividad": self._actividad,
 			}
 		)
-		actividad_row = next(item for item in rows if item["actividad"] == self._actividad)
-		self.assertGreater(actividad_row["deuda_total"], 0)
-		self.assertGreaterEqual(actividad_row["socios_deudores"], 1)
+		equipo_rows = [r for r in rows if int(r.get("indent") or 0) == 2]
+		self.assertEqual(len(equipo_rows), 2)
+		by_equipo = {r["equipo_actividad"]: r for r in equipo_rows}
+		self.assertEqual(by_equipo[self._equipo]["deuda_arancel"], 5000.0)
+		self.assertEqual(by_equipo[equipo_b]["deuda_arancel"], 7000.0)
+
+		grupo_sub = next(r for r in rows if int(r.get("indent") or 0) == 1)
+		self.assertEqual(grupo_sub["deuda_arancel"], 12000.0)
+		self.assertEqual(grupo_sub["socios_deudores"], 2)
+
+		act_sub = next(
+			r
+			for r in rows
+			if int(r.get("indent") or 0) == 0 and r["actividad"] == self._actividad and r["nivel"] != "Total"
+		)
+		self.assertEqual(act_sub["deuda_arancel"], 12000.0)
+
 		total_row = rows[-1]
-		self.assertEqual(total_row["actividad"], "Total")
-		self.assertGreater(total_row["deuda_total"], 0)
+		self.assertEqual(total_row["nivel"], "Total")
+		self.assertEqual(total_row["deuda_arancel"], 12000.0)
+		self.assertEqual(total_row["socios_deudores"], 2)
 
 	def test_pagos_arancel_proporcional_pago_parcial(self) -> None:
 		socio = self._socio_activo(dni="74001014", email="pagos.prop@example.com")

@@ -17,10 +17,9 @@
 		table.data td.num, table.data th.num { text-align: right; }
 		.two-col { width: 100%; }
 		.two-col td { width: 50%; vertical-align: top; padding-right: 8px; }
-		.firmas { margin-top: 24px; }
-		.firmas td { padding: 12px 8px 0 0; width: 50%; }
+		.firmas { margin-top: 16px; }
+		.firmas p { margin: 4px 0; }
 		.muted { color: #666; font-size: 10px; }
-		.page-break { page-break-before: always; }
 	</style>
 </head>
 <body>
@@ -110,21 +109,17 @@
 						</tr>
 					</tbody>
 				</table>
+				<div class="firmas">
+					<h2>3. {{ _("Conciliación y firmas de control") }}</h2>
+					<p>{{ _("Firma Responsable Caja / Administración") }}</p>
+					<p>_______________________</p>
+					<p style="margin-top: 14px;">{{ _("Firma Tesorería / Comisión Directiva") }}</p>
+					<p>_______________________</p>
+				</div>
 			</td>
 		</tr>
 	</table>
 
-	<div class="firmas">
-		<h2>3. {{ _("Conciliación y firmas de control") }}</h2>
-		<table class="two-col">
-			<tr>
-				<td>{{ _("Firma Responsable Caja / Administración") }}<br/><br/>_______________________</td>
-				<td>{{ _("Firma Tesorería / Comisión Directiva") }}<br/><br/>_______________________</td>
-			</tr>
-		</table>
-	</div>
-
-	<div class="page-break"></div>
 	<h2>{{ _("Detalle de cobranzas") }}</h2>
 	<p class="muted">{{ fecha_desde_txt }}{% if fecha_desde_txt != fecha_hasta_txt %} — {{ fecha_hasta_txt }}{% endif %} · {{ operaciones }} {{ _("cobranzas") }}</p>
 	<table class="data">

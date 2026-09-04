@@ -18,10 +18,10 @@ from club_management.members.services.cobranza_manual import (
 	_campo_periodo_cobro,
 	_campo_socio_en,
 	erpnext_cobranza_disponible,
+	label_concepto_historial,
 )
 from club_management.members.services.concepto_informe_label import (
 	agrupacion_tipo_concepto,
-	etiqueta_concepto_informe_desde_linea_si,
 )
 from club_management.members.services.modos_pago_desk import DESK_MODOS_PAGO_COBRANZA
 from club_management.members.services.socio_operaciones_secretaria import (
@@ -30,8 +30,6 @@ from club_management.members.services.socio_operaciones_secretaria import (
 from club_management.scripts.informe_concepto_cobranza import concepto_informe_desde_pe
 
 _AGRUPACIONES_VALIDAS = frozenset({"Cuota", "Arancel", "CTO COMP", "Federativa", "Otro"})
-VISTA_RENDICION = "Rendición por concepto"
-VISTA_PAGOS_DIA = "Pagos del día"
 
 
 def _label_medio(mode: str) -> str:
@@ -166,6 +164,7 @@ def get_informe_recaudacion_por_concepto(filters: dict[str, Any] | None = None) 
 		return _empty_informe(fecha_desde, fecha_hasta)
 
 	lineas_by_inv: dict[str, list[dict[str, Any]]] = {}
+	item_codes: set[str] = set()
 	for row in frappe.get_all(
 		"Sales Invoice Item",
 		filters={"parent": ["in", list(invoice_meta)]},
@@ -173,6 +172,17 @@ def get_informe_recaudacion_por_concepto(filters: dict[str, Any] | None = None) 
 		order_by="idx asc",
 	):
 		lineas_by_inv.setdefault(row.parent, []).append(row)
+		if row.item_code:
+			item_codes.add(row.item_code)
+
+	item_name_by_code: dict[str, str] = {}
+	if item_codes:
+		for it in frappe.get_all(
+			"Item",
+			filters={"name": ["in", list(item_codes)]},
+			fields=["name", "item_name"],
+		):
+			item_name_by_code[it.name] = it.item_name or ""
 
 	socio_ids = {
 		invoice_meta[name].get(campo_socio)
@@ -258,11 +268,49 @@ def get_informe_recaudacion_por_concepto(filters: dict[str, Any] | None = None) 
 				)
 
 			concepto_pe = concepto_informe_desde_pe(pe.reference_no, getattr(pe, "remarks", None))
-			if concepto_pe:
-				_append(concepto_pe, allocated)
-				continue
+
+			def _label_linea(line: Any) -> str:
+				return label_concepto_historial(
+					line.item_code,
+					line.description,
+					categoria_socio=categoria,
+					item_name=item_name_by_code.get(line.item_code or "") or None,
+				)
+
+			def _match_linea_pe(concepto: str) -> Any | None:
+				pe_u = (concepto or "").strip().upper()
+				if not pe_u:
+					return None
+				for line in inv_lineas:
+					label_u = _label_linea(line).upper()
+					desc_u = (line.description or "").strip().upper()
+					name_u = (item_name_by_code.get(line.item_code or "") or "").strip().upper()
+					if pe_u in label_u or label_u in pe_u:
+						return line
+					if pe_u in desc_u or pe_u in name_u:
+						return line
+					if "CUOTA SOCIAL" in pe_u and "CUOTA SOCIAL" in label_u:
+						return line
+				return None
 
 			line_total = sum(flt(line.amount) for line in inv_lineas)
+
+			if concepto_pe:
+				matched = _match_linea_pe(concepto_pe)
+				if matched:
+					_append(_label_linea(matched), allocated)
+					continue
+				if len(inv_lineas) == 1:
+					_append(_label_linea(inv_lineas[0]), allocated)
+					continue
+				# PE indica concepto pero no hay match de línea: etiquetar sin genéricos
+				concepto = label_concepto_historial(
+					None,
+					concepto_pe,
+					categoria_socio=categoria,
+				)
+				_append(concepto, allocated)
+				continue
 
 			if not inv_lineas or line_total <= 0:
 				concepto = _("Sin concepto")
@@ -270,13 +318,7 @@ def get_informe_recaudacion_por_concepto(filters: dict[str, Any] | None = None) 
 				continue
 
 			if len(inv_lineas) == 1:
-				line = inv_lineas[0]
-				concepto = etiqueta_concepto_informe_desde_linea_si(
-					line.item_code,
-					line.description,
-					categoria_socio=categoria,
-				)
-				_append(concepto, allocated)
+				_append(_label_linea(inv_lineas[0]), allocated)
 				continue
 
 			acumulado = 0.0
@@ -286,12 +328,7 @@ def get_informe_recaudacion_por_concepto(filters: dict[str, Any] | None = None) 
 				else:
 					parte = flt(allocated * (flt(line.amount) / line_total))
 					acumulado += parte
-				concepto = etiqueta_concepto_informe_desde_linea_si(
-					line.item_code,
-					line.description,
-					categoria_socio=categoria,
-				)
-				_append(concepto, parte)
+				_append(_label_linea(line), parte)
 
 	lineas.sort(
 		key=lambda row: (
@@ -407,47 +444,28 @@ def get_recaudacion_por_concepto_report_summary(
 	return summary
 
 
-def _is_pagos_dia_vista(filters: dict[str, Any] | None) -> bool:
-	return (filters or {}).get("vista") == VISTA_PAGOS_DIA
-
-
-def _filters_for_pagos_dia(filters: dict[str, Any] | None) -> dict[str, Any]:
-	raw = filters or {}
-	fecha = raw.get("fecha") or raw.get("fecha_desde") or today()
-	return {"fecha": fecha}
-
-
 def get_recaudacion_unificada_report_columns(
 	filters: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-	if _is_pagos_dia_vista(filters):
-		from club_management.members.services.informe_pagos_del_dia import (
-			get_pagos_del_dia_report_columns,
-		)
-
-		return get_pagos_del_dia_report_columns()
 	return get_recaudacion_por_concepto_report_columns()
 
 
 def get_recaudacion_unificada_report_data(
 	filters: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-	if _is_pagos_dia_vista(filters):
-		from club_management.members.services.informe_pagos_del_dia import (
-			get_pagos_del_dia_report_data,
-		)
-
-		return get_pagos_del_dia_report_data(_filters_for_pagos_dia(filters))
-	return get_recaudacion_por_concepto_report_data(filters)
+	"""Normaliza filtros legado (`fecha` / vista Pagos del día) a rango Desde–Hasta."""
+	raw = dict(filters or {})
+	if raw.get("fecha") and not raw.get("fecha_desde"):
+		raw["fecha_desde"] = raw["fecha"]
+		raw["fecha_hasta"] = raw.get("fecha_hasta") or raw["fecha"]
+	return get_recaudacion_por_concepto_report_data(raw)
 
 
 def get_recaudacion_unificada_report_summary(
 	filters: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-	if _is_pagos_dia_vista(filters):
-		from club_management.members.services.informe_pagos_del_dia import (
-			get_pagos_del_dia_report_summary,
-		)
-
-		return get_pagos_del_dia_report_summary(_filters_for_pagos_dia(filters))
-	return get_recaudacion_por_concepto_report_summary(filters)
+	raw = dict(filters or {})
+	if raw.get("fecha") and not raw.get("fecha_desde"):
+		raw["fecha_desde"] = raw["fecha"]
+		raw["fecha_hasta"] = raw.get("fecha_hasta") or raw["fecha"]
+	return get_recaudacion_por_concepto_report_summary(raw)

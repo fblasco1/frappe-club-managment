@@ -17,6 +17,12 @@
 				reqd: 1,
 				default: frappe.datetime.get_today(),
 			},
+			{
+				fieldname: "actividad",
+				label: __("Actividad"),
+				fieldtype: "Link",
+				options: "Actividad",
+			},
 		],
 		get_datatable_options: layout.get_datatable_options,
 		after_datatable_render: layout.after_datatable_render,

@@ -79,12 +79,17 @@ class TestInicioWorkspace(FrappeTestCase):
 
 	def test_informes_club_no_estan_en_pestanas_superiores(self) -> None:
 		self.assertEqual(len(CLUB_DESK_REPORTS), 3)
-		self.assertIn("Deuda por equipo", CLUB_DESK_REPORTS)
-		self.assertIn("Pagos por equipo", CLUB_DESK_REPORTS)
-		self.assertIn("Recaudacion por concepto", CLUB_DESK_REPORTS)
+		self.assertEqual(
+			list(CLUB_DESK_REPORTS),
+			["Cobranza por fechas", "Pagos por equipo", "Deuda por actividad"],
+		)
+		self.assertNotIn("Pagos del dia", CLUB_DESK_REPORTS)
+		self.assertNotIn("Recaudacion por concepto", CLUB_DESK_REPORTS)
+		self.assertNotIn("Deuda por equipo", CLUB_DESK_REPORTS)
 		nav_workspaces = {workspace for _label, workspace in CLUB_DESK_NAV_TABS}
 		for report_name in CLUB_DESK_REPORTS:
 			self.assertNotIn(report_name, nav_workspaces)
+
 
 	def test_default_workspace_secretaria_es_secretaria(self) -> None:
 		ensure_role_secretaria_exists()

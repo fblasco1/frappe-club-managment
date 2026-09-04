@@ -500,26 +500,6 @@ def sync_saldo_deuda_socio(socio_name: str) -> float:
 	return total
 
 
-def _lineas_factura_pendiente(invoice_name: str) -> list[dict[str, Any]]:
-	"""Líneas aún impagas: descuenta cobros por concepto del comprobante (no prorratea)."""
-	from club_management.scripts.informe_concepto_cobranza import _cobros_imputados_por_linea
-
-	lineas: list[dict[str, Any]] = []
-	for row in _cobros_imputados_por_linea(invoice_name):
-		restante = flt(row.get("restante"), 2)
-		if restante <= 0.005:
-			continue
-		concepto = (row.get("description") or row.get("item_code") or "").strip()
-		lineas.append(
-			{
-				"concepto": concepto or _("Concepto"),
-				"item_code": row.get("item_code"),
-				"monto": restante,
-			}
-		)
-	return lineas
-
-
 def _cargos_extra_pendientes_socio(socio_name: str) -> list[dict[str, Any]]:
 	"""Cargos extra aún no facturados (únicos pendientes o recurrentes vigentes)."""
 	if not frappe.db.exists("DocType", "Cargo Socio"):
@@ -554,15 +534,57 @@ def _cargos_extra_pendientes_socio(socio_name: str) -> list[dict[str, Any]]:
 	return result
 
 
+def _lineas_factura_pendiente(
+	invoice_name: str,
+	*,
+	categoria_socio: str | None = None,
+) -> list[dict[str, Any]]:
+	"""Líneas aún impagas: descuenta cobros por concepto del comprobante (no prorratea)."""
+	from club_management.scripts.informe_concepto_cobranza import _cobros_imputados_por_linea
+
+	raw_rows = list(_cobros_imputados_por_linea(invoice_name))
+	item_codes = {str(row.get("item_code") or "") for row in raw_rows if row.get("item_code")}
+	item_name_by_code: dict[str, str] = {}
+	if item_codes:
+		for row in frappe.get_all(
+			"Item",
+			filters={"name": ["in", list(item_codes)]},
+			fields=["name", "item_name"],
+		):
+			item_name_by_code[row.name] = row.item_name or ""
+
+	lineas: list[dict[str, Any]] = []
+	for row in raw_rows:
+		restante = flt(row.get("restante"), 2)
+		if restante <= 0.005:
+			continue
+		item_code = row.get("item_code")
+		concepto = label_concepto_historial(
+			item_code,
+			row.get("description"),
+			categoria_socio=categoria_socio,
+			item_name=item_name_by_code.get(str(item_code or "")) or None,
+		)
+		lineas.append(
+			{
+				"concepto": concepto or _("Concepto"),
+				"item_code": item_code,
+				"monto": restante,
+			}
+		)
+	return lineas
+
+
 def get_detalle_deuda_socio(socio_name: str) -> dict[str, Any]:
 	"""Saldo impago y desglose por facturas / cargos extra pendientes."""
 	saldo = sync_saldo_deuda_socio(socio_name)
+	categoria = frappe.db.get_value(SOCIO_DOCTYPE, socio_name, "categoria") or ""
 	facturas: list[dict[str, Any]] = []
 	for row in list_facturas_pendientes_socio(socio_name):
 		facturas.append(
 			{
 				**row,
-				"lineas": _lineas_factura_pendiente(row["name"]),
+				"lineas": _lineas_factura_pendiente(row["name"], categoria_socio=categoria),
 			}
 		)
 	return {
@@ -586,6 +608,7 @@ def list_facturas_pendientes_socio(socio_name: str) -> list[dict[str, Any]]:
 	if campo_periodo:
 		fields.append(campo_periodo)
 
+	categoria = frappe.db.get_value(SOCIO_DOCTYPE, socio_name, "categoria") or ""
 	rows = frappe.get_all(
 		SALES_INVOICE_DOCTYPE,
 		filters={campo: socio_name, "docstatus": 1, "outstanding_amount": [">", 0]},
@@ -594,7 +617,7 @@ def list_facturas_pendientes_socio(socio_name: str) -> list[dict[str, Any]]:
 	)
 	result: list[dict[str, Any]] = []
 	for row in rows:
-		lineas = _lineas_factura_pendiente(row.name)
+		lineas = _lineas_factura_pendiente(row.name, categoria_socio=categoria)
 		concepto = (lineas[0]["concepto"] if lineas else None) or (row.remarks or row.name)
 		periodo = ""
 		if campo_periodo:
@@ -958,8 +981,18 @@ _GENERIC_CONCEPTO_SI = frozenset(
 		"arancel",
 		"cuota social",
 		"concepto",
+		"cargos varios",
+		"cargo varios",
 	}
 )
+
+
+def _es_nombre_cargo_especifico(text: str | None) -> bool:
+	norm = (text or "").upper()
+	return any(
+		token in norm
+		for token in ("CTO COMP", "C FED", "C.FED", "CUOTA FED", "EXPEDIENTE", "FEBAMBA")
+	)
 
 
 def label_concepto_historial(
@@ -969,10 +1002,11 @@ def label_concepto_historial(
 	categoria_socio: str | None = None,
 	item_name: str | None = None,
 ) -> str:
-	"""Etiqueta legible para historial de pagos (Desk Socio).
+	"""Etiqueta legible para historial / deuda / recaudación (Desk).
 
 	- Cuota social → ``CUOTA SOCIAL {CATEGORIA}``
-	- Arancel / resto → ``Item.item_name`` (p. ej. ARANCEL MENSUAL - …), no genéricos.
+	- Arancel → ``Item.item_name`` (p. ej. ARANCEL MENSUAL - …), no genéricos
+	- Cargos varios → nombre del cargo (CTO COMP / C FED / Expediente…)
 	"""
 	from club_management.members.data.cuotas_sociales_vigentes import CUOTA_SOCIAL_ITEM_CODE
 
@@ -1005,11 +1039,20 @@ def label_concepto_historial(
 			return f"CUOTA SOCIAL {cat.upper()}"
 		return "CUOTA SOCIAL"
 
-	if name:
+	if _es_nombre_cargo_especifico(desc):
+		return desc
+	if _es_nombre_cargo_especifico(name):
+		return name
+
+	# Preferir item_name “de negocio” (ARANCEL MENSUAL - …); si el nombre es el código, usar descripción
+	if name and name_l not in _GENERIC_CONCEPTO_SI and name != code:
 		return name
 	if desc and desc_l not in _GENERIC_CONCEPTO_SI:
 		return desc
-	return desc or code or _("Concepto")
+	if name and name_l not in _GENERIC_CONCEPTO_SI:
+		return name
+	# Nunca devolver genéricos («Cuota social», «Arancel actividad», …)
+	return code or _("Concepto")
 
 
 def list_historial_pagos_socio(socio_name: str, *, limit: int = 50) -> list[dict[str, Any]]:

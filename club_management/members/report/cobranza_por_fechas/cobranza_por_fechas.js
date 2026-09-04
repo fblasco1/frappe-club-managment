@@ -1,7 +1,7 @@
 // Copyright (c) 2026, fblasco1 and contributors
 // For license information, please see license.txt
 
-function export_recaudacion_rendicion(report, file_format) {
+function export_cobranza_por_fechas(report, file_format) {
 	const filters = report.get_values ? report.get_values() : report.get_filter_values();
 	open_url_post(
 		"/api/method/club_management.members.api.cobranza_desk.export_recaudacion_por_concepto",
@@ -12,7 +12,7 @@ function export_recaudacion_rendicion(report, file_format) {
 	);
 }
 
-frappe.query_reports["Recaudacion por concepto"] = {
+frappe.query_reports["Cobranza por fechas"] = {
 	filters: [
 		{
 			fieldname: "fecha_desde",
@@ -54,10 +54,10 @@ frappe.query_reports["Recaudacion por concepto"] = {
 	],
 	onload(report) {
 		report.page.add_inner_button(__("Exportar Excel"), () => {
-			export_recaudacion_rendicion(report, "Excel");
+			export_cobranza_por_fechas(report, "Excel");
 		});
 		report.page.add_inner_button(__("Exportar PDF"), () => {
-			export_recaudacion_rendicion(report, "PDF");
+			export_cobranza_por_fechas(report, "PDF");
 		});
 	},
 };

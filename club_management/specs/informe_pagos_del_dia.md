@@ -1,23 +1,27 @@
-# Spec: Informe de pagos del día
+# Spec: Informe de pagos del día (legado)
 
-Cierre diario de cobranza en **Gestión de Socios → Informes**.
+> **Estado:** absorbido por **Cobranza por fechas** (`informes_secretaria_menu.md`, `informe_rendicion_cobranza_secretaria.md`).  
+> El Script Report `Pagos del dia` permanece como alias (mismo día = Desde=Hasta) pero **no** figura en el menú de Informes.
 
-**Relacionado:** `cobro_multi_factura_medios_mixtos.md`, `secretaria_workspace_panel_kpis.md`, `mvp_operacion_secretaria_sin_pagos.md`
+Cierre diario de cobranza — usar **Cobranza por fechas** con Desde = Hasta.
+
+**Relacionado:** `informes_secretaria_menu.md`, `informe_rendicion_cobranza_secretaria.md`, `cobro_multi_factura_medios_mixtos.md`
 
 ---
 
-## Scenario: visible en Informes de Gestión de Socios
+## Scenario: no visible como ítem de menú
 
 Given un usuario Secretaría en Desk
-When abre la sección **Informes** del workspace Secretaría / Gestión de Socios
-Then ve el enlace **Pagos del dia** junto a Deuda/Pagos por equipo y Deuda por actividad.
+When abre la sección **Informes**
+Then **no** ve **Pagos del dia** ni **Recaudacion por concepto**
+And sí ve **Cobranza por fechas**, **Pagos por equipo** y **Deuda por actividad**.
 
 ---
 
 ## Scenario: header con total y medios
 
 Given cobros del día en Efectivo y Transferencia
-When Secretaría abre **Pagos del dia** filtrado por esa fecha
+When Secretaría abre **Cobranza por fechas** (o el alias legado) filtrado por esa fecha
 Then el encabezado (summary) muestra el **total recaudado**
 And un total por cada **medio de pago**
 And el summary **no** mezcla los totales por concepto (van al pie del listado).

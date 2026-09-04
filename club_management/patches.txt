@@ -87,3 +87,4 @@ club_management.patches.v1_0.import_horarios_lunes_viernes
 club_management.patches.v1_0.fix_gimnasio_cancha_mapping
 club_management.patches.v1_0.import_horarios_sabado
 club_management.patches.v1_0.sync_planilla_tipos_evento
+club_management.patches.v1_0.sync_informes_secretaria_menu

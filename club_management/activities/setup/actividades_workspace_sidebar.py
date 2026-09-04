@@ -58,6 +58,14 @@ SIDEBAR_ITEMS: list[dict] = [
 		"indent": 1,
 	},
 	{
+		"label": "Cobranza por fechas",
+		"type": "Link",
+		"link_type": "Report",
+		"link_to": "Cobranza por fechas",
+		"icon": "table",
+		"child": 1,
+	},
+	{
 		"label": "Pagos por equipo",
 		"type": "Link",
 		"link_type": "Report",
@@ -66,10 +74,10 @@ SIDEBAR_ITEMS: list[dict] = [
 		"child": 1,
 	},
 	{
-		"label": "Deuda por equipo",
+		"label": "Deuda por actividad",
 		"type": "Link",
 		"link_type": "Report",
-		"link_to": "Deuda por equipo",
+		"link_to": "Deuda por actividad",
 		"icon": "table",
 		"child": 1,
 	},

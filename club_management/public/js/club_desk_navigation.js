@@ -66,15 +66,11 @@
 
 	club_management.club_desk_navigation.CLUB_REPORTS = new Set([
 
-		"Deuda por equipo",
+		"Cobranza por fechas",
 
 		"Pagos por equipo",
 
-		"Recaudacion por concepto",
-
 		"Deuda por actividad",
-
-		"Pagos del dia",
 
 	]);
 
@@ -82,17 +78,23 @@
 
 	club_management.club_desk_navigation.CLUB_REPORTS_SOCIOS = new Set([
 
-		"Deuda por equipo",
+		"Cobranza por fechas",
 
 		"Pagos por equipo",
 
-		"Recaudacion por concepto",
+		"Deuda por actividad",
 
 	]);
 
 
 
 	club_management.club_desk_navigation.CLUB_REPORTS_ACTIVIDADES = new Set([
+
+		"Cobranza por fechas",
+
+		"Pagos por equipo",
+
+		"Deuda por actividad",
 
 	]);
 
