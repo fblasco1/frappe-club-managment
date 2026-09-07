@@ -37,7 +37,7 @@ def _iter_json_values(obj: Any) -> Iterable[str]:
     """Itera valores JSON en orden, recursivo, sin claves ni separadores."""
     if isinstance(obj, dict):
         for k, v in obj.items():
-            if k == "hash":
+            if str(k).lower() == "hash":
                 continue
             yield from _iter_json_values(v)
         return

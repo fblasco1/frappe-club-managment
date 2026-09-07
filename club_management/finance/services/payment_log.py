@@ -25,6 +25,7 @@ def record_gateway_transaction(
 	currency: str = "ARS",
 	payload: dict[str, Any] | None = None,
 	status: str = "Recibido",
+	ignore_permissions: bool = False,
 ) -> Document:
 	"""Inserta o reutiliza un Payment Log. Nunca reasigna el ID a otro pago."""
 	tid = (gateway_transaction_id or "").strip()
@@ -67,5 +68,5 @@ def record_gateway_transaction(
 			"received_at": now_datetime(),
 		}
 	)
-	doc.insert()
+	doc.insert(ignore_permissions=ignore_permissions)
 	return doc
