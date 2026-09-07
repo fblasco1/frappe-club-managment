@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "source": "fmv_voley",
+  "generated_at": "2026-08-28T20:00:00-03:00",
+  "club": "PEDRO ECHAGUE",
+  "club_id_fmv": 420,
+  "partidos": [
+    {
+      "source": "fmv_voley",
+      "external_id": "753076",
+      "fecha": "2026-08-28",
+      "hora": "21:00",
+      "categoria": "Sub 15",
+      "tira": "Nivel E",
+      "equipo": "SUB 15 ECHAGÜE",
+      "rival": "SHOLEM B",
+      "localia": "Local",
+      "direccion": "Portela 836, CABA",
+      "espacio": null
+    },
+    {
+      "source": "fmv_voley",
+      "external_id": "753077",
+      "fecha": "2026-08-29",
+      "hora": "21:00",
+      "categoria": "Superior",
+      "tira": "",
+      "equipo": "SUPERIOR ECHAGÜE",
+      "rival": "CLUB RIVAL",
+      "localia": "Local",
+      "direccion": "Portela 836, CABA",
+      "espacio": null
+    },
+    {
+      "source": "fmv_voley",
+      "external_id": "753078",
+      "fecha": "2026-08-30",
+      "hora": "20:00",
+      "categoria": "Superior",
+      "equipo": "SUPERIOR ECHAGÜE B",
+      "rival": "OTRO",
+      "localia": "Local",
+      "espacio": null
+    },
+    {
+      "source": "fmv_voley",
+      "external_id": "753079",
+      "fecha": "2026-08-31",
+      "hora": "18:00",
+      "categoria": "Sub 13",
+      "equipo": "SUB 13 ECHAGÜE",
+      "rival": "VISITANTE",
+      "localia": "Visitante",
+      "espacio": null
+    }
+  ]
+}

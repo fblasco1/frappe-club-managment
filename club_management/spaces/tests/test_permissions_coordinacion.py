@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import frappe
 
 from club_management.members.permissions_app import has_app_permission
@@ -86,6 +88,29 @@ class TestPermissionsCoordinacion(MembersTestCase):
 		self.assertIn(ROLE_COORDINACION, roles)
 		self.assertIn("Secretaria", roles)
 		self.assertIn("Tesoreria", roles)
+
+	def test_sidebar_espacios_enlaza_dashboard_y_ocupacion(self) -> None:
+		path = Path(
+			frappe.get_app_path(
+				"club_management",
+				"public",
+				"js",
+				"espacios_sidebar_boot.js",
+			)
+		)
+		source = path.read_text(encoding="utf-8")
+		self.assertIn('link_to: "Espacios"', source)
+		self.assertIn('link_to: "ocupacion-espacios"', source)
+
+		bundle = Path(
+			frappe.get_app_path(
+				"club_management",
+				"public",
+				"js",
+				"club_management.bundle.js",
+			)
+		).read_text(encoding="utf-8")
+		self.assertIn('import "./espacios_sidebar_boot.js";', bundle)
 
 	def test_coordinacion_puede_insertar_espacio(self) -> None:
 		user = make_coordinacion_user("coord.insert@example.com")

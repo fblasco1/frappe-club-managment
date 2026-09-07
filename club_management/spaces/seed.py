@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import frappe
 
+from club_management.spaces.planilla import CANCHA_1, CANCHA_2, CANCHA_3
+
 # (titulo, tipo, alquilable)
 ESPACIOS_SEED: tuple[tuple[str, str, int], ...] = (
+	(CANCHA_1, "Cancha", 0),
+	(CANCHA_2, "Cancha", 0),
+	(CANCHA_3, "Cancha", 0),
 	("GIMNASIO BAJO TRIBUNA", "Gimnasio", 0),
 	("SALON P.B.", "Salon", 1),
 	("SUM P.B.", "Salon", 1),

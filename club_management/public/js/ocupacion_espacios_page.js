@@ -37,6 +37,12 @@
 					<button type="button" class="btn btn-sm btn-secondary club-ocupacion-sync-febamba">
 						${__("Sincronizar FeBAMBA")}
 					</button>
+					<button type="button" class="btn btn-sm btn-secondary club-ocupacion-sync-fmv">
+						${__("Sincronizar FMV")}
+					</button>
+					<button type="button" class="btn btn-sm btn-secondary club-ocupacion-import-excel">
+						${__("Importar Excel ligas")}
+					</button>
 				</div>
 			`);
 			page.main.prepend($ctrl);
@@ -45,6 +51,8 @@
 				this.load();
 			});
 			$ctrl.find(".club-ocupacion-sync-febamba").on("click", () => this.sync_febamba());
+			$ctrl.find(".club-ocupacion-sync-fmv").on("click", () => this.sync_fmv());
+			$ctrl.find(".club-ocupacion-import-excel").on("click", () => this.import_excel_ligas());
 		},
 
 		sync_febamba() {
@@ -54,32 +62,117 @@
 				freeze: true,
 				freeze_message: __("Sincronizando fixture FeBAMBA GES…"),
 				callback: (r) => {
-					const rep = r.message || {};
-					const parts = [
-						__("Creados: {0}", [rep.creados || 0]),
-						__("Actualizados: {0}", [rep.actualizados || 0]),
-						__("Cancelados: {0}", [rep.cancelados || 0]),
-					];
-					if ((rep.superposiciones || []).length) {
-						parts.push(__("Superposiciones: {0}", [rep.superposiciones.length]));
-					}
-					frappe.show_alert({
-						message: parts.join(" · "),
-						indicator: rep.errores?.length ? "orange" : "green",
-					});
-					if ((rep.superposiciones || []).length) {
-						frappe.msgprint({
-							title: __("Superposiciones a revisar"),
-							message: `<ul>${rep.superposiciones
-								.slice(0, 15)
-								.map((s) => `<li>${frappe.utils.escape_html(s)}</li>`)
-								.join("")}</ul>`,
-							indicator: "orange",
-						});
-					}
+					this._show_fixture_report(r.message || {});
 					this.load();
 				},
 			});
+		},
+
+		sync_fmv() {
+			frappe.call({
+				method: "club_management.spaces.api.fixtures_desk.sync_fixtures_fmv",
+				args: { cancel_missing: 1 },
+				freeze: true,
+				freeze_message: __("Sincronizando fixture FMV Vóley…"),
+				callback: (r) => {
+					this._show_fixture_report(r.message || {});
+					this.load();
+				},
+			});
+		},
+
+		import_excel_ligas() {
+			const templateUrl =
+				"/api/method/club_management.spaces.api.fixtures_desk.download_fixtures_excel_template";
+			const dialog = new frappe.ui.Dialog({
+				title: __("Importar Excel de fixtures"),
+				fields: [
+					{
+						fieldtype: "HTML",
+						options: `
+							<p>${__("Usá la plantilla canónica para preparar los partidos de la liga.")}</p>
+							<p>
+								<a class="btn btn-default btn-sm" href="${templateUrl}" target="_blank">
+									${__("Descargar plantilla Excel")}
+								</a>
+							</p>
+							<p class="text-muted small">${__(
+								"Reemplazá la fila de ejemplo. SICLUB genera automáticamente el origen, el identificador y el equipo."
+							)}</p>
+						`,
+					},
+				],
+				primary_action_label: __("Seleccionar Excel"),
+				primary_action: () => {
+					dialog.hide();
+					this._open_excel_uploader();
+				},
+			});
+			dialog.show();
+		},
+
+		_open_excel_uploader() {
+			new frappe.ui.FileUploader({
+				restrictions: { allowed_file_types: [".xlsx", ".xls"] },
+				on_success: (file_doc) => {
+					const file_url = file_doc.file_url;
+					frappe.call({
+						method: "club_management.spaces.api.fixtures_desk.preview_fixtures_excel",
+						args: { file_url },
+						freeze: true,
+						freeze_message: __("Validando Excel…"),
+						callback: (r) => {
+							const preview = r.message || {};
+							const ok = (preview.filas_ok || []).length;
+							const err = (preview.errores || []).length;
+							const msg = [
+								__("Filas OK: {0}", [ok]),
+								__("Errores: {0}", [err]),
+							].join(" · ");
+							frappe.confirm(
+								`${msg}<br><br>${__("¿Aplicar importación idempotente?")}`,
+								() => {
+									frappe.call({
+										method: "club_management.spaces.api.fixtures_desk.apply_fixtures_excel",
+										args: { file_url, cancel_missing: 0 },
+										freeze: true,
+										freeze_message: __("Importando partidos…"),
+										callback: (res) => {
+											this._show_fixture_report(res.message || {});
+											this.load();
+										},
+									});
+								}
+							);
+						},
+					});
+				},
+			});
+		},
+
+		_show_fixture_report(rep) {
+			const parts = [
+				__("Creados: {0}", [rep.creados || 0]),
+				__("Actualizados: {0}", [rep.actualizados || 0]),
+				__("Cancelados: {0}", [rep.cancelados || 0]),
+			];
+			if ((rep.superposiciones || []).length) {
+				parts.push(__("Superposiciones: {0}", [rep.superposiciones.length]));
+			}
+			frappe.show_alert({
+				message: parts.join(" · "),
+				indicator: rep.errores?.length ? "orange" : "green",
+			});
+			if ((rep.superposiciones || []).length) {
+				frappe.msgprint({
+					title: __("Superposiciones a revisar"),
+					message: `<ul>${rep.superposiciones
+						.slice(0, 15)
+						.map((s) => `<li>${frappe.utils.escape_html(s)}</li>`)
+						.join("")}</ul>`,
+					indicator: "orange",
+				});
+			}
 		},
 
 		load() {

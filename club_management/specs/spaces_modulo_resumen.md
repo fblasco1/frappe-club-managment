@@ -3,7 +3,7 @@
 **Módulo Frappe:** `Spaces`  
 **Rol principal:** `Coordinacion` (+ `Secretaria` escritura, `Tesoreria` lectura)  
 **Workspace Desk:** Espacios · planilla: `/desk/ocupacion-espacios`  
-**Última revisión:** 2026-08-27 (local / devcontainer)
+**Última revisión:** 2026-09-07 — **en testing** (Coordinación / Desk local). SP-1 FMV live habilitado; SP-2 listo; SP-3 pendiente.
 
 ---
 
@@ -182,13 +182,15 @@ bench --site dev.localhost execute \
 
 ## Entregado vs pendiente
 
-### Entregado (MVP+ operativo Desk)
+### Entregado (MVP+ operativo Desk) — **en testing Coordinación (2026-09-07)**
 
 - [x] Catálogo Espacio + grilla semanal + reservas Confirmada
 - [x] Alquiler externo Temporal / Recurrente
 - [x] Evento club recurrente (cenas, jubilados)
 - [x] Import CSV grilla L–V y sábado
 - [x] Fixtures FeBAMBA GES (JSON + API + planilla)
+- [x] Sync FMV Vóley live (JSON + API + planilla + cron local habilitado) — SP-1
+- [x] Import Excel ligas (preview/apply Desk) — SP-2
 - [x] Planilla 08:00–04:00 con tipos, colores y orden de columnas
 - [x] Superposiciones visibles + selector al clic
 - [x] Reubicar / suspender entrenamiento del día
@@ -199,8 +201,6 @@ bench --site dev.localhost execute \
 
 | # | Tema | Notas |
 |---|------|-------|
-| **SP-1** | **Sync FMV (Vóley)** | Adaptador federación vóley; hoy solo manual/CSV. Ver `spaces_fixtures_partidos.md` § otras federaciones. |
-| **SP-2** | **Fixtures ligas en Excel** | Import Desk desde planillas Excel de ligas (no solo CSV FeBAMBA / grilla Coordinación). Parser + preview + idempotencia. |
 | SP-3 | Reservas online socio/externo + comprobante | Épica 1 — `spaces_sprint_gestion.md` |
 | SP-4 | Disponibilidad en vivo (estados que bloquean) | Épica 2 |
 | SP-5 | Reporte PDF/Excel diario → email coordinador/es | Épica 4 |
@@ -214,8 +214,8 @@ bench --site dev.localhost execute \
 | Fuente | Estado |
 |--------|--------|
 | **FeBAMBA / formativas_ges** | Integrado (JSON GitHub) |
-| **FMV (Vóley)** | **Pendiente** — sin conector |
-| **Excel ligas varias** | **Pendiente** — carga manual parcial vía CSV partidos |
+| **FMV (Vóley)** | Integrado; JSON raw público y cron habilitado en `dev.localhost` |
+| **Excel ligas varias** | **Integrado** — plantilla canónica + preview/apply Desk |
 | **Google Sheet CM** | Consumido vía export JSON del repo GES (no lectura directa Sheet en prod) |
 
 ---

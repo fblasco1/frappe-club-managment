@@ -62,6 +62,16 @@ Then navega a `/desk/ocupacion-espacios` y ve la grilla del día seleccionado.
 
 ---
 
+## Scenario: navegación lateral de Espacios
+
+Given Coordinacion está en el workspace `Espacios` o en `/desk/ocupacion-espacios`
+When se muestra la barra lateral de Desk
+Then ve un acceso a `Espacios` como dashboard principal
+And ve un acceso a `Ocupación de espacios`
+And ambos accesos navegan dentro de Desk.
+
+---
+
 ## Scenario: clic en superposición muestra selector
 
 Given dos o más bloques solapados en el mismo espacio (p. ej. entrenamiento + partido fixture)

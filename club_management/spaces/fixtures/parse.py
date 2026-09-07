@@ -9,6 +9,7 @@ from typing import Any
 from frappe.utils import getdate
 
 from club_management.spaces.fixtures.contract import (
+	ORIGIN_FMV_VOLEY,
 	FixturePartido,
 	LOCALIA_LOCAL,
 	LOCALIA_VISITANTE,
@@ -22,6 +23,8 @@ _LIGA_METRO_WARMUP_MINUTES = 60
 _LIGA_METRO_MATCH_MINUTES = 90
 _SUPERIOR_B_WARMUP_MINUTES = 30
 _SUPERIOR_B_MATCH_MINUTES = 90
+_FMV_MATCH_MINUTES = 90
+_FMV_SUPERIOR_WARMUP_MINUTES = 30
 
 _FORMATIVAS_CATEGORIAS = frozenset(
 	{
@@ -148,12 +151,27 @@ def is_formativa(categoria: str) -> bool:
 	return bool(re.match(r"^U\d{1,2}(\s|$|Fem|Flex)", cat, re.IGNORECASE))
 
 
+def is_fmv_formativa(categoria: str) -> bool:
+	"""Categorías formativas FMV: Sub 13, Sub 15, etc."""
+	return bool(re.search(r"\bsub\s*\d{1,2}\b", (categoria or ""), re.IGNORECASE))
+
+
+def is_fmv_superior(categoria: str, equipo: str = "") -> bool:
+	"""Superiores / DH en FMV (warm-up 30 min)."""
+	blob = f"{categoria or ''} {equipo or ''}".upper()
+	if "SUPERIOR" in blob or re.search(r"\bDH\b", blob):
+		return True
+	return False
+
+
 def ventana_ocupacion_partido(
 	kickoff: str,
 	*,
 	categoria: str = "",
 	tira: str = "",
 	hora_hasta_explicita: str = "",
+	source: str = "",
+	equipo: str = "",
 ) -> tuple[str, str]:
 	"""Devuelve (hora_desde, hora_hasta) de bloqueo de cancha a partir del kickoff."""
 	explicita = parse_hora_hasta_explicita(hora_hasta_explicita)
@@ -162,7 +180,15 @@ def ventana_ocupacion_partido(
 
 	warmup = 0
 	match_min = _DEFAULT_MATCH_MINUTES
-	if is_liga_metro(categoria):
+	if source == ORIGIN_FMV_VOLEY:
+		match_min = _FMV_MATCH_MINUTES
+		if is_fmv_superior(categoria, equipo):
+			warmup = _FMV_SUPERIOR_WARMUP_MINUTES
+		elif is_fmv_formativa(categoria):
+			warmup = 0
+		else:
+			warmup = 0
+	elif is_liga_metro(categoria):
 		warmup = _LIGA_METRO_WARMUP_MINUTES
 		match_min = _LIGA_METRO_MATCH_MINUTES
 	elif is_superior_b(categoria, tira):
@@ -217,6 +243,8 @@ def normalize_partido(raw: dict[str, Any]) -> FixturePartido | str:
 		categoria=item.categoria,
 		tira=item.tira,
 		hora_hasta_explicita=item.hora_hasta,
+		source=item.source,
+		equipo=item.equipo,
 	)
 	localia = normalize_localia(item.localia)
 	motivo = build_motivo(item)
@@ -237,4 +265,5 @@ def normalize_partido(raw: dict[str, Any]) -> FixturePartido | str:
 		resultado=item.resultado,
 		espacio=espacio,
 		motivo=motivo,
+		equipo=item.equipo,
 	)
