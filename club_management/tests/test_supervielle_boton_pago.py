@@ -1,16 +1,14 @@
-"""Tests unitarios del Botón de Pago Supervielle (spec supervielle_boton_pago.md)."""
+"""Contrato puro Botón de Pago Supervielle v2.6."""
 
 from __future__ import annotations
 
 import hashlib
 import unittest
-from unittest.mock import MagicMock
 
 from club_management.integrations.supervielle.payload import (
 	SANDBOX_API_HOST,
 	SANDBOX_API_URL,
 	SANDBOX_CONCEPTO,
-	SANDBOX_CUIT,
 	CheckoutSource,
 	SupervielleRuntimeSettings,
 	assert_sandbox_url_matches_mode,
@@ -18,9 +16,9 @@ from club_management.integrations.supervielle.payload import (
 	extract_boton_pago_result,
 	format_importe,
 	sign_payload,
+	validate_response_hash,
 )
 from club_management.integrations.supervielle_api import SupervielleIntegrationError
-
 
 SANDBOX_SECRET = "14D6C372-F28C-4DED-BE02-71E3A6C94415"
 
@@ -31,10 +29,10 @@ def _source() -> CheckoutSource:
 		amount=19500,
 		due_date="2026-09-10",
 		numero_socio="12062",
+		dni="23456789",
 		socio_name="12062",
 		socio_nombre="PEREZ ANA",
 		email="ana@example.com",
-		periodo_cobro="09/2026",
 	)
 
 
@@ -45,90 +43,80 @@ def _settings(*, sandbox_mode: bool = True, api_url: str = SANDBOX_API_URL) -> S
 		cuit_emisor="20-40638192-8",
 		api_url=api_url,
 		concepto_default=SANDBOX_CONCEPTO,
+		url_ok="https://gestion.icdpedroechague.com.ar/pago-ok",
+		url_error="https://gestion.icdpedroechague.com.ar/pago-error",
+		rendicion_api_url="https://cobranzaagiltst.supervielle.com.ar/rest/rendicion",
+		convenio="TODOS",
+		mode_of_payment="Cobros Plus (ARS)",
+		clearing_account="115002 Cobros Plus - a liquidar (ARS) - ICDPE",
 	)
 
 
 class TestSupervielleBotonPagoPayload(unittest.TestCase):
-	def test_payload_order_and_sources(self) -> None:
-		payload = build_checkout_payload(_source(), _settings())
+	def test_payload_v26_order_and_sources(self) -> None:
+		payload = build_checkout_payload(_source(), _settings(), "SICLUB-ABC123")
 		self.assertEqual(
-			list(payload.keys()),
+			list(payload),
 			[
-				"Cuit",
-				"Concepto",
-				"IdCliente",
-				"IdReferencia",
-				"Importe",
-				"Moneda",
-				"FechaVencimiento",
-				"Email",
+				"IdEmpresa",
+				"UserName",
 				"Nombre",
+				"NroDoc",
+				"Concepto",
+				"Importe",
+				"DatoLibreEmp",
+				"URLOk",
+				"URLError",
+				"FechaVencPubl",
+				"ImporteSegVenc",
+				"FechaSegVencPubl",
 			],
 		)
-		self.assertEqual(payload["Cuit"], SANDBOX_CUIT)
-		self.assertEqual(payload["Concepto"], "PRUEBA")
-		self.assertEqual(payload["IdCliente"], "12062")
-		self.assertEqual(payload["IdReferencia"], "ACC-SINV-0001")
+		self.assertEqual(payload["IdEmpresa"], "20406381928")
+		self.assertEqual(payload["NroDoc"], "23456789")
+		self.assertEqual(payload["DatoLibreEmp"], "SICLUB-ABC123")
 		self.assertEqual(payload["Importe"], "19500.00")
-		self.assertEqual(payload["Moneda"], "ARS")
-		self.assertEqual(payload["FechaVencimiento"], "2026-09-10")
-		self.assertEqual(payload["Email"], "ana@example.com")
-		self.assertEqual(payload["Nombre"], "PEREZ ANA")
-		self.assertNotIn("Hash", payload)
+		self.assertEqual(payload["FechaVencPubl"], "10092026")
+		self.assertEqual(payload["ImporteSegVenc"], "")
 		self.assertNotIn(SANDBOX_SECRET, str(payload))
 
-	def test_sign_payload_excludes_hash_and_appends_secret(self) -> None:
-		base = build_checkout_payload(_source(), _settings())
+	def test_sign_payload_uses_values_in_order(self) -> None:
+		base = build_checkout_payload(_source(), _settings(), "SICLUB-ABC123")
 		signed = sign_payload(base, SANDBOX_SECRET)
-		concatenated = (
-			"".join(
-				[
-					SANDBOX_CUIT,
-					"PRUEBA",
-					"12062",
-					"ACC-SINV-0001",
-					"19500.00",
-					"ARS",
-					"2026-09-10",
-					"ana@example.com",
-					"PEREZ ANA",
-				]
-			)
-			+ SANDBOX_SECRET
-		)
-		expected = hashlib.sha256(concatenated.encode("utf-8")).hexdigest()
+		expected = hashlib.sha256(
+			("".join(str(value) for value in base.values()) + SANDBOX_SECRET).encode("utf-8")
+		).hexdigest()
 		self.assertEqual(signed["Hash"], expected)
-		self.assertEqual(expected, expected.lower())
+
+	def test_response_hash_and_access_link(self) -> None:
+		token = "50bb6cd4-6579-4abf-b6cd-84bc56d86e51"
+		response_hash = hashlib.sha256((token + SANDBOX_SECRET).encode("utf-8")).hexdigest()
+		payload = {
+			"Token": token,
+			"Hash": response_hash,
+			"AccessLink": "https://cobranzaagiltst.supervielle.com.ar/Clientes/Login?token=x",
+		}
+		validate_response_hash(payload, SANDBOX_SECRET)
+		url, returned_token = extract_boton_pago_result(payload, sandbox_mode=True)
+		self.assertEqual(returned_token, token)
+		self.assertEqual(url, payload["AccessLink"])
+
+	def test_response_hash_invalido_y_host_externo_fallan(self) -> None:
+		with self.assertRaises(SupervielleIntegrationError):
+			validate_response_hash({"Token": "x", "Hash": "bad"}, SANDBOX_SECRET)
+		with self.assertRaises(SupervielleIntegrationError):
+			extract_boton_pago_result(
+				{"Token": "x", "AccessLink": "https://attacker.example/token"},
+				sandbox_mode=True,
+			)
 
 	def test_format_importe_two_decimals(self) -> None:
-		self.assertEqual(format_importe(19500), "19500.00")
 		self.assertEqual(format_importe(19500.5), "19500.50")
 
-	def test_sandbox_mode_rejects_production_host(self) -> None:
-		prod = "https://cobranzaagil.supervielle.com.ar/rest/botonpago/publicacion"
+	def test_ambiente_cruzado_falla(self) -> None:
+		prod = "https://www.cobranzaagil.supervielle.com.ar/rest/botonpago/publicacion"
 		with self.assertRaises(SupervielleIntegrationError):
 			assert_sandbox_url_matches_mode(sandbox_mode=True, api_url=prod)
-
-	def test_production_mode_rejects_sandbox_host(self) -> None:
 		with self.assertRaises(SupervielleIntegrationError):
 			assert_sandbox_url_matches_mode(sandbox_mode=False, api_url=SANDBOX_API_URL)
-
-	def test_sandbox_mode_allows_test_host(self) -> None:
-		assert_sandbox_url_matches_mode(sandbox_mode=True, api_url=SANDBOX_API_URL)
 		self.assertIn(SANDBOX_API_HOST, SANDBOX_API_URL)
-
-	def test_extract_url_and_id_from_response(self) -> None:
-		url, tid = extract_boton_pago_result(
-			{"UrlBotonPago": "https://pago.example/abc", "IdTransaccion": "TX-99"}
-		)
-		self.assertEqual(url, "https://pago.example/abc")
-		self.assertEqual(tid, "TX-99")
-
-	def test_extract_id_without_url(self) -> None:
-		url, tid = extract_boton_pago_result({"IdOperacion": "OP-1"})
-		self.assertIsNone(url)
-		self.assertEqual(tid, "OP-1")
-
-	def test_extract_without_url_or_id_raises(self) -> None:
-		with self.assertRaises(SupervielleIntegrationError):
-			extract_boton_pago_result({"Mensaje": "ok"})

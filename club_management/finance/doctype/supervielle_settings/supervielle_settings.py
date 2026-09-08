@@ -11,3 +11,10 @@ class SupervielleSettings(Document):
 	cuit_emisor: str
 	api_url: str
 	concepto_default: str
+	url_ok: str
+	url_error: str
+	convenio: str
+	rendicion_api_url: str
+	rendicion_apply_enabled: int
+	mode_of_payment: str
+	clearing_account: str | None

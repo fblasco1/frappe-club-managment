@@ -10,6 +10,7 @@
  "editable_grid": 0,
  "engine": "InnoDB",
  "field_order": [
+  "merchant_transaction_id",
   "gateway_transaction_id",
   "provider",
   "status",
@@ -27,13 +28,21 @@
  ],
  "fields": [
   {
+   "fieldname": "merchant_transaction_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "ID transacción SICLUB",
+   "set_only_once": 1,
+   "unique": 1
+  },
+  {
    "fieldname": "gateway_transaction_id",
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "ID transacci\u00f3n gateway",
-   "reqd": 1,
-   "set_only_once": 1,
+   "reqd": 0,
    "unique": 1
   },
   {
@@ -78,8 +87,7 @@
    "fieldname": "payment_entry",
    "fieldtype": "Link",
    "label": "Payment Entry",
-   "options": "Payment Entry",
-   "set_only_once": 1
+   "options": "Payment Entry"
   },
   {
    "fieldname": "socio",

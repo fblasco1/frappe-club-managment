@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -78,6 +79,12 @@ class TestSupervielleSettingsAndPublicacion(MembersTestCase):
 		settings.cuit_emisor = SANDBOX_CUIT
 		settings.api_url = SANDBOX_API_URL
 		settings.concepto_default = SANDBOX_CONCEPTO
+		settings.url_ok = "https://gestion.icdpedroechague.com.ar/pago-ok"
+		settings.url_error = "https://gestion.icdpedroechague.com.ar/pago-error"
+		settings.convenio = "TODOS"
+		settings.rendicion_api_url = "https://cobranzaagiltst.supervielle.com.ar/rest/rendicion"
+		settings.mode_of_payment = frappe.db.get_value("Mode of Payment", {}, "name") or "Cash"
+		settings.clearing_account = frappe.db.get_value("Account", {"is_group": 0}, "name")
 		settings.secret_key = SANDBOX_SECRET
 		settings.save(ignore_permissions=True)
 		frappe.clear_document_cache("Supervielle Settings", "Supervielle Settings")
@@ -124,6 +131,12 @@ class TestSuperviellePublicacionInvoice(MembersTestCase):
 		settings.cuit_emisor = SANDBOX_CUIT
 		settings.api_url = SANDBOX_API_URL
 		settings.concepto_default = SANDBOX_CONCEPTO
+		settings.url_ok = "https://gestion.icdpedroechague.com.ar/pago-ok"
+		settings.url_error = "https://gestion.icdpedroechague.com.ar/pago-error"
+		settings.convenio = "TODOS"
+		settings.rendicion_api_url = "https://cobranzaagiltst.supervielle.com.ar/rest/rendicion"
+		settings.mode_of_payment = frappe.db.get_value("Mode of Payment", {}, "name") or "Cash"
+		settings.clearing_account = frappe.db.get_value("Account", {"is_group": 0}, "name")
 		settings.secret_key = SANDBOX_SECRET
 		settings.save(ignore_permissions=True)
 		frappe.clear_document_cache("Supervielle Settings", "Supervielle Settings")
@@ -154,23 +167,32 @@ class TestSuperviellePublicacionInvoice(MembersTestCase):
 
 		socio, inv = self._crear_factura()
 		session = MagicMock()
+		token = "SV-TOKEN-001"
+		response_hash = hashlib.sha256((token + SANDBOX_SECRET).encode("utf-8")).hexdigest()
 		session.post.return_value = _FakeResponse(
 			200,
-			{"UrlBotonPago": "https://pago.example/xyz", "IdTransaccion": "SV-TX-001"},
+			{
+				"AccessLink": "https://cobranzaagiltst.supervielle.com.ar/Clientes/Login?token=x",
+				"Token": token,
+				"Hash": response_hash,
+			},
 		)
 		result = publicar_boton_pago(inv.name, session=session)
-		self.assertEqual(result.url, "https://pago.example/xyz")
-		self.assertEqual(result.transaction_id, "SV-TX-001")
-		self.assertTrue(frappe.db.exists("Payment Log", {"gateway_transaction_id": "SV-TX-001"}))
-		log = frappe.get_doc("Payment Log", {"gateway_transaction_id": "SV-TX-001"})
+		self.assertIn("cobranzaagiltst.supervielle.com.ar", result.url)
+		self.assertTrue(result.transaction_id.startswith("SIC-"))
+		log = frappe.get_doc("Payment Log", {"merchant_transaction_id": result.transaction_id})
 		self.assertEqual(log.provider, "Banco Supervielle")
 		self.assertEqual(log.status, "Recibido")
+		self.assertFalse(log.gateway_transaction_id)
 		self.assertEqual(log.sales_invoice, inv.name)
 		self.assertEqual(log.socio, socio.name)
 		self.assertNotIn(SANDBOX_SECRET, frappe.as_json(log.payload_json or {}))
 		session.post.assert_called_once()
 		posted_url = session.post.call_args.args[0]
 		self.assertEqual(posted_url, SANDBOX_API_URL)
+		posted_payload = session.post.call_args.kwargs["json"]
+		self.assertEqual(posted_payload["DatoLibreEmp"], result.transaction_id)
+		self.assertNotIn("IdReferencia", posted_payload)
 
 	def test_error_http_registra_log_rechazado(self) -> None:
 		from club_management.integrations.supervielle.client import publicar_boton_pago
@@ -186,6 +208,32 @@ class TestSuperviellePublicacionInvoice(MembersTestCase):
 			pluck="name",
 		)
 		self.assertTrue(rechazados)
+
+	def test_reintento_reutiliza_dato_libre_y_payment_log(self) -> None:
+		from club_management.integrations.supervielle.client import publicar_boton_pago
+
+		_socio, inv = self._crear_factura(rate=100)
+		token = "SV-TOKEN-RETRY"
+		response_hash = hashlib.sha256((token + SANDBOX_SECRET).encode("utf-8")).hexdigest()
+		session = MagicMock()
+		session.post.return_value = _FakeResponse(
+			200,
+			{
+				"AccessLink": "https://cobranzaagiltst.supervielle.com.ar/account/Login?token=x",
+				"Token": token,
+				"Hash": response_hash,
+			},
+		)
+		first = publicar_boton_pago(inv.name, session=session)
+		second = publicar_boton_pago(inv.name, session=session)
+		self.assertEqual(first.transaction_id, second.transaction_id)
+		self.assertEqual(
+			frappe.db.count(
+				"Payment Log",
+				{"sales_invoice": inv.name, "provider": "Banco Supervielle"},
+			),
+			1,
+		)
 
 	def test_factura_pagada_no_publica(self) -> None:
 		from club_management.integrations.supervielle.client import publicar_boton_pago

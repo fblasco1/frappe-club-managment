@@ -1,0 +1,134 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-09-08 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "event_key",
+  "provider",
+  "merchant_transaction_id",
+  "gateway_transaction_id",
+  "status_code",
+  "status_description",
+  "state_changed_at",
+  "payment_log",
+  "payment_entry",
+  "processing_result",
+  "event_payload_json"
+ ],
+ "fields": [
+  {
+   "fieldname": "event_key",
+   "fieldtype": "Data",
+   "label": "Clave idempotente",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "provider",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Proveedor",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "merchant_transaction_id",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "ID transacción SICLUB",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "gateway_transaction_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "ID transacción gateway",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "status_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Código estado",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "status_description",
+   "fieldtype": "Data",
+   "label": "Estado",
+   "read_only": 1
+  },
+  {
+   "fieldname": "state_changed_at",
+   "fieldtype": "Datetime",
+   "label": "Fecha cambio estado",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "payment_log",
+   "fieldtype": "Link",
+   "label": "Payment Log",
+   "options": "Payment Log",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "label": "Payment Entry",
+   "options": "Payment Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "processing_result",
+   "fieldtype": "Data",
+   "label": "Resultado",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "event_payload_json",
+   "fieldtype": "Code",
+   "label": "Payload JSON sanitizado",
+   "options": "JSON",
+   "read_only": 1,
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-08 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Finance",
+ "name": "Payment Gateway Event",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 0,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "write": 0
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "read": 1,
+   "report": 1,
+   "role": "Tesoreria",
+   "write": 0
+  }
+ ],
+ "sort_field": "state_changed_at",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}
