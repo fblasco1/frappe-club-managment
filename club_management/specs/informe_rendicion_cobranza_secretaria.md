@@ -1,6 +1,14 @@
 # Spec: Informes de rendición de cobranza — Secretaría / cobradora
 
 **Épica:** 5.1 Caja diaria y rendición actividades (Club Echagüe)  
+
+## Scenario: vista unificada de pagos del día
+
+Given el informe consolidado `Cobranza por fechas`
+When Secretaría selecciona la vista `Pagos del día`
+Then la primera columna identifica al socio
+And el filtro de fecha se normaliza como un rango del mismo día
+And la vista de rendición conserva Concepto como primera columna.
 **Objetivo:** que Secretaría y la cobradora vean en Desk la recaudación **imputada** por concepto/actividad y los saldos pendientes, sin depender del Excel intermedio del informe manual.
 
 **Relacionado:** `carga_masiva_cobranzas.md`, `informe_concepto_cobranza.md`, `informe_pagos_del_dia.md`, `secretaria_workspace_panel_kpis.md`, `pagos_por_equipo.md`, `liquidacion_equipo_deuda_rango.md`

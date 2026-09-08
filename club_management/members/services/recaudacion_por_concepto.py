@@ -30,6 +30,7 @@ from club_management.members.services.socio_operaciones_secretaria import (
 from club_management.scripts.informe_concepto_cobranza import concepto_informe_desde_pe
 
 _AGRUPACIONES_VALIDAS = frozenset({"Cuota", "Arancel", "CTO COMP", "Federativa", "Otro"})
+VISTA_PAGOS_DIA = "Pagos del día"
 
 
 def _label_medio(mode: str) -> str:
@@ -447,6 +448,20 @@ def get_recaudacion_por_concepto_report_summary(
 def get_recaudacion_unificada_report_columns(
 	filters: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
+	if (filters or {}).get("vista") == VISTA_PAGOS_DIA:
+		columns = get_recaudacion_por_concepto_report_columns()
+		by_field = {column["fieldname"]: column for column in columns}
+		order = (
+			"socio_label",
+			"nro_socio",
+			"posting_date",
+			"concepto_informe",
+			"periodo",
+			"mode_of_payment",
+			"paid_amount",
+			"payment_entry",
+		)
+		return [by_field[fieldname] for fieldname in order]
 	return get_recaudacion_por_concepto_report_columns()
 
 
