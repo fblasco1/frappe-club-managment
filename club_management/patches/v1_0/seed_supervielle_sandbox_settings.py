@@ -8,6 +8,7 @@ from club_management.integrations.supervielle.payload import (
 	SANDBOX_API_URL,
 	SANDBOX_CONCEPTO,
 	SANDBOX_CUIT,
+	SANDBOX_RENDITION_URL,
 )
 
 
@@ -24,5 +25,15 @@ def execute() -> None:
 		settings.api_url = SANDBOX_API_URL
 	if not settings.concepto_default:
 		settings.concepto_default = SANDBOX_CONCEPTO
+	if not settings.url_ok:
+		settings.url_ok = "https://gestion.icdpedroechague.com.ar/pago-ok"
+	if not settings.url_error:
+		settings.url_error = "https://gestion.icdpedroechague.com.ar/pago-error"
+	if not settings.convenio:
+		settings.convenio = "TODOS"
+	if not settings.rendicion_api_url:
+		settings.rendicion_api_url = SANDBOX_RENDITION_URL
+	if not settings.mode_of_payment:
+		settings.mode_of_payment = "Cobros Plus (ARS)"
 	settings.sandbox_mode = 1
 	settings.save(ignore_permissions=True)

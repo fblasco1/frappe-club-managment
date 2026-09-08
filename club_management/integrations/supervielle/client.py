@@ -1,18 +1,20 @@
-"""Cliente HTTP Botón de Pago Supervielle Cobranza Ágil."""
+"""Cliente Botón de Pago Supervielle v2.6 con auditoría idempotente."""
 
 from __future__ import annotations
 
-import json
-import uuid
+import hashlib
 from dataclasses import dataclass
 from typing import Any
 
 import frappe
+import requests
 from frappe import _
-from frappe.utils import flt, getdate
+from frappe.utils import flt
 
-from club_management.finance.permissions import ensure_finance_panel_access
-from club_management.finance.services.payment_log import record_gateway_transaction
+from club_management.finance.services.payment_log import (
+	PROVIDER_SUPERVIELLE,
+	record_gateway_transaction,
+)
 from club_management.integrations.supervielle.payload import (
 	CheckoutSource,
 	SupervielleRuntimeSettings,
@@ -20,237 +22,202 @@ from club_management.integrations.supervielle.payload import (
 	build_checkout_payload,
 	extract_boton_pago_result,
 	sign_payload,
+	validate_response_hash,
 )
 from club_management.integrations.supervielle_api import SupervielleIntegrationError
 from club_management.members.services.cobranza_manual import _campo_socio_en
 
-try:
-	import requests
-except Exception:  # pragma: no cover
-	requests = None  # type: ignore[assignment]
-
-PROVIDER = "Banco Supervielle"
-DEFAULT_TIMEOUT_SECONDS = 10
+_TIMEOUT_SECONDS = 30
+_ALLOWED_ROLES = {"System Manager", "Tesoreria", "Secretaria"}
 
 
 @dataclass(frozen=True)
 class BotonPagoResult:
-	url: str | None
+	url: str
 	transaction_id: str
-	raw: dict[str, Any]
-	payment_log: str | None
+	response: dict[str, Any]
 
 
-def load_runtime_settings() -> SupervielleRuntimeSettings:
-	settings = frappe.get_single("Supervielle Settings")
-	secret = settings.get_password("secret_key") if settings.secret_key else ""
+def _get_secret(settings_doc: Any) -> str:
+	try:
+		secret = settings_doc.get_password("secret_key", raise_exception=False)
+	except TypeError:
+		secret = settings_doc.get_password("secret_key")
 	if not secret:
-		raise SupervielleIntegrationError("Falta secret_key en Supervielle Settings.")
-	api_url = (settings.api_url or "").strip()
-	if not api_url:
-		raise SupervielleIntegrationError("Falta api_url en Supervielle Settings.")
-	return SupervielleRuntimeSettings(
-		sandbox_mode=bool(int(settings.sandbox_mode or 0)),
-		secret_key=secret,
-		cuit_emisor=settings.cuit_emisor or "",
-		api_url=api_url,
-		concepto_default=settings.concepto_default or "PRUEBA",
+		frappe.throw(_("Falta Secret Key de Supervielle"), frappe.ValidationError)
+	return str(secret)
+
+
+def get_runtime_settings() -> SupervielleRuntimeSettings:
+	settings = frappe.get_single("Supervielle Settings")
+	runtime = SupervielleRuntimeSettings(
+		sandbox_mode=bool(settings.sandbox_mode),
+		secret_key=_get_secret(settings),
+		cuit_emisor=str(settings.cuit_emisor or "").strip(),
+		api_url=str(settings.api_url or "").strip(),
+		concepto_default=str(settings.concepto_default or "").strip(),
+		url_ok=str(settings.url_ok or "").strip(),
+		url_error=str(settings.url_error or "").strip(),
+		rendicion_api_url=str(settings.rendicion_api_url or "").strip(),
+		convenio=str(settings.convenio or "").strip(),
+		mode_of_payment=str(settings.mode_of_payment or "").strip(),
+		clearing_account=str(settings.clearing_account or "").strip(),
 	)
+	for fieldname in (
+		"cuit_emisor",
+		"api_url",
+		"concepto_default",
+		"url_ok",
+		"url_error",
+		"rendicion_api_url",
+		"convenio",
+		"mode_of_payment",
+		"clearing_account",
+	):
+		if not getattr(runtime, fieldname):
+			frappe.throw(
+				_("Falta configurar {0} en Supervielle Settings").format(fieldname),
+				frappe.ValidationError,
+			)
+	assert_sandbox_url_matches_mode(sandbox_mode=runtime.sandbox_mode, api_url=runtime.api_url)
+	assert_sandbox_url_matches_mode(
+		sandbox_mode=runtime.sandbox_mode,
+		api_url=runtime.rendicion_api_url,
+	)
+	return runtime
 
 
-def _socio_nombre_visible(socio: Any) -> str:
-	completo = (socio.get("nombre_completo") or "").strip()
-	if completo:
-		return completo
-	parts = [str(socio.get("apellido") or "").strip(), str(socio.get("nombre") or "").strip()]
-	return " ".join(p for p in parts if p)
-
-
-def checkout_source_from_invoice(sales_invoice: str) -> CheckoutSource:
-	invoice = frappe.get_doc("Sales Invoice", sales_invoice)
-	if int(invoice.docstatus or 0) != 1:
-		frappe.throw(_("La factura debe estar submitted para publicar el botón de pago."), frappe.ValidationError)
-
-	amount = flt(invoice.get("outstanding_amount"))
+def _load_checkout_source(sales_invoice_name: str) -> CheckoutSource:
+	if not frappe.db.exists("Sales Invoice", sales_invoice_name):
+		frappe.throw(_("Factura no encontrada"), frappe.DoesNotExistError)
+	invoice = frappe.get_doc("Sales Invoice", sales_invoice_name)
+	if invoice.docstatus != 1:
+		frappe.throw(_("La factura debe estar presentada"), frappe.ValidationError)
+	amount = flt(invoice.outstanding_amount)
 	if amount <= 0:
-		frappe.throw(_("La factura no tiene saldo para publicar en Supervielle."), frappe.ValidationError)
-
+		frappe.throw(_("La factura no tiene saldo pendiente"), frappe.ValidationError)
 	campo_socio = _campo_socio_en("Sales Invoice")
-	socio_name = (invoice.get(campo_socio) if campo_socio else None) or invoice.get("socio")
+	socio_name = invoice.get(campo_socio) if campo_socio else None
 	if not socio_name:
-		frappe.throw(_("La factura no tiene Socio vinculado."), frappe.ValidationError)
-
+		frappe.throw(_("La factura no está vinculada a un Socio"), frappe.ValidationError)
 	socio = frappe.get_doc("Socio", socio_name)
-	due = invoice.get("due_date") or invoice.get("posting_date")
+	numero = str(socio.get("numero_socio") or socio.name).strip()
+	dni = str(socio.get("dni") or socio.get("numero_documento") or "").strip()
+	nombre = str(socio.get("nombre_completo") or socio.get("nombre") or socio.name).strip()
+	email = str(socio.get("email") or socio.get("email_id") or "").strip()
 	return CheckoutSource(
 		invoice_name=invoice.name,
-		amount=float(amount),
-		due_date=str(getdate(due)),
-		numero_socio=str(socio.get("numero_socio") or socio.name),
+		amount=amount,
+		due_date=str(invoice.due_date or invoice.posting_date),
+		numero_socio=numero,
+		dni=dni,
 		socio_name=socio.name,
-		socio_nombre=_socio_nombre_visible(socio),
-		email=str(socio.get("email") or ""),
-		periodo_cobro=invoice.get("periodo_cobro") or invoice.get("custom_periodo_cobro"),
+		socio_nombre=nombre,
+		email=email,
 	)
 
 
-def _audit_payload(request_body: dict[str, Any], response_body: Any, http_status: int | None) -> dict[str, Any]:
-	safe_request = dict(request_body)
-	safe_request.pop("Hash", None)
-	safe_request.pop("hash", None)
-	return {
-		"request": safe_request,
-		"response": response_body,
-		"http_status": http_status,
-	}
+def _new_merchant_transaction_id(source: CheckoutSource) -> str:
+	digest = hashlib.sha256(source.invoice_name.encode("utf-8")).hexdigest()[:26]
+	return f"SIC-{digest}"
 
 
-def _record_attempt(
+def _existing_merchant_transaction_id(source: CheckoutSource) -> str | None:
+	rows = frappe.get_all(
+		"Payment Log",
+		filters={
+			"provider": PROVIDER_SUPERVIELLE,
+			"sales_invoice": source.invoice_name,
+			"currency": "ARS",
+		},
+		fields=["merchant_transaction_id", "gateway_transaction_id", "amount"],
+		order_by="creation desc",
+		limit=5,
+	)
+	for row in rows:
+		if (
+			row.merchant_transaction_id
+			and not row.gateway_transaction_id
+			and abs(flt(row.amount) - flt(source.amount)) <= 0.005
+		):
+			return str(row.merchant_transaction_id)
+	return None
+
+
+def _sanitized_request(payload: dict[str, Any]) -> dict[str, Any]:
+	return {key: value for key, value in payload.items() if key not in {"Hash", "Token", "AccessLink"}}
+
+
+def _reject_log(log: Any, message: str) -> None:
+	log.status = "Rechazado"
+	log.error_message = str(message)[:2000]
+	log.save(ignore_permissions=True)
+
+
+def _post_json(url: str, payload: dict[str, Any], *, session: Any | None = None) -> Any:
+	client = session or requests
+	try:
+		return client.post(url, json=payload, timeout=_TIMEOUT_SECONDS)
+	except requests.RequestException as exc:
+		raise SupervielleIntegrationError("No se pudo conectar con Supervielle.") from exc
+
+
+def publicar_boton_pago(
+	sales_invoice_name: str,
 	*,
-	transaction_id: str,
-	invoice_name: str,
-	socio_name: str,
-	amount: float,
-	payload: dict[str, Any],
-	status: str,
-) -> str:
-	doc = record_gateway_transaction(
-		gateway_transaction_id=transaction_id,
-		provider=PROVIDER,
-		gateway_reference=invoice_name,
-		sales_invoice=invoice_name,
-		socio=socio_name,
-		amount=amount,
-		payload=payload,
-		status=status,
+	session: Any | None = None,
+) -> BotonPagoResult:
+	settings = get_runtime_settings()
+	source = _load_checkout_source(sales_invoice_name)
+	merchant_id = _existing_merchant_transaction_id(source) or _new_merchant_transaction_id(source)
+	base_payload = build_checkout_payload(source, settings, merchant_id)
+	signed_payload = sign_payload(base_payload, settings.secret_key)
+	log = record_gateway_transaction(
+		merchant_transaction_id=merchant_id,
+		provider=PROVIDER_SUPERVIELLE,
+		gateway_reference=source.invoice_name,
+		status="Recibido",
+		amount=source.amount,
+		currency="ARS",
+		sales_invoice=source.invoice_name,
+		socio=source.socio_name,
+		payload=_sanitized_request(signed_payload),
 		ignore_permissions=True,
 	)
-	return doc.name
-
-
-def _post_publicacion(
-	*,
-	api_url: str,
-	body: dict[str, Any],
-	session: Any | None,
-	timeout: float = DEFAULT_TIMEOUT_SECONDS,
-) -> tuple[int, dict[str, Any], str]:
-	sess = session
-	if sess is None:
-		if requests is None:
+	if log.status != "Recibido":
+		log.status = "Recibido"
+		log.save(ignore_permissions=True)
+	try:
+		response = _post_json(settings.api_url, signed_payload, session=session)
+		if int(response.status_code) < 200 or int(response.status_code) >= 300:
 			raise SupervielleIntegrationError(
-				"Dependencia 'requests' no disponible para integrar con Supervielle."
+				f"Supervielle respondió HTTP {response.status_code}."
 			)
-		sess = requests.Session()
-	try:
-		resp = sess.post(api_url, json=body, timeout=timeout)
+		try:
+			data = response.json()
+		except (TypeError, ValueError) as exc:
+			raise SupervielleIntegrationError("Supervielle devolvió JSON inválido.") from exc
+		if not isinstance(data, dict):
+			raise SupervielleIntegrationError("Respuesta Supervielle inválida.")
+		validate_response_hash(data, settings.secret_key)
+		url, token = extract_boton_pago_result(data, sandbox_mode=settings.sandbox_mode)
 	except Exception as exc:
-		frappe.log_error(
-			title="Supervielle API Error",
-			message=json.dumps({"url": api_url, "exception": repr(exc)}, ensure_ascii=False),
-		)
-		raise SupervielleIntegrationError("Error de red al llamar a Supervielle.") from exc
-
-	status_code = int(getattr(resp, "status_code", 0) or 0)
-	text = getattr(resp, "text", "") or ""
-	try:
-		data = resp.json()
-	except Exception:
-		data = {"raw": text}
-	if not isinstance(data, dict):
-		data = {"raw": data}
-	return status_code, data, text
+		_reject_log(log, str(exc))
+		if isinstance(exc, SupervielleIntegrationError):
+			raise
+		raise SupervielleIntegrationError("Falló la publicación en Supervielle.") from exc
+	return BotonPagoResult(url=url, transaction_id=merchant_id, response={"status": "ok"})
 
 
-def _is_business_error(data: dict[str, Any]) -> bool:
-	if data.get("error") or data.get("errors") or data.get("error_code") or data.get("codigo_error"):
-		return True
-	codigo = data.get("CodigoResultado")
-	if codigo is None:
-		codigo = data.get("codigoResultado")
-	if codigo is None:
-		return False
-	try:
-		return int(codigo) != 0
-	except (TypeError, ValueError):
-		return str(codigo).strip() not in {"0", "OK", "ok"}
-
-
-def publicar_boton_pago(sales_invoice: str, *, session: Any | None = None) -> BotonPagoResult:
-	"""Publica la deuda de una Sales Invoice y registra Payment Log."""
-	settings = load_runtime_settings()
-	assert_sandbox_url_matches_mode(sandbox_mode=settings.sandbox_mode, api_url=settings.api_url)
-	source = checkout_source_from_invoice(sales_invoice)
-	unsigned = build_checkout_payload(source, settings)
-	body = sign_payload(unsigned, settings.secret_key)
-
-	status_code, data, _text = _post_publicacion(
-		api_url=settings.api_url,
-		body=body,
-		session=session,
-	)
-	audit = _audit_payload(body, data, status_code)
-
-	if status_code != 200 or _is_business_error(data):
-		attempt_id = f"PUB-{source.invoice_name}-{uuid.uuid4().hex[:12]}"
-		_record_attempt(
-			transaction_id=attempt_id,
-			invoice_name=source.invoice_name,
-			socio_name=source.socio_name,
-			amount=source.amount,
-			payload=audit,
-			status="Rechazado",
-		)
-		frappe.log_error(
-			title="Supervielle API Error",
-			message=json.dumps({"url": settings.api_url, "status_code": status_code, "response": data}, ensure_ascii=False),
-		)
-		raise SupervielleIntegrationError(
-			f"Supervielle respondió HTTP {status_code or 'desconocido'}."
-		)
-
-	try:
-		url, bank_id = extract_boton_pago_result(data)
-	except SupervielleIntegrationError:
-		attempt_id = f"PUB-{source.invoice_name}-{uuid.uuid4().hex[:12]}"
-		_record_attempt(
-			transaction_id=attempt_id,
-			invoice_name=source.invoice_name,
-			socio_name=source.socio_name,
-			amount=source.amount,
-			payload=audit,
-			status="Rechazado",
-		)
-		raise
-
-	transaction_id = bank_id or f"PUB-{source.invoice_name}-{uuid.uuid4().hex[:12]}"
-	log_name = _record_attempt(
-		transaction_id=transaction_id,
-		invoice_name=source.invoice_name,
-		socio_name=source.socio_name,
-		amount=source.amount,
-		payload=audit,
-		status="Recibido",
-	)
-	return BotonPagoResult(
-		url=url,
-		transaction_id=transaction_id,
-		raw=data,
-		payment_log=log_name,
-	)
+def _ensure_publish_permission(sales_invoice_name: str) -> None:
+	if not _ALLOWED_ROLES.intersection(frappe.get_roles()):
+		frappe.throw(_("No autorizado para publicar cobros"), frappe.PermissionError)
+	if not frappe.has_permission("Sales Invoice", ptype="read", doc=sales_invoice_name):
+		frappe.throw(_("Sin permiso sobre la factura"), frappe.PermissionError)
 
 
 @frappe.whitelist()
-def publicar_boton_pago_factura(sales_invoice: str) -> dict[str, Any]:
-	"""Publica botón de pago para una factura. Requiere panel Finanzas + lectura SI."""
-	ensure_finance_panel_access()
-	if not sales_invoice:
-		frappe.throw(_("Falta Sales Invoice"), frappe.ValidationError)
-	if not frappe.has_permission("Sales Invoice", ptype="read", doc=sales_invoice):
-		frappe.throw(_("No autorizado"), frappe.PermissionError)
-	result = publicar_boton_pago(sales_invoice)
-	return {
-		"url": result.url,
-		"transaction_id": result.transaction_id,
-		"payment_log": result.payment_log,
-	}
+def publicar_boton_pago_factura(sales_invoice_name: str) -> dict[str, Any]:
+	_ensure_publish_permission(sales_invoice_name)
+	result = publicar_boton_pago(sales_invoice_name)
+	return {"url": result.url, "transaction_id": result.transaction_id}
