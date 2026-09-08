@@ -1,0 +1,90 @@
+{
+ "actions": [],
+ "allow_import": 0,
+ "allow_rename": 0,
+ "creation": "2026-09-07 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Setup",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sandbox_mode",
+  "secret_key",
+  "cuit_emisor",
+  "api_url",
+  "concepto_default"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "description": "Con sandbox activo solo se publica contra cobranzaagiltst.supervielle.com.ar.",
+   "fieldname": "sandbox_mode",
+   "fieldtype": "Check",
+   "label": "Modo sandbox",
+   "reqd": 0
+  },
+  {
+   "fieldname": "secret_key",
+   "fieldtype": "Password",
+   "label": "Secret Key",
+   "reqd": 0
+  },
+  {
+   "default": "20406381928",
+   "fieldname": "cuit_emisor",
+   "fieldtype": "Data",
+   "label": "CUIT emisor",
+   "reqd": 1
+  },
+  {
+   "default": "https://cobranzaagiltst.supervielle.com.ar/rest/botonpago/publicacion",
+   "fieldname": "api_url",
+   "fieldtype": "Data",
+   "label": "API URL",
+   "reqd": 1
+  },
+  {
+   "default": "PRUEBA",
+   "fieldname": "concepto_default",
+   "fieldtype": "Data",
+   "label": "Concepto default",
+   "reqd": 1
+  }
+ ],
+ "idx": 0,
+ "issingle": 1,
+ "is_single": 1,
+ "is_submittable": 0,
+ "links": [],
+ "module": "Finance",
+ "name": "Supervielle Settings",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Tesoreria",
+   "write": 0
+  }
+ ],
+ "quick_entry": 0,
+ "read_only": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

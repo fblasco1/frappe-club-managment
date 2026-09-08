@@ -1,8 +1,10 @@
 # Spec: Payment Log (IDs inmutables — Cobrand / Banco Supervielle)
 
-**Estado:** diseño inicial de persistencia. **No** define ni inventa endpoints HTTP de Cobrand ni de Banco Supervielle; esas URLs se cablearán cuando el equipo cargue la documentación de API.
+**Estado:** implementación inicial (2026-09-07). Canal: Cobrand + Banco Supervielle. **SIRO no aplica.**
 
-**Canal online:** Cobrand + Banco Supervielle. **SIRO no aplica.**
+El webhook legado (`supervielle_webhook.py`) hoy busca la factura por `reference`. Este DocType es el mapa `gateway_transaction_id` → factura; **no** cambia el contrato de hash SHA-256 ya especificado.
+
+La publicación de Botón de Pago (`specs/supervielle_boton_pago.md`) **también** escribe un Payment Log por intento (`provider = Banco Supervielle`, snapshot request/response en `payload_json`).
 
 **Ruta en Bench:** `apps/club_management/club_management/specs/payment_log.md`
 
@@ -127,5 +129,4 @@ And no se documentan flujos SIRO
 ## Fuera de alcance (esta entrega)
 
 - Botón «Pagar» en portal o wizard de alta.
-- Llamadas REST a Cobrand / Supervielle.
 - Cambio del webhook más allá de *consultar* este log cuando se cablee el `cod_trx`.
