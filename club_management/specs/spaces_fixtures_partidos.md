@@ -201,17 +201,40 @@ And la planilla refleja los partidos el día correspondiente.
 - Campo nuevo opcional `equipo`: nombre del plantel en FMV (para reglas Cancha 1 vs 2).
 - Upsert clave: `(origen_fixture, id_externo_fixture)`.
 
-**Estado:** spec detallada — **lista**; adaptador `fmv_voley.py` en SICLUB — **pendiente**;
-extractor externo [`fmv_voley_ges`](https://github.com/fblasco1/fmv_voley_ges) — **implementado**.
+**Estado:** adaptador SICLUB y extractor externo — **implementados y publicados (2026-09-07)**.
+El JSON canónico está disponible en la rama `main`; `dev.localhost` tiene
+`fmv_voley_fixture_sync_enabled = true` y la prueba live resultó idempotente
+(2 locales importados, 1 visitante omitido).
 
-### Scenario (pendiente): import fixtures de ligas desde Excel
+### Scenario: import fixtures de ligas desde Excel (SP-2)
 
-Given un Excel de liga con columnas mínimas (fecha, hora, espacio/equipo, rival, categoría)
-When Coordinación sube el archivo desde Desk con preview
-Then se validan filas, se mapean espacios y se upsertean reservas idempotentemente
-And un informe lista errores/omitidos sin duplicar Confirmada existente.
+Given un Excel (`.xlsx`) con hoja `Fixture` o la primera hoja y columnas canónicas:
 
-**Estado:** plantilla + parser — **pendiente (SP-2)**.
+| Columna | Requerida | Notas |
+|---------|-----------|-------|
+| `fecha` | sí | `DD/MM/YYYY` o ISO |
+| `hora_inicio` | sí | Inicio aproximado del partido |
+| `hora_fin` | sí | Fin aproximado del partido |
+| `espacio` | sí | Nombre SICLUB o alias `GIMNASIO N` / `CANCHA N` |
+| `categoria` | sí | Categoría deportiva |
+| `tira` | sí | Tira / nivel / división |
+| `rival` | sí | Club rival |
+
+La planilla operativa no expone campos técnicos. SICLUB fija internamente
+`origen = liga_excel` y `localia = Local`, genera `id_externo` determinístico
+a partir de los datos del partido y deriva `equipo` como la conjunción
+`tira + categoria`.
+
+When Coordinación sube el archivo desde Desk (`preview_fixtures_excel`)
+Then se listan filas OK y errores **sin escribir** en BD
+And antes de seleccionar el archivo puede descargar `plantilla_fixture_ligas.xlsx`
+And la plantilla contiene las columnas canónicas y filas de ejemplo editables
+When confirma (`apply_fixtures_excel`)
+Then se upsertean `Reserva Espacio` Confirmada por `(origen_fixture, id_externo_fixture)`
+And un informe lista omitidos / errores / superposiciones
+And reimportar el mismo archivo no duplica filas.
+
+**Estado:** plantilla + parser Desk — **implementado (2026-09-07)**.
 
 ---
 
@@ -274,7 +297,8 @@ spaces/
     febamba_ges_sample.json
     sources/
       febamba_ges.py     # lee JSON del Action formativas_ges
-  api/fixtures_desk.py   # whitelist: import_fixtures_json, sync_fixtures_febamba, import_fixtures_csv
+  api/fixtures_desk.py   # whitelist: import_fixtures_json, sync_fixtures_febamba, sync_fixtures_fmv,
+                         # preview_fixtures_excel, apply_fixtures_excel, import_fixtures_csv
 ```
 
 **Implementado (2026-08-26):** upsert + JSON FeBAMBA + CSV + API Desk.
@@ -332,7 +356,7 @@ club_management.spaces.api.fixtures_desk.import_fixtures_json
 ## UI Desk (fase posterior al MVP CSV)
 
 - Workspace **Espacios** → «Importar partidos» (CSV + preview + informe).
-- Botón «Sincronizar FeBAMBA» (solo si source habilitado).
+- Botones planilla: «Sincronizar FeBAMBA», «Sincronizar FMV», «Importar Excel ligas».
 - Listado de reservas con filtro `origen` / próximos partidos.
 
 ---
@@ -342,8 +366,8 @@ club_management.spaces.api.fixtures_desk.import_fixtures_json
 1. **Upsert común** + CSV manual partidos (MVP). — **[x] hecho**
 2. **Consumir JSON** de `formativas_ges` (`ID_PARTIDO`, solo `LOCALIA=Local`). — **[x] hecho**
 3. Cron Desk + botón planilla + `site_config` opcional. — **[x] hecho**
-4. **FMV (Vóley)** — adaptador + sync (SP-1). — **[ ] pendiente**
-5. **Fixtures ligas en Excel** — import Desk con plantilla acordada (SP-2). — **[ ] pendiente**
+4. **FMV (Vóley)** — adaptador + sync (SP-1). — **[x] hecho**
+5. **Fixtures ligas en Excel** — import Desk con plantilla acordada (SP-2). — **[x] hecho**
 6. Otras federaciones (futsal, etc.) según prioridad deportiva.
 
 ---

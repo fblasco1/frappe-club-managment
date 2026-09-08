@@ -173,6 +173,7 @@ scheduler_events = {
 		# 08:00 y 20:00 ART (UTC-3) — alineado al cron formativas_ges
 		"0 11,23 * * *": [
 			"club_management.spaces.fixtures.sources.febamba_ges.sync_febamba_ges_scheduled",
+			"club_management.spaces.fixtures.sources.fmv_voley.sync_fmv_voley_scheduled",
 		],
 	},
 }

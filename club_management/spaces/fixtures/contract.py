@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 ORIGIN_FEBAMBA_GES = "febamba_ges"
+ORIGIN_FMV_VOLEY = "fmv_voley"
+ORIGIN_LIGA_EXCEL = "liga_excel"
 ORIGIN_MANUAL = "manual"
 
 LOCALIA_LOCAL = "local"
@@ -29,28 +31,31 @@ class FixturePartido:
 	resultado: str = ""
 	espacio: str | None = None
 	motivo: str = ""
+	equipo: str = ""
 
 	@classmethod
 	def from_mapping(cls, raw: dict[str, Any]) -> FixturePartido:
-		"""Parsea dict del contrato JSON o fila CSV normalizada."""
+		"""Parsea dict del contrato JSON o fila CSV/Excel normalizada."""
 		source = (raw.get("source") or raw.get("origen") or ORIGIN_MANUAL).strip()
 		external_id = str(
 			raw.get("external_id") or raw.get("id_externo") or raw.get("ID_PARTIDO") or ""
 		).strip()
+		espacio_raw = raw.get("espacio") if "espacio" in raw else raw.get("ESPACIO")
 		return cls(
 			source=source,
 			external_id=external_id,
 			fecha=str(raw.get("fecha") or raw.get("FECHA") or "").strip(),
 			hora_desde=str(raw.get("hora_desde") or raw.get("hora") or raw.get("HORA") or "").strip(),
-			hora_hasta=str(raw.get("hora_hasta") or "").strip(),
+			hora_hasta=str(raw.get("hora_hasta") or raw.get("HORA_HASTA") or "").strip(),
 			categoria=str(raw.get("categoria") or raw.get("CATEGORIA") or "").strip(),
 			tira=str(raw.get("tira") or raw.get("TIRA") or "").strip(),
 			rival=str(raw.get("rival") or raw.get("RIVAL") or "").strip(),
 			localia=str(raw.get("localia") or raw.get("LOCALIA") or "").strip(),
 			direccion=str(raw.get("direccion") or raw.get("DIRECCION") or "").strip(),
 			resultado=str(raw.get("resultado") or raw.get("RESULTADO") or "").strip(),
-			espacio=(raw.get("espacio") or raw.get("ESPACIO") or None),
-			motivo=str(raw.get("motivo") or "").strip(),
+			espacio=None if espacio_raw is None else str(espacio_raw).strip() or None,
+			motivo=str(raw.get("motivo") or raw.get("MOTIVO") or "").strip(),
+			equipo=str(raw.get("equipo") or raw.get("EQUIPO") or "").strip(),
 		)
 
 
