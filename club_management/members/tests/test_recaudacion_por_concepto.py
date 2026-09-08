@@ -34,7 +34,7 @@ from club_management.members.test_helpers import MembersTestCase, insert_socio, 
 class TestRecaudacionPorConcepto(MembersTestCase):
 	_DESDE = "2020-04-01"
 	_HASTA = "2020-04-30"
-	_DIA_COBRO = "2020-04-15"
+	_DIA_COBRO = "2020-04-05"
 	_PERIODO = "04/2020"
 
 	def setUp(self) -> None:
@@ -66,6 +66,8 @@ class TestRecaudacionPorConcepto(MembersTestCase):
 					"standard_rate": rate,
 				}
 			).insert(ignore_permissions=True)
+		elif item_name:
+			frappe.db.set_value("Item", code, "item_name", item_name, update_modified=False)
 		return code
 
 	def _crear_si(
@@ -126,7 +128,11 @@ class TestRecaudacionPorConcepto(MembersTestCase):
 			categoria="Activo",
 		)
 		cambiar_estado(socio.name, "Activo", motivo="Test recaudación concepto")
-		item_cuota = self._ensure_item("ICDPE-CUOTA-SOCIAL", 31000)
+		item_cuota = self._ensure_item(
+			"ICDPE-CUOTA-SOCIAL",
+			31000,
+			item_name="Cuota Social Activo",
+		)
 		item_arancel = self._ensure_item("ICDPE-BASQUET-ESCUELITA", 24150, item_name="Básquet Escuelita")
 		si_c = self._crear_si(
 			socio.name,
@@ -167,27 +173,31 @@ class TestRecaudacionPorConcepto(MembersTestCase):
 
 		self.assertAlmostEqual(flt(informe["total"]), total_c + total_a)
 		por_concepto = {row["concepto"]: flt(row["total"]) for row in informe["por_concepto"]}
-		self.assertAlmostEqual(por_concepto.get("Cuota Social Activo", 0), total_c)
-		self.assertAlmostEqual(por_concepto.get("Adicional Basquet Escuelita", 0), total_a)
+		self.assertAlmostEqual(por_concepto.get("CUOTA SOCIAL ACTIVO", 0), total_c)
+		self.assertAlmostEqual(por_concepto.get("Básquet Escuelita", 0), total_a)
 		self.assertAlmostEqual(
 			sum(flt(row["total"]) for row in informe["por_concepto"]),
 			flt(informe["total"]),
 		)
 
 		conceptos_linea = {row["concepto_informe"] for row in informe["lineas"]}
-		self.assertIn("Cuota Social Activo", conceptos_linea)
-		self.assertIn("Adicional Basquet Escuelita", conceptos_linea)
+		self.assertIn("CUOTA SOCIAL ACTIVO", conceptos_linea)
+		self.assertIn("Básquet Escuelita", conceptos_linea)
 
 		summary_labels = [row["label"] for row in summary]
 		self.assertEqual(summary_labels[0], "Total recaudado")
 		self.assertTrue(
-			any("Total Cuota Social Activo" in str(row.get("concepto_informe") or "") for row in data)
+			any("Total CUOTA SOCIAL ACTIVO" in str(row.get("concepto_informe") or "") for row in data)
 		)
 
 	def test_filtro_solo_cuotas_sociales(self) -> None:
 		socio = insert_socio(dni="99440002", email="rec.solo.cuota@example.com", categoria="Menor")
 		cambiar_estado(socio.name, "Activo", motivo="Test solo cuota")
-		item_cuota = self._ensure_item("ICDPE-CUOTA-SOCIAL-MENOR-TEST", 28500)
+		item_cuota = self._ensure_item(
+			"ICDPE-CUOTA-SOCIAL-MENOR-TEST",
+			28500,
+			item_name="Cuota Social Menor",
+		)
 		item_arancel = self._ensure_item("ICDPE-TEST-ARANCEL-REC", 5000)
 		si_c = self._crear_si(socio.name, item_cuota, 28500, description="Cuota Social Menor")
 		si_a = self._crear_si(socio.name, item_arancel, 5000, description="Arancel test")
@@ -220,7 +230,7 @@ class TestRecaudacionPorConcepto(MembersTestCase):
 
 		self.assertAlmostEqual(flt(informe["total"]), total_c)
 		conceptos = {row["concepto_informe"] for row in informe["lineas"]}
-		self.assertIn("Cuota Social Menor", conceptos)
+		self.assertIn("CUOTA SOCIAL MENOR", conceptos)
 		self.assertFalse(any("Arancel" in c for c in conceptos))
 
 	def test_si_mixta_imputa_por_concepto_pe_no_prorratea(self) -> None:
@@ -233,7 +243,11 @@ class TestRecaudacionPorConcepto(MembersTestCase):
 
 		socio = insert_socio(dni="99440004", email="rec.mixta@example.com", categoria="Menor")
 		cambiar_estado(socio.name, "Activo", motivo="Test SI mixta recaudación")
-		item_cuota = self._ensure_item("ICDPE-CUOTA-SOCIAL", 28500)
+		item_cuota = self._ensure_item(
+			"ICDPE-CUOTA-SOCIAL",
+			28500,
+			item_name="Cuota Social Menor",
+		)
 		item_arancel = self._ensure_item("ICDPE-VOLEY-FEDERADO", 24150, item_name="Voley federado")
 		campo = _campo_socio_en(SALES_INVOICE_DOCTYPE)
 		campo_periodo = _campo_periodo_cobro()
@@ -273,7 +287,7 @@ class TestRecaudacionPorConcepto(MembersTestCase):
 			frappe.set_user("Administrator")
 
 		por_concepto = {row["concepto"]: flt(row["total"]) for row in informe["por_concepto"]}
-		self.assertAlmostEqual(por_concepto.get("Cuota Social Menor", 0), 28500.0)
+		self.assertAlmostEqual(por_concepto.get("CUOTA SOCIAL MENOR", 0), 28500.0)
 		self.assertAlmostEqual(por_concepto.get("Adicional Voley Menor", 0), 0.0)
 
 	def test_filtro_periodo_cobro(self) -> None:
