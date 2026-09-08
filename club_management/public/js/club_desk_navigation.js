@@ -149,6 +149,7 @@
 		secretaria: "Secretaría",
 
 		"gestion-de-actividades": "Gestión de Actividades",
+		"gestión-de-actividades": "Gestión de Actividades",
 
 		"gestion-de-socios": "Secretaría",
 
@@ -201,6 +202,10 @@
 		if (route.length === 1 && route[0]) {
 
 			const key = this.workspace_slug(route[0]);
+			const alias = this.SLUG_ALIASES[key];
+			if (alias) {
+				return alias;
+			}
 
 			if (key && frappe.workspaces?.[key]) {
 

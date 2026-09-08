@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import frappe
 
 from club_management.activities.api.gestion_actividades_workspace import get_dashboard
@@ -16,6 +18,35 @@ from club_management.activities.services.gestion_actividades_dashboard import (
 	count_inscripciones_activas,
 )
 from club_management.members.test_helpers import MembersTestCase, insert_socio, make_secretaria_user
+
+
+class TestGestionActividadesDashboardAssets(MembersTestCase):
+	def test_ruta_corta_reconoce_alias_antes_de_cargar_workspaces(self) -> None:
+		path = Path(
+			frappe.get_app_path(
+				"club_management",
+				"public",
+				"js",
+				"club_desk_navigation.js",
+			)
+		)
+		source = path.read_text(encoding="utf-8")
+		self.assertIn('"gestión-de-actividades": "Gestión de Actividades"', source)
+		self.assertIn("this.SLUG_ALIASES[key]", source)
+
+	def test_seccion_informes_boot_declara_collapsible(self) -> None:
+		path = Path(
+			frappe.get_app_path(
+				"club_management",
+				"public",
+				"js",
+				"actividades_sidebar_boot.js",
+			)
+		)
+		source = path.read_text(encoding="utf-8")
+		section_start = source.index('label: __("Informes")')
+		section_end = source.index("},", section_start)
+		self.assertIn("collapsible: 1", source[section_start:section_end])
 
 
 class TestGestionActividadesDashboardKpis(MembersTestCase):
