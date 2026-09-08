@@ -60,6 +60,17 @@ class TestEventoClubSocialImport(MembersTestCase):
 					"habilitado": 1,
 				}
 			).insert(ignore_permissions=True)
+		for name in frappe.get_all(
+			"Reserva Espacio",
+			filters={
+				"espacio": "SALA ALBAMONTE",
+				"tipo": "Evento club",
+				"estado": "Confirmada",
+				"motivo": "CENA SEMANAL VITALICIOS",
+			},
+			pluck="name",
+		):
+			frappe.delete_doc("Reserva Espacio", name, force=True, ignore_permissions=True)
 
 		# Solo viernes para acotar
 		import csv

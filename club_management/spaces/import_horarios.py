@@ -230,7 +230,7 @@ def infer_tipo_sesion(espacio_raw: str, actividad: str) -> str:
 def match_actividad(actividad: str) -> str | None:
 	upper = (actividad or "").upper()
 	for needle, name in _ACTIVIDAD_KEYWORDS:
-		if needle in upper and frappe.db.exists("Actividad", name):
+		if needle in upper:
 			return name
 	return None
 
@@ -326,6 +326,11 @@ def _horario_row_dict(item: ImportRow) -> dict[str, Any]:
 	tipo = item.tipo_sesion
 	if tipo not in TIPOS_SESION:
 		tipo = "Entrenamiento"
+	linked_activity = (
+		item.actividad
+		if item.actividad and frappe.db.exists("Actividad", item.actividad)
+		else None
+	)
 	payload: dict[str, Any] = {
 		"dia_semana": item.dia,
 		"hora_desde": item.hora_desde,
@@ -333,10 +338,10 @@ def _horario_row_dict(item: ImportRow) -> dict[str, Any]:
 		"tipo_sesion": tipo,
 		"etiqueta": item.etiqueta,
 	}
-	if item.actividad:
-		payload["actividad"] = item.actividad
+	if linked_activity:
+		payload["actividad"] = linked_activity
 	payload["titulo"] = build_horario_titulo(
-		item.actividad,
+		linked_activity,
 		None,
 		None,
 		tipo_sesion=tipo,

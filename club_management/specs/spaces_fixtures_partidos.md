@@ -275,6 +275,18 @@ Given un envelope FMV pertenece a otro club, repite IDs o contiene filas sin cam
 When se valida antes de importar
 Then se rechaza el envelope completo sin escrituras parciales.
 
+### Scenario: importación de la grilla es determinística
+
+Given una etiqueta `BASQUET FEMENINO`, `ESCUELITA` o `PATIN`
+When se convierte la planilla semanal
+Then el mapeo de Actividad no depende de qué registros hayan quedado en la base de test
+And los nombres canónicos específicos tienen prioridad sobre categorías genéricas.
+
+Given un evento social recurrente ya existe
+When se reimporta la misma grilla
+Then no se duplica la Reserva Espacio
+And la prueba de creación parte de un estado aislado y verificable.
+
 ---
 
 ## Fuente concreta: fmv_voley_ges → JSON
