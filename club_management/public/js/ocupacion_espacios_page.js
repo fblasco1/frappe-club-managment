@@ -113,7 +113,7 @@
 
 		_open_excel_uploader() {
 			new frappe.ui.FileUploader({
-				restrictions: { allowed_file_types: [".xlsx", ".xls"] },
+				restrictions: { allowed_file_types: [".xlsx"] },
 				on_success: (file_doc) => {
 					const file_url = file_doc.file_url;
 					frappe.call({
@@ -159,6 +159,12 @@
 			if ((rep.superposiciones || []).length) {
 				parts.push(__("Superposiciones: {0}", [rep.superposiciones.length]));
 			}
+			if ((rep.omitidos || []).length) {
+				parts.push(__("Omitidos: {0}", [rep.omitidos.length]));
+			}
+			if ((rep.errores || []).length) {
+				parts.push(__("Errores: {0}", [rep.errores.length]));
+			}
 			frappe.show_alert({
 				message: parts.join(" · "),
 				indicator: rep.errores?.length ? "orange" : "green",
@@ -169,6 +175,17 @@
 					message: `<ul>${rep.superposiciones
 						.slice(0, 15)
 						.map((s) => `<li>${frappe.utils.escape_html(s)}</li>`)
+						.join("")}</ul>`,
+					indicator: "orange",
+				});
+			}
+			const issues = [...(rep.errores || []), ...(rep.omitidos || [])];
+			if (issues.length) {
+				frappe.msgprint({
+					title: __("Filas no importadas"),
+					message: `<ul>${issues
+						.slice(0, 30)
+						.map((item) => `<li>${frappe.utils.escape_html(item)}</li>`)
 						.join("")}</ul>`,
 					indicator: "orange",
 				});

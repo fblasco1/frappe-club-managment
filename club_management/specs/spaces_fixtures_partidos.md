@@ -236,6 +236,45 @@ And reimportar el mismo archivo no duplica filas.
 
 **Estado:** plantilla + parser Desk — **implementado (2026-09-07)**.
 
+### Scenario: fuentes y archivos de fixture fallan cerrados
+
+Given Coordinación o Secretaría solicita una sincronización FMV/FeBAMBA desde Desk
+When intenta reemplazar la URL canónica o leer una ruta local arbitraria
+Then la API responde `PermissionError`
+And no realiza requests a hosts elegidos por el usuario
+And solo System Manager puede usar overrides técnicos.
+
+Given Coordinación sube un Excel
+When solicita preview/apply
+Then el argumento debe corresponder a un DocType `File` `.xlsx` legible por ese usuario
+And una ruta absoluta, un archivo privado ajeno o un `.xls` se rechazan sin leer su contenido.
+
+### Scenario: cancelación e identidad estable
+
+Given un partido FMV futuro fue importado como Local
+When el mismo `external_id` pasa a Visitante y `cancel_missing = true`
+Then la reserva anterior queda Cancelada.
+
+Given una fuente habilitada devuelve un envelope válido sin partidos
+When se sincroniza con `cancel_missing = true`
+Then se cancelan las reservas futuras Confirmadas de ese origen.
+
+Given un partido Excel conserva fecha, categoría, tira y rival
+When Coordinación corrige su horario o cancha
+Then SICLUB conserva el mismo `id_externo` derivado y actualiza la reserva existente.
+
+### Scenario: unicidad y feed FMV estricto
+
+Given dos procesos intentan crear simultáneamente el mismo
+`(origen_fixture, id_externo_fixture)`
+When PostgreSQL aplica el upsert
+Then existe una sola `Reserva Espacio`
+And el segundo proceso reutiliza el registro existente.
+
+Given un envelope FMV pertenece a otro club, repite IDs o contiene filas sin campos obligatorios
+When se valida antes de importar
+Then se rechaza el envelope completo sin escrituras parciales.
+
 ---
 
 ## Fuente concreta: fmv_voley_ges → JSON

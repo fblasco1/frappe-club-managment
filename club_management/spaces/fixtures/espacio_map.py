@@ -32,6 +32,10 @@ def fold_accents(value: str) -> str:
 	return " ".join(ascii_only.upper().split())
 
 
+def _espacio_habilitado(name: str) -> bool:
+	return bool(frappe.db.get_value("Espacio", name, "habilitado"))
+
+
 def resolve_espacio_fmv(partido: FixturePartido) -> str | None:
 	"""Reglas Cancha 1/2 para partidos FMV sin espacio explícito."""
 	label = fold_accents(partido.equipo or partido.categoria or "")
@@ -41,7 +45,7 @@ def resolve_espacio_fmv(partido: FixturePartido) -> str | None:
 		target = VOLEY_ESPACIO_DEFAULT
 	else:
 		target = VOLEY_ESPACIO_DEFAULT
-	if frappe.db.exists("Espacio", target):
+	if _espacio_habilitado(target):
 		return target
 	return None
 
@@ -52,14 +56,12 @@ def resolve_espacio(partido: FixturePartido) -> str | None:
 		return None
 	if partido.espacio:
 		mapped = map_espacio(partido.espacio) or partido.espacio.strip()
-		if frappe.db.exists("Espacio", mapped):
+		if _espacio_habilitado(mapped):
 			return mapped
 		return None
 	if partido.source == ORIGIN_FMV_VOLEY:
 		return resolve_espacio_fmv(partido)
 	# FeBAMBA / basquet sin espacio explícito → Cancha 3.
-	if partido.source == ORIGIN_FEBAMBA_GES and frappe.db.exists(
-		"Espacio", BASQUET_ESPACIO_DEFAULT
-	):
+	if partido.source == ORIGIN_FEBAMBA_GES and _espacio_habilitado(BASQUET_ESPACIO_DEFAULT):
 		return BASQUET_ESPACIO_DEFAULT
 	return None

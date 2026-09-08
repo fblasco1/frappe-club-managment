@@ -19,6 +19,8 @@ FMV_VOLEY_JSON_URL = (
 )
 
 _FETCH_TIMEOUT_SEC = 60
+_EXPECTED_CLUB_ID = 420
+_REQUIRED_PARTIDO_FIELDS = ("external_id", "fecha", "hora", "categoria", "localia")
 
 
 def default_fixture_json_path() -> Path:
@@ -55,6 +57,31 @@ def validate_fixture_envelope(data: dict[str, Any]) -> None:
 	partidos = data.get("partidos")
 	if not isinstance(partidos, list):
 		frappe.throw(_("Fixture FMV: falta lista partidos"), frappe.ValidationError)
+	if data.get("club_id_fmv") != _EXPECTED_CLUB_ID:
+		frappe.throw(_("Fixture FMV: club_id_fmv inesperado"), frappe.ValidationError)
+	club = " ".join(str(data.get("club") or "").upper().replace("Ü", "U").split())
+	if "ECHAGUE" not in club:
+		frappe.throw(_("Fixture FMV: club inesperado"), frappe.ValidationError)
+	seen_ids: set[str] = set()
+	for index, partido in enumerate(partidos, start=1):
+		if not isinstance(partido, dict):
+			frappe.throw(
+				_("Fixture FMV: partido {0} no es un objeto").format(index),
+				frappe.ValidationError,
+			)
+		missing = [field for field in _REQUIRED_PARTIDO_FIELDS if not str(partido.get(field) or "").strip()]
+		if missing:
+			frappe.throw(
+				_("Fixture FMV: partido {0} sin {1}").format(index, ", ".join(missing)),
+				frappe.ValidationError,
+			)
+		external_id = str(partido["external_id"]).strip()
+		if external_id in seen_ids:
+			frappe.throw(
+				_("Fixture FMV: external_id duplicado ({0})").format(external_id),
+				frappe.ValidationError,
+			)
+		seen_ids.add(external_id)
 
 
 def fetch_fixture_json(url: str | None = None) -> dict[str, Any]:

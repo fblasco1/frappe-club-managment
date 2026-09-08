@@ -94,7 +94,7 @@ def build_excel_external_id(raw: dict[str, Any]) -> str:
 	"""Genera clave idempotente sin exponer IDs técnicos en la planilla."""
 	identity = "|".join(
 		_identity_value(raw.get(field))
-		for field in ("fecha", "hora", "espacio", "categoria", "tira", "rival")
+		for field in ("fecha", "categoria", "tira", "rival")
 	)
 	return f"xlsx-{hashlib.sha256(identity.encode('utf-8')).hexdigest()[:20]}"
 
@@ -140,15 +140,17 @@ def resolve_excel_path(file_url: str | Path) -> Path:
 		frappe.throw(_("Falta archivo Excel"), frappe.ValidationError)
 	path = Path(raw)
 	if path.is_file():
-		return path
-	try:
-		resolved = get_file_path(raw)
-	except Exception as exc:
-		frappe.throw(_("No se pudo leer el archivo: {0}").format(exc), frappe.ValidationError)
-	path = Path(resolved)
-	if not path.is_file():
+		resolved_path = path
+	else:
+		try:
+			resolved_path = Path(get_file_path(raw))
+		except Exception as exc:
+			frappe.throw(_("No se pudo leer el archivo: {0}").format(exc), frappe.ValidationError)
+	if resolved_path.suffix.lower() != ".xlsx":
+		frappe.throw(_("Solo se admiten archivos .xlsx"), frappe.ValidationError)
+	if not resolved_path.is_file():
 		frappe.throw(_("Archivo no encontrado: {0}").format(raw), frappe.ValidationError)
-	return path
+	return resolved_path
 
 
 def read_excel_rows(path: str | Path) -> tuple[list[dict[str, Any]], list[str]]:

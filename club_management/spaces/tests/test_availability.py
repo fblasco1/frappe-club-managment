@@ -8,6 +8,7 @@ from club_management.members.test_helpers import MembersTestCase
 from club_management.spaces.availability import (
 	assert_no_overlap_with_occupancy,
 	dia_semana_de_fecha,
+	find_occupancy_conflicts,
 	get_occupancy,
 	intervals_overlap,
 	validate_time_range,
@@ -97,6 +98,31 @@ class TestAvailability(MembersTestCase):
 		self.assertEqual(len(bloques), 1)
 		self.assertEqual(bloques[0]["inicio"], "22:00")
 		self.assertEqual(bloques[0]["fin"], "01:00")
+
+	def test_reserva_del_dia_anterior_solapa_madrugada(self) -> None:
+		espacio = insert_espacio("Salon Cola Nocturna", tipo="Salon")
+		frappe.get_doc(
+			{
+				"doctype": "Reserva Espacio",
+				"espacio": espacio,
+				"fecha": "2026-09-05",
+				"hora_desde": "23:30:00",
+				"hora_hasta": "01:00:00",
+				"tipo": "Evento club",
+				"estado": "Confirmada",
+				"motivo": "Evento hasta madrugada",
+			}
+		).insert(ignore_permissions=True)
+
+		conflicts = find_occupancy_conflicts(
+			espacio,
+			"2026-09-06",
+			"00:30:00",
+			"00:45:00",
+		)
+		self.assertEqual(len(conflicts), 1)
+		self.assertEqual(conflicts[0]["tipo"], "reserva")
+		self.assertTrue(any(s.get("motivo") == "Evento hasta madrugada" for s in get_occupancy(espacio, "2026-09-06")))
 
 	def test_occupancy_incluye_grilla_y_reserva(self) -> None:
 		espacio = insert_espacio(

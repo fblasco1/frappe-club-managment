@@ -63,6 +63,22 @@ def intervals_overlap(start_a: Any, end_a: Any, start_b: Any, end_b: Any) -> boo
 	return a0 < b1 and b0 < a1
 
 
+def _slot_overlaps_query(
+	query_start: Any,
+	query_end: Any,
+	slot_start: Any,
+	slot_end: Any,
+	*,
+	slot_starts_previous_day: bool = False,
+) -> bool:
+	q0, q1 = _interval_minutes(query_start, query_end)
+	s0, s1 = _interval_minutes(slot_start, slot_end)
+	if slot_starts_previous_day:
+		s0 -= 24 * 60
+		s1 -= 24 * 60
+	return q0 < s1 and s0 < q1
+
+
 def validate_time_range(hora_desde: Any, hora_hasta: Any) -> None:
 	if _as_time(hora_desde) == _as_time(hora_hasta):
 		frappe.throw(_("hora_hasta debe ser mayor que hora_desde"), frappe.ValidationError)
@@ -185,6 +201,7 @@ def get_confirmed_reservations(
 		if row.name in suspended:
 			continue
 		if _reserva_ocupa_fecha(row, target, dia):
+			row["_starts_previous_day"] = _reserva_starts_previous_day(row, target)
 			out.append(row)
 	return out
 
@@ -203,8 +220,6 @@ def _reserva_ocupa_fecha(row: dict[str, Any], target: date, dia: str) -> bool:
 		hasta = row.get("fecha_hasta")
 		if not desde or not hasta:
 			return False
-		if getdate(desde) > target or getdate(hasta) < target:
-			return False
 		dias = {
 			d.dia_semana
 			for d in frappe.get_all(
@@ -213,11 +228,40 @@ def _reserva_ocupa_fecha(row: dict[str, Any], target: date, dia: str) -> bool:
 				fields=["dia_semana"],
 			)
 		}
-		return dia in dias
+		if getdate(desde) <= target <= getdate(hasta) and dia in dias:
+			return True
+		previous = target - timedelta(days=1)
+		return (
+			_crosses_midnight(row)
+			and getdate(desde) <= previous <= getdate(hasta)
+			and dia_semana_de_fecha(previous) in dias
+		)
 	# Puntual (incluye Temporal y tipos internos)
 	if not row.get("fecha"):
 		return False
-	return getdate(row.fecha) == target
+	fecha = getdate(row.fecha)
+	return fecha == target or (_crosses_midnight(row) and fecha + timedelta(days=1) == target)
+
+
+def _crosses_midnight(row: dict[str, Any]) -> bool:
+	return _minutes_of_day(row.get("hora_hasta")) <= _minutes_of_day(row.get("hora_desde"))
+
+
+def _reserva_starts_previous_day(row: dict[str, Any], target: date) -> bool:
+	if not _crosses_midnight(row):
+		return False
+	if _reserva_es_recurrente(row):
+		previous = target - timedelta(days=1)
+		dias = {
+			d.dia_semana
+			for d in frappe.get_all(
+				"Reserva Espacio Dia",
+				filters={"parent": row.name, "parenttype": "Reserva Espacio"},
+				fields=["dia_semana"],
+			)
+		}
+		return dia_semana_de_fecha(previous) in dias
+	return bool(row.get("fecha") and getdate(row.fecha) + timedelta(days=1) == target)
 
 
 def iter_recurrence_dates(
@@ -321,7 +365,13 @@ def find_occupancy_conflicts(
 				}
 			)
 	for res in get_confirmed_reservations(espacio, fecha, exclude=exclude_reserva):
-		if intervals_overlap(hora_desde, hora_hasta, res.hora_desde, res.hora_hasta):
+		if _slot_overlaps_query(
+			hora_desde,
+			hora_hasta,
+			res.hora_desde,
+			res.hora_hasta,
+			slot_starts_previous_day=bool(res.get("_starts_previous_day")),
+		):
 			conflicts.append(
 				{
 					"tipo": "reserva",
@@ -345,7 +395,13 @@ def assert_no_overlap_with_reservations_only(
 	"""Lanza ValidationError si solapa otra reserva Confirmada (sin considerar grilla)."""
 	validate_time_range(hora_desde, hora_hasta)
 	for res in get_confirmed_reservations(espacio, fecha, exclude=exclude_reserva):
-		if intervals_overlap(hora_desde, hora_hasta, res.hora_desde, res.hora_hasta):
+		if _slot_overlaps_query(
+			hora_desde,
+			hora_hasta,
+			res.hora_desde,
+			res.hora_hasta,
+			slot_starts_previous_day=bool(res.get("_starts_previous_day")),
+		):
 			frappe.throw(
 				_("El horario se solapa con la reserva confirmada {0}").format(res.name),
 				frappe.ValidationError,
@@ -374,7 +430,13 @@ def assert_no_overlap_with_occupancy(
 			}
 		)
 	for slot in slots:
-		if intervals_overlap(hora_desde, hora_hasta, slot["hora_desde"], slot["hora_hasta"]):
+		if _slot_overlaps_query(
+			hora_desde,
+			hora_hasta,
+			slot["hora_desde"],
+			slot["hora_hasta"],
+			slot_starts_previous_day=bool(slot.get("_starts_previous_day")),
+		):
 			frappe.throw(
 				_("El horario se solapa con ocupación existente del espacio {0}").format(espacio),
 				frappe.ValidationError,

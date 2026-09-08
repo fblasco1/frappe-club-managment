@@ -43,6 +43,35 @@ def _ensure_reserva_write() -> None:
 		frappe.throw(frappe._("No autorizado"), frappe.PermissionError)
 
 
+def _is_system_manager() -> bool:
+	return "System Manager" in frappe.get_roles()
+
+
+def _ensure_technical_override_allowed(value: str | None) -> None:
+	if value and not _is_system_manager():
+		frappe.throw(
+			frappe._("Solo System Manager puede reemplazar URL o ruta de fixture"),
+			frappe.PermissionError,
+		)
+
+
+def _authorized_excel_file(file_url: str) -> str:
+	raw = str(file_url or "").strip()
+	if not raw:
+		frappe.throw(frappe._("Falta archivo Excel"), frappe.ValidationError)
+	if Path(raw).suffix.lower() != ".xlsx":
+		frappe.throw(frappe._("Solo se admiten archivos .xlsx"), frappe.ValidationError)
+	if _is_system_manager() and Path(raw).is_file():
+		return raw
+	file_name = frappe.db.get_value("File", {"file_url": raw}, "name")
+	if not file_name:
+		frappe.throw(frappe._("El archivo debe haber sido subido a SICLUB"), frappe.PermissionError)
+	file_doc = frappe.get_doc("File", file_name)
+	if not frappe.has_permission("File", ptype="read", doc=file_doc):
+		frappe.throw(frappe._("No autorizado para leer el archivo"), frappe.PermissionError)
+	return raw
+
+
 @frappe.whitelist()
 def import_fixtures_json(payload: str | dict[str, Any], cancel_missing: int = 0) -> dict[str, Any]:
 	"""Importa envelope JSON o lista de partidos desde Desk."""
@@ -59,6 +88,7 @@ def sync_fixtures_febamba(
 ) -> dict[str, Any]:
 	"""Sync FeBAMBA GES: URL canónica (default), override url, o archivo local."""
 	_ensure_reserva_write()
+	_ensure_technical_override_allowed(file_path or url)
 	if file_path:
 		return import_febamba_ges_json(
 			file_path,
@@ -78,6 +108,7 @@ def sync_fixtures_fmv(
 ) -> dict[str, Any]:
 	"""Sync FMV Vóley: URL canónica (default), override url, o archivo local."""
 	_ensure_reserva_write()
+	_ensure_technical_override_allowed(file_path or url)
 	if file_path:
 		return import_fmv_voley_json(
 			file_path,
@@ -93,6 +124,7 @@ def sync_fixtures_fmv(
 def import_fixtures_csv(file_path: str, cancel_missing: int = 0) -> dict[str, Any]:
 	"""Importa CSV de partidos (formato CM o manual)."""
 	_ensure_reserva_write()
+	_ensure_technical_override_allowed(file_path)
 	path = Path(file_path)
 	if not path.is_file():
 		frappe.throw(frappe._("Archivo no encontrado: {0}").format(file_path))
@@ -103,14 +135,17 @@ def import_fixtures_csv(file_path: str, cancel_missing: int = 0) -> dict[str, An
 def preview_fixtures_excel(file_url: str) -> dict[str, Any]:
 	"""Preview Excel ligas sin escribir BD."""
 	_ensure_reserva_write()
-	return preview_excel_fixtures(file_url)
+	return preview_excel_fixtures(_authorized_excel_file(file_url))
 
 
 @frappe.whitelist()
 def apply_fixtures_excel(file_url: str, cancel_missing: int = 0) -> dict[str, Any]:
 	"""Aplica import Excel ligas (upsert idempotente)."""
 	_ensure_reserva_write()
-	return apply_excel_fixtures(file_url, cancel_missing=bool(cancel_missing))
+	return apply_excel_fixtures(
+		_authorized_excel_file(file_url),
+		cancel_missing=bool(cancel_missing),
+	)
 
 
 @frappe.whitelist()
