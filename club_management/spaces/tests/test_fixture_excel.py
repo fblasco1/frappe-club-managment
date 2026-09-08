@@ -7,11 +7,13 @@ from pathlib import Path
 
 import frappe
 import openpyxl
+from frappe.utils.file_manager import save_file
 
 from club_management.members.test_helpers import MembersTestCase
 from club_management.spaces.fixtures.contract import ORIGIN_LIGA_EXCEL
 from club_management.spaces.fixtures.import_excel import (
 	apply_excel_fixtures,
+	build_excel_external_id,
 	preview_excel_fixtures,
 )
 from club_management.spaces.fixtures.upsert import find_reserva_by_fixture
@@ -79,6 +81,11 @@ class TestFixtureExcel(MembersTestCase):
 		)
 		return path
 
+	def _file_url_for(self, path: Path, owner: str) -> str:
+		doc = save_file(path.name, path.read_bytes(), None, None, is_private=1)
+		frappe.db.set_value("File", doc.name, "owner", owner, update_modified=False)
+		return doc.file_url
+
 	def test_preview_sin_side_effects(self) -> None:
 		path = self._ok_path()
 		before = frappe.db.count("Reserva Espacio")
@@ -108,6 +115,24 @@ class TestFixtureExcel(MembersTestCase):
 		second = apply_excel_fixtures(path)
 		self.assertEqual(second["creados"], 0)
 		self.assertGreaterEqual(second["actualizados"], 2)
+
+	def test_identidad_no_cambia_al_corregir_horario_o_espacio(self) -> None:
+		base = {
+			"fecha": "2026-09-07",
+			"hora": "18:30",
+			"espacio": CANCHA_2,
+			"categoria": "Sub 13",
+			"tira": "Nivel D",
+			"rival": "Rival B",
+		}
+		changed = {**base, "hora": "19:00", "espacio": CANCHA_3}
+		self.assertEqual(build_excel_external_id(base), build_excel_external_id(changed))
+
+	def test_rechaza_extension_xls(self) -> None:
+		path = self._tmp / "fixture_legacy.xls"
+		path.write_bytes(b"legacy")
+		with self.assertRaises(frappe.ValidationError):
+			preview_excel_fixtures(path)
 
 	def test_fila_invalida_no_aborta_lote(self) -> None:
 		path = self._tmp / "liga_excel_mixed_test.xlsx"
@@ -159,12 +184,25 @@ class TestFixtureExcel(MembersTestCase):
 
 		path = self._ok_path()
 		user = make_coordinacion_user("coord.excel@example.com")
+		file_url = self._file_url_for(path, user)
 		frappe.set_user(user)
 		try:
-			preview = preview_fixtures_excel(str(path))
+			preview = preview_fixtures_excel(file_url)
 			self.assertEqual(len(preview["filas_ok"]), 2)
-			applied = apply_fixtures_excel(str(path), cancel_missing=0)
+			applied = apply_fixtures_excel(file_url, cancel_missing=0)
 			self.assertIn("creados", applied)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_coordinacion_rechaza_ruta_local_arbitraria(self) -> None:
+		from club_management.spaces.api.fixtures_desk import preview_fixtures_excel
+
+		path = self._ok_path()
+		user = make_coordinacion_user("coord.excel.security@example.com")
+		frappe.set_user(user)
+		try:
+			with self.assertRaises(frappe.PermissionError):
+				preview_fixtures_excel(str(path))
 		finally:
 			frappe.set_user("Administrator")
 

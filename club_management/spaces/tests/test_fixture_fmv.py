@@ -68,6 +68,18 @@ class TestFmvParseAndMap(MembersTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			validate_fixture_envelope({"version": 2, "partidos": []})
 
+	def test_validate_envelope_rechaza_otro_club_e_ids_duplicados(self) -> None:
+		other_club = {**_SAMPLE_ENVELOPE, "club_id_fmv": 999}
+		with self.assertRaises(frappe.ValidationError):
+			validate_fixture_envelope(other_club)
+
+		duplicated = {
+			**_SAMPLE_ENVELOPE,
+			"partidos": [_SAMPLE_ENVELOPE["partidos"][0], _SAMPLE_ENVELOPE["partidos"][0]],
+		}
+		with self.assertRaises(frappe.ValidationError):
+			validate_fixture_envelope(duplicated)
+
 	def test_ventana_formativa_90(self) -> None:
 		result = normalize_partido(
 			{
@@ -160,16 +172,69 @@ class TestFmvImport(MembersTestCase):
 		self.assertEqual(second["creados"], 0)
 		self.assertGreaterEqual(second["actualizados"], 1)
 
+	def test_local_que_pasa_a_visitante_se_cancela(self) -> None:
+		local = {**_SAMPLE_ENVELOPE, "partidos": [_SAMPLE_ENVELOPE["partidos"][0]]}
+		import_fmv_voley_json_data = import_fmv_voley_json
+		with patch(
+			"club_management.spaces.fixtures.sources.fmv_voley.load_json_file",
+			return_value=local,
+		):
+			import_fmv_voley_json_data(cancel_missing=True)
+
+		visitor_row = {**_SAMPLE_ENVELOPE["partidos"][0], "localia": "Visitante"}
+		visitor = {**_SAMPLE_ENVELOPE, "partidos": [visitor_row]}
+		with patch(
+			"club_management.spaces.fixtures.sources.fmv_voley.load_json_file",
+			return_value=visitor,
+		):
+			import_fmv_voley_json_data(cancel_missing=True)
+
+		name = find_reserva_by_fixture(ORIGIN_FMV_VOLEY, "fmv-local-001")
+		self.assertEqual(frappe.db.get_value("Reserva Espacio", name, "estado"), "Cancelada")
+
+	def test_feed_vacio_cancela_reservas_futuras(self) -> None:
+		local = {**_SAMPLE_ENVELOPE, "partidos": [_SAMPLE_ENVELOPE["partidos"][0]]}
+		with patch(
+			"club_management.spaces.fixtures.sources.fmv_voley.load_json_file",
+			return_value=local,
+		):
+			import_fmv_voley_json(cancel_missing=True)
+
+		empty = {**_SAMPLE_ENVELOPE, "partidos": []}
+		with patch(
+			"club_management.spaces.fixtures.sources.fmv_voley.load_json_file",
+			return_value=empty,
+		):
+			result = import_fmv_voley_json(cancel_missing=True)
+
+		name = find_reserva_by_fixture(ORIGIN_FMV_VOLEY, "fmv-local-001")
+		self.assertEqual(result["cancelados"], 1)
+		self.assertEqual(frappe.db.get_value("Reserva Espacio", name, "estado"), "Cancelada")
+
 	def test_whitelist_coordinacion(self) -> None:
 		from club_management.spaces.api.fixtures_desk import sync_fixtures_fmv
 
 		user = make_coordinacion_user("coord.fmv@example.com")
 		frappe.set_user(user)
 		try:
-			result = sync_fixtures_fmv(
-				file_path=str(default_fixture_json_path()),
-				cancel_missing=0,
-			)
+			with patch(
+				"club_management.spaces.fixtures.sources.fmv_voley.fetch_fixture_json",
+				return_value=_SAMPLE_ENVELOPE,
+			):
+				result = sync_fixtures_fmv(cancel_missing=0)
 			self.assertIn("creados", result)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_coordinacion_no_puede_reemplazar_url_o_ruta_local(self) -> None:
+		from club_management.spaces.api.fixtures_desk import sync_fixtures_fmv
+
+		user = make_coordinacion_user("coord.fmv.security@example.com")
+		frappe.set_user(user)
+		try:
+			with self.assertRaises(frappe.PermissionError):
+				sync_fixtures_fmv(url="https://127.0.0.1/internal.json")
+			with self.assertRaises(frappe.PermissionError):
+				sync_fixtures_fmv(file_path="/etc/passwd")
 		finally:
 			frappe.set_user("Administrator")

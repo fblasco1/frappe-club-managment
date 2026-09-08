@@ -89,3 +89,4 @@ club_management.patches.v1_0.import_horarios_sabado
 club_management.patches.v1_0.sync_planilla_tipos_evento
 club_management.patches.v1_0.sync_informes_secretaria_menu
 club_management.patches.v1_0.seed_supervielle_sandbox_settings
+club_management.patches.v1_0.add_reserva_fixture_unique_index

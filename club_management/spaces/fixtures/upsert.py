@@ -86,6 +86,15 @@ def upsert_fixture_partido(
 		if report is not None:
 			report.errores.append(f"{partido.external_id}: {exc}")
 		return None
+	except Exception:
+		# Una restricción unique puede ganar la carrera entre dos workers.
+		# Releer convierte el segundo insert en un upsert idempotente.
+		concurrent = find_reserva_by_fixture(partido.source, partido.external_id)
+		if not concurrent:
+			raise
+		if report is not None:
+			report.actualizados += 1
+		return concurrent
 	_record_superposiciones(doc, partido, espacio, report)
 	if report is not None:
 		report.creados += 1
@@ -169,10 +178,11 @@ def import_fixture_rows(
 			partido.source = source
 		if resolved_source is None:
 			resolved_source = partido.source
-		seen_ids.add(partido.external_id)
+		if partido.localia != LOCALIA_VISITANTE:
+			seen_ids.add(partido.external_id)
 		upsert_fixture_partido(partido, report=report)
 
-	if cancel_missing and resolved_source and seen_ids:
+	if cancel_missing and resolved_source:
 		cancel_missing_fixtures(resolved_source, seen_ids, report=report)
 
 	return report.as_dict()
