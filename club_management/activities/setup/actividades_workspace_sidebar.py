@@ -55,8 +55,8 @@ SIDEBAR_ITEMS: list[dict] = [
 		"label": "Informes",
 		"type": "Section Break",
 		"icon": "file-text",
-		"indent": 1,
 		"collapsible": 1,
+		"indent": 1,
 	},
 	{
 		"label": "Cobranza por fechas",

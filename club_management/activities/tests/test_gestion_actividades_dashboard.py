@@ -20,30 +20,19 @@ from club_management.activities.services.gestion_actividades_dashboard import (
 from club_management.members.test_helpers import MembersTestCase, insert_socio, make_secretaria_user
 
 
+def _public_js_source(filename: str) -> str:
+	path = Path(frappe.get_app_path("club_management", "public", "js", filename))
+	return path.read_text(encoding="utf-8")
+
+
 class TestGestionActividadesDashboardAssets(MembersTestCase):
 	def test_ruta_corta_reconoce_alias_antes_de_cargar_workspaces(self) -> None:
-		path = Path(
-			frappe.get_app_path(
-				"club_management",
-				"public",
-				"js",
-				"club_desk_navigation.js",
-			)
-		)
-		source = path.read_text(encoding="utf-8")
+		source = _public_js_source("club_desk_navigation.js")
 		self.assertIn('"gestión-de-actividades": "Gestión de Actividades"', source)
 		self.assertIn("this.SLUG_ALIASES[key]", source)
 
 	def test_seccion_informes_boot_declara_collapsible(self) -> None:
-		path = Path(
-			frappe.get_app_path(
-				"club_management",
-				"public",
-				"js",
-				"actividades_sidebar_boot.js",
-			)
-		)
-		source = path.read_text(encoding="utf-8")
+		source = _public_js_source("actividades_sidebar_boot.js")
 		section_start = source.index('label: __("Informes")')
 		section_end = source.index("},", section_start)
 		self.assertIn("collapsible: 1", source[section_start:section_end])

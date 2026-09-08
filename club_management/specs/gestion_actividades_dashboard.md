@@ -1,18 +1,20 @@
 # Spec: Dashboard Gestión de Actividades y Deportes
 
 Panel Desk en el workspace **Gestión de Actividades** (rol `Secretaria`): responde
-### Scenario: apertura directa por ruta corta
+¿qué tan ocupado está el club? y ¿qué disciplinas rinden mejor?
+
+**Relacionado:** `gestion_actividades_panel.md`, `activities_jerarquia.md`
+
+---
+
+## Scenario: apertura directa por ruta corta
 
 Given un usuario autorizado abre Desk directamente en `/desk/gestión-de-actividades`
 When el registro de workspaces todavía no terminó de inicializarse en el navegador
 Then la navegación reconoce el alias de la ruta como `Gestión de Actividades`
-And el dashboard custom se monta sin dejar el área de contenido en blanco.
+And el dashboard custom se monta sin dejar el área de contenido en blanco
 And la sección `Informes` del sidebar declara `collapsible`
 And soporta el estado previamente guardado en `section-breaks-state`.
-
-¿qué tan ocupado está el club? y ¿qué disciplinas rinden mejor?
-
-**Relacionado:** `gestion_actividades_panel.md`, `activities_jerarquia.md`
 
 ---
 
