@@ -66,23 +66,23 @@ class TestCorreccionPublica(MembersTestCase):
 
 		result = _actualizar_solicitud_impl(
 			sol.token_seguimiento,
-			{"telefono": "+549111000000", "workflow_state": "Validada", "socio_generado": "X"},
+			{"telefono_movil": "+549111000000", "workflow_state": "Validada", "socio_generado": "X"},
 		)
 		self.assertEqual(result["status"], "ok")
 		doc.reload()
 		self.assertEqual(doc.workflow_state, STATE_PENDIENTE)
-		self.assertEqual(doc.telefono, "+549111000000")
+		self.assertEqual(doc.telefono_movil, "+549111000000")
 		self.assertFalse(doc.socio_generado)
 		frappe.set_user("Administrator")
 
 	def test_actualizar_solicitud_token_invalido_404(self) -> None:
 		with self.assertRaises(DoesNotExistError):
-			_actualizar_solicitud_impl("bad-token", {"telefono": "123"})
+			_actualizar_solicitud_impl("bad-token", {"telefono_movil": "123"})
 
 	def test_actualizar_solicitud_estado_incorrecto_404(self) -> None:
 		sol = insert_solicitud_asociacion(dni="60111003", email="pend@example.com")
 		with self.assertRaises(DoesNotExistError):
-			_actualizar_solicitud_impl(sol.token_seguimiento, {"telefono": "123"})
+			_actualizar_solicitud_impl(sol.token_seguimiento, {"telefono_movil": "123"})
 
 
 class TestPagoStubPublico(MembersTestCase):
@@ -109,8 +109,9 @@ class TestPagoStubPublico(MembersTestCase):
 		pago_token = sign_pago_token(doc.name)
 		result = _confirmar_pago_stub_impl(pago_token)
 		self.assertEqual(result["status"], "ok")
+		self.assertIn("inscripcion_url", result)
 		socio = frappe.get_doc("Socio", doc.socio_generado)
-		self.assertEqual(socio.estado, "Activo")
+		self.assertEqual(socio.estado, "Pendiente de Inscripción")
 		frappe.set_user("Administrator")
 
 	def test_confirmar_pago_token_invalido_404(self) -> None:

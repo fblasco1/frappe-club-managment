@@ -1,0 +1,128 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:BEC-{YYYY}-{#####}",
+ "creation": "2026-07-05 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "socio",
+  "tipo_beca",
+  "column_break_beca",
+  "pct_cuota_social",
+  "pct_arancel",
+  "section_vigencia",
+  "fecha_desde",
+  "fecha_hasta",
+  "estado",
+  "observaciones"
+ ],
+ "fields": [
+  {
+   "fieldname": "socio",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Socio",
+   "options": "Socio",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tipo_beca",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Tipo de beca",
+   "options": "Total\nParcial Porcentaje\nParcial Exime Cuota\nParcial Exime Arancel",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_beca",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "pct_cuota_social",
+   "fieldtype": "Percent",
+   "label": "Descuento cuota social (%)"
+  },
+  {
+   "default": "0",
+   "fieldname": "pct_arancel",
+   "fieldtype": "Percent",
+   "label": "Descuento arancel (%)"
+  },
+  {
+   "fieldname": "section_vigencia",
+   "fieldtype": "Section Break",
+   "label": "Vigencia"
+  },
+  {
+   "default": "Today",
+   "fieldname": "fecha_desde",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Desde",
+   "reqd": 1
+  },
+  {
+   "fieldname": "fecha_hasta",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Hasta",
+   "reqd": 1
+  },
+  {
+   "default": "Activa",
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Estado",
+   "options": "Activa\nVencida\nCancelada",
+   "reqd": 1
+  },
+  {
+   "fieldname": "observaciones",
+   "fieldtype": "Small Text",
+   "label": "Observaciones"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-05 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Members",
+ "name": "Beca Socio",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Secretaria",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -40,8 +40,14 @@ class TestSolicitudAsociacionMetadata(MembersTestCase):
     def test_campos_calle_en_meta(self) -> None:
         meta = frappe.get_meta(DOCTYPE)
         self.assertIsNotNone(meta.get_field("calle"))
+        self.assertIsNotNone(meta.get_field("telefono_movil"))
+        self.assertIsNotNone(meta.get_field("localidad_barrio"))
         self.assertIsNotNone(meta.get_field("calle_tutor"))
+        self.assertIsNotNone(meta.get_field("telefono_movil_tutor"))
+        self.assertIsNotNone(meta.get_field("localidad_barrio_tutor"))
         self.assertIsNone(meta.get_field("domicilio"))
+        self.assertIsNone(meta.get_field("telefono"))
+        self.assertIsNone(meta.get_field("localidad"))
 
     def test_campos_documentacion_tutor_en_meta(self) -> None:
         meta = frappe.get_meta(DOCTYPE)

@@ -1,0 +1,277 @@
+.club-actividades-workspace #editorjs {
+	display: none;
+}
+
+.club-actividades-workspace .codex-editor,
+.club-actividades-workspace .codex-editor__redactor {
+	min-height: unset !important;
+}
+
+.club-actividades-toolbar {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-bottom: 1rem;
+}
+
+.club-actividades-toolbar-title {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	min-width: 0;
+	flex: 1;
+}
+
+.club-actividades-filter {
+	max-width: 320px;
+}
+
+.club-actividades-admin {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.75rem;
+	margin-bottom: 0.75rem;
+	padding: 0.55rem 0.75rem;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-sm);
+	background: var(--control-bg);
+}
+
+.club-actividades-admin-label {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+
+.club-actividades-admin-nav {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.club-actividades-admin-sep {
+	color: var(--text-muted);
+	font-size: 0.85rem;
+}
+
+.club-actividades-catalog {
+	width: 100%;
+	margin-top: 0.75rem;
+}
+
+.club-actividades-accordion {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	max-height: calc(100vh - 260px);
+	overflow: auto;
+}
+
+.club-actividad-card,
+.club-grupo-card {
+	flex-shrink: 0;
+	background: var(--card-bg);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+	overflow: visible;
+}
+
+.club-actividad-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	width: 100%;
+	padding: 0.85rem 1rem;
+	border: 0;
+	background: transparent;
+	text-align: left;
+	cursor: pointer;
+}
+
+.club-actividad-toggle:hover {
+	background: var(--fg-hover-color);
+}
+
+.club-actividad-chevron {
+	width: 1rem;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.club-actividad-toggle-text {
+	display: flex;
+	flex-direction: column;
+	gap: 0.1rem;
+	min-width: 0;
+}
+
+.club-actividad-body {
+	padding: 0 1rem 1rem;
+	border-top: 1px solid var(--border-color);
+}
+
+.club-actividad-body.is-collapsed {
+	display: none;
+}
+
+.club-actividad-card-header,
+.club-grupo-header {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.75rem;
+	margin: 0.75rem 0;
+}
+
+.club-grupos-wrap {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	margin-top: 0.5rem;
+}
+
+.club-grupo-card {
+	padding: 0;
+	overflow: hidden;
+}
+
+.club-grupo-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	width: 100%;
+	padding: 0.75rem 1rem;
+	border: 0;
+	background: transparent;
+	text-align: left;
+	cursor: pointer;
+}
+
+.club-grupo-toggle:hover {
+	background: var(--fg-hover-color);
+}
+
+.club-grupo-chevron {
+	width: 1rem;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.club-grupo-toggle-text {
+	display: flex;
+	flex-direction: column;
+	gap: 0.1rem;
+	min-width: 0;
+}
+
+.club-grupo-body {
+	padding: 0 1rem 1rem;
+	border-top: 1px solid var(--border-color);
+}
+
+.club-grupo-body.is-collapsed {
+	display: none;
+}
+
+.club-equipos-wrap {
+	margin-top: 0.5rem;
+}
+
+.club-equipos-table {
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-sm);
+	overflow: hidden;
+}
+
+.club-equipos-table-head,
+.club-equipo-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) auto;
+	gap: 0.5rem;
+	align-items: center;
+	padding: 0.4rem 0.65rem;
+}
+
+.club-equipos-table-head {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--text-muted);
+	background: var(--control-bg);
+	border-bottom: 1px solid var(--border-color);
+}
+
+.club-equipo-row + .club-equipo-row {
+	border-top: 1px solid var(--border-color);
+}
+
+.club-equipo-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.club-equipo-arancel {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.club-node-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	justify-content: flex-end;
+}
+
+.club-node-actions--compact .btn {
+	min-width: 1.75rem;
+	padding-left: 0.35rem;
+	padding-right: 0.35rem;
+}
+
+.club-arancel-row {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0.35rem 0.75rem;
+	align-items: center;
+	max-width: 520px;
+	margin-bottom: 0.75rem;
+}
+
+.club-arancel-row label {
+	margin-bottom: 0;
+}
+
+.club-arancel-item-picker {
+	display: flex;
+	align-items: stretch;
+	gap: 0.35rem;
+	min-width: 0;
+}
+
+.club-arancel-item {
+	flex: 1 1 auto;
+	min-width: 0;
+	cursor: pointer;
+}
+
+.club-arancel-item-actions {
+	display: flex;
+	flex-shrink: 0;
+	gap: 0.25rem;
+}
+
+.club-arancel-rate {
+	max-width: 140px;
+}
+
+@media (max-width: 992px) {
+	.club-actividades-accordion {
+		max-height: none;
+	}
+}

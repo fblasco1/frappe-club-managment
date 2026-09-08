@@ -1,0 +1,38 @@
+{
+ "app": "club_management",
+ "charts": [],
+ "content": "[]",
+ "creation": "2026-06-06 00:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "home",
+ "idx": 0,
+ "is_hidden": 1,
+ "label": "Inicio",
+ "links": [],
+ "modified": "2026-06-06 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Members",
+ "name": "Inicio",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": "",
+ "roles": [
+  {
+   "role": "Secretaria"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 0.05,
+ "shortcuts": [],
+ "title": "Inicio",
+ "type": "Workspace"
+}

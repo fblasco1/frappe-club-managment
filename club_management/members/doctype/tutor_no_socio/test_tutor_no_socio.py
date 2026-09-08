@@ -46,6 +46,18 @@ class TestTutorNoSocioCamposObligatorios(MembersTestCase):
         with self.assertRaises(frappe.MandatoryError):
             frappe.get_doc(payload).insert(ignore_permissions=True)
 
+    def test_telefono_movil_obligatorio(self) -> None:
+        payload = make_tutor_no_socio_payload(telefono_movil="")
+        with self.assertRaises(frappe.MandatoryError):
+            frappe.get_doc(payload).insert(ignore_permissions=True)
+
+    def test_meta_tiene_contacto_y_domicilio_estructurado(self) -> None:
+        meta = frappe.get_meta("Tutor No Socio")
+        self.assertIsNotNone(meta.get_field("telefono_movil"))
+        self.assertIsNotNone(meta.get_field("localidad_barrio"))
+        self.assertIsNone(meta.get_field("telefono"))
+        self.assertIsNone(meta.get_field("domicilio"))
+
     def test_dni_unico(self) -> None:
         insert_tutor_no_socio()
         with self.assertRaises(frappe.UniqueValidationError):

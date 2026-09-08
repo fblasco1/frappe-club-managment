@@ -1,9 +1,12 @@
 app_name = "club_management"
-app_title = "Club Management"
+app_title = "SICLUB"
 app_publisher = "fblasco1"
 app_description = "ERP for Sports Clubs"
 app_email = "francisco.o.blasco@gmail.com"
 app_license = "mit"
+
+# Parche scheduler PostgreSQL al cargar hooks (también en `bench schedule`).
+import club_management.integrations.scheduler_postgres  # noqa: F401, E402
 
 # Apps
 # ------------------
@@ -11,25 +14,26 @@ app_license = "mit"
 # required_apps = []
 
 # Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "club_management",
-# 		"logo": "/assets/club_management/logo.png",
-# 		"title": "Club Management",
-# 		"route": "/club_management",
-# 		"has_permission": "club_management.api.permission.has_app_permission"
-# 	}
-# ]
+add_to_apps_screen = [
+	{
+		"name": "club_management",
+		"logo": "/assets/frappe/images/frappe-framework-logo.svg",
+		"title": "SICLUB",
+		"route": "/desk/secretaria",
+		"has_permission": "club_management.members.permissions_app.has_app_permission",
+	}
+]
 
 # Includes in <head>
 # ------------------
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/club_management/css/club_management.css"
-# app_include_js = "/assets/club_management/js/club_management.js"
+app_include_css = "club_management.bundle.css"
+app_include_js = "club_management.bundle.js"
 
 # include js, css files in header of web template
-# web_include_css = "/assets/club_management/css/club_management.css"
+web_include_css = "/assets/club_management/css/siclub_login.css"
 # web_include_js = "/assets/club_management/js/club_management.js"
 
 # include custom scss in every website theme (without file extension ".scss")
@@ -86,7 +90,7 @@ app_license = "mit"
 # ------------
 
 # before_install = "club_management.install.before_install"
-# after_install = "club_management.install.after_install"
+after_install = "club_management.install.after_install"
 
 # Uninstallation
 # ------------
@@ -124,17 +128,29 @@ permission_query_conditions = {
 	"Socio": "club_management.members.permissions.socio_query_conditions",
 	"Tutor No Socio": "club_management.members.permissions.tutor_no_socio_query_conditions",
 	"Grupo Familiar": "club_management.members.permissions.grupo_familiar_query_conditions",
+	"Cargo Socio": "club_management.members.permissions.cargo_socio_query_conditions",
 }
 
 has_permission = {
 	"Socio": "club_management.members.permissions.socio_has_permission",
 	"Tutor No Socio": "club_management.members.permissions.tutor_no_socio_has_permission",
 	"Grupo Familiar": "club_management.members.permissions.grupo_familiar_has_permission",
+	"Cargo Socio": "club_management.members.permissions.cargo_socio_has_permission",
 }
 
 # Document Events
 # ---------------
 # Hook on document methods and events
+
+doc_events = {
+	"Inscripcion Actividad": {
+		"after_insert": "club_management.members.services.suscripciones_socio.sync_suscripcion_tras_inscripcion",
+		"on_update": "club_management.members.services.suscripciones_socio.sync_suscripcion_tras_inscripcion",
+	},
+	"Purchase Invoice": {
+		"validate": "club_management.finance.services.purchase_invoice_validation.validate_egreso",
+	},
+}
 
 # doc_events = {
 # 	"*": {
@@ -146,6 +162,20 @@ has_permission = {
 
 # Scheduled Tasks
 # ---------------
+
+scheduler_events = {
+	"daily": [
+		"club_management.members.jobs.cobranza_periodica.run_generar_deuda_si_corresponde",
+		"club_management.members.jobs.cobranza_periodica.run_recargos_si_corresponde",
+		"club_management.members.jobs.moroso_automatico.run_evaluar_morosos_si_corresponde",
+	],
+	"cron": {
+		# 08:00 y 20:00 ART (UTC-3) — alineado al cron formativas_ges
+		"0 11,23 * * *": [
+			"club_management.spaces.fixtures.sources.febamba_ges.sync_febamba_ges_scheduled",
+		],
+	},
+}
 
 # scheduler_events = {
 # 	"all": [
@@ -181,9 +211,24 @@ has_permission = {
 # Overriding Methods
 # ------------------------------
 #
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "club_management.event.get_events"
-# }
+before_request = [
+	"club_management.integrations.payment_ledger_postgres.apply_patch",
+	"club_management.integrations.scheduler_postgres.apply_patch",
+]
+on_session_creation = [
+	"club_management.integrations.payment_ledger_postgres.apply_patch",
+	"club_management.integrations.scheduler_postgres.apply_patch",
+]
+before_job = ["club_management.integrations.scheduler_postgres.apply_patch"]
+
+override_whitelisted_methods = {
+	"frappe.desk.doctype.number_card.number_card.get_result": (
+		"club_management.integrations.number_card_postgres.get_result"
+	),
+	"frappe.desk.doctype.number_card.number_card.get_percentage_difference": (
+		"club_management.integrations.number_card_postgres.get_percentage_difference"
+	),
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
@@ -243,6 +288,8 @@ has_permission = {
 before_login = [
 	"club_management.members.auth.dual_login.resolve_login_user",
 ]
+
+extend_bootinfo = "club_management.boot.extend_bootinfo"
 
 # Automatically update python controller files with type annotations for this app.
 export_python_type_annotations = True

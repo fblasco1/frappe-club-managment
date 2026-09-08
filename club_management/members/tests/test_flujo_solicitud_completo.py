@@ -5,6 +5,8 @@ Spec: `specs/solicitud_asociacion_publica.md` — «Flujo E2E — CI y Q&A super
 
 from __future__ import annotations
 
+import secrets
+
 import frappe
 
 from club_management.members.qa.flujo_solicitud import FlujoSolicitudRunner
@@ -25,9 +27,10 @@ class TestFlujoSolicitudCompleto(MembersTestCase):
 		ensure_role_socio_exists()
 
 	def test_flujo_feliz_adulto_hasta_socio_activo(self) -> None:
+		dni = str(secrets.randbelow(90_000_000) + 10_000_000)
 		runner = FlujoSolicitudRunner(
-			dni="80999001",
-			email="flujo.ci.01@example.com",
+			dni=dni,
+			email=f"flujo.ci.{dni}@example.com",
 		)
 		result = runner.run_happy_path_adulto()
 
@@ -41,13 +44,14 @@ class TestFlujoSolicitudCompleto(MembersTestCase):
 		self.assertEqual(len(result.steps), 4)
 
 	def test_flujo_con_correccion_antes_de_validar(self) -> None:
+		dni = str(secrets.randbelow(90_000_000) + 10_000_000)
 		runner = FlujoSolicitudRunner(
-			dni="80999002",
-			email="flujo.ci.02@example.com",
+			dni=dni,
+			email=f"flujo.ci.{dni}@example.com",
 		)
 		result = runner.run_path_con_correccion()
 
 		doc = frappe.get_doc("Solicitud Asociacion", result.solicitud_name)
-		self.assertEqual(doc.telefono, "+549119998877")
+		self.assertEqual(doc.telefono_movil, "+549119998877")
 		socio = frappe.get_doc("Socio", result.socio_name)
 		self.assertEqual(socio.estado, "Activo")

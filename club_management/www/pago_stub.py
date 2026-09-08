@@ -2,12 +2,15 @@
 
 import frappe
 
-from club_management.members.services.solicitud_tokens import verify_pago_token
+from club_management.members.services.solicitud_tokens import (
+	normalize_pago_token_from_request,
+	verify_pago_token,
+)
 from club_management.members.workflow.solicitud_asociacion_workflow import STATE_VALIDADA
 
 
 def get_context(context):
-	token = (frappe.form_dict.get("token") or "").strip()
+	token = normalize_pago_token_from_request(frappe.form_dict.get("token"))
 	context.no_cache = 1
 	context.pago_token = token
 	context.pago_valido = False

@@ -31,9 +31,25 @@ class TutorNoSocio(Document):
 		self.ultima_modificacion_en = now()
 
 	def before_save(self) -> None:
+		from club_management.members.services.documentacion_adjuntos import (
+			CAMPOS_TUTOR,
+			asegurar_adjuntos_privados,
+			pisa_adjuntos_reemplazados,
+		)
+
+		pisa_adjuntos_reemplazados(self, CAMPOS_TUTOR)
+		asegurar_adjuntos_privados(self, CAMPOS_TUTOR)
 		if not self.is_new():
 			self.ultima_modificacion_por = frappe.session.user
 			self.ultima_modificacion_en = now()
+
+	def after_insert(self) -> None:
+		from club_management.members.services.documentacion_adjuntos import (
+			CAMPOS_TUTOR,
+			vincular_adjuntos_del_doc,
+		)
+
+		vincular_adjuntos_del_doc(self, CAMPOS_TUTOR)
 
 	def _validate_mayor_de_edad(self) -> None:
 		if not self.fecha_nacimiento:

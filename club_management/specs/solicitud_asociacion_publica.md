@@ -910,6 +910,19 @@ When se renderiza el template del email post-validación
 Then el cuerpo del email contiene solo datos de `ana`
 And no expone PII (DNI, dirección) en el cuerpo del email (basta nombre + monto + link)
 And el link de pago lleva un token único que **no es** adivinable por enumeración.
+And la URL del stub incluye el token **percent-encoded** en el query `token`.
+And el módulo Python de la ruta `/pago-stub` se llama `www/pago_stub.py`
+(convención Frappe: guiones del HTML → guiones bajos en el `.py`).
+
+---
+
+## Scenario: página `/pago-stub` valida el token al renderizar
+
+Given una `Solicitud de Asociación` en estado `Validada` con `socio_generado` definido
+And un `pago_token` firmado para esa solicitud
+When el visitante abre `/pago-stub?token=<pago_token>`
+Then la página muestra el botón **Marcar como pagado** (no "Enlace no válido")
+And el contexto Jinja expone `pago_valido = true`.
 
 ---
 

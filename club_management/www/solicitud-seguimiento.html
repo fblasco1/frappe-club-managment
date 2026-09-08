@@ -58,25 +58,37 @@
 			</div>
 
 			<div class="row g-2">
-				<div class="col-12 col-md-6">
-					<label class="form-label" for="telefono">Teléfono</label>
-					<input class="form-control" id="telefono" name="telefono" type="text" maxlength="40" />
+				<div class="col-12 col-md-4">
+					<label class="form-label" for="telefono_fijo">Teléfono fijo</label>
+					<input class="form-control" id="telefono_fijo" name="telefono_fijo" type="text" maxlength="40" />
 				</div>
-				<div class="col-12 col-md-6">
+				<div class="col-12 col-md-4">
+					<label class="form-label" for="telefono_movil">Teléfono móvil</label>
+					<input class="form-control" id="telefono_movil" name="telefono_movil" type="text" maxlength="40" />
+				</div>
+				<div class="col-12 col-md-4">
 					<label class="form-label" for="email">Email</label>
 					<input class="form-control" id="email" name="email" type="email" maxlength="140" />
 				</div>
-				<div class="col-12">
+				<div class="col-12 col-md-8">
 					<label class="form-label" for="calle">Calle</label>
 					<input class="form-control" id="calle" name="calle" type="text" maxlength="240" />
 				</div>
 				<div class="col-12 col-md-4">
-					<label class="form-label" for="localidad">Localidad</label>
-					<input class="form-control" id="localidad" name="localidad" type="text" maxlength="120" />
+					<label class="form-label" for="numero">Número</label>
+					<input class="form-control" id="numero" name="numero" type="text" maxlength="32" />
 				</div>
 				<div class="col-12 col-md-4">
 					<label class="form-label" for="provincia">Provincia</label>
 					<input class="form-control" id="provincia" name="provincia" type="text" maxlength="120" />
+				</div>
+				<div class="col-12 col-md-4">
+					<label class="form-label" for="ciudad">Ciudad</label>
+					<input class="form-control" id="ciudad" name="ciudad" type="text" maxlength="120" />
+				</div>
+				<div class="col-12 col-md-4">
+					<label class="form-label" for="localidad_barrio">Localidad / Barrio</label>
+					<input class="form-control" id="localidad_barrio" name="localidad_barrio" type="text" maxlength="120" />
 				</div>
 				<div class="col-12 col-md-4">
 					<label class="form-label" for="codigo_postal">Código postal</label>
@@ -177,7 +189,10 @@
 		}
 
 		if (data.editable) {
-			const fields = ["telefono", "email", "calle", "localidad", "provincia", "codigo_postal"];
+			const fields = [
+				"telefono_fijo", "telefono_movil", "email", "calle", "numero",
+				"provincia", "ciudad", "localidad_barrio", "codigo_postal",
+			];
 			fields.forEach((f) => {
 				if (typeof data.editable[f] !== "undefined" && data.editable[f] !== null) {
 					const el = document.getElementById(f);
@@ -208,11 +223,14 @@
 		if (!token) return showError("Ingresá un token de seguimiento.");
 
 		const data = {
-			telefono: (document.getElementById("telefono").value || "").trim(),
+			telefono_fijo: (document.getElementById("telefono_fijo").value || "").trim(),
+			telefono_movil: (document.getElementById("telefono_movil").value || "").trim(),
 			email: (document.getElementById("email").value || "").trim(),
 			calle: (document.getElementById("calle").value || "").trim(),
-			localidad: (document.getElementById("localidad").value || "").trim(),
+			numero: (document.getElementById("numero").value || "").trim(),
 			provincia: (document.getElementById("provincia").value || "").trim(),
+			ciudad: (document.getElementById("ciudad").value || "").trim(),
+			localidad_barrio: (document.getElementById("localidad_barrio").value || "").trim(),
 			codigo_postal: (document.getElementById("codigo_postal").value || "").trim(),
 		};
 

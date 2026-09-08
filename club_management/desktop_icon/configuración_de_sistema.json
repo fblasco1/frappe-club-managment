@@ -1,0 +1,22 @@
+{
+ "app": "club_management",
+ "bg_color": "gray",
+ "creation": "2026-07-28 19:39:01.018110",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon": "setting",
+ "icon_type": "Link",
+ "idx": 3,
+ "label": "Configuraci\u00f3n de Sistema",
+ "link_to": "Configuraci\u00f3n de Sistema",
+ "link_type": "Workspace Sidebar",
+ "modified": "2026-07-28 19:39:04.403346",
+ "modified_by": "Administrator",
+ "name": "Configuraci\u00f3n de Sistema",
+ "owner": "Administrator",
+ "parent_icon": "SICLUB",
+ "restrict_removal": 1,
+ "roles": [],
+ "standard": 1
+}

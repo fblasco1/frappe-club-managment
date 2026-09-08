@@ -12,6 +12,7 @@ from typing import Any, Callable
 import frappe
 from frappe.model.workflow import apply_workflow
 
+from club_management.activities.services.inscripcion_socio import confirmar_inscripcion_post_pago
 from club_management.members.api.solicitud_publica import (
 	_actualizar_solicitud_impl,
 	_consultar_solicitud_impl,
@@ -141,10 +142,16 @@ class FlujoSolicitudRunner:
 		pago_token = sign_pago_token(doc.name)
 		pago = _confirmar_pago_stub_impl(pago_token)
 		socio.reload()
+		inscripcion = confirmar_inscripcion_post_pago(doc.name, [])
+		socio.reload()
 		if socio.estado != "Activo":
 			frappe.throw(f"Socio debería estar Activo, está {socio.estado}")
 
-		pago_evidence = {"pago": pago, "socio_estado": socio.estado}
+		pago_evidence = {
+			"pago": pago,
+			"inscripcion": inscripcion,
+			"socio_estado": socio.estado,
+		}
 		steps.append({"step": "pago_stub", "result": pago_evidence})
 		self._emit("pago_stub", pago_evidence)
 
@@ -182,7 +189,7 @@ class FlujoSolicitudRunner:
 		frappe.set_user("Administrator")
 
 		correccion = _actualizar_solicitud_impl(
-			token, {"telefono": "+549119998877"}
+			token, {"telefono_movil": "+549119998877"}
 		)
 		doc.reload()
 		if doc.workflow_state != STATE_PENDIENTE:
@@ -208,13 +215,14 @@ class FlujoSolicitudRunner:
 		doc.reload()
 		pago_token = sign_pago_token(doc.name)
 		_confirmar_pago_stub_impl(pago_token)
+		confirmar_inscripcion_post_pago(doc.name, [])
 		socio = frappe.get_doc("Socio", doc.socio_generado)
 		if socio.estado != "Activo":
 			frappe.throw("Socio no quedó Activo")
 
 		self._emit(
 			"fin",
-			{"socio_estado": socio.estado, "telefono": doc.telefono},
+			{"socio_estado": socio.estado, "telefono_movil": doc.telefono_movil},
 		)
 
 		return FlujoSolicitudResult(

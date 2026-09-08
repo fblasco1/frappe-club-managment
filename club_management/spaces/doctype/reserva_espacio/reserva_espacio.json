@@ -1,0 +1,271 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-08-20 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "espacio",
+  "tipo",
+  "estado",
+  "section_cuando",
+  "modalidad_alquiler",
+  "recurrencia_semanal",
+  "fecha",
+  "fecha_desde",
+  "fecha_hasta",
+  "hora_desde",
+  "hora_hasta",
+  "dias_recurrencia",
+  "section_externo",
+  "arrendatario_nombre",
+  "arrendatario_contacto",
+  "item_alquiler",
+  "section_otros",
+  "motivo",
+  "origen_fixture",
+  "id_externo_fixture",
+  "superposicion_detectada",
+  "socio",
+  "equipo_actividad"
+ ],
+ "fields": [
+  {
+   "default": "RES-.YYYY.-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "RES-.YYYY.-.#####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "espacio",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Espacio",
+   "options": "Espacio",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tipo",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Tipo",
+   "options": "Alquiler externo\nAlquiler socio\nEvento club\nBloqueo",
+   "reqd": 1
+  },
+  {
+   "default": "Borrador",
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Estado",
+   "options": "Borrador\nConfirmada\nCancelada",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_cuando",
+   "fieldtype": "Section Break",
+   "label": "Cu\u00e1ndo"
+  },
+  {
+   "depends_on": "eval:doc.tipo==\"Alquiler externo\"",
+   "fieldname": "modalidad_alquiler",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Modalidad alquiler",
+   "options": "\nTemporal\nRecurrente",
+   "description": "Temporal = una fecha. Recurrente = d\u00edas de la semana en un rango."
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.tipo==\"Evento club\"",
+   "fieldname": "recurrencia_semanal",
+   "fieldtype": "Check",
+   "label": "Recurrencia semanal",
+   "description": "Repite el mismo horario cada semana en los d\u00edas indicados (eventos sociales, cenas, etc.)."
+  },
+  {
+   "depends_on": "eval:(doc.tipo!='Alquiler externo' || doc.modalidad_alquiler=='Temporal' || !doc.modalidad_alquiler) && !(doc.tipo=='Evento club' && doc.recurrencia_semanal)",
+   "fieldname": "fecha",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Fecha"
+  },
+  {
+   "depends_on": "eval:(doc.tipo=='Alquiler externo' && doc.modalidad_alquiler=='Recurrente') || (doc.tipo=='Evento club' && doc.recurrencia_semanal)",
+   "fieldname": "fecha_desde",
+   "fieldtype": "Date",
+   "label": "Fecha desde"
+  },
+  {
+   "depends_on": "eval:(doc.tipo=='Alquiler externo' && doc.modalidad_alquiler=='Recurrente') || (doc.tipo=='Evento club' && doc.recurrencia_semanal)",
+   "fieldname": "fecha_hasta",
+   "fieldtype": "Date",
+   "label": "Fecha hasta"
+  },
+  {
+   "fieldname": "hora_desde",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Hora desde",
+   "reqd": 1
+  },
+  {
+   "fieldname": "hora_hasta",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Hora hasta",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:(doc.tipo=='Alquiler externo' && doc.modalidad_alquiler=='Recurrente') || (doc.tipo=='Evento club' && doc.recurrencia_semanal)",
+   "fieldname": "dias_recurrencia",
+   "fieldtype": "Table",
+   "label": "D\u00edas de la semana",
+   "options": "Reserva Espacio Dia"
+  },
+  {
+   "depends_on": "eval:doc.tipo==\"Alquiler externo\"",
+   "fieldname": "section_externo",
+   "fieldtype": "Section Break",
+   "label": "Arrendatario externo"
+  },
+  {
+   "depends_on": "eval:doc.tipo==\"Alquiler externo\"",
+   "fieldname": "arrendatario_nombre",
+   "fieldtype": "Data",
+   "label": "Nombre / instituci\u00f3n"
+  },
+  {
+   "depends_on": "eval:doc.tipo==\"Alquiler externo\"",
+   "fieldname": "arrendatario_contacto",
+   "fieldtype": "Data",
+   "label": "Contacto (tel / email)"
+  },
+  {
+   "depends_on": "eval:doc.tipo==\"Alquiler externo\"",
+   "description": "Opcional. Preferir ICDPE-ALQ-*-TEMP o ICDPE-ALQ-*-REC seg\u00fan modalidad.",
+   "fieldname": "item_alquiler",
+   "fieldtype": "Link",
+   "label": "\u00cdtem alquiler",
+   "options": "Item"
+  },
+  {
+   "fieldname": "section_otros",
+   "fieldtype": "Section Break",
+   "label": "Otros"
+  },
+  {
+   "fieldname": "motivo",
+   "fieldtype": "Small Text",
+   "label": "Motivo"
+  },
+  {
+   "fieldname": "origen_fixture",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Origen fixture",
+   "read_only": 1
+  },
+  {
+   "fieldname": "id_externo_fixture",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "ID externo fixture",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.origen_fixture",
+   "fieldname": "superposicion_detectada",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Superposici\u00f3n detectada",
+   "read_only": 1
+  },
+  {
+   "fieldname": "socio",
+   "fieldtype": "Link",
+   "label": "Socio",
+   "options": "Socio"
+  },
+  {
+   "fieldname": "equipo_actividad",
+   "fieldtype": "Link",
+   "label": "Equipo Actividad",
+   "options": "Equipo Actividad"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-08-21 14:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Spaces",
+ "name": "Reserva Espacio",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Coordinacion",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Secretaria",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Tesoreria",
+   "share": 0,
+   "write": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

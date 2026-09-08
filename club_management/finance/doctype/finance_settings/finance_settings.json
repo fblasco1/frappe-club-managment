@@ -1,0 +1,71 @@
+{
+ "actions": [],
+ "allow_import": 0,
+ "allow_rename": 0,
+ "creation": "2026-07-17 12:30:00.000000",
+ "doctype": "DocType",
+ "document_type": "Setup",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "seccion_feriados",
+  "holiday_list",
+  "info_html"
+ ],
+ "fields": [
+  {
+   "fieldname": "seccion_feriados",
+   "fieldtype": "Section Break",
+   "label": "Feriados y días hábiles"
+  },
+  {
+   "description": "Lista de feriados usada para calcular el último día hábil del mes. Si se deja vacío, se usa la lista de feriados de la empresa.",
+   "fieldname": "holiday_list",
+   "fieldtype": "Link",
+   "label": "Lista de feriados (último día hábil)",
+   "options": "Holiday List"
+  },
+  {
+   "fieldname": "info_html",
+   "fieldtype": "HTML",
+   "options": "<p>Configuración del módulo de Finanzas del club.</p>"
+  }
+ ],
+ "idx": 0,
+ "is_single": 1,
+ "is_submittable": 0,
+ "links": [],
+ "module": "Finance",
+ "name": "Finance Settings",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Tesoreria",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Secretaria"
+  }
+ ],
+ "quick_entry": 0,
+ "read_only": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

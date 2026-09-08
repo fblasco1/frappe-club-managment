@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<style>
+		body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 11px; color: #111; }
+		h1 { font-size: 16px; margin: 0 0 4px 0; }
+		h2 { font-size: 13px; margin: 18px 0 8px 0; border-bottom: 1px solid #333; padding-bottom: 3px; }
+		.meta { color: #444; margin-bottom: 12px; }
+		.kpis { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+		.kpis td { border: 1px solid #ccc; padding: 8px; width: 25%; vertical-align: top; }
+		.kpis .label { font-size: 10px; text-transform: uppercase; color: #555; }
+		.kpis .value { font-size: 15px; font-weight: bold; margin-top: 4px; }
+		table.data { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+		table.data th, table.data td { border: 1px solid #ccc; padding: 4px 6px; text-align: left; }
+		table.data th { background: #f0f0f0; font-size: 10px; }
+		table.data td.num, table.data th.num { text-align: right; }
+		.two-col { width: 100%; }
+		.two-col td { width: 50%; vertical-align: top; padding-right: 8px; }
+		.firmas { margin-top: 16px; }
+		.firmas p { margin: 4px 0; }
+		.muted { color: #666; font-size: 10px; }
+	</style>
+</head>
+<body>
+	<h1>{{ titulo }}</h1>
+	<div class="meta">
+		{{ subtitulo }}<br/>
+		{{ _("Destinatario: Comisión Directiva / Tesorería") }} | {{ _("Generado") }}: {{ generado_txt }}
+	</div>
+
+	<table class="kpis">
+		<tr>
+			<td>
+				<div class="label">{{ _("Recaudación total") }}</div>
+				<div class="value">{{ total_txt }}</div>
+			</td>
+			<td>
+				<div class="label">{{ _("Operaciones") }}</div>
+				<div class="value">{{ operaciones }}</div>
+			</td>
+			<td>
+				<div class="label">{{ _("Total cuotas sociales") }}</div>
+				<div class="value">{{ total_cuotas_txt }}</div>
+			</td>
+			<td>
+				<div class="label">{{ _("Total aranceles / deportes") }}</div>
+				<div class="value">{{ total_aranceles_txt }}</div>
+			</td>
+		</tr>
+	</table>
+
+	<table class="two-col">
+		<tr>
+			<td>
+				<h2>1. {{ _("Resumen por concepto") }}</h2>
+				<table class="data">
+					<thead>
+						<tr>
+							<th>{{ _("Concepto / Cuenta") }}</th>
+							<th class="num">{{ _("Ops") }}</th>
+							<th class="num">{{ _("Total ($)") }}</th>
+							<th class="num">%</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for row in por_concepto %}
+						<tr>
+							<td>{{ row.concepto }}</td>
+							<td class="num">{{ row.operaciones }}</td>
+							<td class="num">{{ row.total_txt }}</td>
+							<td class="num">{{ row.pct_txt }}</td>
+						</tr>
+						{% endfor %}
+						<tr>
+							<th>{{ _("TOTAL GENERAL") }}</th>
+							<th class="num">{{ operaciones }}</th>
+							<th class="num">{{ total_txt }}</th>
+							<th class="num">100.00%</th>
+						</tr>
+					</tbody>
+				</table>
+			</td>
+			<td>
+				<h2>2. {{ _("Arqueo por medio de cobro") }}</h2>
+				<table class="data">
+					<thead>
+						<tr>
+							<th>{{ _("Medio de Cobro") }}</th>
+							<th class="num">{{ _("Ops") }}</th>
+							<th class="num">{{ _("Total ($)") }}</th>
+							<th class="num">%</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for row in por_medio %}
+						<tr>
+							<td>{{ row.label }}</td>
+							<td class="num">{{ row.operaciones }}</td>
+							<td class="num">{{ row.total_txt }}</td>
+							<td class="num">{{ row.pct_txt }}</td>
+						</tr>
+						{% endfor %}
+						<tr>
+							<th>{{ _("TOTAL POR MEDIOS") }}</th>
+							<th class="num">{{ operaciones }}</th>
+							<th class="num">{{ total_txt }}</th>
+							<th class="num">100.00%</th>
+						</tr>
+					</tbody>
+				</table>
+				<div class="firmas">
+					<h2>3. {{ _("Conciliación y firmas de control") }}</h2>
+					<p>{{ _("Firma Responsable Caja / Administración") }}</p>
+					<p>_______________________</p>
+					<p style="margin-top: 14px;">{{ _("Firma Tesorería / Comisión Directiva") }}</p>
+					<p>_______________________</p>
+				</div>
+			</td>
+		</tr>
+	</table>
+
+	<h2>{{ _("Detalle de cobranzas") }}</h2>
+	<p class="muted">{{ fecha_desde_txt }}{% if fecha_desde_txt != fecha_hasta_txt %} — {{ fecha_hasta_txt }}{% endif %} · {{ operaciones }} {{ _("cobranzas") }}</p>
+	<table class="data">
+		<thead>
+			<tr>
+				<th>#</th>
+				<th>{{ _("Concepto") }}</th>
+				<th>{{ _("Fecha") }}</th>
+				<th>{{ _("N° Socio") }}</th>
+				<th>{{ _("Socio") }}</th>
+				<th>{{ _("Período") }}</th>
+				<th>{{ _("Medio") }}</th>
+				<th class="num">{{ _("Monto") }}</th>
+				<th>{{ _("Comprobante") }}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for row in detalle %}
+			<tr>
+				<td>{{ row.nro }}</td>
+				<td>{{ row.concepto }}</td>
+				<td>{{ row.fecha_txt }}</td>
+				<td>{{ row.nro_socio }}</td>
+				<td>{{ row.socio_label }}</td>
+				<td>{{ row.periodo }}</td>
+				<td>{{ row.medio }}</td>
+				<td class="num">{{ row.monto_txt }}</td>
+				<td>{{ row.comprobante }}</td>
+			</tr>
+			{% endfor %}
+			<tr>
+				<th colspan="7">{{ _("TOTAL") }}</th>
+				<th class="num">{{ total_txt }}</th>
+				<th></th>
+			</tr>
+		</tbody>
+	</table>
+</body>
+</html>

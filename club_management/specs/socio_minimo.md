@@ -20,9 +20,11 @@ Esta primera entrega del DocType `Socio` cubre el flujo prioritario
 - Datos personales completos (incluida `nacionalidad`).
 - Categoría obligatoria; `Vitalicio` no asignable manualmente.
 - Adjuntos obligatorios (foto, DNI ambas caras, ficha médica validada por MIME/tamaño).
+- Al renovar, el archivo **pisa** al anterior (sin histórico): `almacenamiento_documentacion_socios.md`.
 - Auditoría server-side de transiciones de estado y alta validada.
 - Política de `User`: opcional para menores cuyo email es compartido por su tutor.
-- Login dual DNI / Número de Socio para Socios con `User` propio.
+- Login DNI / email para Socios con `User` propio (el número de socio es el `name`
+  entero, no un identificador de login).
 - `Grupo Familiar` y `tutor` integrados desde Sprint 0 (DocType `Grupo Familiar`
   definido en su propio spec, `grupo_familiar_minimo.md`).
 
@@ -38,6 +40,13 @@ Quedan **fuera** de Sprint 0 (cubiertos por `socios_categoria_validacion.md`):
 
 ## Campos propuestos
 
+
+### Identidad (naming)
+
+| Campo           | Tipo | Reqd | Read-only en UI | Comentario                                                  |
+| --------------- | ---- | ---- | --------------- | ----------------------------------------------------------- |
+| `numero_socio`  | Int  | sí   | no              | **Es el `name` (PK)**. Histórico y autoincremental; vacío en alta nueva ⇒ `MAX + 1`. Inmutable (`allow_rename = 0`) |
+| `fecha_ingreso` | Date | no   | no              | Ingreso administrativo (año de ingreso); default `Today`. Distinto de `fecha_alta` |
 
 ### Datos personales
 
@@ -70,8 +79,8 @@ Quedan **fuera** de Sprint 0 (cubiertos por `socios_categoria_validacion.md`):
 | ------------------ | ------------------------------------------ | ------- | --------------- | ----------------------------------------------------------- |
 | `user`             | Link → `User`                              | no      | no              | `unique` cuando está presente. **Opcional**: ver "Política de User" abajo |
 | `grupo_familiar`   | Link → `Grupo Familiar`                    | depende | no              | **Obligatorio si `categoria = "Menor"`**. Ver `grupo_familiar_minimo.md` |
-| `tipo_tutor`       | Select                                     | depende | no              | **Obligatorio si `categoria = "Menor"`**. Valores: `"Socio"` / `"Tutor No Socio"` |
-| `tutor`            | Dynamic Link (`options = tipo_tutor`)      | depende | no              | **Obligatorio si `categoria = "Menor"`**. Apunta a `Socio` o `Tutor No Socio` según `tipo_tutor`; debe ser mayor de 18 y figurar como **titular activo** (principal o cotitular) en `grupo_familiar.titulares` |
+| `tipo_tutor`       | Select                                     | no      | no              | Opcional (dato crítico si `categoria = "Menor"`). Valores: `"Socio"` / `"Tutor No Socio"` |
+| `tutor`            | Dynamic Link (`options = tipo_tutor`)      | no      | no              | Opcional (dato crítico si Menor). Si está cargado: mayor de 18; si hay `grupo_familiar`, debe ser titular activo |
 | `solicitud_origen` | Link → `Solicitud de Asociación`           | no      | **sí**          | Trazabilidad del origen                                     |
 
 ### Documentos adjuntos
@@ -81,7 +90,8 @@ Quedan **fuera** de Sprint 0 (cubiertos por `socios_categoria_validacion.md`):
 | `foto_perfil`  | Attach Image | **sí** | no              |                                                             |
 | `dni_frente`   | Attach       | **sí** | no              | Copiado desde la Solicitud al validar                       |
 | `dni_dorso`    | Attach       | **sí** | no              | Idem                                                        |
-| `ficha_medica` | Attach       | **sí** | no              | PDF / JPEG / PNG, ≤ 5MB; firmado por profesional médico     |
+| `ficha_medica` | Attach       | **sí** | no              | PDF / JPEG / PNG, ≤ 5MB; al renovar **pisa** el archivo anterior (`almacenamiento_documentacion_socios.md`) |
+| `comprobante_jubilado` | Attach | no | no         | Solo categoría Jubilado; copiado desde la solicitud al validar |
 
 ### Auditoría (todos `read-only` en UI; setean desde server-side)
 
@@ -98,9 +108,45 @@ Quedan **fuera** de Sprint 0 (cubiertos por `socios_categoria_validacion.md`):
 > las transiciones de estado y la procedencia del alta.
 
 
-**Naming y "número de socio":** `autoname` por serie estable `SOC-.{YYYY}.-.####`.
-El **número de socio** es ese `name` (ej. `SOC-2026-0042`) y es único e inmutable.
-El DNI también es único pero es un identificador externo, no la PK del DocType.
+**Naming y "número de socio":** `autoname = "field:numero_socio"` (`naming_rule = "By fieldname"`).
+El **número de socio** es un entero histórico y autoincremental que **es** el `name`
+(PK) del documento; es único e inmutable (`allow_rename = 0`). El DNI también es único
+pero es un identificador externo, no la PK del DocType.
+
+Reglas de asignación (controller `Socio.before_insert`):
+
+- **Migración de base histórica (alta manual desde el Desk):** Secretaría carga
+  `numero_socio` con el número real del socio (p. ej. `1500`). Ese valor se usa
+  tal cual como `name` para respetar la numeración existente del club.
+- **Altas nuevas (aprobación de `Solicitud Asociacion` vía web):** si `numero_socio`
+  viene vacío, el controller calcula `MAX(numero_socio) + 1` y lo asigna al campo y
+  al `name`. La consulta usa el **query builder de Frappe** (`frappe.qb` + `Max`),
+  DB-agnóstico y compatible con **PostgreSQL v14**; **no** se usa SQL crudo con
+  `CAST(... AS UNSIGNED)` (sintaxis MariaDB que falla en PostgreSQL).
+- **Concurrencia:** `MAX + 1` tiene una ventana de carrera teórica. El backstop es
+  el `name` (PK único): dos inserts simultáneos con el mismo número fallan con
+  `DuplicateEntryError` (fallo seguro, sin corrupción). El volumen del club (altas
+  una a una) hace despreciable el riesgo.
+- **Orden operativo:** migrar primero la base histórica (1500 socios) y recién
+  después habilitar altas web, para que el autoincremento parta del máximo real.
+- **Unicidad por PK (no `unique` de campo):** `numero_socio` **no** lleva
+  `"unique": 1`. La unicidad ya la garantiza el `name` (PK), y un `unique` de campo
+  sería peligroso al correr `bench migrate` sobre una base con filas `Socio`
+  preexistentes: Frappe crea la columna `Int` con `DEFAULT 0`, por lo que todas las
+  filas legacy quedarían en `0` y un índice único colisionaría. Los registros
+  legacy quedan en `numero_socio = 0` hasta que se los renumere en la migración.
+
+**`fecha_ingreso` vs `fecha_alta`:** `fecha_ingreso` (Date, default `Today`) registra
+el ingreso administrativo del socio (año de ingreso) sin ensuciar el `name`.
+Es distinta de `fecha_alta`, que marca el primer pase a `Activo`.
+
+### Listado Desk (`Socio`)
+
+Given Secretaría abre la lista de socios en Desk
+When se muestra la grilla por defecto del DocType `Socio`
+Then la primera columna enlazable es `Número de Socio` (`numero_socio` / `name`) sin repetir ese valor en otra columna
+And las columnas siguientes son: `Nombre`, `Apellido`, `Estado`, `Categoría`, `Actividad`
+And la lista ordena por `numero_socio` ascendente
 
 **Política de User (login del portal):**
 
@@ -126,17 +172,17 @@ Regla:
 **No se crean emails técnicos sintéticos.** Si un `Socio` no tiene `User` propio,
 es porque está bajo la gestión de su tutor.
 
-**Login dual: DNI o Número de Socio (solo aplica a Socios con `User` propio)**
+**Login (solo aplica a Socios con `User` propio)**
 
-Para los socios que tienen `User` propio, tanto el **DNI** como el **Número de Socio**
-(`SOC-…`) sirven como identificador de login. El DNI es el `User.username` persistido;
-el Número de Socio se resuelve en tiempo de autenticación.
+Para los socios que tienen `User` propio, el login se hace con **email** o con **DNI**
+(el DNI es el `User.username` persistido; Frappe lo resuelve con
+`allow_login_using_user_name = 1`).
 
-Implementación esperada: un `auth_hook` (registrado en `hooks.py` como `auth_hooks`)
-que, ante un intento de login, si el identificador recibido tiene el formato
-`SOC-{YYYY}-{####}`, busca el `Socio` con ese `name`, obtiene su `dni` y delega al
-`LoginManager` estándar con ese DNI como `username`. Si el formato no matchea, el
-flujo de Frappe sigue normal (acepta email o username = DNI directamente).
+> **Cambio de diseño (refactor de naming a número de socio entero):** al pasar el
+> `name` del `Socio` a un entero, el login por número de socio **se elimina** para
+> evitar la ambigüedad con el DNI (ambos serían numéricos). El `auth_hook`
+> `resolve_login_user` mantiene la traducción `TNS-{YYYY}-{####} → Tutor No Socio.user`,
+> pero **ya no** reescribe identificadores de `Socio`. Ver `login_dual.md`.
 
 **Estados (`estado`):**
 
@@ -167,13 +213,18 @@ And el único camino válido para mutar `estado` es la API server-side
 
 ---
 
-## Scenario: `fecha_alta` se setea solo la primera vez que `estado` llega a `Activo`
+## Scenario: `fecha_alta` se setea la primera vez que `estado` llega a `Activo`
 
 Given un `Socio` con `fecha_alta` vacío y `estado` en cualquier valor ≠ `Activo`
 When el flujo server-side transiciona `estado` a `Activo`
 Then `fecha_alta` se setea a la fecha del servidor (hoy) en esa misma transición
-And subsiguientes transiciones desde otros estados a `Activo` **no sobreescriben** `fecha_alta`
-And consultar `fecha_alta` luego siempre devuelve la fecha del primer alta.
+And transiciones posteriores a `Activo` desde estados **distintos de `Baja`** (p. ej. `Moroso`) **no sobreescriben** `fecha_alta`.
+
+Given un `Socio` que vuelve de `Baja` a `Activo`
+When el alta ocurre **dentro de los 6 meses** posteriores a la baja
+Then se conserva `fecha_alta` (misma antigüedad)
+When el alta ocurre **después de más de 6 meses**
+Then `fecha_alta` se reinicia a hoy (ver `socio_alta_post_baja.md`).
 
 ---
 
@@ -265,29 +316,26 @@ propio documento.
 
 ---
 
-## Scenario: login dual — Número de Socio funciona como username
+## Scenario: login — Número de Socio numérico NO se intercepta
 
-Given el mismo `Socio` con `name = "SOC-2026-0042"` y `dni = "30123456"`
-And un `auth_hook` está registrado en `hooks.py` (`auth_hooks`)
-When el usuario intenta iniciar sesión usando `"SOC-2026-0042"` como identificador
-Then el `auth_hook` reconoce el formato `SOC-{YYYY}-{####}`, busca el `Socio` con
-ese `name`, obtiene su `dni` ("30123456") y delega al `LoginManager` con el DNI
-And la autenticación tiene éxito con la misma contraseña que el caso DNI directo
-And se crea una sesión equivalente al login por DNI.
+Given un `Socio` con `name = "1500"` (número de socio entero), `dni = "30123456"`
+y `user = "ana@example.com"`
+And el `auth_hook` `resolve_login_user` está registrado en `hooks.py` (`auth_hooks`)
+When el usuario intenta iniciar sesión usando `"1500"` como identificador
+Then el `auth_hook` **no** reescribe el identificador (el login por número de socio
+fue eliminado en el refactor de naming para evitar ambigüedad con el DNI)
+And Frappe procesa el identificador por su flujo estándar (email / `username`),
+fallando con error de credenciales si no corresponde a ningún `User`.
 
 ---
 
-## Scenario: login dual — formato inválido o `SOC-` inexistente cae al flujo normal
+## Scenario: login — identificador cae al flujo normal de Frappe
 
-Given un identificador de login que **no** matchea el formato `SOC-{YYYY}-{####}`
-(por ejemplo "SOC-foo", "SOCIO-2026-0001", "30123456", "ana@example.com")
+Given un identificador de login que **no** matchea el formato `TNS-{YYYY}-{####}`
+(por ejemplo "30123456", "ana@example.com", "1500")
 When el usuario intenta iniciar sesión con ese identificador
 Then el `auth_hook` no intercepta y delega al flujo estándar de Frappe (login por
-email o por `username`)
-And si el identificador **sí** matchea el formato `SOC-{YYYY}-{####}` pero **no**
-existe ningún `Socio` con ese `name`, el `auth_hook` no inventa un fallback
-silencioso: deja que el flujo estándar reciba el identificador y falle con
-`frappe.AuthenticationError`
+email o por `username = DNI`)
 And el mensaje de error mostrado al usuario no distingue entre "no existe" y
 "contraseña incorrecta" (evitar enumeración de socios).
 
@@ -312,6 +360,18 @@ Given el mismo `Socio`
 When se adjunta un PDF de 1 MB como `ficha_medica`
 Then el archivo se persiste correctamente
 And `ficha_medica` contiene la URL al archivo dentro de `/files/` o `/private/files/`.
+
+---
+
+## Scenario: renovación de ficha o DNI pisa el archivo anterior
+
+Given un `Socio` con `ficha_medica` (o DNI / foto) ya cargada
+When se adjunta un archivo **válido** en el mismo campo
+Then el campo apunta solo al archivo nuevo
+And el `File` anterior se elimina del disco
+And no se conserva un histórico de ese documento.
+
+Ver política de storage y umbral multi-club en `almacenamiento_documentacion_socios.md`.
 
 ---
 

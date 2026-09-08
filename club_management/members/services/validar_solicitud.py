@@ -10,9 +10,15 @@ from frappe import _
 from frappe.model.document import Document
 
 from club_management.members.services import grupo_familiar as gf
+from club_management.members.services.alta_grupo_familiar import MSG_TITULAR_SIN_VALIDAR
 from club_management.members.services.solicitud_notificaciones import (
 	enqueue_validacion_pago_email,
 )
+from club_management.members.services.contacto_domicilio import (
+	map_socio_contacto_domicilio_desde_solicitud,
+	map_tutor_contacto_domicilio_desde_solicitud,
+)
+from club_management.members.services.suscripciones_socio import sync_suscripcion_cuota_al_validar_socio
 from club_management.members.services.user_provisioning import (
 	provision_user_for_socio,
 	provision_user_for_tutor_no_socio,
@@ -24,6 +30,9 @@ from club_management.members.workflow.solicitud_asociacion_workflow import (
 ESTADO_SOCIO_TRAS_VALIDAR = "Pendiente de Pago"
 CATEGORIA_MENOR = "Menor"
 ROL_MIEMBRO_MENOR = "Hijo"
+ROL_MIEMBRO_OTRO = "Otro"
+ROL_TITULAR_GRUPO = "Titular"
+TRAMITE_DOCTYPE = "Solicitud Grupo Familiar"
 
 MSG_EMAIL_ADULTO_TOMADO = _(
 	"El email ya tiene cuenta en el portal; pedí al solicitante un email distinto"
@@ -43,7 +52,7 @@ CAMPOS_TUTOR_OBLIGATORIOS = (
 	"apellido_tutor",
 	"fecha_nacimiento_tutor",
 	"email_tutor",
-	"telefono_tutor",
+	"telefono_movil_tutor",
 	"rol_tutor",
 )
 
@@ -54,6 +63,8 @@ def ejecutar_validacion_desde_solicitud(solicitud: Document) -> None:
 		return
 	if solicitud.workflow_state != STATE_VALIDADA:
 		return
+
+	_assert_orden_de_validacion_del_tramite(solicitud)
 
 	if solicitud.categoria_solicitada == CATEGORIA_MENOR:
 		_validar_menor(solicitud)
@@ -69,7 +80,14 @@ def _validar_adulto(solicitud: Document) -> None:
 
 	socio = _insert_socio_desde_solicitud(solicitud, categoria=solicitud.categoria_solicitada)
 	user_name = provision_user_for_socio(socio.name)
-	grupo_name = gf.ensure_grupo_for_socio(socio, solicitud=solicitud)
+
+	grupo_del_tramite = _grupo_familiar_del_tramite(solicitud)
+	if grupo_del_tramite:
+		grupo_name = gf.add_socio_a_grupo_existente(
+			socio, grupo_del_tramite, rol=solicitud.rol_en_grupo or ROL_MIEMBRO_OTRO
+		)
+	else:
+		grupo_name = gf.ensure_grupo_for_socio(socio, solicitud=solicitud)
 
 	_finalize_solicitud(
 		solicitud,
@@ -146,6 +164,10 @@ def _validar_menor_con_tutor_tns_existente(solicitud: Document, tns_name: str) -
 	tutor_doc = frappe.get_doc("Tutor No Socio", tns_name)
 	if not gf.tutor_es_mayor_de_edad(tutor_doc.fecha_nacimiento):
 		frappe.throw(MSG_TUTOR_MENOR_EDAD, frappe.ValidationError)
+
+	from club_management.members.services.documentacion_adjuntos import completar_docs_tutor_si_vacios
+
+	completar_docs_tutor_si_vacios(tutor_doc, solicitud)
 
 	grupo_name = gf.find_active_grupo_for_titular("Tutor No Socio", tns_name)
 	if not grupo_name:
@@ -234,6 +256,49 @@ def _validar_menor_con_tutor_nuevo_tns(solicitud: Document) -> None:
 	)
 
 
+def _grupo_familiar_del_tramite(solicitud: Document) -> str:
+	"""Grupo ya creado por el titular del trámite familiar, o `""`.
+
+	Devuelve vacío para altas individuales y para la solicitud del titular:
+	en ambos casos corresponde crear un `Grupo Familiar` nuevo.
+	"""
+	if not solicitud.get("solicitud_grupo"):
+		return ""
+	if solicitud.get("rol_en_grupo") == ROL_TITULAR_GRUPO:
+		return ""
+	return (
+		frappe.db.get_value(
+			TRAMITE_DOCTYPE, solicitud.solicitud_grupo, "grupo_familiar_generado"
+		)
+		or ""
+	)
+
+
+def _assert_orden_de_validacion_del_tramite(solicitud: Document) -> None:
+	"""El titular crea el grupo: nadie más puede validarse antes que él."""
+	if not solicitud.get("solicitud_grupo"):
+		return
+	if solicitud.get("rol_en_grupo") == ROL_TITULAR_GRUPO:
+		return
+	if frappe.db.get_value(
+		TRAMITE_DOCTYPE, solicitud.solicitud_grupo, "grupo_familiar_generado"
+	):
+		return
+	frappe.throw(MSG_TITULAR_SIN_VALIDAR, frappe.ValidationError)
+
+
+def _registrar_grupo_en_tramite(solicitud: Document, grupo_name: str) -> None:
+	"""Deja el grupo del titular accesible para el resto del trámite."""
+	tramite = solicitud.get("solicitud_grupo")
+	if not tramite or not grupo_name:
+		return
+	if frappe.db.get_value(TRAMITE_DOCTYPE, tramite, "grupo_familiar_generado"):
+		return
+	frappe.db.set_value(
+		TRAMITE_DOCTYPE, tramite, "grupo_familiar_generado", grupo_name, update_modified=False
+	)
+
+
 def _finalize_solicitud(
 	solicitud: Document,
 	*,
@@ -245,6 +310,8 @@ def _finalize_solicitud(
 	solicitud.socio_generado = socio_name
 	solicitud.user_generado = user_name or ""
 	solicitud.grupo_familiar_generado = grupo_name
+	_registrar_grupo_en_tramite(solicitud, grupo_name)
+	sync_suscripcion_cuota_al_validar_socio(socio_name)
 	enqueue_validacion_pago_email(solicitud.name, email_destino)
 
 
@@ -264,12 +331,7 @@ def _insert_socio_desde_solicitud(
 		"nacionalidad": solicitud.nacionalidad,
 		"fecha_nacimiento": solicitud.fecha_nacimiento,
 		"genero": solicitud.genero,
-		"email": solicitud.email,
-		"telefono": solicitud.telefono,
-		"domicilio": solicitud.calle or "",
-		"localidad": solicitud.localidad,
-		"provincia": solicitud.provincia,
-		"codigo_postal": solicitud.codigo_postal,
+		**map_socio_contacto_domicilio_desde_solicitud(solicitud),
 		"categoria": categoria,
 		"estado": ESTADO_SOCIO_TRAS_VALIDAR,
 		"solicitud_origen": solicitud.name,
@@ -277,6 +339,7 @@ def _insert_socio_desde_solicitud(
 		"dni_frente": solicitud.dni_frente,
 		"dni_dorso": solicitud.dni_dorso,
 		"ficha_medica": solicitud.ficha_medica,
+		"comprobante_jubilado": solicitud.get("comprobante_jubilado") or "",
 		"tipo_tutor": tipo_tutor,
 		"tutor": tutor,
 		"grupo_familiar": grupo_familiar,
@@ -296,12 +359,10 @@ def _insert_tutor_desde_solicitud(solicitud: Document) -> Document:
 			"nacionalidad": solicitud.nacionalidad_tutor or solicitud.nacionalidad,
 			"fecha_nacimiento": solicitud.fecha_nacimiento_tutor,
 			"genero": solicitud.genero_tutor,
-			"email": solicitud.email_tutor,
-			"telefono": solicitud.telefono_tutor,
-			"domicilio": solicitud.calle_tutor or solicitud.calle or "",
-			"localidad": solicitud.localidad_tutor or solicitud.localidad,
-			"provincia": solicitud.provincia_tutor or solicitud.provincia,
-			"codigo_postal": solicitud.codigo_postal_tutor or solicitud.codigo_postal,
+			**map_tutor_contacto_domicilio_desde_solicitud(solicitud),
+			"foto_perfil": solicitud.get("foto_perfil_tutor") or "",
+			"dni_frente": solicitud.get("dni_frente_tutor") or "",
+			"dni_dorso": solicitud.get("dni_dorso_tutor") or "",
 		}
 	)
 	tutor.insert(ignore_permissions=True)

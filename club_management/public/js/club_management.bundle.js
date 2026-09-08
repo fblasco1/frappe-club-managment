@@ -1,0 +1,13 @@
+import "./desk_secretaria_home.js";
+import "./club_desk_navigation.js";
+import "./secretaria_sidebar_boot.js";
+import "./inscripcion_cascada_desk.js";
+import "./socio_alta_guiada.js";
+import "./secretaria_workspace_panel.js";
+import "./tesoreria_workspace_panel.js";
+import "./actividades_sidebar_boot.js";
+import "./gestion_actividades_workspace_panel.js";
+import "./valores_cuota_social_page.js";
+import "./ocupacion_espacios_page.js";
+import "./recibo_pago_escpos.js";
+import "./club_equipo_report_layout.js";

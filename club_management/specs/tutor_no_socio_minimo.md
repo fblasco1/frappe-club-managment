@@ -70,9 +70,18 @@ Quedan **fuera** de Sprint 0:
 **Naming:** `autoname` por serie estable `TNS-.{YYYY}.-.####` (ej. `TNS-2026-0042`).
 No usar DNI como `name` por la misma razón que en `Socio` (correcciones).
 
-**No** se guardan adjuntos (foto de perfil, DNI, ficha médica) en `Tutor No Socio`
-en Sprint 0. Si en algún futuro la persona se asocia, esos documentos se piden
-durante el flujo de solicitud y se guardan en el `Socio` resultante.
+### Documentos adjuntos (alta de menores)
+
+Un vigente por campo; al renovar **pisa** (ver `almacenamiento_documentacion_socios.md`).
+No hay ficha médica en el tutor.
+
+| Campo         | Tipo         | Reqd | Comentario                                      |
+| ------------- | ------------ | ---- | ----------------------------------------------- |
+| `foto_perfil` | Attach Image | no   | Copiado desde `foto_perfil_tutor` al validar    |
+| `dni_frente`  | Attach       | no   | Copiado desde `dni_frente_tutor`                |
+| `dni_dorso`   | Attach       | no   | Copiado desde `dni_dorso_tutor`                 |
+
+En Desk son opcionales (dato crítico). El portal de alta los exige en la solicitud del menor.
 
 ---
 

@@ -1,0 +1,144 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:titulo",
+ "creation": "2026-08-20 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "titulo",
+  "tipo",
+  "alquilable",
+  "habilitado",
+  "capacidad_personas",
+  "notas",
+  "section_horarios",
+  "horarios"
+ ],
+ "fields": [
+  {
+   "fieldname": "titulo",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "T\u00edtulo",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "tipo",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Tipo",
+   "options": "Cancha\nGimnasio\nSalon\nOtro",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "alquilable",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Alquilable",
+   "description": "Metadato para portal/alquiler externo futuro; no restringe uso interno."
+  },
+  {
+   "default": "1",
+   "fieldname": "habilitado",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Habilitado"
+  },
+  {
+   "default": "0",
+   "fieldname": "capacidad_personas",
+   "fieldtype": "Int",
+   "label": "Capacidad (personas)",
+   "description": "Capacidad f\u00edsica del espacio (distinta de cupos de inscripci\u00f3n)."
+  },
+  {
+   "fieldname": "notas",
+   "fieldtype": "Small Text",
+   "label": "Notas"
+  },
+  {
+   "fieldname": "section_horarios",
+   "fieldtype": "Section Break",
+   "label": "Grilla de entrenamientos"
+  },
+  {
+   "fieldname": "horarios",
+   "fieldtype": "Table",
+   "label": "Horarios",
+   "options": "Horario Entrenamiento"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [
+  {
+   "group": "Reservas",
+   "link_doctype": "Reserva Espacio",
+   "link_fieldname": "espacio"
+  }
+ ],
+ "modified": "2026-08-20 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Spaces",
+ "name": "Espacio",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Coordinacion",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Secretaria",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Tesoreria",
+   "share": 0,
+   "write": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

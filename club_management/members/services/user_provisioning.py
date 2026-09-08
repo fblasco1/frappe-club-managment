@@ -3,8 +3,9 @@
 Reglas (Sprint 0 — ver `socio_minimo.md` y `tutor_no_socio_minimo.md`):
 
 - `User.name` = email real de la persona; **no** se crean emails técnicos.
-- `User.username` = DNI (permite login dual junto con el `auth_hook` que
-  reconoce las series `SOC-…` y `TNS-…`).
+- `User.username` = DNI (permite login por DNI; el `auth_hook` además reconoce
+  la serie `TNS-…` de Tutor No Socio. El login por número de socio se eliminó
+  al pasar el `name` del `Socio` a entero).
 - Si el email **ya está tomado** por otro `User`, la provisión falla con
   `frappe.ValidationError` y el `<Doc>.user` queda vacío.
 - Rol asignado: `Socio` (decisión Sprint 0; se puede refinar a un rol `Tutor`

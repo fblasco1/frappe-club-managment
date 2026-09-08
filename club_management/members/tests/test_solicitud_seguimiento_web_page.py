@@ -23,11 +23,25 @@ def _seguimiento_web_page_path() -> str:
 	)
 
 
+def _seguimiento_py_module_path() -> str:
+	return os.path.join(
+		frappe.get_app_path("club_management"),
+		"www",
+		"solicitud_seguimiento.py",
+	)
+
+
 class TestSolicitudSeguimientoWebPage(FrappeTestCase):
 	def test_archivo_plantilla_existe(self) -> None:
 		self.assertTrue(
 			os.path.isfile(_seguimiento_web_page_path()),
 			"Debe existir www/solicitud-seguimiento.html en el paquete club_management",
+		)
+
+	def test_modulo_python_usa_nombre_frappe_www(self) -> None:
+		self.assertTrue(
+			os.path.isfile(_seguimiento_py_module_path()),
+			"Debe existir www/solicitud_seguimiento.py para get_context",
 		)
 
 	def test_plantilla_declara_metodos_publicos(self) -> None:

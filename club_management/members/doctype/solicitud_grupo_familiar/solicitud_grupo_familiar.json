@@ -1,0 +1,57 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:SGF-{YYYY}-{#####}",
+ "creation": "2026-08-07 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "datos_tramite_section",
+  "apellido_principal",
+  "email_contacto",
+  "column_break_tramite",
+  "cantidad_personas",
+  "solicitud_titular",
+  "resultado_section",
+  "grupo_familiar_generado",
+  "column_break_resultado",
+  "token_seguimiento",
+  "enviado_desde_ip"
+ ],
+ "fields": [
+  { "fieldname": "datos_tramite_section", "fieldtype": "Section Break", "label": "Tr\u00e1mite" },
+  { "fieldname": "apellido_principal", "fieldtype": "Data", "label": "Apellido principal", "reqd": 1, "in_list_view": 1, "description": "Apellido del titular; nombra al Grupo Familiar generado." },
+  { "fieldname": "email_contacto", "fieldtype": "Data", "label": "Email de contacto", "options": "Email", "reqd": 1, "in_list_view": 1, "description": "Email del titular. Receptor de las notificaciones del tr\u00e1mite." },
+  { "fieldname": "column_break_tramite", "fieldtype": "Column Break" },
+  { "fieldname": "cantidad_personas", "fieldtype": "Int", "label": "Personas", "read_only": 1, "default": "0", "in_list_view": 1, "description": "Titular + familiares enviados en el mismo tr\u00e1mite." },
+  { "fieldname": "solicitud_titular", "fieldtype": "Link", "label": "Solicitud del titular", "options": "Solicitud Asociacion", "read_only": 1, "description": "Se valida primero: es quien crea el Grupo Familiar." },
+  { "fieldname": "resultado_section", "fieldtype": "Section Break", "label": "Resultado y trazabilidad" },
+  { "fieldname": "grupo_familiar_generado", "fieldtype": "Link", "label": "Grupo Familiar generado", "options": "Grupo Familiar", "read_only": 1, "description": "Se setea al validar la solicitud del titular." },
+  { "fieldname": "column_break_resultado", "fieldtype": "Column Break" },
+  { "fieldname": "token_seguimiento", "fieldtype": "Data", "label": "Token de seguimiento", "read_only": 1, "unique": 1, "description": "Token p\u00fablico \u00fanico para consultar el estado de todo el tr\u00e1mite." },
+  { "fieldname": "enviado_desde_ip", "fieldtype": "Data", "label": "Enviado desde IP", "read_only": 1 }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [
+  {
+   "group": "Solicitudes",
+   "link_doctype": "Solicitud Asociacion",
+   "link_fieldname": "solicitud_grupo"
+  }
+ ],
+ "modified": "2026-08-07 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Members",
+ "name": "Solicitud Grupo Familiar",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  { "role": "System Manager", "create": 1, "read": 1, "write": 1, "delete": 1, "report": 1, "export": 1, "share": 1, "print": 1, "email": 1 },
+  { "role": "Secretaria", "create": 1, "read": 1, "write": 1, "delete": 0, "report": 1, "export": 1, "share": 0, "print": 1, "email": 1 }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "apellido_principal",
+ "track_changes": 1
+}
