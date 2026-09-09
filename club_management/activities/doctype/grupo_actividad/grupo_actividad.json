@@ -10,6 +10,7 @@
   "titulo",
   "item",
   "pct_liquidacion_entrenador",
+  "portal_socio_elige",
   "habilitada",
   "capacidad",
   "orden",
@@ -45,6 +46,13 @@
    "fieldtype": "Percent",
    "label": "% liquidación entrenador",
    "description": "Opcional. Si está vacío, usa el default de Club Settings."
+  },
+  {
+   "default": "0",
+   "description": "Permite que el socio seleccione esta variante desde el portal autenticado.",
+   "fieldname": "portal_socio_elige",
+   "fieldtype": "Check",
+   "label": "Seleccionable por socio"
   },
   {
    "default": "1",

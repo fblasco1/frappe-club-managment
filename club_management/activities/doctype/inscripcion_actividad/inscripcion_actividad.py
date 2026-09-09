@@ -6,15 +6,25 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
+from club_management.activities.permissions import assert_inscripcion_socio_matches_session
+
 
 class InscripcionActividad(Document):
 	def validate(self) -> None:
+		assert_inscripcion_socio_matches_session(self)
 		self._validate_actividad_grupo_equipo()
 		self._validate_unica_activa()
 
 	def _validate_actividad_grupo_equipo(self) -> None:
-		usa_grupos = frappe.db.get_value("Actividad", self.actividad, "usa_grupos")
-		if usa_grupos and not self.grupo_actividad:
+		actividad = frappe.db.get_value(
+			"Actividad",
+			self.actividad,
+			["usa_grupos", "tipo_inscripcion_portal"],
+			as_dict=True,
+		)
+		usa_grupos = actividad.usa_grupos if actividad else 0
+		tipo_portal = actividad.tipo_inscripcion_portal if actividad else None
+		if usa_grupos and not self.grupo_actividad and tipo_portal != "deporte":
 			frappe.throw(
 				_("La actividad {0} requiere elegir un grupo / tira.").format(self.actividad)
 			)

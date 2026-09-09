@@ -9,6 +9,7 @@
   "titulo",
   "item",
   "usa_grupos",
+  "tipo_inscripcion_portal",
   "habilitada",
   "capacidad",
   "orden",
@@ -37,6 +38,15 @@
    "fieldtype": "Check",
    "label": "Usa grupos / tiras",
    "description": "Si est\u00e1 marcado, la inscripci\u00f3n exige elegir un Grupo Actividad (cada uno con su arancel)."
+  },
+  {
+   "default": "plana",
+   "description": "Define qu\u00e9 puede seleccionar el socio desde el portal autenticado.",
+   "fieldname": "tipo_inscripcion_portal",
+   "fieldtype": "Select",
+   "label": "Tipo de inscripci\u00f3n en portal",
+   "options": "plana\ndeporte\nvariante_grupo",
+   "reqd": 1
   },
   {
    "default": "1",
