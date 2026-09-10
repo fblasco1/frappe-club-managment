@@ -23,6 +23,7 @@
   "incluir_cargos_extra_en_deuda_mensual",
   "alta_publica_section",
   "habilitar_pago_online_alta",
+  "portal_socio_url",
   "liquidacion_entrenadores_section",
   "pct_liquidacion_entrenador_default",
   "recibo_section",
@@ -158,6 +159,12 @@
    "description": "Off (default) hasta Cobros Plus: el email post-validación no incluye link de pago; Secretaría contacta por WhatsApp/presencial y activa en Desk. On: envía link de pago firmado (stub / futuro Cobrand)."
   },
   {
+   "fieldname": "portal_socio_url",
+   "fieldtype": "Data",
+   "label": "URL portal del socio",
+   "description": "Área autenticada en Vercel, sin token. Ej: https://www.icdpedroechague.com.ar/socios/actividades. site_config portal_socio_url tiene prioridad por ambiente."
+  },
+  {
    "fieldname": "liquidacion_entrenadores_section",
    "fieldtype": "Section Break",
    "label": "Liquidación entrenadores"
@@ -224,7 +231,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-06-05 00:00:00",
+ "modified": "2026-09-09 00:00:00",
  "modified_by": "Administrator",
  "module": "Members",
  "name": "Club Settings",

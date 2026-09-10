@@ -251,6 +251,19 @@ class TestPortalSocioInscripcionApi(MembersTestCase):
 		self.assertEqual(result["estado"], ESTADO_SOCIO_PENDIENTE_INSCRIPCION)
 		self.assertNotIn("socio", result)
 
+	def test_bootstrap_sesion_entrega_csrf_solo_al_socio_actual(self) -> None:
+		with as_user(self.socio.user):
+			result = portal_api().get_session_bootstrap()
+
+		self.assertIsInstance(result["csrf_token"], str)
+		self.assertTrue(result["csrf_token"])
+		self.assertNotIn("socio", result)
+
+	def test_guest_no_puede_obtener_csrf_del_portal(self) -> None:
+		with as_user("Guest"):
+			with self.assertRaises((frappe.AuthenticationError, frappe.PermissionError)):
+				portal_api().get_session_bootstrap()
+
 	def test_usuario_sin_rol_socio_es_rechazado(self) -> None:
 		user = insert_website_user("portal.sinrol@example.com", roles=[])
 

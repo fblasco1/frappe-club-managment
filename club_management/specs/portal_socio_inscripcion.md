@@ -40,8 +40,49 @@ La página legacy en Frappe (`/inscripcion-actividades`) es provisional y no def
 - Las mutaciones usan sesión autenticada, método POST y token CSRF de Frappe.
 - Catálogo y confirmación fallan cerrados para Guest, usuarios sin rol `Socio` y usuarios sin vínculo único.
 - La confirmación mantiene rate limit y no registra cookies, CSRF tokens ni datos personales en logs.
-- `inscripcion_url` apunta al área autenticada del dominio Vercel y es configurable por ambiente.
+- `inscripcion_url` (portal) apunta al área autenticada del dominio Vercel y es configurable por ambiente.
 - Los errores de autorización son genéricos y no revelan si existe otro socio o inscripción.
+
+### URL del portal autenticado
+
+La URL productiva **no lleva `pago_token`**. Precedencia:
+
+1. `site_config.json` → `portal_socio_url`
+2. `Club Settings.portal_socio_url`
+3. Default `https://www.icdpedroechague.com.ar/socios/actividades`
+
+Si el valor es solo el origen (`https://www.icdpedroechague.com.ar`), se concatena `/socios/actividades`. Cualquier query `token` / `pago_token` se descarta.
+
+El builder legacy `build_inscripcion_actividades_url(pago_token)` queda para QA (`/inscripcion-actividades?token=`). El stub de pago puede devolver ambas: `inscripcion_url` (legacy) y `portal_url` (sesión).
+
+### Scenario: URL de portal no incluye token
+
+Given `Club Settings.portal_socio_url` o `site_config.portal_socio_url` configurado
+When el backend arma la URL del portal
+Then el resultado es el área `/socios/actividades`
+And no contiene `token` ni `pago_token`.
+
+### Scenario: site_config tiene prioridad sobre Club Settings
+
+Given `site_config.portal_socio_url = http://localhost:3000/socios/actividades`
+And Club Settings apunta a producción
+When se resuelve la URL
+Then se usa el valor de `site_config`.
+
+### Scenario: CORS nunca es wildcard
+
+Given `allow_cors` en site_config
+When se calculan los orígenes permitidos del portal
+Then `*` no forma parte de la lista
+And el origen derivado de `portal_socio_url` sí está incluido.
+
+### Scenario: bootstrap de sesión entrega CSRF
+
+Given el socio completó el login nativo de Frappe y obtuvo una cookie `sid`
+When el BFF consulta por GET el bootstrap autenticado del portal
+Then recibe un token CSRF no vacío para las mutaciones posteriores
+And el endpoint vuelve a validar rol `Socio` y vínculo único de la sesión
+And Guest no puede obtener un token.
 
 ---
 
@@ -239,6 +280,7 @@ Los métodos actuales de `activities/api/inscripcion_publica.py` son una base le
 |-----------|-----------|
 | Spec | `specs/portal_socio_inscripcion.md` (este archivo) |
 | API autenticada | `activities/api/portal_socio.py` |
+| URL portal / CORS | `activities/services/portal_urls.py`, `Club Settings.portal_socio_url` |
 | Servicios | `activities/services/actividades_catalog.py`, `grupos_portal.py`, `inscripcion_socio.py` |
 | Permisos | `activities/permissions.py` y hooks correspondientes |
 | Desk | Completar tira/equipo en `inscripcion_gestion_desk.md` |

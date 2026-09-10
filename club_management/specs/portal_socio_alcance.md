@@ -51,12 +51,12 @@ Orden de entrega. Solo el ítem 1–4 entra en el primer corte usable.
 | 2 | Contexto del socio (estado, elegibilidad) | Backend BL-6 | `get_contexto_socio` |
 | 3 | Catálogo de inscripción (plana / deporte / variante) | Backend BL-6 | `get_catalogo_inscripcion` |
 | 4 | Confirmar actividades e inscripciones propias | Backend BL-6 | `confirmar_inscripcion_actividades`, `list_inscripciones_propias` |
-| 5 | Home autenticado (saludo, estado, CTA de inscripción o “ya activo”) | Pendiente UI Vercel | Reusa 2–4 |
-| 6 | Ver inscripciones actuales (solo lectura) | API lista lista; falta UI | Sin baja ni cambio post-alta |
+| 5 | Home autenticado (saludo, cards, carnet, accesos) | Hecho | UI shell estilo dashboard: `/socios` Inicio, tabs Mis datos / Actividades; Deudas/Reservas próximamente |
+| 6 | Ver inscripciones actuales (solo lectura) | Hecho (en Actividades) | Sin baja ni cambio post-alta |
 | 7 | Enlace al área de pago cuando exista gateway | Fuera de BL-6 | Supervielle / Cobrand |
-| 8 | Carnet digital | Fuera de MVP portal | XSS: no renderizar HTML crudo |
+| 8 | Carnet digital | Parcial | Resumen + foto en Inicio; QR formal fuera de MVP |
 | 9 | Historial de pagos del socio | Fuera de MVP portal | Hoy es Desk (`historial_pagos_socio.md`) |
-| 10 | Autogestión de datos personales / documentación | Fuera de MVP portal | Secretaría edita; portal como mucho “ver y solicitar corrección” |
+| 10 | Perfil (datos personales + foto 4×4; actualización) | Hecho | `portal_socio_perfil.md` — Mis datos en shell del portal |
 | 11 | Reserva de espacios alquilables | Futuro | SP-7, `spaces_fases_futuras.md` |
 
 ### Scenario: socio pendiente ve solo lo suyo
@@ -105,13 +105,13 @@ And Secretaría opera por Desk, no por el portal.
 3. Suite de aislamiento (dos socios) y reglas plana / deporte / variante.
 4. `bench migrate` en el sitio de desarrollo.
 
-**Hecho en esta branch.** Siguiente: suite dirigida verde en Docker.
+**Hecho en esta branch (backend + URL/CORS).** Cliente Vercel: `/socios/login` y `/socios/actividades` en el repo del sitio.
 
 ### Fase B — Contrato Vercel ↔ Frappe
 
-1. CORS solo orígenes del sitio; cookies + CSRF en mutaciones.
-2. `inscripcion_url` por ambiente apuntando al área autenticada Vercel.
-3. Cliente Vercel: login existente → contexto → catálogo → confirmar.
+1. CORS solo orígenes del sitio; nunca `*`. El cliente Vercel usa BFF (`/api/socios/*`) que reenvía `sid` + CSRF a Frappe (el browser no habla con Frappe).
+2. `portal_socio_url` por ambiente (`site_config` > Club Settings > default Vercel).
+3. Cliente Vercel: `/socios/login` (email o DNI) → `/socios/actividades` (contexto, catálogo, confirmar).
 4. UAT local: cobro manual Secretaría → socio pendiente → login → inscripción.
 
 ### Fase C — Cutover

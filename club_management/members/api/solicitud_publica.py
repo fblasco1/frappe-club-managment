@@ -22,6 +22,7 @@ from frappe.rate_limiter import rate_limit
 from club_management.activities.services.actividades_catalog import (
     ESTADO_SOCIO_PENDIENTE_INSCRIPCION,
 )
+from club_management.activities.services.portal_urls import build_portal_socio_url
 from club_management.members.services.actividades_portal import list_actividades_asociacion
 from club_management.members.services.google_places import get_places_config_for_portal
 from club_management.members.services.socio_transitions import cambiar_estado
@@ -319,6 +320,14 @@ def _actualizar_solicitud_impl(token: str, data: Any) -> dict[str, Any]:
 	return {"status": "ok", "message": _("Solicitud actualizada y reenviada.")}
 
 
+def _pago_stub_urls(pago_token: str) -> dict[str, str]:
+	return {
+		"status": "ok",
+		"inscripcion_url": build_inscripcion_actividades_url(pago_token),
+		"portal_url": build_portal_socio_url(),
+	}
+
+
 def _confirmar_pago_stub_impl(pago_token: str) -> dict[str, str]:
 	"""Stub Sprint 1: pago registrado; el socio elige actividades antes de `Activo`."""
 	solicitud_name = verify_pago_token(pago_token)
@@ -331,25 +340,16 @@ def _confirmar_pago_stub_impl(pago_token: str) -> dict[str, str]:
 
 	socio = frappe.get_doc("Socio", solicitud.socio_generado)
 	if socio.estado == ESTADO_SOCIO_PENDIENTE_INSCRIPCION:
-		return {
-			"status": "ok",
-			"inscripcion_url": build_inscripcion_actividades_url(pago_token),
-		}
+		return _pago_stub_urls(pago_token)
 	if socio.estado == "Activo":
-		return {
-			"status": "ok",
-			"inscripcion_url": build_inscripcion_actividades_url(pago_token),
-		}
+		return _pago_stub_urls(pago_token)
 
 	cambiar_estado(
 		solicitud.socio_generado,
 		ESTADO_SOCIO_PENDIENTE_INSCRIPCION,
 		motivo="Pago stub Sprint 1",
 	)
-	return {
-		"status": "ok",
-		"inscripcion_url": build_inscripcion_actividades_url(pago_token),
-	}
+	return _pago_stub_urls(pago_token)
 
 
 @frappe.whitelist(allow_guest=True)

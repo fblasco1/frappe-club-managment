@@ -17,22 +17,11 @@ from club_management.activities.services.inscripcion_socio import (
 	actividades_resumen_socio,
 	inscribir_socio_selecciones,
 )
-
-
-SOCIO_ROLE = "Socio"
+from club_management.members.services.portal_session import get_current_socio
 
 
 def _current_socio() -> frappe.model.document.Document:
-	user = frappe.session.user
-	if user == "Guest":
-		frappe.throw(_("Authentication required"), frappe.AuthenticationError)
-	if SOCIO_ROLE not in frappe.get_roles(user):
-		frappe.throw(_("Not permitted"), frappe.PermissionError)
-
-	names = frappe.get_all("Socio", filters={"user": user}, pluck="name", limit=2)
-	if len(names) != 1:
-		frappe.throw(_("Not permitted"), frappe.PermissionError)
-	return frappe.get_doc("Socio", names[0])
+	return get_current_socio()
 
 
 def _parse_selecciones(raw: Any) -> list[dict[str, Any]]:
@@ -106,6 +95,13 @@ def _response(socio: str, actividades: list[str]) -> dict[str, Any]:
 		"actividades": actividades,
 		"actividad_resumen": actividades_resumen_socio(socio),
 	}
+
+
+@frappe.whitelist()
+def get_session_bootstrap() -> dict[str, str]:
+	"""Entrega el CSRF de la sesión después de validar al socio autenticado."""
+	_current_socio()
+	return {"csrf_token": frappe.sessions.get_csrf_token()}
 
 
 @frappe.whitelist()
