@@ -6,6 +6,7 @@ import frappe
 
 from club_management.activities.services.portal_urls import (
 	DEFAULT_PORTAL_SOCIO_URL,
+	apply_portal_cors_allowlist,
 	build_portal_socio_url,
 	portal_allowed_origins,
 )
@@ -29,6 +30,8 @@ class TestPortalSocioUrl(MembersTestCase):
 		for key in ("portal_socio_url", "allow_cors"):
 			if key in frappe.conf:
 				del frappe.conf[key]
+		if hasattr(frappe.local, "allow_cors"):
+			delattr(frappe.local, "allow_cors")
 		super().tearDown()
 
 	def test_site_config_no_incluye_token(self) -> None:
@@ -90,6 +93,23 @@ class TestPortalSocioUrl(MembersTestCase):
 		field = frappe.get_meta("Club Settings").get_field("portal_socio_url")
 		self.assertIsNotNone(field)
 		self.assertEqual(field.fieldtype, "Data")
+
+	def test_apply_portal_cors_allowlist_nunca_wildcard(self) -> None:
+		frappe.conf.allow_cors = "*"
+		frappe.conf.portal_socio_url = "http://localhost:3000/socios/actividades"
+
+		apply_portal_cors_allowlist()
+
+		self.assertNotIn("*", frappe.local.allow_cors)
+		self.assertIn("http://localhost:3000", frappe.local.allow_cors)
+
+	def test_hooks_registra_cors_portal(self) -> None:
+		from club_management import hooks
+
+		self.assertIn(
+			"club_management.activities.services.portal_urls.apply_portal_cors_allowlist",
+			hooks.before_request,
+		)
 
 
 class TestPortalUrlEnPagoStub(MembersTestCase):

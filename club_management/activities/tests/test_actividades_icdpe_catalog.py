@@ -76,3 +76,21 @@ class TestActividadesIcdpeCatalog(MembersTestCase):
 		futbol_name = _resolve_actividad_docname("Futbol")
 		self.assertTrue(futbol_name)
 		self.assertEqual(frappe.db.get_value("Actividad", futbol_name, "item"), item_link)
+
+	def test_sync_asigna_tipo_inscripcion_portal(self) -> None:
+		sync_actividades_catalogo_icdpe(deshabilitar_legacy=False)
+		basquet = _resolve_actividad_docname("Basquet")
+		funcional = _resolve_actividad_docname("Funcional")
+		zumba = _resolve_actividad_docname("Zumba")
+		self.assertEqual(
+			frappe.db.get_value("Actividad", basquet, "tipo_inscripcion_portal"),
+			"deporte",
+		)
+		self.assertEqual(
+			frappe.db.get_value("Actividad", funcional, "tipo_inscripcion_portal"),
+			"variante_grupo",
+		)
+		self.assertEqual(
+			frappe.db.get_value("Actividad", zumba, "tipo_inscripcion_portal"),
+			"plana",
+		)

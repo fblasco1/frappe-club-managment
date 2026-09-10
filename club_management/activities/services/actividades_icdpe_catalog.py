@@ -57,6 +57,20 @@ ACTIVIDADES_CON_GRUPOS: frozenset[str] = frozenset(
 	}
 )
 
+# Portal: deportes = solo actividad; el resto con grupos = variante de plan.
+DEPORTES_PORTAL_ICDPE: frozenset[str] = frozenset(
+	{"Basquet", "Voley Femenino", "Futbol"}
+)
+
+
+def tipo_inscripcion_portal_icdpe(titulo: str) -> str:
+	"""Metadata `tipo_inscripcion_portal` del catálogo oficial ICDPE."""
+	if titulo in DEPORTES_PORTAL_ICDPE:
+		return "deporte"
+	if titulo in ACTIVIDADES_CON_GRUPOS:
+		return "variante_grupo"
+	return "plana"
+
 _TITULOS_OFICIALES = frozenset(e.titulo for e in ACTIVIDADES_CATALOGO_ICDPE)
 
 # Títulos del seed anterior u otras variantes → catálogo ICDPE actual.
@@ -168,6 +182,7 @@ def upsert_actividad_catalog_entry(entry: ActividadCatalogEntry) -> str:
 		"habilitada": 1,
 		"orden": entry.orden,
 		"usa_grupos": 1 if entry.titulo in ACTIVIDADES_CON_GRUPOS else 0,
+		"tipo_inscripcion_portal": tipo_inscripcion_portal_icdpe(entry.titulo),
 	}
 	if item_link:
 		payload["item"] = item_link
@@ -177,6 +192,13 @@ def upsert_actividad_catalog_entry(entry: ActividadCatalogEntry) -> str:
 		frappe.db.set_value("Actividad", existing, "titulo", entry.titulo, update_modified=False)
 		frappe.db.set_value("Actividad", existing, "orden", entry.orden, update_modified=False)
 		frappe.db.set_value("Actividad", existing, "habilitada", 1, update_modified=False)
+		frappe.db.set_value(
+			"Actividad",
+			existing,
+			"tipo_inscripcion_portal",
+			tipo_inscripcion_portal_icdpe(entry.titulo),
+			update_modified=False,
+		)
 		if item_link:
 			frappe.db.set_value("Actividad", existing, "item", item_link, update_modified=True)
 		else:

@@ -63,3 +63,8 @@ def portal_allowed_origins() -> list[str]:
 
 	unique = sorted(set(origins))
 	return unique
+
+
+def apply_portal_cors_allowlist() -> None:
+	"""Fail closed: Frappe lee `frappe.local.allow_cors`; nunca propaga `*`."""
+	frappe.local.allow_cors = portal_allowed_origins()

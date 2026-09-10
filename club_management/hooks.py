@@ -221,6 +221,7 @@ scheduler_events = {
 before_request = [
 	"club_management.integrations.payment_ledger_postgres.apply_patch",
 	"club_management.integrations.scheduler_postgres.apply_patch",
+	"club_management.activities.services.portal_urls.apply_portal_cors_allowlist",
 ]
 on_session_creation = [
 	"club_management.integrations.payment_ledger_postgres.apply_patch",
