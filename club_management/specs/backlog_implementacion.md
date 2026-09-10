@@ -13,18 +13,43 @@
 
 
 **Última revisión MVP producción:** 2026-08-19 — commit en Hetzner: **`43b226f`** (validación Adherente/Jubilado en alta pública).  
-**Última actualización backlog:** 2026-08-27 (módulo Spaces — resumen + pendientes FMV/Excel).  
+**Última actualización backlog:** 2026-09-10 (gate de release Spaces + portal socio base; Supervielle sandbox post-release).  
 
 **Destino producción:** Hetzner Cloud **CX23** — https://gestion.icdpedroechague.com.ar  
 **Landing (wizard):** https://www.icdpedroechague.com.ar/asociate/inscripcion  
+**Portal socio (landing):** https://www.icdpedroechague.com.ar/socios (Vercel `pedro-echague-landing-page`)
 
-**Gap local → prod:** el go-live de agosto está desplegado. Queda WIP local en `stash@{0}` (`wip leftover KPIs/post-baja`) — **no** incluye post-baja (eso ya está en prod). Ver «Pendiente post go-live 2026-08-19».
-
-
+**Gap local → prod:** el go-live de agosto está desplegado. Portal socio base (BL-6 perfil + inscripción) está en `develop` local (UAT OK); **no** sale a prod hasta cerrar el gate de Spaces abajo. WIP cobranza/Spaces/Supervielle en stash — no mezclar con el freeze del portal.
 
 ---
 
+## Próximo release a producción (gate)
 
+**Regla de salida:** no hay release a Hetzner/Vercel de “Spaces + portal socio base” hasta que Spaces permita **reservas externas** y **reservas desde el portal del socio**, además del portal socio base ya congelado en `develop`.
+
+| Bloque | Alcance mínimo | Specs | Estado 2026-09-10 |
+|--------|----------------|-------|-------------------|
+| **Portal socio base** | Sesión (`socio_sid`/`socio_csrf`), perfil + proxy foto, inscripción a actividades (catálogo deporte/variante/plana), CORS allowlist | `portal_socio_alcance.md`, `portal_socio_perfil.md`, `portal_socio_inscripcion.md` | `[~]` Backend + shell Next en `develop` / landing local; UAT local PASS; **sin push/deploy prod** |
+| **Spaces — reservas externas** | Solicitud online de externo (token/flujo público), bloqueo de slot, tarifas canal externo, comprobante fase 1 (transferencia + PDF), confirmación Coordinación | `spaces_sprint_gestion.md` Épica 1 · `spaces_alquiler_externo.md` (Desk ya OK) · `spaces_fases_futuras.md` | `[ ]` **Bloqueante release** (SP-3) |
+| **Spaces — reservas desde portal socio** | Socio autenticado reserva espacios `alquilable=1`, aislamiento por `Socio`, tarifas canal socio, mismo flujo de confirmación | `spaces_fases_futuras.md` (portal socio) · `spaces_sprint_gestion.md` Épica 1 · SP-7 | `[ ]` **Bloqueante release** |
+
+**Orden de trabajo del release**
+
+1. Cerrar SP-3 (reservas online socio **y** externo + comprobante + confirmación Coordinación).
+2. Exponer el flujo socio en el portal (`/socios` / Spaces) con aislamiento y CSRF/sesión existentes.
+3. Smoke UAT Spaces + portal; merge/push `develop`; dual-deploy Hetzner (`gestion.icdpedroechague.com.ar`) + Vercel (landing).
+4. **Recién entonces** — release siguiente: integración sandbox Supervielle (botón de pago + débito automático).
+
+### Release siguiente (después de Spaces + portal base)
+
+| ID | Tema | Prioridad | Spec / notas |
+|----|------|-----------|--------------|
+| SV-SANDBOX | Sandbox Banco Supervielle / Cobros Plus | Alta | Probar en sandbox; **no** inventar endpoints — usar `integrations/supervielle_*` y specs `supervielle_cobros_plus_*` |
+| SV-BOTON | Botón de pago (portal / deuda) | Alta | Idempotencia + Payment Log; IDs de gateway inmutables |
+| SV-DEBITO | Débito automático | Alta | Alta de adhesión + cobros recurrentes; webhooks idempotentes |
+| — | SIRO | — | **Fuera de alcance** — no diseñar ni documentar |
+
+---
 
 ## Producción — Hetzner CX23
 
@@ -1038,21 +1063,21 @@ Error en producción al **Registrar cobro** desde formulario Socio: `NameError: 
 
 | ID | Tema | Prioridad | Spec / notas |
 |----|------|-----------|--------------|
-| **SP-1** | **Sincronizar fixtures FMV (Vóley)** | **Alta** | Adaptador en `spaces/fixtures/sources/`; contrato payload + upsert idempotente; botón/cron en planilla. Hoy: solo carga manual. `spaces_fixtures_partidos.md` § otras federaciones. |
-| **SP-2** | **Carga fixtures de ligas desde Excel** | **Alta** | Import Desk: Excel → preview → upsert `Reserva Espacio` (idempotente). Complementa CSV FeBAMBA y grilla Coordinación. |
-| SP-3 | Reservas online socio + externo + comprobante PDF | Media | Épica 1 — `spaces_sprint_gestion.md` |
+| **SP-3** | **Reservas online socio + externo + comprobante PDF** | **Crítica (gate release)** | Épica 1 — `spaces_sprint_gestion.md`. Incluye canal externo (token/público) y canal socio. |
+| **SP-7** | **Portal socio — reserva espacios alquilables** | **Crítica (gate release)** | UI `/socios` + APIs; aislamiento por Socio. `spaces_fases_futuras.md`. |
+| SP-1 | Sincronizar fixtures FMV (Vóley) | Alta | En `develop` hay trabajo de adaptador/fixtures; validar cierre vs spec. `spaces_fixtures_partidos.md`. |
+| SP-2 | Carga fixtures de ligas desde Excel | Alta | Import Desk idempotente; validar cierre vs Coordinación. |
 | SP-4 | Disponibilidad en vivo (estados que bloquean) | Media | Épica 2 — `spaces_sprint_gestion.md` |
 | SP-5 | Reporte diario PDF/Excel → email coordinador/es | Media | Épica 4 — replicación manual WhatsApp CD |
-| SP-6 | Cobro alquiler (Cobrand / ítems ICDPE-ALQ) | Baja | `spaces_fases_futuras.md` |
-| SP-7 | Portal socio — reserva espacios alquilables | Baja | `spaces_fases_futuras.md` |
-| SP-8 | Deploy prod Hetzner + smoke planilla/fixtures | Media | Tras validación Coordinación en dev |
+| SP-6 | Cobro alquiler (Cobrand / ítems ICDPE-ALQ) | Baja | Post-release Supervielle; `spaces_fases_futuras.md` |
+| SP-8 | Deploy prod Hetzner + smoke planilla/fixtures | Alta | **Tras** SP-3 + SP-7 + portal socio base |
 
 ### Próximo paso sugerido (Spaces)
 
-1. **SP-1 FMV:** definir fuente (API, Excel periódico o export web) → spec Given/When/Then → adaptador + tests.
-2. **SP-2 Excel ligas:** plantilla Excel acordada con Coordinación → import Desk con informe de errores.
-3. Validar en dev con Coordinación un viernes con cena vitalicios + partido FeBAMBA + superposición.
-4. Deploy a prod cuando CD apruebe planilla operativa.
+1. **SP-3 + SP-7 (gate):** reservas online externo y desde portal socio → tests → UAT Coordinación.
+2. Cerrar SP-1/SP-2 si aún falta validación operativa de fixtures FMV/Excel.
+3. Dual-deploy Spaces + portal socio base (Hetzner + Vercel).
+4. **Siguiente release:** sandbox Supervielle (botón de pago + débito automático).
 
 ---
 
@@ -1067,7 +1092,7 @@ Error en producción al **Registrar cobro** desde formulario Socio: `NameError: 
 | BL-14 | Filtro tendencia KPI (todos / cuota / arancel / mora) | Media | WIP `stash@{0}` — no bloquea |
 | BL-15 | Informe pagos del día (concepto `Cuota Social · categoría`) | Baja | WIP `stash@{0}` |
 | BL-16 | Liquidación por inscripción (cuota/arancel/federativa) | Baja | WIP `stash@{0}` — validar con caso real |
-| BL-6 | Portal socio inscripción post-pago | Media | Distinto del wizard de alta |
+| BL-6 | Portal socio inscripción post-pago | — | **[~] En `develop`** (perfil + inscripción + UAT local). Release prod **después** del gate Spaces SP-3/SP-7. |
 | — | Smoke humano: 1 Adherente + 1 Jubilado de prueba en prod | Alta | Verificar solicitud en Desk y adjuntos privados |
 | — | UAT Cloudflare / túnel | — | **Cerrado** — túnel apagado; Preview ya no apunta a Frappe local |
 
