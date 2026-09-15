@@ -175,6 +175,10 @@ scheduler_events = {
 		"club_management.members.jobs.cobranza_periodica.run_recargos_si_corresponde",
 		"club_management.members.jobs.moroso_automatico.run_evaluar_morosos_si_corresponde",
 	],
+	"hourly": [
+		# Solo consulta API si sandbox_mode o polling_enabled (ver renditions.py).
+		"club_management.integrations.supervielle.renditions.process_renditions_scheduler_tick",
+	],
 	"cron": {
 		# 08:00 y 20:00 ART (UTC-3) — alineado al cron formativas_ges
 		"0 11,23 * * *": [

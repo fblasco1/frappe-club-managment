@@ -1,4 +1,8 @@
-"""Contrato de consulta y preview de rendiciones Supervielle v6.2."""
+"""Contrato de consulta y preview de rendiciones Supervielle v6.2.
+
+Los tests extendidos (tick, hash auditoría, idempotencia) viven en
+`club_management.integrations.supervielle.tests.test_renditions`.
+"""
 
 from __future__ import annotations
 

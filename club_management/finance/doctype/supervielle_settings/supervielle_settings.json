@@ -18,6 +18,7 @@
   "convenio",
   "rendicion_api_url",
   "rendicion_apply_enabled",
+  "polling_enabled",
   "mode_of_payment",
   "clearing_account"
  ],
@@ -89,6 +90,13 @@
    "fieldname": "rendicion_apply_enabled",
    "fieldtype": "Check",
    "label": "Aplicar rendiciones automáticamente"
+  },
+  {
+   "default": "0",
+   "description": "Consulta periódica de rendiciones vía scheduler. También se activa implícitamente con sandbox_mode.",
+   "fieldname": "polling_enabled",
+   "fieldtype": "Check",
+   "label": "Polling de rendiciones"
   },
   {
    "default": "Cobros Plus (ARS)",
