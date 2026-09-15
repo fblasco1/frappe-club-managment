@@ -18,6 +18,10 @@ from club_management.members.setup.secretaria_workspace import WORKSPACE_NAME as
 from club_management.members.setup.secretaria_workspace_sidebar import (
 	SIDEBAR_ITEMS as SECRETARIA_SIDEBAR_ITEMS,
 )
+from club_management.spaces.setup.espacios_workspace_sidebar import (
+	SIDEBAR_ESPACIOS,
+	SIDEBAR_ITEMS as ESPACIOS_SIDEBAR_ITEMS,
+)
 
 SICLUB_APP_LABEL = "SICLUB"
 SICLUB_APP_NAME = "club_management"
@@ -54,11 +58,18 @@ SICLUB_CHILD_ICONS: tuple[dict[str, Any], ...] = (
 		"idx": 2,
 	},
 	{
+		"label": SIDEBAR_ESPACIOS,
+		"icon": "organization",
+		"link_to": SIDEBAR_ESPACIOS,
+		"bg_color": "blue",
+		"idx": 3,
+	},
+	{
 		"label": SIDEBAR_CONFIG,
 		"icon": "setting",
 		"link_to": SIDEBAR_CONFIG,
 		"bg_color": "gray",
-		"idx": 3,
+		"idx": 4,
 	},
 )
 
@@ -86,6 +97,12 @@ def _ensure_landing_sidebars() -> None:
 		header_icon="activity",
 		module="Activities",
 		items=ACTIVIDADES_SIDEBAR_ITEMS,
+	)
+	_upsert_workspace_sidebar(
+		SIDEBAR_ESPACIOS,
+		header_icon="organization",
+		module="Spaces",
+		items=ESPACIOS_SIDEBAR_ITEMS,
 	)
 	_upsert_workspace_sidebar(
 		SIDEBAR_CONFIG,

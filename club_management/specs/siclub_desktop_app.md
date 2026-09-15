@@ -25,6 +25,7 @@ When el usuario lo abre (modal como Framework)
 Then ve hijos con `parent_icon = "SICLUB"`:
 - **Socios** → sidebar con el mismo contenido operativo de Secretaría
 - **Actividades** → sidebar de Gestión de Actividades
+- **Espacios** → sidebar de Gestión de Espacios y Canchas
 - **Configuración de Sistema** → acceso a `Club Settings`
 And cada hijo es `icon_type = "Link"` y `link_type = "Workspace Sidebar"`
 

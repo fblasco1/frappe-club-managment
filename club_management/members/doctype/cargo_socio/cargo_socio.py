@@ -43,6 +43,8 @@ class CargoSocio(Document):
 		deuda mensual; el mes corriente se factura desde el diálogo Desk."""
 		if self.modo_cobro != "Unico" or self.estado != "Pendiente":
 			return
+		if getattr(frappe.flags, "skip_cargo_auto_invoice", False):
+			return
 		if (
 			frappe.flags.in_migrate
 			or frappe.flags.in_install

@@ -99,7 +99,8 @@ class TestPermissionsCoordinacion(MembersTestCase):
 			)
 		)
 		source = path.read_text(encoding="utf-8")
-		self.assertIn('link_to: "Espacios"', source)
+		# SP-3: inicio apunta a Page `espacios` (dashboard), no al Workspace label.
+		self.assertIn('link_to: "espacios"', source)
 		self.assertIn('link_to: "ocupacion-espacios"', source)
 
 		bundle = Path(

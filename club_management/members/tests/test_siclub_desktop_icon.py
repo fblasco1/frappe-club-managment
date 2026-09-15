@@ -8,6 +8,7 @@ from club_management.members.setup.siclub_desktop_icon import (
 	SICLUB_APP_LABEL,
 	SIDEBAR_ACTIVIDADES,
 	SIDEBAR_CONFIG,
+	SIDEBAR_ESPACIOS,
 	SIDEBAR_SOCIOS,
 	ensure_siclub_desktop_icons,
 	siclub_child_labels,
@@ -45,7 +46,7 @@ class TestSiclubDesktopIcon(MembersTestCase):
 
 	def test_ensure_crea_sidebars_landing(self) -> None:
 		ensure_siclub_desktop_icons()
-		for name in (SIDEBAR_SOCIOS, SIDEBAR_ACTIVIDADES, SIDEBAR_CONFIG):
+		for name in (SIDEBAR_SOCIOS, SIDEBAR_ACTIVIDADES, SIDEBAR_ESPACIOS, SIDEBAR_CONFIG):
 			self.assertTrue(frappe.db.exists("Workspace Sidebar", name), name)
 			items = frappe.get_all(
 				"Workspace Sidebar Item",
