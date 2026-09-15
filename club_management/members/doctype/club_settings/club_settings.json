@@ -24,6 +24,8 @@
   "alta_publica_section",
   "habilitar_pago_online_alta",
   "portal_socio_url",
+  "espacios_section",
+  "espacios_reserva_externa_habilitada",
   "liquidacion_entrenadores_section",
   "pct_liquidacion_entrenador_default",
   "recibo_section",
@@ -165,6 +167,18 @@
    "description": "Área autenticada en Vercel, sin token. Ej: https://www.icdpedroechague.com.ar/socios/actividades. site_config portal_socio_url tiene prioridad por ambiente."
   },
   {
+   "fieldname": "espacios_section",
+   "fieldtype": "Section Break",
+   "label": "Espacios"
+  },
+  {
+   "default": "0",
+   "description": "Si est\u00e1 apagado, las APIs guest de reserva externa fallan cerradas (PermissionError).",
+   "fieldname": "espacios_reserva_externa_habilitada",
+   "fieldtype": "Check",
+   "label": "Habilitar reserva externa online"
+  },
+  {
    "fieldname": "liquidacion_entrenadores_section",
    "fieldtype": "Section Break",
    "label": "Liquidación entrenadores"
@@ -231,7 +245,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-09-09 00:00:00",
+ "modified": "2026-09-12 00:00:00",
  "modified_by": "Administrator",
  "module": "Members",
  "name": "Club Settings",
