@@ -26,11 +26,19 @@ def _fail(msg: str) -> None:
 	raise RuntimeError(msg)
 
 
+def _ensure_fresh_espacio(nombre: str, **kwargs: Any) -> str:
+	"""Idempotente: borra espacio UAT previo si quedó de un smoke anterior."""
+	if frappe.db.exists("Espacio", nombre):
+		frappe.delete_doc("Espacio", nombre, force=True, ignore_permissions=True)
+		frappe.db.commit()
+	return insert_espacio(nombre, **kwargs)
+
+
 def smoke_externo() -> str:
 	frappe.set_user("Administrator")
 	_ensure_alquiler_item(rate=25000.0)
 	frappe.db.set_single_value("Club Settings", "espacios_reserva_externa_habilitada", 1)
-	esp = insert_espacio("UAT Externo Smoke", tipo="Cancha", alquilable=1, habilitado=1)
+	esp = _ensure_fresh_espacio("UAT Externo Smoke", tipo="Cancha", alquilable=1, habilitado=1)
 	frappe.db.set_value("Espacio", esp, "tarifa_externo", 30000)
 
 	api = importlib.import_module("club_management.spaces.api.externo_reservas")
@@ -115,7 +123,7 @@ def smoke_socio() -> str:
 	frappe.set_user("Administrator")
 	info = ensure_qa()
 	email = (info or {}).get("email") or "reserva.qa@icdpe.test"
-	esp = insert_espacio("UAT Socio Smoke", tipo="Salon", alquilable=1, habilitado=1)
+	esp = _ensure_fresh_espacio("UAT Socio Smoke", tipo="Salon", alquilable=1, habilitado=1)
 	frappe.db.set_value("Espacio", esp, "tarifa_socio", 12000)
 	_ensure_alquiler_item(rate=12000.0)
 
