@@ -57,7 +57,7 @@ Orden de entrega. Solo el ítem 1–4 entra en el primer corte usable.
 | 8 | Carnet digital | Parcial | Resumen + foto en Inicio; QR formal fuera de MVP |
 | 9 | Historial de pagos del socio | Fuera de MVP portal | Hoy es Desk (`historial_pagos_socio.md`) |
 | 10 | Perfil (datos personales + foto 4×4; actualización) | Hecho | `portal_socio_perfil.md` — Mis datos en shell del portal |
-| 11 | Reserva de espacios alquilables | Futuro | SP-7, `spaces_fases_futuras.md` |
+| 11 | Reserva de espacios alquilables | Backend SP-7 | `reservas_espacio_portal.md` — `get_espacios_disponibles`, `solicitar_reserva_espacio` |
 
 ### Scenario: socio pendiente ve solo lo suyo
 
@@ -131,7 +131,7 @@ And Secretaría opera por Desk, no por el portal.
 1. Historial de pagos en portal (reusar servicio Desk con alcance de sesión).
 2. Carnet (plantilla escapada).
 3. Solicitud de corrección de datos.
-4. Reservas de espacios (SP-7).
+4. Reservas de espacios (SP-7) — **API + confirmación Coordinación** (`reservas_espacio_portal.md`, `reservas_espacio_confirmacion.md`); canal externo token y email pendientes.
 
 Cada extensión: spec Given/When/Then → test con dos usuarios → API con sesión
 → UI Vercel. No se agregan campos “por las dudas”.

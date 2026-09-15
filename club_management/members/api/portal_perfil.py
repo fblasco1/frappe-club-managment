@@ -162,6 +162,35 @@ def get_foto_perfil_path() -> str:
 	return path
 
 
+def _is_image_file_url(file_url: str) -> bool:
+	url = (file_url or "").strip().lower()
+	if not url:
+		return False
+	if not (url.startswith("/private/files/") or url.startswith("/files/")):
+		return False
+	if ".." in url or "://" in url:
+		return False
+	exts = (".jpg", ".jpeg", ".png", ".webp", ".gif")
+	if any(url.split("?", 1)[0].endswith(ext) for ext in exts):
+		return True
+	file_name = frappe.db.get_value("File", {"file_url": file_url}, "file_name") or ""
+	return str(file_name).lower().endswith(exts)
+
+
+@frappe.whitelist()
+def update_foto_perfil(file_url: str) -> dict[str, Any]:
+	"""Actualiza la foto 4×4 del socio de sesión (URL ya subida)."""
+	socio = get_current_socio()
+	url = (file_url or "").strip()
+	if not _is_image_file_url(url):
+		frappe.throw(_("La foto debe ser una imagen válida"), frappe.ValidationError)
+	socio.flags.ignore_permissions = True
+	socio.foto_perfil = url
+	socio.save()
+	socio.reload()
+	return _perfil_payload(socio)
+
+
 def assert_foto_path_pertenece_al_socio(path: str) -> None:
 	"""Impide servir un blob que no sea la foto_perfil del socio de sesión."""
 	socio = get_current_socio()

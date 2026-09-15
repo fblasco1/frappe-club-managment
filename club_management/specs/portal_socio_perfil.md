@@ -25,14 +25,14 @@
 | Contacto | `telefono_fijo`, `telefono_movil` | sí | **sí** |
 | Domicilio | `calle`, `numero`, `piso`, `departamento`, `provincia`, `ciudad`, `localidad_barrio`, `codigo_postal` | sí | **sí** |
 | Membresía | `estado`, `categoria`, `actividad`, `fecha_ingreso`, `fecha_alta` | sí | **no** |
-| Foto | `tiene_foto` | sí | **no** (este corte) |
+| Foto | `tiene_foto` | sí | **sí** vía `update_foto_perfil` (archivo imagen) |
 
 Whitelist de escritura (`EDITABLE_FIELDS`):
 `nombre`, `apellido`, `nacionalidad`, `fecha_nacimiento`, `genero`,
 `telefono_fijo`, `telefono_movil`, `calle`, `numero`, `piso`, `departamento`,
 `provincia`, `ciudad`, `localidad_barrio`, `codigo_postal`.
 
-La respuesta **no** incluye el `name` interno del DocType `Socio`. Preferir `numero_socio`.
+Foto: endpoint dedicado `update_foto_perfil(file_url)` — solo rutas `/private/files/` o `/files/` de imagen; identidad de sesión.
 
 ---
 
@@ -111,10 +111,19 @@ And el proxy de foto responde 404 sin filtrar datos de otro socio.
 
 ---
 
+## Scenario: socio actualiza o carga foto de perfil
+
+Given un Website User con rol `Socio` vinculado a un único `Socio`
+When llama `update_foto_perfil` con una URL de imagen válida subida a `/private/files/…` o `/files/…`
+Then `foto_perfil` queda apuntando a esa URL
+And `tiene_foto` es verdadero
+And un Guest no puede actualizar la foto.
+
+---
+
 ## Fuera de alcance
 
 - Cambiar email o DNI desde el portal (Secretaría).
-- Subir o renovar foto 4×4.
 - Ver o descargar DNI / ficha médica / comprobante jubilado.
 - Carnet digital (spec aparte; puede reutilizar foto más adelante).
 

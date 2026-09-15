@@ -231,3 +231,17 @@ class TestPortalSocioPerfil(MembersTestCase):
 		self.assertEqual(self.socio_b.calle, calle_b)
 		self.socio_a.reload()
 		self.assertEqual(self.socio_a.calle, "Solo A")
+
+	def test_actualiza_foto_perfil(self) -> None:
+		with as_user(self.socio_a.user):
+			result = perfil_api().update_foto_perfil("/private/files/nueva_foto_a.jpg")
+		self.assertTrue(result["tiene_foto"])
+		self.socio_a.reload()
+		self.assertEqual(self.socio_a.foto_perfil, "/private/files/nueva_foto_a.jpg")
+
+	def test_foto_invalida_rechaza(self) -> None:
+		with as_user(self.socio_a.user):
+			with self.assertRaises(frappe.ValidationError):
+				perfil_api().update_foto_perfil("/etc/passwd")
+			with self.assertRaises(frappe.ValidationError):
+				perfil_api().update_foto_perfil("/private/files/comprobante.pdf")
