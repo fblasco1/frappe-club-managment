@@ -29,7 +29,12 @@ class TestGestionActividadesDashboardAssets(MembersTestCase):
 	def test_ruta_corta_reconoce_alias_antes_de_cargar_workspaces(self) -> None:
 		source = _public_js_source("club_desk_navigation.js")
 		self.assertIn('"gestión-de-actividades": "Gestión de Actividades"', source)
-		self.assertIn("this.SLUG_ALIASES[key]", source)
+		self.assertIn('"gestion-de-actividades": "Gestión de Actividades"', source)
+		# Lookup robusto: tilde en URL (prod) + clave ASCII en bundle viejo.
+		self.assertIn("resolve_slug_alias", source)
+		self.assertIn("fold_slug_key", source)
+		self.assertIn("this.resolve_slug_alias(route[0])", source)
+		self.assertIn("this.resolve_slug_alias(decodeURIComponent(parts[0]))", source)
 
 	def test_seccion_informes_boot_declara_collapsible(self) -> None:
 		source = _public_js_source("actividades_sidebar_boot.js")

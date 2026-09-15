@@ -226,6 +226,58 @@
 
 
 
+	/** Quita diacríticos (gestión → gestion). `frappe.router.slug` no lo hace. */
+
+	club_management.club_desk_navigation.fold_slug_key = function (value) {
+
+		const base = String(value || "");
+
+		try {
+
+			return base.normalize("NFD").replace(/\p{M}/gu, "");
+
+		} catch (e) {
+
+			return base;
+
+		}
+
+	};
+
+
+
+	/** Resuelve alias de ruta corta ASCII o con tilde (prod vs local). */
+
+	club_management.club_desk_navigation.resolve_slug_alias = function (segment) {
+
+		if (!segment) {
+
+			return null;
+
+		}
+
+		const raw = String(segment);
+
+		const slug = this.workspace_slug(raw);
+
+		const folded = this.fold_slug_key(slug || raw);
+
+		return (
+
+			this.SLUG_ALIASES[raw] ||
+
+			this.SLUG_ALIASES[slug] ||
+
+			this.SLUG_ALIASES[folded] ||
+
+			null
+
+		);
+
+	};
+
+
+
 	club_management.club_desk_navigation.get_club_workspace_name = function () {
 
 		const route = frappe.get_route() || [];
@@ -244,18 +296,26 @@
 
 		}
 
-		// Ruta de un solo segmento (p. ej. /desk/tesorería): slugificar el segmento, nunca slug().
+		// Ruta de un solo segmento (p. ej. /desk/tesorería o /desk/gestión-de-actividades).
 		if (route.length === 1 && route[0]) {
 
-			const key = this.workspace_slug(route[0]);
-			const alias = this.SLUG_ALIASES[key];
+			const alias = this.resolve_slug_alias(route[0]);
 			if (alias) {
 				return alias;
 			}
 
+			const key = this.workspace_slug(route[0]);
+			const folded = this.fold_slug_key(key);
+
 			if (key && frappe.workspaces?.[key]) {
 
 				return frappe.workspaces[key].name;
+
+			}
+
+			if (folded && frappe.workspaces?.[folded]) {
+
+				return frappe.workspaces[folded].name;
 
 			}
 
@@ -597,7 +657,9 @@
 
 		}
 
-		const workspace_name = this.SLUG_ALIASES[parts[0]];
+		// Prod puede servir /desk/gestión-de-actividades (tilde) con bundle que solo
+		// tenía la clave ASCII; plegar diacríticos antes del lookup.
+		const workspace_name = this.resolve_slug_alias(decodeURIComponent(parts[0]));
 
 		if (workspace_name) {
 

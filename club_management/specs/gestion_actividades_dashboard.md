@@ -10,8 +10,10 @@ Panel Desk en el workspace **Gestión de Actividades** (rol `Secretaria`): respo
 ## Scenario: apertura directa por ruta corta
 
 Given un usuario autorizado abre Desk directamente en `/desk/gestión-de-actividades`
+Or en `/desk/gestion-de-actividades` (sin tilde)
 When el registro de workspaces todavía no terminó de inicializarse en el navegador
-Then la navegación reconoce el alias de la ruta como `Gestión de Actividades`
+Then la navegación reconoce el alias (ASCII o con diacríticos) como `Gestión de Actividades`
+And redirige a `/desk/Workspaces/Gestión de Actividades`
 And el dashboard custom se monta sin dejar el área de contenido en blanco
 And la sección `Informes` del sidebar declara `collapsible`
 And soporta el estado previamente guardado en `section-breaks-state`.
