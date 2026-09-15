@@ -1,0 +1,65 @@
+{
+ "app": "club_management",
+ "creation": "2026-09-12 11:48:46.325959",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "header_icon": "organization",
+ "idx": 0,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "home",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Inicio Espacios",
+   "link_to": "espacios",
+   "link_type": "Page",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "calendar",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Ocupaci\u00f3n (planilla)",
+   "link_to": "ocupacion-espacios",
+   "link_type": "Page",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "organization",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Cat\u00e1logo de espacios",
+   "link_to": "Espacio",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "list",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Reservas",
+   "link_to": "Reserva Espacio",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-09-12 16:59:55.342085",
+ "modified_by": "Administrator",
+ "module": "Spaces",
+ "name": "Espacios",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "Espacios"
+}

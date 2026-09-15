@@ -22,6 +22,7 @@
   "section_externo",
   "arrendatario_nombre",
   "arrendatario_contacto",
+  "token_acceso",
   "item_alquiler",
   "section_otros",
   "motivo",
@@ -29,7 +30,14 @@
   "id_externo_fixture",
   "superposicion_detectada",
   "socio",
-  "equipo_actividad"
+  "equipo_actividad",
+  "monto_arancel",
+  "cargo_socio",
+  "slot_key",
+  "section_comprobante",
+  "comprobante",
+  "fecha_comprobante",
+  "motivo_rechazo"
  ],
  "fields": [
   {
@@ -66,7 +74,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Estado",
-   "options": "Borrador\nConfirmada\nCancelada",
+   "options": "Borrador\nPendiente\nConfirmada\nCancelada",
    "reqd": 1
   },
   {
@@ -153,6 +161,17 @@
   },
   {
    "depends_on": "eval:doc.tipo==\"Alquiler externo\"",
+   "description": "Token opaco para gesti\u00f3n guest de la reserva (no enumerable).",
+   "fieldname": "token_acceso",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Token acceso",
+   "no_copy": 1,
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "depends_on": "eval:doc.tipo==\"Alquiler externo\"",
    "description": "Opcional. Preferir ICDPE-ALQ-*-TEMP o ICDPE-ALQ-*-REC seg\u00fan modalidad.",
    "fieldname": "item_alquiler",
    "fieldtype": "Link",
@@ -204,11 +223,58 @@
    "fieldtype": "Link",
    "label": "Equipo Actividad",
    "options": "Equipo Actividad"
+  },
+  {
+   "depends_on": "eval:doc.tipo==\"Alquiler socio\" || doc.tipo==\"Alquiler externo\"",
+   "fieldname": "monto_arancel",
+   "fieldtype": "Currency",
+   "label": "Monto arancel",
+   "description": "Tarifa del canal socio (portal) o externo (guest) al solicitar online."
+  },
+  {
+   "fieldname": "cargo_socio",
+   "fieldtype": "Link",
+   "label": "Cargo Socio",
+   "options": "Cargo Socio",
+   "read_only": 1,
+   "description": "Borrador de cargo generado al solicitar la reserva."
+  },
+  {
+   "description": "Clave \u00fanica espacio|fecha|hora_desde|hora_hasta mientras el estado ocupa el calendario.",
+   "fieldname": "slot_key",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Slot key",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_comprobante",
+   "fieldtype": "Section Break",
+   "label": "Comprobante / Coordinaci\u00f3n"
+  },
+  {
+   "description": "PDF de transferencia (fase 1). Fase 2: Cobrand.",
+   "fieldname": "comprobante",
+   "fieldtype": "Attach",
+   "label": "Comprobante PDF"
+  },
+  {
+   "fieldname": "fecha_comprobante",
+   "fieldtype": "Datetime",
+   "label": "Fecha comprobante",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.estado==\"Cancelada\"",
+   "fieldname": "motivo_rechazo",
+   "fieldtype": "Small Text",
+   "label": "Motivo rechazo"
   }
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-08-21 14:00:00.000000",
+ "modified": "2026-09-12 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Spaces",
  "name": "Reserva Espacio",

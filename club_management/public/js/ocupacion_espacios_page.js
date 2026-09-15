@@ -41,7 +41,10 @@
 						${__("Sincronizar FMV")}
 					</button>
 					<button type="button" class="btn btn-sm btn-secondary club-ocupacion-import-excel">
-						${__("Importar Excel ligas")}
+						${__("Importar Excel con eventos")}
+					</button>
+					<button type="button" class="btn btn-sm btn-primary club-ocupacion-export-pdf">
+						${__("Exportar PDF")}
 					</button>
 				</div>
 			`);
@@ -53,6 +56,52 @@
 			$ctrl.find(".club-ocupacion-sync-febamba").on("click", () => this.sync_febamba());
 			$ctrl.find(".club-ocupacion-sync-fmv").on("click", () => this.sync_fmv());
 			$ctrl.find(".club-ocupacion-import-excel").on("click", () => this.import_excel_ligas());
+			$ctrl.find(".club-ocupacion-export-pdf").on("click", () => this.export_pdf());
+		},
+
+		export_pdf() {
+			const defaultFecha = this._fecha || frappe.datetime.get_today();
+			const dialog = new frappe.ui.Dialog({
+				title: __("Exportar ocupación a PDF"),
+				fields: [
+					{
+						fieldname: "fecha_desde",
+						label: __("Fecha desde"),
+						fieldtype: "Date",
+						default: defaultFecha,
+						reqd: 1,
+					},
+					{
+						fieldname: "fecha_hasta",
+						label: __("Fecha hasta"),
+						fieldtype: "Date",
+						default: defaultFecha,
+						reqd: 1,
+					},
+				],
+				primary_action_label: __("Descargar PDF"),
+				primary_action: (values) => {
+					const desde = values.fecha_desde;
+					const hasta = values.fecha_hasta;
+					if (!desde || !hasta) {
+						frappe.msgprint(__("Indicá fecha desde y hasta"));
+						return;
+					}
+					if (desde > hasta) {
+						frappe.msgprint(__("La fecha hasta debe ser mayor o igual a la fecha desde"));
+						return;
+					}
+					dialog.hide();
+					open_url_post(
+						"/api/method/club_management.spaces.api.ocupacion_reporte.download_ocupacion_pdf",
+						{
+							fecha_desde: desde,
+							fecha_hasta: hasta,
+						}
+					);
+				},
+			});
+			dialog.show();
 		},
 
 		sync_febamba() {
@@ -85,12 +134,12 @@
 			const templateUrl =
 				"/api/method/club_management.spaces.api.fixtures_desk.download_fixtures_excel_template";
 			const dialog = new frappe.ui.Dialog({
-				title: __("Importar Excel de fixtures"),
+				title: __("Importar Excel con eventos"),
 				fields: [
 					{
 						fieldtype: "HTML",
 						options: `
-							<p>${__("Usá la plantilla canónica para preparar los partidos de la liga.")}</p>
+							<p>${__("Usá la plantilla canónica para cargar partidos y eventos en la planilla.")}</p>
 							<p>
 								<a class="btn btn-default btn-sm" href="${templateUrl}" target="_blank">
 									${__("Descargar plantilla Excel")}

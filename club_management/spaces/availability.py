@@ -21,6 +21,9 @@ DIAS_SEMANA: tuple[str, ...] = (
 	"Domingo",
 )
 
+# Pendiente = bloqueo temporal (portal); Confirmada = ocupación firme.
+ESTADOS_QUE_OCUPAN: frozenset[str] = frozenset({"Pendiente", "Confirmada"})
+
 _WEEKDAY_TO_DIA: dict[int, str] = {i: nombre for i, nombre in enumerate(DIAS_SEMANA)}
 
 
@@ -170,7 +173,7 @@ def get_confirmed_reservations(
 	*,
 	exclude: str | None = None,
 ) -> list[dict[str, Any]]:
-	"""Reservas Confirmada del espacio que ocupan la fecha (puntual o recurrente)."""
+	"""Reservas que ocupan el calendario (Confirmada + Pendiente) en la fecha."""
 	from club_management.spaces.services.suspension_reserva import (
 		get_suspended_reserva_names_for_date,
 	)
@@ -180,7 +183,7 @@ def get_confirmed_reservations(
 	suspended = get_suspended_reserva_names_for_date(str(target))
 	rows = frappe.get_all(
 		"Reserva Espacio",
-		filters={"espacio": espacio, "estado": "Confirmada"},
+		filters={"espacio": espacio, "estado": ("in", list(ESTADOS_QUE_OCUPAN))},
 		fields=[
 			"name",
 			"hora_desde",
@@ -192,6 +195,8 @@ def get_confirmed_reservations(
 			"fecha_desde",
 			"fecha_hasta",
 			"recurrencia_semanal",
+			"estado",
+			"arrendatario_nombre",
 		],
 	)
 	out: list[dict[str, Any]] = []
@@ -326,6 +331,8 @@ def get_occupancy(espacio: str, fecha: date | str) -> list[dict[str, Any]]:
 				"hora_hasta": res.hora_hasta,
 				"tipo": res.tipo,
 				"motivo": res.motivo,
+				"estado": res.estado,
+				"arrendatario_nombre": res.get("arrendatario_nombre"),
 			}
 		)
 	return occupancy

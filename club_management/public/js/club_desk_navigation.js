@@ -8,7 +8,12 @@
 
 	const NAV_ID = "club-desk-nav";
 
-	const PANEL_ROLES = new Set(["Secretaria", "System Manager"]);
+	const PANEL_ROLES = new Set([
+		"Secretaria",
+		"Coordinacion",
+		"Tesoreria",
+		"System Manager",
+	]);
 
 	const HIDDEN_WORKSPACES = new Set(["Inicio", "Inicio Club"]);
 
@@ -39,6 +44,20 @@
 			icon: "activity",
 
 			tab: "actividades",
+
+			type: "workspace",
+
+		},
+
+		{
+
+			label: __("Gestión de Espacios y Canchas"),
+
+			workspace: "Gestión de Espacios y Canchas",
+
+			icon: "organization",
+
+			tab: "espacios",
 
 			type: "workspace",
 
@@ -106,6 +125,10 @@
 
 		"catalogo-actividades",
 
+		"espacios",
+
+		"ocupacion-espacios",
+
 	]);
 
 
@@ -121,6 +144,16 @@
 	club_management.club_desk_navigation.CLUB_PAGES_ACTIVIDADES = new Set([
 
 		"catalogo-actividades",
+
+	]);
+
+
+
+	club_management.club_desk_navigation.CLUB_PAGES_ESPACIOS = new Set([
+
+		"espacios",
+
+		"ocupacion-espacios",
 
 	]);
 
@@ -144,12 +177,25 @@
 
 
 
+	club_management.club_desk_navigation.CLUB_ESPACIOS_DOCTYPES = new Set([
+
+		"Espacio",
+
+		"Reserva Espacio",
+
+	]);
+
+
+
 	club_management.club_desk_navigation.SLUG_ALIASES = {
 
 		secretaria: "Secretaría",
 
 		"gestion-de-actividades": "Gestión de Actividades",
 		"gestión-de-actividades": "Gestión de Actividades",
+
+		"gestion-de-espacios-y-canchas": "Gestión de Espacios y Canchas",
+		"gestión-de-espacios-y-canchas": "Gestión de Espacios y Canchas",
 
 		"gestion-de-socios": "Secretaría",
 
@@ -299,6 +345,16 @@
 
 
 
+	club_management.club_desk_navigation.is_club_espacio_page = function () {
+
+		const doctype = this.get_active_doctype();
+
+		return doctype ? this.CLUB_ESPACIOS_DOCTYPES.has(doctype) : false;
+
+	};
+
+
+
 	club_management.club_desk_navigation.is_club_workspace = function (workspace_name) {
 
 		const active = workspace_name || this.get_club_workspace_name();
@@ -308,6 +364,8 @@
 			active === "Secretaría" ||
 
 			active === "Gestión de Actividades" ||
+
+			active === "Gestión de Espacios y Canchas" ||
 
 			active === "Tesorería"
 
@@ -339,6 +397,8 @@
 
 			this.is_club_actividad_page() ||
 
+			this.is_club_espacio_page() ||
+
 			this.is_club_page()
 
 		);
@@ -369,6 +429,12 @@
 
 		}
 
+		if (this.is_club_espacio_page()) {
+
+			return this.TABS.find((tab) => tab.tab === "espacios") || null;
+
+		}
+
 		if (this.is_club_page()) {
 
 			const page = this.get_active_page();
@@ -376,6 +442,12 @@
 			if (page && this.CLUB_PAGES_ACTIVIDADES?.has(page)) {
 
 				return this.TABS.find((tab) => tab.tab === "actividades") || null;
+
+			}
+
+			if (page && this.CLUB_PAGES_ESPACIOS?.has(page)) {
+
+				return this.TABS.find((tab) => tab.tab === "espacios") || null;
 
 			}
 
@@ -397,6 +469,19 @@
 
 			return;
 
+		}
+
+		// Espacios: el dashboard operativo es la Page `/desk/espacios` (no el workspace de shortcuts).
+		if (workspace === "Gestión de Espacios y Canchas") {
+			const route = frappe.get_route() || [];
+			if (route.length === 1 && route[0] === "espacios") {
+				club_management.espacios_sidebar?.refresh?.();
+				return;
+			}
+			frappe.route_flags.replace_route = true;
+			frappe.set_route("espacios");
+			club_management.espacios_sidebar?.refresh?.();
+			return;
 		}
 
 		const slug = this.workspace_slug(workspace);
@@ -491,6 +576,15 @@
 
 				this.navigate_to_workspace("Secretaría");
 
+				return;
+
+			}
+
+			// Workspace Espacios → dashboard Page (pendientes + agenda del día).
+			if (workspace === "Gestión de Espacios y Canchas") {
+				frappe.route_flags.replace_route = true;
+				frappe.set_route("espacios");
+				return;
 			}
 
 			return;
@@ -517,22 +611,36 @@
 
 	club_management.club_desk_navigation.get_mount_parent = function () {
 
-		if (this.is_club_report() || this.is_club_socio_page() || this.is_club_page()) {
+		if (
+			this.is_club_report() ||
+			this.is_club_socio_page() ||
+			this.is_club_actividad_page() ||
+			this.is_club_espacio_page() ||
+			this.is_club_page()
+		) {
 
-			const qrMain = frappe.query_report?.page?.main;
+			const candidates = [
+				club_management.espacios_dashboard_page?.page?.main,
+				club_management.ocupacion_espacios_page?.page?.main,
+				typeof cur_list !== "undefined" ? cur_list?.page?.main : null,
+				typeof cur_frm !== "undefined" ? cur_frm?.page?.main : null,
+				frappe.query_report?.page?.main,
+				cur_page?.page?.main,
+				frappe.container?.page?.main,
+			];
 
-			if (qrMain?.length) {
-
-				return qrMain;
-
+			for (const candidate of candidates) {
+				if (candidate?.length && candidate.closest("body").length) {
+					return candidate;
+				}
 			}
 
-			const $report = $(".page-content, .layout-main-section").first();
+			const $section = $(".page-container:visible .layout-main-section, .page-content:visible")
+				.filter(":visible")
+				.first();
 
-			if ($report.length) {
-
-				return $report;
-
+			if ($section.length) {
+				return $section;
 			}
 
 		}
@@ -595,6 +703,7 @@
 
 
 
+		$(".club-desk-with-nav").not($parent).removeClass("club-desk-with-nav");
 		$parent.addClass("club-desk-with-nav");
 
 		const active_tab = this.get_active_tab();
@@ -602,16 +711,13 @@
 		let $nav = $(`#${NAV_ID}`);
 
 		if (!$nav.length) {
-
 			$nav = $(
-
 				`<nav id="${NAV_ID}" class="club-desk-nav" aria-label="${__("Navegación")}"></nav>`
-
 			);
-
-			$parent.prepend($nav);
-
 		}
+
+		// Siempre reparentar al mount visible (Workspace ↔ Page ↔ List).
+		$parent.prepend($nav);
 
 
 
@@ -751,7 +857,12 @@
 
 				}
 
-				if (workspace === nav.get_club_workspace_name() && !nav.get_active_report()) {
+				if (workspace === "Gestión de Espacios y Canchas") {
+					const route = frappe.get_route() || [];
+					if (route.length === 1 && route[0] === "espacios") {
+						return;
+					}
+				} else if (workspace === nav.get_club_workspace_name() && !nav.get_active_report()) {
 
 					return;
 
@@ -807,6 +918,14 @@
 
 		}
 
+		if (this.is_club_espacio_page()) {
+
+			club_management.espacios_sidebar?.refresh?.();
+
+			return;
+
+		}
+
 		const page = this.get_active_page();
 
 		if (page && this.CLUB_PAGES_SOCIOS?.has(page)) {
@@ -825,6 +944,14 @@
 
 		}
 
+		if (page && this.CLUB_PAGES_ESPACIOS?.has(page)) {
+
+			club_management.espacios_sidebar?.refresh?.();
+
+			return;
+
+		}
+
 		const workspace = this.get_club_workspace_name();
 
 		if (workspace === "Secretaría") {
@@ -834,6 +961,10 @@
 		} else if (workspace === "Gestión de Actividades") {
 
 			club_management.actividades_sidebar?.refresh?.();
+
+		} else if (workspace === "Gestión de Espacios y Canchas") {
+
+			club_management.espacios_sidebar?.refresh?.();
 
 		}
 
@@ -845,6 +976,8 @@
 
 		this.redirect_slug_aliases();
 
+		this.apply_portal_theme();
+
 		this.render_nav();
 
 		this.refresh_sidebar();
@@ -852,6 +985,53 @@
 	};
 
 
+
+	club_management.club_desk_navigation.PORTAL_ACCENTS = [
+		"socios",
+		"actividades",
+		"espacios",
+		"tesoreria",
+	];
+
+	club_management.club_desk_navigation.apply_portal_theme = function () {
+		const body = document.body;
+		if (!body) {
+			return;
+		}
+
+		const enabled = this.has_panel_role() && this.is_club_desk_page();
+		body.classList.toggle("club-portal-theme", !!enabled);
+
+		this.PORTAL_ACCENTS.forEach((accent) => {
+			body.classList.remove(`club-portal--${accent}`);
+		});
+
+		if (enabled) {
+			const tab = this.get_active_tab()?.tab || "socios";
+			if (this.PORTAL_ACCENTS.includes(tab)) {
+				body.classList.add(`club-portal--${tab}`);
+			}
+
+			body.setAttribute("data-theme-override", "light");
+			if (!body.dataset.clubPrevTheme) {
+				body.dataset.clubPrevTheme =
+					document.documentElement.getAttribute("data-theme") || "";
+			}
+			document.documentElement.setAttribute("data-theme", "light");
+			return;
+		}
+
+		if (body.hasAttribute("data-theme-override")) {
+			const prev = body.dataset.clubPrevTheme || "";
+			body.removeAttribute("data-theme-override");
+			delete body.dataset.clubPrevTheme;
+			if (prev) {
+				document.documentElement.setAttribute("data-theme", prev);
+			} else {
+				document.documentElement.removeAttribute("data-theme");
+			}
+		}
+	};
 
 	club_management.club_desk_navigation.schedule_refresh = function () {
 

@@ -10,29 +10,39 @@ from club_management.activities.setup.actividades_sidebar_boot import apply_acti
 from club_management.members.setup.club_desktop_landing import (
 	apply_club_desktop_landing_sidebar_aliases,
 	apply_club_desktop_landing_to_boot,
+	user_sees_club_desktop_landing,
 )
 from club_management.members.setup.secretaria_sidebar_boot import apply_secretaria_sidebar_to_boot
+from club_management.spaces.setup.espacios_desktop_landing import (
+	apply_espacios_desktop_landing_sidebar_alias,
+	apply_espacios_desktop_landing_to_boot,
+	user_sees_espacios_desktop_landing,
+)
+from club_management.spaces.setup.espacios_sidebar_boot import apply_espacios_sidebar_to_boot
 
 
 def extend_bootinfo(bootinfo: dict[str, Any]) -> None:
-	"""Landing Desk de Secretaría, sidebar y workspace por defecto."""
+	"""Landing Desk Secretaría/Coordinación, sidebars y workspace por defecto."""
 	apply_club_desktop_landing_to_boot(bootinfo)
+	apply_espacios_desktop_landing_to_boot(bootinfo)
 	apply_secretaria_sidebar_to_boot(bootinfo)
 	apply_actividades_sidebar_to_boot(bootinfo)
+	apply_espacios_sidebar_to_boot(bootinfo)
 	apply_club_desktop_landing_sidebar_aliases(bootinfo)
+	apply_espacios_desktop_landing_sidebar_alias(bootinfo)
 
 	user = bootinfo.get("user") or {}
+	if user_sees_club_desktop_landing(user.get("name")) or user_sees_espacios_desktop_landing(
+		user.get("name")
+	):
+		return
+
 	workspace = user.get("default_workspace")
 	if not workspace or not isinstance(workspace, dict):
 		return
 
 	name = workspace.get("name")
 	if not name or not frappe.db.exists("Workspace", name):
-		return
-
-	from club_management.members.setup.club_desktop_landing import user_sees_club_desktop_landing
-
-	if user_sees_club_desktop_landing(user.get("name")):
 		return
 
 	from frappe.desk.utils import slug

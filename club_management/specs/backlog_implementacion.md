@@ -30,15 +30,14 @@
 | Bloque | Alcance mínimo | Specs | Estado 2026-09-10 |
 |--------|----------------|-------|-------------------|
 | **Portal socio base** | Sesión (`socio_sid`/`socio_csrf`), perfil + proxy foto, inscripción a actividades (catálogo deporte/variante/plana), CORS allowlist | `portal_socio_alcance.md`, `portal_socio_perfil.md`, `portal_socio_inscripcion.md` | `[~]` Backend + shell Next en `develop` / landing local; UAT local PASS; **sin push/deploy prod** |
-| **Spaces — reservas externas** | Solicitud online de externo (token/flujo público), bloqueo de slot, tarifas canal externo, comprobante fase 1 (transferencia + PDF), confirmación Coordinación | `spaces_sprint_gestion.md` Épica 1 · `spaces_alquiler_externo.md` (Desk ya OK) · `spaces_fases_futuras.md` | `[ ]` **Bloqueante release** (SP-3) |
-| **Spaces — reservas desde portal socio** | Socio autenticado reserva espacios `alquilable=1`, aislamiento por `Socio`, tarifas canal socio, mismo flujo de confirmación | `spaces_fases_futuras.md` (portal socio) · `spaces_sprint_gestion.md` Épica 1 · SP-7 | `[ ]` **Bloqueante release** |
+| **Spaces — reservas externas** | Solicitud online de externo (token/flujo público), bloqueo de slot, tarifas canal externo, comprobante fase 1 (transferencia + PDF), confirmación Coordinación | `reservas_espacio_externo.md` · landing `/alquiler` · UAT `spaces/qa/uat_spaces_smoke.py` | `[x]` Local OK (API+UI+smoke 2026-09-12); pendiente deploy prod |
+| **Spaces — reservas desde portal socio** | Socio autenticado reserva espacios `alquilable=1`, aislamiento por `Socio`, tarifas canal socio, mismo flujo de confirmación | `reservas_espacio_portal.md` · `reservas_espacio_confirmacion.md` · `/socios/reservas` · UAT smoke | `[x]` Local OK (API+UI+smoke 2026-09-12); pendiente deploy prod |
 
 **Orden de trabajo del release**
 
-1. Cerrar SP-3 (reservas online socio **y** externo + comprobante + confirmación Coordinación).
-2. Exponer el flujo socio en el portal (`/socios` / Spaces) con aislamiento y CSRF/sesión existentes.
-3. Smoke UAT Spaces + portal; merge/push `develop`; dual-deploy Hetzner (`gestion.icdpedroechague.com.ar`) + Vercel (landing).
-4. **Recién entonces** — release siguiente: integración sandbox Supervielle (botón de pago + débito automático).
+1. ~~SP-3 socio + externo (API, UI, comprobante, confirmación)~~ — UAT smoke local PASS 2026-09-12 (`specs/avances/2026-09-12-uat-spaces-sp3.md`).
+2. Merge/push `develop` + dual-deploy Hetzner (`gestion.icdpedroechague.com.ar`) + Vercel (landing `/alquiler` + `/socios/reservas`).
+3. **Recién entonces** — release siguiente: sandbox Supervielle (botón de pago + débito).
 
 ### Release siguiente (después de Spaces + portal base)
 

@@ -82,6 +82,7 @@ club_management.patches.v1_0.ensure_spaces_module
 club_management.patches.v1_0.ensure_role_coordinacion
 club_management.patches.v1_0.sync_espacios_workspace
 club_management.patches.v1_0.sync_espacios_ocupacion_page
+club_management.patches.v1_0.sync_espacios_desk_dashboard
 club_management.patches.v1_0.seed_espacios_catalogo
 club_management.patches.v1_0.import_horarios_lunes_viernes
 club_management.patches.v1_0.fix_gimnasio_cancha_mapping
@@ -90,4 +91,6 @@ club_management.patches.v1_0.sync_planilla_tipos_evento
 club_management.patches.v1_0.sync_informes_secretaria_menu
 club_management.patches.v1_0.seed_supervielle_sandbox_settings
 club_management.patches.v1_0.add_reserva_fixture_unique_index
+club_management.patches.v1_0.add_reserva_slot_unique_index
 club_management.patches.v1_0.backfill_supervielle_settings_v26
+club_management.patches.v1_0.sync_reservas_espacio_externo

@@ -10,12 +10,16 @@ disponibilidad en vivo, carga de planillas, reporte Comisión Directiva).
 
 ## Fase: portal socio / equipo
 
-### Scenario (futuro): socio reserva espacio alquilable
+> **Núcleo SP-3 / SP-7 (bloqueo + API):** ver `reservas_espacio_portal.md`.
+> Confirmación Coordinación / comprobante PDF siguen pendientes.
+
+### Scenario: socio reserva espacio alquilable
 
 Given un `Espacio` con `alquilable = 1` y `habilitado = 1`
-And el socio está autenticado en el portal
+And el socio está autenticado en el portal y `estado = Activo`
 When solicita una reserva para cumpleaños o evento familiar
-Then se crea un pedido de reserva acotado a **su** `Socio`
+Then se crea `Reserva Espacio` `Alquiler socio` en estado **Pendiente** acotada a **su** `Socio`
+And el slot ocupa el calendario
 And no puede ver ni modificar reservas de otros socios.
 
 ### Scenario (futuro): equipo reserva para asado
@@ -35,7 +39,8 @@ Then ese espacio **no** aparece.
 ## Fase: alquiler a externos con costo
 
 > **Ocupación Desk Temporal/Recurrente:** implementada en `spaces_alquiler_externo.md`.
-> Lo siguiente sigue pendiente.
+> **Canal guest online (sesion_token + token_acceso):** backend en `reservas_espacio_externo.md`
+> (UI Next `/alquiler` pendiente). Cobro factura/Cobrand sigue pendiente abajo.
 
 ### Scenario (futuro): cobro con ítems ICDPE-ALQ
 

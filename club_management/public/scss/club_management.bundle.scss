@@ -1,4 +1,5 @@
-/* Panel Secretaría + navegación club */
+/* Panel Secretaría + navegación club + theme portal */
+@import "./club_portal_theme";
 @import "./secretaria_workspace_panel";
 @import "./club_desk_navigation";
 
@@ -11,6 +12,7 @@
 
 /* Dashboard ocupación de espacios */
 @import "./ocupacion_espacios";
+@import "./espacios_desk_layout";
 .club-actividades-workspace #editorjs {
 	display: none;
 }

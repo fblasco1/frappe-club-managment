@@ -5,9 +5,10 @@ from __future__ import annotations
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import getdate
+from frappe.utils import get_time, getdate
 
 from club_management.spaces.availability import (
+	ESTADOS_QUE_OCUPAN,
 	assert_no_overlap_with_occupancy,
 	assert_no_overlap_with_reservations_only,
 	assert_recurring_no_overlap,
@@ -17,8 +18,21 @@ from club_management.spaces.availability import (
 from club_management.spaces.fixtures.superposicion import refresh_superposicion_flag
 
 TIPOS_VALIDOS = frozenset({"Alquiler externo", "Alquiler socio", "Evento club", "Bloqueo"})
-ESTADOS_QUE_OCUPAN = frozenset({"Confirmada"})
 MODALIDADES_ALQUILER = frozenset({"Temporal", "Recurrente"})
+
+
+def build_slot_key(
+	espacio: str,
+	fecha: str | None,
+	hora_desde,
+	hora_hasta,
+) -> str:
+	"""Clave única compuesta espacio|fecha|slot para estados que ocupan."""
+	if not espacio or not fecha:
+		return ""
+	inicio = str(get_time(hora_desde))
+	fin = str(get_time(hora_hasta))
+	return f"{espacio}|{getdate(fecha)}|{inicio}|{fin}"
 
 
 class ReservaEspacio(Document):
@@ -30,8 +44,15 @@ class ReservaEspacio(Document):
 				frappe.ValidationError,
 			)
 
+		if not (self.token_acceso or "").strip():
+			self.token_acceso = None
+		elif self.tipo != "Alquiler externo":
+			self.token_acceso = None
+
 		if self.tipo == "Alquiler externo":
 			self._validate_alquiler_externo()
+		elif self.tipo == "Alquiler socio":
+			self._validate_alquiler_socio()
 		elif self.tipo == "Evento club" and self.recurrencia_semanal:
 			self._validate_evento_club_recurrente()
 		else:
@@ -43,11 +64,86 @@ class ReservaEspacio(Document):
 			if not self.fecha:
 				frappe.throw(_("La fecha es obligatoria"), frappe.ValidationError)
 
+		self._sync_slot_key()
+
 		if self.estado in ESTADOS_QUE_OCUPAN and self.espacio:
 			self._assert_occupancy()
 
+	def _sync_slot_key(self) -> None:
+		"""Índice único lógico (espacio, fecha, slot) solo mientras ocupa."""
+		if self.estado in ESTADOS_QUE_OCUPAN and self.fecha and not self._is_recurring_reserva():
+			key = build_slot_key(
+				self.espacio,
+				str(self.fecha),
+				self.hora_desde,
+				self.hora_hasta,
+			)
+			self.slot_key = key
+			existing = frappe.db.get_value(
+				"Reserva Espacio",
+				{
+					"slot_key": key,
+					"name": ("!=", self.name or ""),
+				},
+				"name",
+			)
+			if existing:
+				frappe.throw(
+					_("Ya existe una reserva activa para ese espacio, fecha y horario ({0})").format(
+						existing
+					),
+					frappe.ValidationError,
+				)
+		else:
+			# Vacío: no compite en el índice único parcial (varios Cancelada/Borrador).
+			self.slot_key = None
+
+	@staticmethod
+	def on_doctype_update() -> None:
+		"""Índice único parcial (espacio, fecha, slot) solo con slot_key poblado."""
+		frappe.db.sql(
+			"""
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_reserva_espacio_slot_key
+			ON "tabReserva Espacio" (slot_key)
+			WHERE slot_key IS NOT NULL AND slot_key <> ''
+			"""
+		)
+		frappe.db.sql(
+			"""
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_reserva_espacio_token_acceso
+			ON "tabReserva Espacio" (token_acceso)
+			WHERE token_acceso IS NOT NULL AND token_acceso <> ''
+			"""
+		)
 	def _is_fixture_import(self) -> bool:
 		return bool((self.origen_fixture or "").strip())
+
+	def _validate_alquiler_socio(self) -> None:
+		self.modalidad_alquiler = None
+		self.recurrencia_semanal = 0
+		self.fecha_desde = None
+		self.fecha_hasta = None
+		self.set("dias_recurrencia", [])
+		if not self.fecha:
+			frappe.throw(_("La fecha es obligatoria"), frappe.ValidationError)
+		if self.estado in ESTADOS_QUE_OCUPAN:
+			if not self.socio:
+				frappe.throw(
+					_("El socio es obligatorio para Alquiler socio"),
+					frappe.ValidationError,
+				)
+			alquilable = frappe.db.get_value("Espacio", self.espacio, "alquilable")
+			if not alquilable:
+				frappe.throw(
+					_("El espacio debe ser alquilable para Alquiler socio"),
+					frappe.ValidationError,
+				)
+			estado_socio = frappe.db.get_value("Socio", self.socio, "estado")
+			if estado_socio != "Activo":
+				frappe.throw(
+					_("Solo un socio Activo puede reservar espacios"),
+					frappe.ValidationError,
+				)
 
 	def _validate_alquiler_externo(self) -> None:
 		alquilable = frappe.db.get_value("Espacio", self.espacio, "alquilable")

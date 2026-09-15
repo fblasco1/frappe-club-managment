@@ -20,6 +20,41 @@ ESPACIOS_SEED: tuple[tuple[str, str, int], ...] = (
 	("LA CASONA", "Salon", 1),
 )
 
+TARIFAS_SOCIO: dict[str, float] = {
+	"SALON P.B.": 28000,
+	"SUM P.B.": 30000,
+	"SUBSUELO": 18000,
+	"SALA ALBAMONTE": 25000,
+	"PARRILLA - TERRAZA": 20000,
+	"LA CASONA": 35000,
+}
+
+IMAGENES_PORTAL: dict[str, str] = {
+	"SALON P.B.": "/images/salon.png",
+	"SUM P.B.": "/images/salon.png",
+	"SALA ALBAMONTE": "/images/salon.png",
+	"LA CASONA": "/images/salon.png",
+	"PARRILLA - TERRAZA": "/placeholder.jpg",
+	"SUBSUELO": "/placeholder.jpg",
+}
+
+COMBOS: tuple[tuple[str, str], ...] = (
+	("PARRILLA - TERRAZA", "SALA ALBAMONTE"),
+)
+
+
+def _sync_combo(espacio: str, partners: list[str]) -> None:
+	doc = frappe.get_doc("Espacio", espacio)
+	current = {row.espacio for row in (doc.combo_con or [])}
+	desired = set(partners)
+	if current == desired:
+		return
+	doc.set("combo_con", [])
+	for partner in partners:
+		if frappe.db.exists("Espacio", partner):
+			doc.append("combo_con", {"espacio": partner})
+	doc.save(ignore_permissions=True)
+
 
 def ensure_espacios_catalogo() -> list[str]:
 	"""Crea o alinea los espacios del catálogo. Devuelve nombres creados o ya existentes."""
@@ -37,6 +72,14 @@ def ensure_espacios_catalogo() -> list[str]:
 			if int(doc.habilitado or 0) != 1:
 				doc.habilitado = 1
 				changed = True
+			tarifa = TARIFAS_SOCIO.get(titulo)
+			if tarifa is not None and float(doc.get("tarifa_socio") or 0) != float(tarifa):
+				doc.tarifa_socio = tarifa
+				changed = True
+			img = IMAGENES_PORTAL.get(titulo)
+			if img and (doc.get("imagen_portal") or "") != img:
+				doc.imagen_portal = img
+				changed = True
 			if changed:
 				doc.save(ignore_permissions=True)
 			names.append(titulo)
@@ -48,8 +91,19 @@ def ensure_espacios_catalogo() -> list[str]:
 				"tipo": tipo,
 				"alquilable": alquilable,
 				"habilitado": 1,
+				"tarifa_socio": TARIFAS_SOCIO.get(titulo) or 0,
+				"imagen_portal": IMAGENES_PORTAL.get(titulo) or "",
 			}
 		)
 		doc.insert(ignore_permissions=True)
 		names.append(doc.name)
+
+	partners: dict[str, list[str]] = {}
+	for a, b in COMBOS:
+		partners.setdefault(a, []).append(b)
+		partners.setdefault(b, []).append(a)
+	for espacio, plist in partners.items():
+		if frappe.db.exists("Espacio", espacio):
+			_sync_combo(espacio, plist)
+
 	return names

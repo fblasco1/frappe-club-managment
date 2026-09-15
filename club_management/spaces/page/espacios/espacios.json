@@ -1,0 +1,25 @@
+{
+ "content": null,
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "module": "Spaces",
+ "name": "espacios",
+ "page_name": "espacios",
+ "roles": [
+  {
+   "role": "Coordinacion"
+  },
+  {
+   "role": "Secretaria"
+  },
+  {
+   "role": "Tesoreria"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "standard": "Yes",
+ "title": "Gestión de Espacios y Canchas"
+}

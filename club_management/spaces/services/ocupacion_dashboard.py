@@ -147,6 +147,10 @@ def _finalize_block(item: dict[str, Any], start_min: int, end_min: int) -> dict[
 		"inicio_min": start_min,
 		"fin_min": end_min,
 	}
+	if item.get("estado"):
+		block["estado"] = str(item["estado"])
+	if item.get("arrendatario_nombre"):
+		block["arrendatario_nombre"] = str(item["arrendatario_nombre"])
 	block["categoria"] = categoria_evento(block)
 	block["color"] = color_for_block(block)
 	return block

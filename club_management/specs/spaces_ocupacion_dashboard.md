@@ -64,11 +64,13 @@ Then navega a `/desk/ocupacion-espacios` y ve la grilla del día seleccionado.
 
 ## Scenario: navegación lateral de Espacios
 
-Given Coordinacion está en el workspace `Espacios` o en `/desk/ocupacion-espacios`
+Given Coordinacion está en `/desk/espacios`, el workspace **Gestión de Espacios y Canchas** o en `/desk/ocupacion-espacios`
 When se muestra la barra lateral de Desk
-Then ve un acceso a `Espacios` como dashboard principal
+Then ve un acceso al dashboard principal (`/desk/espacios`)
 And ve un acceso a `Ocupación de espacios`
 And ambos accesos navegan dentro de Desk.
+
+**Navbar:** el ítem público se titula **Gestión de Espacios y Canchas** (`sequence_id` 0.3), entre Gestión de Actividades y Tesorería. Ver `espacios_desk_dashboard.md`.
 
 ---
 

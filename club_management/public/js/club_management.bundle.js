@@ -10,5 +10,6 @@ import "./gestion_actividades_workspace_panel.js";
 import "./espacios_sidebar_boot.js";
 import "./valores_cuota_social_page.js";
 import "./ocupacion_espacios_page.js";
+import "./espacios_dashboard_page.js";
 import "./recibo_pago_escpos.js";
 import "./club_equipo_report_layout.js";

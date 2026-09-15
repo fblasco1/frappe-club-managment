@@ -1,0 +1,409 @@
+/* Portal de gestión — línea UX unificada (referencia: vista Espacios) */
+
+body.club-portal-theme {
+	/* Tokens alineados a semántica Frappe Desk (light):
+	   --fg-color / --subtle-fg se usan como FONDOS, no como color de texto. */
+	--bg-color: #f3f4f6;
+	--fg-color: #ffffff;
+	--text-color: #111827;
+	--text-muted: #6b7280;
+	--heading-color: #0f172a;
+	--card-bg: #ffffff;
+	--control-bg: #ffffff;
+	--border-color: #e5e7eb;
+	--subtle-fg: #f3f4f6;
+	--awesomplete-hover-bg: #f3f4f6;
+
+	--club-radius: 10px;
+	--club-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+	--club-shadow-lg: 0 10px 28px rgba(15, 23, 42, 0.12);
+
+	/* Accent por área (override en modifiers) */
+	--club-accent: #2563eb;
+	--club-accent-soft: #dbeafe;
+	--club-accent-hover: #1d4ed8;
+	--club-accent-ink: #1e3a8a;
+}
+
+body.club-portal-theme.club-portal--socios {
+	--club-accent: #2563eb;
+	--club-accent-soft: #dbeafe;
+	--club-accent-hover: #1d4ed8;
+	--club-accent-ink: #1e3a8a;
+	--awesomplete-hover-bg: #dbeafe;
+}
+
+body.club-portal-theme.club-portal--actividades {
+	--club-accent: #059669;
+	--club-accent-soft: #d1fae5;
+	--club-accent-hover: #047857;
+	--club-accent-ink: #064e3b;
+	--awesomplete-hover-bg: #d1fae5;
+}
+
+body.club-portal-theme.club-portal--espacios {
+	--club-accent: #0f766e;
+	--club-accent-soft: #ccfbf1;
+	--club-accent-hover: #0d9488;
+	--club-accent-ink: #134e4a;
+	--awesomplete-hover-bg: #ccfbf1;
+}
+
+body.club-portal-theme.club-portal--tesoreria {
+	--club-accent: #b45309;
+	--club-accent-soft: #ffedd5;
+	--club-accent-hover: #c2410c;
+	--club-accent-ink: #7c2d12;
+	--awesomplete-hover-bg: #ffedd5;
+}
+
+[data-theme="dark"] body.club-portal-theme,
+html[data-theme="dark"] body.club-portal-theme {
+	--bg-color: #f3f4f6 !important;
+	--fg-color: #ffffff !important;
+	--text-color: #111827 !important;
+	--text-muted: #6b7280 !important;
+	--heading-color: #0f172a !important;
+	--card-bg: #ffffff !important;
+	--control-bg: #ffffff !important;
+	--border-color: #e5e7eb !important;
+	--subtle-fg: #f3f4f6 !important;
+	color-scheme: light;
+}
+
+/* Canvas: fondo gris, sin “recuadro blanco” Frappe anidado */
+body.club-portal-theme .layout-main,
+body.club-portal-theme .layout-main-section-wrapper,
+body.club-portal-theme .page-body,
+body.club-portal-theme .page-container,
+body.club-portal-theme .page-content {
+	background: var(--bg-color) !important;
+	color: var(--text-color);
+}
+
+body.club-portal-theme .layout-main-section-wrapper {
+	padding-left: 0.75rem !important;
+	padding-right: 1rem !important;
+	margin-left: 0 !important;
+	width: 100% !important;
+	max-width: none !important;
+	box-sizing: border-box;
+}
+
+body.club-portal-theme .layout-main-section.frappe-card,
+body.club-portal-theme .layout-main-section {
+	margin-left: 0 !important;
+	padding-left: 0.25rem !important;
+	padding-right: 0.25rem !important;
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+	border-radius: 0 !important;
+}
+
+@media (min-width: 992px) {
+	body.club-portal-theme .layout-main-section-wrapper {
+		padding-left: 1rem !important;
+		padding-right: 1.25rem !important;
+	}
+
+	body.club-portal-theme .layout-main-section.frappe-card,
+	body.club-portal-theme .layout-main-section {
+		padding-left: 0.35rem !important;
+		padding-right: 0.35rem !important;
+	}
+}
+
+body.club-portal-theme .layout-side-section {
+	border-right: 1px solid var(--border-color);
+	background: #fff !important;
+}
+
+body.club-portal-theme .desk-sidebar,
+body.club-portal-theme .standard-sidebar,
+body.club-portal-theme .list-sidebar {
+	background: #fff !important;
+	color: var(--text-color) !important;
+}
+
+/* Barra de navegación club */
+body.club-portal-theme .club-desk-nav {
+	margin: 0 0 0.85rem;
+	padding: 0.55rem 0.75rem;
+	background: #fff;
+	border: 1px solid var(--border-color);
+	border-radius: var(--club-radius);
+	box-shadow: var(--club-shadow);
+}
+
+body.club-portal-theme .club-desk-nav-tab {
+	padding: 0.4rem 0.85rem;
+	font-size: 0.8125rem;
+	border-radius: 999px;
+}
+
+body.club-portal-theme .club-desk-nav-tab:not(.is-active) {
+	background: #f9fafb;
+	color: #1f2937;
+	border-color: #e5e7eb;
+}
+
+body.club-portal-theme .club-desk-nav-tab:not(.is-active):hover {
+	background: #f3f4f6;
+	border-color: #d1d5db;
+}
+
+body.club-portal-theme .club-desk-nav-search {
+	border-radius: 999px;
+	border-color: #d1d5db;
+	background: #f9fafb;
+	min-height: 2rem;
+}
+
+body.club-portal-theme .club-desk-nav-search:focus {
+	background: #fff;
+	border-color: var(--club-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--club-accent) 18%, transparent);
+}
+
+body.club-portal-theme .club-desk-nav-search-results {
+	border-radius: var(--club-radius);
+	border-color: #e5e7eb;
+	box-shadow: var(--club-shadow-lg);
+	overflow: hidden;
+}
+
+body.club-portal-theme .club-desk-nav-search-item:hover,
+body.club-portal-theme .club-desk-nav-search-item:focus {
+	background: var(--club-accent-soft);
+}
+
+/* Page-head / dropdowns */
+body.club-portal-theme .page-head .btn-default,
+body.club-portal-theme .page-head .btn-secondary,
+body.club-portal-theme .page-actions .btn-default {
+	background: #fff;
+	border: 1px solid #d1d5db;
+	border-radius: 8px;
+	color: #1f2937;
+	box-shadow: none;
+}
+
+body.club-portal-theme .page-head .btn-default:hover,
+body.club-portal-theme .page-actions .btn-default:hover {
+	background: #f9fafb;
+	border-color: #9ca3af;
+}
+
+body.club-portal-theme .page-head .btn-primary,
+body.club-portal-theme .page-actions .btn-primary {
+	background: var(--club-accent);
+	border-color: var(--club-accent);
+}
+
+body.club-portal-theme .page-head .btn-primary:hover,
+body.club-portal-theme .page-actions .btn-primary:hover {
+	background: var(--club-accent-hover);
+	border-color: var(--club-accent-hover);
+}
+
+body.club-portal-theme .page-head .dropdown-menu,
+body.club-portal-theme .page-actions .dropdown-menu,
+body.club-portal-theme .form-dashboard .dropdown-menu,
+body.club-portal-theme .dropdown-menu,
+body.club-portal-theme .awesomplete > ul,
+body.club-portal-theme .datepicker,
+body.club-portal-theme .ql-toolbar .ql-picker-options {
+	background: #fff !important;
+	background-color: #fff !important;
+	color: #1f2937 !important;
+	border: 1px solid #e5e7eb !important;
+	border-radius: var(--club-radius);
+	box-shadow: var(--club-shadow-lg);
+	padding: 0.35rem;
+	min-width: 12rem;
+}
+
+body.club-portal-theme .page-head .dropdown-item,
+body.club-portal-theme .page-actions .dropdown-item,
+body.club-portal-theme .dropdown-item,
+body.club-portal-theme .dropdown-menu li,
+body.club-portal-theme .dropdown-menu a,
+body.club-portal-theme .dropdown-menu .dropdown-item-container,
+body.club-portal-theme .dropdown-menu .grey-link,
+body.club-portal-theme .dropdown-menu .menu-item-label {
+	border-radius: 6px;
+	padding: 0.45rem 0.7rem;
+	font-size: 0.875rem;
+	color: #1f2937 !important;
+	background: transparent !important;
+}
+
+body.club-portal-theme .page-head .dropdown-item:hover,
+body.club-portal-theme .page-actions .dropdown-item:hover,
+body.club-portal-theme .dropdown-item:hover,
+body.club-portal-theme .dropdown-item:focus,
+body.club-portal-theme .dropdown-menu li:hover,
+body.club-portal-theme .dropdown-menu a:hover,
+body.club-portal-theme .dropdown-menu .grey-link:hover {
+	background: var(--club-accent-soft) !important;
+	color: var(--club-accent-ink) !important;
+}
+
+/* Controles de formulario compartidos */
+body.club-portal-theme .form-control,
+body.club-portal-theme select.form-control,
+body.club-portal-theme input.form-control {
+	border: 1px solid #d1d5db;
+	border-radius: 8px;
+	background: #fff;
+	color: #111827;
+	box-shadow: none;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+body.club-portal-theme .form-control:focus,
+body.club-portal-theme select.form-control:focus {
+	border-color: var(--club-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--club-accent) 18%, transparent);
+	outline: none;
+}
+
+body.club-portal-theme select.form-control {
+	appearance: none;
+	-webkit-appearance: none;
+	padding-right: 2rem;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 0.55rem center;
+	background-size: 0.9rem;
+	cursor: pointer;
+}
+
+/* Utilidades de layout (usar en paneles nuevos) */
+.club-portal-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 0.75rem 1rem;
+	margin-bottom: 1rem;
+	padding: 0.85rem 1rem;
+	background: #fff;
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-radius: var(--club-radius, 10px);
+	box-shadow: var(--club-shadow, 0 1px 2px rgba(15, 23, 42, 0.06));
+}
+
+.club-portal-field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	min-width: 0;
+}
+
+.club-portal-field label,
+.club-portal-field > span:first-child {
+	margin: 0;
+	font-size: 0.72rem;
+	font-weight: 600;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+	color: var(--text-muted, #6b7280);
+}
+
+.club-portal-panel {
+	background: #fff;
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-radius: var(--club-radius, 10px);
+	box-shadow: var(--club-shadow, 0 1px 2px rgba(15, 23, 42, 0.06));
+	padding: 1rem 1.1rem 1.1rem;
+}
+
+.club-portal-panel-title {
+	margin: 0 0 0.85rem;
+	color: var(--heading-color, #0f172a);
+	font-size: 0.95rem;
+	font-weight: 700;
+}
+
+.club-portal-chip {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.35rem 0.75rem;
+	border-radius: 999px;
+	background: var(--club-accent-soft, #dbeafe);
+	color: var(--club-accent-ink, #1e3a8a);
+	font-size: 0.8125rem;
+	font-weight: 600;
+}
+
+.club-portal-cta-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.55rem;
+}
+
+.club-portal-cta-row .btn {
+	border-radius: 8px;
+	font-weight: 600;
+}
+
+.club-portal-cta-row .btn-default,
+.club-portal-cta-row .btn-secondary {
+	background: #fff;
+	border: 1px solid #d1d5db;
+	color: #1f2937;
+}
+
+.club-portal-cta-row .btn-primary {
+	background: var(--club-accent, #2563eb);
+	border-color: var(--club-accent, #2563eb);
+}
+
+.club-portal-cta-row .btn-primary:hover {
+	background: var(--club-accent-hover, #1d4ed8);
+	border-color: var(--club-accent-hover, #1d4ed8);
+}
+
+/* Armonizar tarjetas existentes de los paneles */
+body.club-portal-theme .club-secretaria-kpi,
+body.club-portal-theme .club-secretaria-list-card,
+body.club-portal-theme .club-secretaria-chart-card,
+body.club-portal-theme .club-secretaria-quick-actions,
+body.club-portal-theme .club-tesoreria-kpi,
+body.club-portal-theme .club-tesoreria-list-card,
+body.club-portal-theme .club-tesoreria-actions,
+body.club-portal-theme .club-actividad-card,
+body.club-portal-theme .club-grupo-card,
+body.club-portal-theme .club-actividades-admin,
+body.club-portal-theme .club-valores-cuota-card {
+	border-radius: var(--club-radius);
+	box-shadow: var(--club-shadow);
+	border-color: var(--border-color);
+	background: #fff;
+}
+
+body.club-portal-theme .btn-primary:not(.btn-xs):not(.btn-link) {
+	background: var(--club-accent);
+	border-color: var(--club-accent);
+}
+
+body.club-portal-theme .btn-primary:not(.btn-xs):not(.btn-link):hover {
+	background: var(--club-accent-hover);
+	border-color: var(--club-accent-hover);
+}
+
+/* Listas Desk: header a ancho completo con fondo subtle correcto */
+body.club-portal-theme .list-row-head,
+body.club-portal-theme .list-row-head .level-left,
+body.club-portal-theme .list-row-head .level-right,
+body.club-portal-theme .list-row-head .list-count,
+body.club-portal-theme .list-row-head .list-liked-by-me {
+	background-color: var(--subtle-fg) !important;
+	color: var(--text-muted);
+}
+
+body.club-portal-theme .list-row-head {
+	width: 100%;
+	border-radius: var(--club-radius);
+}

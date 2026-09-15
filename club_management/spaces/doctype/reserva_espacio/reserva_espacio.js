@@ -4,6 +4,7 @@
 frappe.ui.form.on("Reserva Espacio", {
 	refresh(frm) {
 		_toggle_alquiler_fields(frm);
+		_add_confirmacion_actions(frm);
 	},
 	tipo(frm) {
 		if (frm.doc.tipo !== "Alquiler externo") {
@@ -23,6 +24,58 @@ frappe.ui.form.on("Reserva Espacio", {
 	},
 });
 
+function _add_confirmacion_actions(frm) {
+	if (frm.is_new() || frm.doc.estado !== "Pendiente") {
+		return;
+	}
+	const tiposOnline = ["Alquiler socio", "Alquiler externo"];
+	if (!tiposOnline.includes(frm.doc.tipo)) {
+		return;
+	}
+	frm.add_custom_button(__("Confirmar"), () => {
+		frappe.call({
+			method: "club_management.spaces.api.confirmacion_reservas.confirmar_reserva_espacio",
+			args: { reserva: frm.doc.name },
+			freeze: true,
+			callback(r) {
+				if (!r.exc) {
+					frm.reload_doc();
+					frappe.show_alert({ message: __("Reserva confirmada"), indicator: "green" });
+				}
+			},
+		});
+	}, __("Coordinación"));
+	frm.add_custom_button(__("Rechazar"), () => {
+		frappe.prompt(
+			[
+				{
+					fieldname: "motivo",
+					fieldtype: "Small Text",
+					label: __("Motivo del rechazo"),
+					reqd: 1,
+				},
+			],
+			(values) => {
+				frappe.call({
+					method: "club_management.spaces.api.confirmacion_reservas.rechazar_reserva_espacio",
+					args: { reserva: frm.doc.name, motivo: values.motivo },
+					freeze: true,
+					callback(r) {
+						if (!r.exc) {
+							frm.reload_doc();
+							frappe.show_alert({
+								message: __("Reserva rechazada"),
+								indicator: "orange",
+							});
+						}
+					},
+				});
+			},
+			__("Rechazar reserva"),
+			__("Rechazar")
+		);
+	}, __("Coordinación"));
+}
 frappe.views.calendar["Reserva Espacio"] = {
 	field_map: {
 		start: "fecha",
@@ -42,7 +95,7 @@ frappe.views.calendar["Reserva Espacio"] = {
 		{
 			fieldtype: "Select",
 			fieldname: "estado",
-			options: "\nBorrador\nConfirmada\nCancelada",
+			options: "\nBorrador\nPendiente\nConfirmada\nCancelada",
 			label: __("Estado"),
 		},
 	],

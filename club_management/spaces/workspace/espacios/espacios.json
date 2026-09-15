@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"esp_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Espacios</b></span>\",\"col\":12}},{\"id\":\"esp_sc_ocupacion\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Ocupación de espacios\",\"col\":4}},{\"id\":\"esp_sc_espacio\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Espacio\",\"col\":4}},{\"id\":\"esp_sc_reserva\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Reserva Espacio\",\"col\":4}},{\"id\":\"esp_spacer\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"esp_card_catalogo\",\"type\":\"card\",\"data\":{\"card_name\":\"Catálogo\",\"col\":4}},{\"id\":\"esp_card_ocupacion\",\"type\":\"card\",\"data\":{\"card_name\":\"Ocupación\",\"col\":4}}]",
+ "content": "[{\"id\":\"esp_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Gestión de Espacios y Canchas</b></span>\",\"col\":12}},{\"id\":\"esp_sc_dashboard\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Dashboard Espacios\",\"col\":4}},{\"id\":\"esp_sc_ocupacion\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Ocupación de espacios\",\"col\":4}},{\"id\":\"esp_sc_espacio\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Espacio\",\"col\":4}},{\"id\":\"esp_spacer\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"esp_card_catalogo\",\"type\":\"card\",\"data\":{\"card_name\":\"Catálogo\",\"col\":4}},{\"id\":\"esp_card_ocupacion\",\"type\":\"card\",\"data\":{\"card_name\":\"Ocupación\",\"col\":4}}]",
  "creation": "2026-08-20 00:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -10,7 +10,7 @@
  "icon": "organization",
  "idx": 0,
  "is_hidden": 0,
- "label": "Espacios",
+ "label": "Gestión de Espacios y Canchas",
  "links": [
   {
    "hidden": 0,
@@ -35,10 +35,20 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Ocupación",
-   "link_count": 2,
+   "link_count": 3,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Dashboard Espacios",
+   "link_count": 0,
+   "link_to": "espacios",
+   "link_type": "Page",
+   "onboard": 1,
+   "type": "Link"
   },
   {
    "hidden": 0,
@@ -61,10 +71,10 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-21 00:00:00.000000",
+ "modified": "2026-09-11 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Spaces",
- "name": "Espacios",
+ "name": "Gestión de Espacios y Canchas",
  "number_cards": [],
  "owner": "Administrator",
  "parent_page": "",
@@ -85,10 +95,17 @@
    "role": "System Manager"
   }
  ],
- "sequence_id": 2.5,
+ "sequence_id": 0.3,
  "shortcuts": [
   {
    "color": "Green",
+   "doc_view": "",
+   "label": "Dashboard Espacios",
+   "link_to": "espacios",
+   "type": "Page"
+  },
+  {
+   "color": "Blue",
    "doc_view": "",
    "label": "Ocupación de espacios",
    "link_to": "ocupacion-espacios",
@@ -109,5 +126,5 @@
    "type": "DocType"
   }
  ],
- "title": "Espacios"
+ "title": "Gestión de Espacios y Canchas"
 }

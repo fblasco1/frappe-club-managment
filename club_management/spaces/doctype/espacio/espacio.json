@@ -11,7 +11,13 @@
   "alquilable",
   "habilitado",
   "capacidad_personas",
+  "tarifa_socio",
+  "tarifa_externo",
+  "imagen",
+  "imagen_portal",
   "notas",
+  "section_combo",
+  "combo_con",
   "section_horarios",
   "horarios"
  ],
@@ -57,9 +63,50 @@
    "description": "Capacidad f\u00edsica del espacio (distinta de cupos de inscripci\u00f3n)."
   },
   {
+   "depends_on": "eval:doc.alquilable",
+   "description": "Tarifa canal socio (portal). Si est\u00e1 vac\u00eda, se usa el \u00edtem ICDPE-ALQ-ARS-TEMP.",
+   "fieldname": "tarifa_socio",
+   "fieldtype": "Currency",
+   "label": "Tarifa socio"
+  },
+  {
+   "depends_on": "eval:doc.alquilable",
+   "description": "Tarifa canal externo (guest). Si est\u00e1 vac\u00eda/0, se usa el \u00edtem ICDPE-ALQ-ARS-TEMP.",
+   "fieldname": "tarifa_externo",
+   "fieldtype": "Currency",
+   "label": "Tarifa externo"
+  },
+  {
+   "depends_on": "eval:doc.alquilable",
+   "fieldname": "imagen",
+   "fieldtype": "Attach Image",
+   "label": "Imagen"
+  },
+  {
+   "depends_on": "eval:doc.alquilable",
+   "description": "Ruta p\u00fablica del portal (ej. /images/salon.png) si no hay Attach.",
+   "fieldname": "imagen_portal",
+   "fieldtype": "Data",
+   "label": "Imagen portal (URL relativa)"
+  },
+  {
    "fieldname": "notas",
    "fieldtype": "Small Text",
    "label": "Notas"
+  },
+  {
+   "depends_on": "eval:doc.alquilable",
+   "fieldname": "section_combo",
+   "fieldtype": "Section Break",
+   "label": "Reserva conjunta"
+  },
+  {
+   "depends_on": "eval:doc.alquilable",
+   "description": "Espacios que se pueden (y suelen) reservar junto con este en el mismo horario.",
+   "fieldname": "combo_con",
+   "fieldtype": "Table",
+   "label": "Se reserva junto con",
+   "options": "Espacio Combo"
   },
   {
    "fieldname": "section_horarios",
@@ -81,7 +128,7 @@
    "link_fieldname": "espacio"
   }
  ],
- "modified": "2026-08-20 00:00:00.000000",
+ "modified": "2026-09-12 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Spaces",
  "name": "Espacio",
