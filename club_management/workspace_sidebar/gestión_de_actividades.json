@@ -1,0 +1,16 @@
+{
+ "app": "club_management",
+ "creation": "2026-07-02 11:41:42.829798",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "header_icon": "activity",
+ "idx": 0,
+ "items": [],
+ "modified": "2026-07-02 11:41:42.829798",
+ "modified_by": "Administrator",
+ "module": "Activities",
+ "name": "Gesti\u00f3n de Actividades",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "Gesti\u00f3n de Actividades"
+}

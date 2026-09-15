@@ -1,0 +1,68 @@
+/* Barra de navegación entre workspaces del club */
+.club-desk-with-nav.club-secretaria-workspace-body {
+	padding-top: 0.25rem;
+}
+
+.club-desk-nav {
+	margin: 0 0 1.5rem;
+}
+
+.club-desk-nav-inner {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.club-desk-nav-tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	padding: 0.55rem 1rem;
+	border: 1px solid var(--border-color, #d1d5db);
+	border-radius: var(--border-radius-lg, 8px);
+	background: var(--card-bg, #fff);
+	color: var(--text-color, #1f2937);
+	font-size: var(--text-md, 0.875rem);
+	font-weight: 500;
+	cursor: pointer;
+	transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.club-desk-nav-tab span {
+	color: inherit;
+}
+
+.club-desk-nav-tab:hover {
+	background: var(--fg-hover-color, #f3f4f6);
+	border-color: var(--gray-400, #9ca3af);
+}
+
+.club-desk-nav-tab.is-active[data-workspace="Secretaría"],
+.club-desk-nav-tab.is-active.club-desk-nav-tab--socios {
+	background: #2563eb;
+	border-color: #2563eb;
+	color: #fff;
+}
+
+.club-desk-nav-tab.is-active[data-workspace="Gestión de Actividades"],
+.club-desk-nav-tab.is-active.club-desk-nav-tab--actividades {
+	background: #059669;
+	border-color: #059669;
+	color: #fff;
+}
+
+.club-desk-nav-tab.is-active .club-desk-nav-icon,
+.club-desk-nav-tab.is-active[data-workspace="Secretaría"] .club-desk-nav-icon,
+.club-desk-nav-tab.is-active[data-workspace="Gestión de Actividades"] .club-desk-nav-icon {
+	--icon-stroke: #fff;
+}
+
+.club-desk-nav-icon {
+	flex-shrink: 0;
+}
+
+/* Retiro defensivo: ocultar pestaña Inicio si quedó en caché antigua */
+.club-desk-nav-tab[data-workspace="Inicio"],
+.club-desk-nav-tab[data-workspace="Inicio Club"] {
+	display: none !important;
+}

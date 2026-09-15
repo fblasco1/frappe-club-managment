@@ -1,0 +1,22 @@
+{
+ "app": "club_management",
+ "bg_color": "blue",
+ "creation": "2026-07-28 19:39:00.990506",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon": "users",
+ "icon_type": "Link",
+ "idx": 1,
+ "label": "Socios",
+ "link_to": "Socios",
+ "link_type": "Workspace Sidebar",
+ "modified": "2026-07-28 19:39:04.384279",
+ "modified_by": "Administrator",
+ "name": "Socios",
+ "owner": "Administrator",
+ "parent_icon": "SICLUB",
+ "restrict_removal": 1,
+ "roles": [],
+ "standard": 1
+}

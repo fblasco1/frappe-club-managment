@@ -1,0 +1,29 @@
+{
+ "app": "club_management",
+ "creation": "2026-07-28 19:39:00.952742",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "header_icon": "setting",
+ "idx": 0,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "setting",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Club Settings",
+   "link_to": "Club Settings",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-07-28 19:39:04.364561",
+ "modified_by": "Administrator",
+ "module": "Members",
+ "name": "Configuraci\u00f3n de Sistema",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "Configuraci\u00f3n de Sistema"
+}

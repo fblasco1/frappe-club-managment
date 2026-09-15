@@ -1,0 +1,33 @@
+{
+ "actions": [],
+ "creation": "2026-05-11 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "socio",
+  "rol",
+  "desde",
+  "hasta",
+  "notas"
+ ],
+ "fields": [
+  { "fieldname": "socio", "fieldtype": "Link", "label": "Socio", "options": "Socio", "reqd": 1, "in_list_view": 1 },
+  { "fieldname": "rol", "fieldtype": "Select", "label": "Rol", "options": "Titular\nC\u00f3nyuge\nHijo\nPadre\nMadre\nOtro", "reqd": 1, "in_list_view": 1 },
+  { "fieldname": "desde", "fieldtype": "Date", "label": "Desde", "in_list_view": 1 },
+  { "fieldname": "hasta", "fieldtype": "Date", "label": "Hasta", "in_list_view": 1 },
+  { "fieldname": "notas", "fieldtype": "Small Text", "label": "Notas" }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-05-11 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Members",
+ "name": "Miembro de Grupo Familiar",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

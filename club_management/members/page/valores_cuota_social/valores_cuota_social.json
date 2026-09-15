@@ -1,0 +1,19 @@
+{
+ "content": null,
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "module": "Members",
+ "name": "valores-cuota-social",
+ "page_name": "valores-cuota-social",
+ "roles": [
+  {
+   "role": "Secretaria"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "standard": "Yes",
+ "title": "Valores de Cuota Social"
+}

@@ -1,0 +1,100 @@
+{
+ "app": "club_management",
+ "creation": "2026-07-28 19:39:00.537495",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "header_icon": "users",
+ "idx": 0,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "home",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Secretar\u00eda",
+   "link_to": "Secretar\u00eda",
+   "link_type": "Workspace",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "user",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Socio",
+   "link_to": "Socio",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "wallet",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Valores de Cuota Social",
+   "link_to": "valores-cuota-social",
+   "link_type": "Page",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "file-text",
+   "indent": 1,
+   "keep_closed": 0,
+   "label": "Informes",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Section Break"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "table",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Cobranza por fechas",
+   "link_to": "Cobranza por fechas",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "table",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Pagos por equipo",
+   "link_to": "Pagos por equipo",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "table",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Deuda por actividad",
+   "link_to": "Deuda por actividad",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-09-04 18:05:22.806330",
+ "modified_by": "Administrator",
+ "module": "Members",
+ "name": "Socios",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "Socios"
+}

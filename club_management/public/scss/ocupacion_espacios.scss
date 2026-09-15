@@ -1,0 +1,188 @@
+/* Dashboard ocupación de espacios — planilla 08:00–04:00 */
+
+.club-ocupacion-page {
+	width: 100%;
+	max-width: none;
+}
+
+.club-ocupacion-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.65rem 1rem;
+	margin-bottom: 0.75rem;
+}
+
+.club-ocupacion-fecha-label {
+	margin: 0;
+	font-weight: 600;
+	font-size: 0.85rem;
+}
+
+.club-ocupacion-fecha {
+	width: 11rem;
+}
+
+.club-ocupacion-dia-label {
+	font-size: 1.15rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	color: #1f7a3a;
+}
+
+.club-ocupacion-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.55rem 1rem;
+	margin-bottom: 0.65rem;
+	font-size: 0.78rem;
+	color: var(--text-muted);
+}
+
+.club-ocupacion-legend-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.club-ocupacion-swatch {
+	width: 0.85rem;
+	height: 0.85rem;
+	border-radius: 2px;
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	flex-shrink: 0;
+}
+
+.club-ocupacion-scroll {
+	overflow: auto;
+	max-height: calc(100vh - 220px);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+	background: var(--card-bg);
+}
+
+.club-ocupacion-table {
+	border-collapse: separate;
+	border-spacing: 0;
+	min-width: 100%;
+	table-layout: fixed;
+}
+
+.club-ocupacion-table th,
+.club-ocupacion-table td {
+	border-right: 1px solid var(--border-color);
+	border-bottom: 1px solid var(--border-color);
+	vertical-align: top;
+	padding: 0;
+}
+
+.club-ocupacion-hora-head,
+.club-ocupacion-hora-body {
+	width: 4.5rem;
+	min-width: 4.5rem;
+	position: sticky;
+	left: 0;
+	z-index: 3;
+	background: #e8f5e9;
+}
+
+.club-ocupacion-hora-head,
+.club-ocupacion-col-head {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	background: #2e7d32;
+	color: #fff;
+	font-size: 0.78rem;
+	font-weight: 700;
+	text-align: center;
+	padding: 0.55rem 0.35rem;
+	white-space: nowrap;
+}
+
+.club-ocupacion-hora-head {
+	z-index: 4;
+	left: 0;
+}
+
+.club-ocupacion-col-head {
+	min-width: 9.5rem;
+}
+
+.club-ocupacion-time-col,
+.club-ocupacion-col-canvas {
+	position: relative;
+	width: 100%;
+}
+
+.club-ocupacion-time-slot {
+	position: absolute;
+	left: 0;
+	right: 0;
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	padding-top: 2px;
+	font-size: 0.7rem;
+	font-weight: 600;
+	color: var(--text-color);
+	box-sizing: border-box;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+	background: #f1f8f2;
+}
+
+.club-ocupacion-gridline {
+	position: absolute;
+	left: 0;
+	right: 0;
+	box-sizing: border-box;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+	background: repeating-linear-gradient(
+		0deg,
+		transparent,
+		transparent 13px,
+		rgba(0, 0, 0, 0.015) 13px,
+		rgba(0, 0, 0, 0.015) 14px
+	);
+}
+
+.club-ocupacion-block {
+	position: absolute;
+	z-index: 1;
+	box-sizing: border-box;
+	padding: 3px 5px;
+	border-radius: 3px;
+	border: 1px solid rgba(0, 0, 0, 0.18);
+	overflow: hidden;
+	cursor: pointer;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.club-ocupacion-block:hover {
+	z-index: 2;
+	filter: brightness(0.97);
+}
+
+.club-ocupacion-block--superposicion {
+	border: 2px solid #c0392b;
+	box-shadow: 0 0 0 1px rgba(192, 57, 43, 0.35);
+}
+
+.club-ocupacion-superposiciones {
+	margin-bottom: 0.65rem;
+	font-size: 0.82rem;
+}
+
+.club-ocupacion-superposiciones-list {
+	margin: 0.35rem 0 0;
+	padding-left: 1.25rem;
+}
+
+.club-ocupacion-block-text {
+	display: block;
+	font-size: 0.68rem;
+	font-weight: 600;
+	line-height: 1.25;
+	color: #1a1a1a;
+	word-break: break-word;
+}

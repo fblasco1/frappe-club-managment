@@ -1,0 +1,22 @@
+{
+ "app": "club_management",
+ "bg_color": "blue",
+ "creation": "2026-09-12 11:48:47.215124",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon": "organization",
+ "icon_type": "Link",
+ "idx": 3,
+ "label": "Espacios",
+ "link_to": "Espacios",
+ "link_type": "Workspace Sidebar",
+ "modified": "2026-09-12 16:59:55.438663",
+ "modified_by": "Administrator",
+ "name": "Espacios",
+ "owner": "Administrator",
+ "parent_icon": "SICLUB",
+ "restrict_removal": 1,
+ "roles": [],
+ "standard": 1
+}

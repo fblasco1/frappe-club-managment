@@ -1,0 +1,19 @@
+{
+ "content": null,
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "module": "Activities",
+ "name": "catalogo-actividades",
+ "page_name": "catalogo-actividades",
+ "roles": [
+  {
+   "role": "Secretaria"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "standard": "Yes",
+ "title": "Catálogo de actividades"
+}

@@ -1,0 +1,146 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:BON-{YYYY}-{#####}",
+ "creation": "2026-08-11 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "periodo_cobro",
+  "estado",
+  "column_break_top",
+  "tipo_descuento",
+  "valor",
+  "section_alcance",
+  "socio",
+  "actividad",
+  "grupo_actividad",
+  "equipo_actividad",
+  "section_motivo",
+  "motivo"
+ ],
+ "fields": [
+  {
+   "fieldname": "periodo_cobro",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Período (MM/YYYY)",
+   "reqd": 1
+  },
+  {
+   "default": "Activa",
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Estado",
+   "options": "Activa\nAnulada",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_top",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Porcentaje",
+   "fieldname": "tipo_descuento",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Tipo descuento",
+   "options": "Porcentaje\nMonto fijo",
+   "reqd": 1
+  },
+  {
+   "fieldname": "valor",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Valor (% o monto)",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_alcance",
+   "fieldtype": "Section Break",
+   "label": "Alcance"
+  },
+  {
+   "description": "Si está vacío, la bonificación es masiva (actividad/grupo/equipo).",
+   "fieldname": "socio",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Socio (individual)",
+   "options": "Socio"
+  },
+  {
+   "fieldname": "actividad",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Actividad",
+   "options": "Actividad"
+  },
+  {
+   "fieldname": "grupo_actividad",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Grupo Actividad",
+   "options": "Grupo Actividad"
+  },
+  {
+   "fieldname": "equipo_actividad",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Equipo Actividad",
+   "options": "Equipo Actividad"
+  },
+  {
+   "fieldname": "section_motivo",
+   "fieldtype": "Section Break",
+   "label": "Motivo"
+  },
+  {
+   "fieldname": "motivo",
+   "fieldtype": "Small Text",
+   "reqd": 1,
+   "label": "Motivo"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-11 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Members",
+ "name": "Bonificacion Arancel",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Secretaria",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

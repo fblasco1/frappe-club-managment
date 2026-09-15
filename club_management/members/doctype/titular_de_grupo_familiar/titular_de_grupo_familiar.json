@@ -1,0 +1,37 @@
+{
+ "actions": [],
+ "creation": "2026-05-11 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "tipo_titular",
+  "titular",
+  "es_principal",
+  "rol",
+  "desde",
+  "hasta",
+  "notas"
+ ],
+ "fields": [
+  { "fieldname": "tipo_titular", "fieldtype": "Select", "label": "Tipo de titular", "options": "Socio\nTutor No Socio", "reqd": 1, "in_list_view": 1 },
+  { "fieldname": "titular", "fieldtype": "Dynamic Link", "label": "Titular", "options": "tipo_titular", "reqd": 1, "in_list_view": 1 },
+  { "fieldname": "es_principal", "fieldtype": "Check", "label": "Es principal", "in_list_view": 1 },
+  { "fieldname": "rol", "fieldtype": "Select", "label": "Rol", "options": "Titular\nPadre\nMadre\nTutor Legal\nCotitular\nOtro", "reqd": 1, "in_list_view": 1 },
+  { "fieldname": "desde", "fieldtype": "Date", "label": "Desde" },
+  { "fieldname": "hasta", "fieldtype": "Date", "label": "Hasta" },
+  { "fieldname": "notas", "fieldtype": "Small Text", "label": "Notas" }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-05-11 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Members",
+ "name": "Titular de Grupo Familiar",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

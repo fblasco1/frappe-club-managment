@@ -34,7 +34,18 @@ venv.bak/
 
 # Dependency directories
 node_modules/
+**/node_modules
 jspm_packages/
+
+# Playwright E2E
+playwright-report/
+test-results/
+blob-report/
+.pw-channel.env
+.pw-browser-ready
+
+# Byproduct de re-export de Workspace en modo desarrollador (fuente canónica: tesoreria/)
+club_management/finance/workspace/tesorería/
 
 # IDEs and editors
 .vscode/
@@ -53,3 +64,8 @@ jspm_packages/
 
 # Aider AI Chat
 .aider*
+
+# Artefactos locales de conciliación / pipelines
+tmp_/
+tmp_*/
+**/tmp_*/

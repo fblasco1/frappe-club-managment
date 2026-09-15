@@ -1,0 +1,388 @@
+body.club-actividades-active-workspace {
+	.layout-main-section-wrapper,
+	.layout-main .layout-main-section-wrapper,
+	.layout-main-section,
+	.layout-main,
+	.workspace-content,
+	.page-body,
+	.container {
+		width: 100% !important;
+		max-width: none !important;
+		flex: 1 1 100% !important;
+	}
+
+	.editor-js-container,
+	.codex-editor,
+	.codex-editor__redactor {
+		width: 100% !important;
+		max-width: none !important;
+	}
+
+	.codex-editor,
+	.codex-editor__redactor {
+		min-height: unset !important;
+	}
+
+	.editor-holder,
+	#editorjs {
+		display: none;
+	}
+}
+
+/* Dashboard Gestión de Actividades y Deportes — ancho completo (patrón Secretaría) */
+
+body.club-actividades-active-workspace .layout-main-section-wrapper,
+body.club-actividades-active-workspace .layout-main .layout-main-section-wrapper,
+.club-actividades-workspace-body.layout-main-section-wrapper,
+.club-actividades-workspace-body.layout-main-section,
+.club-actividades-workspace-body.page-body,
+.club-actividades-workspace-body.container,
+.club-actividades-workspace-body.workspace-content,
+.club-actividades-workspace-body.layout-main,
+.club-actividades-workspace-body .layout-main-section-wrapper,
+.club-actividades-workspace-body .layout-main-section,
+.club-actividades-workspace-body .layout-main {
+	width: 100% !important;
+	max-width: none !important;
+	flex: 1 1 100% !important;
+}
+
+.club-actividades-workspace-body .layout-main-section.frappe-card {
+	padding-left: 1rem;
+	padding-right: 1rem;
+}
+
+@media (min-width: 992px) {
+	.club-actividades-workspace-body .layout-main-section.frappe-card {
+		padding-left: 1.25rem;
+		padding-right: 1.25rem;
+	}
+}
+
+.club-actividades-workspace,
+.club-actividades-workspace .editor-js-container,
+#club-actividades-dashboard {
+	width: 100%;
+	max-width: none;
+	box-sizing: border-box;
+}
+
+.club-actividades-workspace .layout-main-section-wrapper,
+.club-actividades-workspace .layout-main-section {
+	width: 100%;
+	max-width: none;
+}
+
+.club-actividades-workspace .editor-js-container {
+	width: 100%;
+	max-width: none;
+	padding-left: 0;
+	padding-right: 0;
+}
+
+.club-actividades-workspace .codex-editor,
+.club-actividades-workspace .codex-editor__redactor {
+	min-height: unset !important;
+}
+
+.club-actividades-workspace .editor-holder,
+.club-actividades-workspace #editorjs {
+	display: none;
+}
+
+#club-actividades-dashboard {
+	margin-bottom: 1.5rem;
+}
+
+.club-actividades-dashboard-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	align-items: flex-end;
+	margin-bottom: 1rem;
+}
+
+.club-actividades-dashboard-filters .form-group {
+	margin-bottom: 0;
+	min-width: min(100%, 12rem);
+}
+
+.club-actividades-kpi-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+	gap: 1rem;
+	margin: 0 0 1.5rem;
+	width: 100%;
+}
+
+.club-actividades-kpi-card {
+	background: var(--card-bg);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+	padding: 1rem 1.1rem;
+	min-height: 8.5rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.club-actividades-kpi-card.is-semaforo-amarillo {
+	border-color: #f59e0b;
+	box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.25);
+}
+
+.club-actividades-kpi-card.is-semaforo-rojo {
+	border-color: #dc2626;
+	box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.2);
+}
+
+.club-actividades-kpi-title {
+	font-size: var(--text-sm);
+	color: var(--text-muted);
+	margin: 0;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+}
+
+.club-actividades-kpi-value {
+	font-size: clamp(1.5rem, 4vw, 2rem);
+	font-weight: 700;
+	line-height: 1.1;
+}
+
+.club-actividades-kpi-footer {
+	margin-top: auto;
+}
+
+.club-actividades-quick-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.65rem;
+	margin-bottom: 1.25rem;
+}
+
+.club-actividades-charts-row {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 1.25rem;
+	margin-bottom: 1.25rem;
+}
+
+@media (min-width: 992px) {
+	.club-actividades-charts-row--dual {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+.club-actividades-chart-card,
+.club-actividades-list-card {
+	background: var(--card-bg);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+	padding: 1.1rem 1.25rem;
+	width: 100%;
+	min-width: 0;
+}
+
+.club-actividades-chart-card h6,
+.club-actividades-list-card h6 {
+	margin: 0 0 0.85rem;
+	font-weight: 600;
+}
+
+.club-actividades-chart-card--wide {
+	width: 100%;
+}
+
+.club-actividades-chart-ocupacion {
+	position: relative;
+	min-height: 260px;
+}
+
+.club-actividades-chart-ocupacion-canvas {
+	position: relative;
+}
+
+.club-actividades-chart-ocupacion .graph-svg-tip {
+	display: none !important;
+}
+
+.club-actividades-chart-ocupacion .legend-dataset,
+.club-actividades-chart-ocupacion .legend-dataset-label,
+.club-actividades-chart-ocupacion .legend-dataset-value {
+	display: none !important;
+}
+
+.club-actividades-ocupacion-filters {
+	margin-bottom: 0.85rem;
+}
+
+.club-actividades-ocupacion-filters-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.35rem 0.75rem;
+	margin-bottom: 0.45rem;
+}
+
+.club-actividades-ocupacion-filters-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.club-actividades-ocupacion-filters-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem 0.65rem;
+}
+
+.club-actividades-ocupacion-filter {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	margin: 0;
+	font-size: var(--text-sm);
+	cursor: pointer;
+	user-select: none;
+}
+
+.club-actividades-ocupacion-tip {
+	position: absolute;
+	z-index: 5;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.12s ease;
+	min-width: 10rem;
+	max-width: min(18rem, 90vw);
+	padding: 0.55rem 0.65rem;
+	border-radius: var(--border-radius-sm);
+	background: var(--charts-tooltip-bg, #fff);
+	border: 1px solid var(--border-color);
+	box-shadow: var(--shadow-base);
+}
+
+.club-actividades-ocupacion-tip.is-visible {
+	opacity: 1;
+}
+
+.club-actividades-ocupacion-tip-title {
+	font-weight: 600;
+	margin-bottom: 0.15rem;
+}
+
+.club-actividades-ocupacion-tip-total {
+	font-size: var(--text-sm);
+	color: var(--text-muted);
+	margin-bottom: 0.35rem;
+}
+
+.club-actividades-ocupacion-tip-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.club-actividades-ocupacion-tip-list li {
+	display: grid;
+	grid-template-columns: 0.65rem 1fr auto;
+	align-items: center;
+	gap: 0.35rem 0.45rem;
+	font-size: var(--text-sm);
+}
+
+.club-actividades-ocupacion-tip-dot {
+	width: 0.65rem;
+	height: 0.65rem;
+	border-radius: 2px;
+}
+
+.club-actividades-ocupacion-tip-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.club-actividades-ocupacion-tip-value {
+	font-variant-numeric: tabular-nums;
+}
+
+body.club-actividades-catalog-active .layout-main-section-wrapper,
+body.club-actividades-catalog-active .layout-main .layout-main-section-wrapper,
+.club-actividades-catalog-page.layout-main-section-wrapper,
+.club-actividades-catalog-page.layout-main-section,
+.club-actividades-catalog-page.page-body,
+.club-actividades-catalog-page.container,
+.club-actividades-catalog-page .layout-main-section-wrapper,
+.club-actividades-catalog-page .layout-main-section,
+.club-actividades-catalog-page .layout-main {
+	width: 100% !important;
+	max-width: none !important;
+	flex: 1 1 100% !important;
+}
+
+.club-actividades-catalog-page .layout-main-section {
+	width: 100%;
+	max-width: none;
+	padding-left: 1rem;
+	padding-right: 1rem;
+}
+
+.club-actividades-catalog-page .club-actividades-catalog {
+	width: 100%;
+	max-width: none;
+}
+
+.club-actividades-infra-placeholder {
+	color: var(--text-muted);
+	font-size: var(--text-sm);
+	margin: 0;
+}
+
+.club-desk-nav-search-wrap {
+	position: relative;
+	flex: 1 1 220px;
+	max-width: 360px;
+	margin-left: auto;
+}
+
+.club-desk-nav-search {
+	width: 100%;
+}
+
+.club-desk-nav-search-results {
+	position: absolute;
+	top: calc(100% + 0.25rem);
+	left: 0;
+	right: 0;
+	z-index: 20;
+	background: var(--card-bg);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-sm);
+	box-shadow: var(--shadow-base);
+	max-height: 280px;
+	overflow: auto;
+	display: none;
+}
+
+.club-desk-nav-search-results.is-open {
+	display: block;
+}
+
+.club-desk-nav-search-item {
+	display: block;
+	width: 100%;
+	text-align: left;
+	padding: 0.55rem 0.75rem;
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+}
+
+.club-desk-nav-search-item:hover,
+.club-desk-nav-search-item:focus {
+	background: var(--fg-hover-color);
+	outline: none;
+}

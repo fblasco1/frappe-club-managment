@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "source": "febamba_ges",
+  "generated_at": "2026-08-26T20:00:00-03:00",
+  "club": "PEDRO ECHAGUE",
+  "partidos": [
+    {
+      "source": "febamba_ges",
+      "external_id": "fixture-sample-local-001",
+      "fecha": "2026-09-06",
+      "hora": "20:00",
+      "tira": "AZUL",
+      "categoria": "U17",
+      "rival": "Club Visitante Test",
+      "localia": "Local",
+      "direccion": "Portela 836, CABA (CP 1406)",
+      "resultado": "",
+      "espacio": null
+    },
+    {
+      "source": "febamba_ges",
+      "external_id": "fixture-sample-visitante-002",
+      "fecha": "2026-09-07",
+      "hora": "18:00",
+      "tira": "",
+      "categoria": "U15",
+      "rival": "Otro Club",
+      "localia": "Visitante",
+      "direccion": "",
+      "resultado": "",
+      "espacio": null
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+/* Informes Deuda / Pagos por equipo — espaciado y totales legibles */
+
+.club-equipo-report-page .report-wrapper,
+.club-equipo-report-page .report-container {
+	margin-bottom: 1.5rem;
+	padding-bottom: 1.25rem;
+}
+
+.club-equipo-report-page .club-equipo-report-table,
+.club-equipo-report-page .dt-scrollable,
+.club-equipo-report-page .frappe-datatable {
+	margin-bottom: 1.5rem;
+}
+
+.club-equipo-report-page .dt-scrollable {
+	padding-bottom: 0.75rem;
+}
+
+.club-equipo-report-page .dt-row:last-child .dt-cell {
+	font-weight: 600;
+	border-top: 2px solid var(--border-color);
+	background: var(--subtle-accent);
+}
+
+.club-equipo-report-page .dt-row:last-child .dt-cell .content {
+	font-weight: 600;
+}

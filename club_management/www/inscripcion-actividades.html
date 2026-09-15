@@ -1,0 +1,149 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div class="container py-5" style="max-width: 640px;">
+	{% if inscripcion_valida %}
+	<h1>{{ _("Elegí tus actividades") }}</h1>
+	{% if ya_activo %}
+	<p class="text-muted">{{ _("Tu membresía ya está activa. Podés revisar o cerrar esta ventana.") }}</p>
+	{% else %}
+	<p>{{ _("Hola") }} {{ nombre_solicitante | e }}, {{ _("seleccioná una o más actividades. También podés continuar sin elegir ninguna.") }}</p>
+	{% endif %}
+
+	<label class="form-label mt-3" for="club-inscripcion-search">{{ _("Actividades") }}</label>
+	<div class="club-ms-combobox" id="club-inscripcion-combobox">
+		<div class="club-ms-pills" id="club-inscripcion-pills"></div>
+		<div class="position-relative">
+			<input type="text" class="form-control club-ms-search" id="club-inscripcion-search"
+				placeholder="{{ _('Buscar y seleccionar…') }}" autocomplete="off"
+				role="combobox" aria-expanded="false" aria-controls="club-inscripcion-dropdown">
+			<div class="club-ms-dropdown" id="club-inscripcion-dropdown" style="display: none;"></div>
+		</div>
+	</div>
+	<div class="help-block text-muted">{{ _("Escribí para filtrar y hacé clic para agregar.") }}</div>
+
+	<div class="d-flex gap-2 mt-4 flex-wrap">
+		<button class="btn btn-primary" id="confirmar-inscripcion" type="button" {% if ya_activo %}disabled{% endif %}>
+			{{ _("Confirmar y activar membresía") }}
+		</button>
+		<button class="btn btn-outline-secondary" id="omitir-inscripcion" type="button" {% if ya_activo %}disabled{% endif %}>
+			{{ _("Continuar sin actividades") }}
+		</button>
+	</div>
+	<p class="text-muted mt-3" id="inscripcion-resultado"></p>
+
+	<script>
+	(function () {
+		var catalog = [];
+		var selected = {};
+		var token = {{ pago_token | tojson }};
+		var pills = document.getElementById("club-inscripcion-pills");
+		var search = document.getElementById("club-inscripcion-search");
+		var dropdown = document.getElementById("club-inscripcion-dropdown");
+		var combobox = document.getElementById("club-inscripcion-combobox");
+		var resultado = document.getElementById("inscripcion-resultado");
+
+		function renderPills() {
+			pills.innerHTML = "";
+			Object.keys(selected).forEach(function (value) {
+				var pill = document.createElement("span");
+				pill.className = "badge bg-primary me-1 mb-1";
+				pill.textContent = selected[value] + " ×";
+				pill.style.cursor = "pointer";
+				pill.addEventListener("click", function () {
+					delete selected[value];
+					renderPills();
+				});
+				pills.appendChild(pill);
+			});
+		}
+
+		function renderDropdown(filter) {
+			var q = (filter || "").toLowerCase();
+			var items = catalog.filter(function (row) {
+				if (selected[row.value]) return false;
+				var label = (row.label || "").toLowerCase();
+				return !q || label.indexOf(q) >= 0;
+			});
+			dropdown.innerHTML = items.length
+				? items.map(function (row) {
+					return '<button type="button" class="dropdown-item" data-value="' +
+						frappe.utils.escape_html(row.value) + '">' +
+						frappe.utils.escape_html(row.label) + "</button>";
+				}).join("")
+				: '<div class="dropdown-item text-muted disabled">{{ _("No hay más actividades") }}</div>';
+			dropdown.style.display = "block";
+			dropdown.querySelectorAll("[data-value]").forEach(function (btn) {
+				btn.addEventListener("click", function () {
+					var v = btn.getAttribute("data-value");
+					var row = catalog.find(function (r) { return r.value === v; });
+					if (row) {
+						selected[row.value] = row.label;
+						search.value = "";
+						renderPills();
+						renderDropdown("");
+					}
+				});
+			});
+		}
+
+		search.addEventListener("focus", function () {
+			renderDropdown(search.value);
+		});
+		search.addEventListener("input", function () {
+			renderDropdown(search.value);
+		});
+		document.addEventListener("click", function (e) {
+			if (!combobox.contains(e.target)) {
+				dropdown.style.display = "none";
+			}
+		});
+
+		function confirmar(actividades) {
+			frappe.call({
+				method: "club_management.activities.api.inscripcion_publica.confirmar_inscripcion_actividades",
+				args: { token: token, actividades: actividades },
+				callback: function (r) {
+					if (r.message && r.message.status === "ok") {
+						resultado.textContent = "{{ _('¡Listo! Tu membresía está activa.') }}";
+						document.getElementById("confirmar-inscripcion").disabled = true;
+						document.getElementById("omitir-inscripcion").disabled = true;
+					} else {
+						resultado.textContent = "{{ _('No se pudo completar la inscripción.') }}";
+					}
+				},
+			});
+		}
+
+		document.getElementById("confirmar-inscripcion").addEventListener("click", function () {
+			confirmar(Object.keys(selected));
+		});
+		document.getElementById("omitir-inscripcion").addEventListener("click", function () {
+			confirmar([]);
+		});
+
+		frappe.call({
+			method: "club_management.activities.api.inscripcion_publica.get_actividades_inscripcion",
+			callback: function (r) {
+				catalog = r.message || [];
+			},
+		});
+	})();
+	</script>
+	{% else %}
+	<h1>{{ _("Enlace no válido") }}</h1>
+	<p>{{ _("El enlace de inscripción no existe o ya no está disponible.") }}</p>
+	{% endif %}
+</div>
+<style>
+.club-ms-combobox { border: 1px solid var(--border-color, #d1d8dd); border-radius: 6px; padding: 0.5rem; }
+.club-ms-pills { min-height: 1.5rem; margin-bottom: 0.35rem; }
+.club-ms-dropdown {
+	position: absolute; z-index: 1000; width: 100%; max-height: 220px; overflow-y: auto;
+	background: var(--card-bg, #fff); border: 1px solid var(--border-color, #d1d8dd);
+	border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.08);
+}
+.club-ms-dropdown .dropdown-item { display: block; width: 100%; text-align: left; padding: 0.5rem 0.75rem; border: 0; background: transparent; }
+.club-ms-dropdown .dropdown-item:hover { background: var(--control-bg, #f3f3f3); }
+</style>
+{% endblock %}

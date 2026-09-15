@@ -1,0 +1,47 @@
+/* SICLUB branding — solo pantalla de login (spec login_siclub_branding.md) */
+
+body[data-path="login"] .page-content-wrapper,
+.for-login .page-card,
+.signin-page .page-card {
+	border-radius: 12px;
+}
+
+body[data-path="login"] .page-card-head,
+.for-login .page-card-head {
+	text-align: center;
+	padding-top: 1.5rem;
+}
+
+body[data-path="login"] .page-card-head h4,
+.for-login .page-card-head h4 {
+	font-size: 0;
+	line-height: 0;
+}
+
+body[data-path="login"] .page-card-head h4::before,
+.for-login .page-card-head h4::before {
+	content: "SICLUB";
+	display: block;
+	font-size: 1.75rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	color: var(--primary, #249ef0);
+	line-height: 1.2;
+}
+
+body[data-path="login"] .page-card-head h4::after,
+.for-login .page-card-head h4::after {
+	content: "Sistema Integral de Gestión de Clubes Deportivos";
+	display: block;
+	margin-top: 0.35rem;
+	font-size: 0.8rem;
+	font-weight: 400;
+	color: var(--text-muted, #6c757d);
+	line-height: 1.35;
+	letter-spacing: normal;
+}
+
+body[data-path="login"] .page-card-body,
+.for-login .page-card-body {
+	padding-top: 0.5rem;
+}

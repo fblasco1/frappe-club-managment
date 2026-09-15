@@ -1,0 +1,13 @@
+{
+  "name": "club_management-qa",
+  "private": true,
+  "description": "Playwright E2E headless (WSL). UI supervisada: Cursor Browser MCP — ver .cursor/skills/qa-solicitud-supervisada/",
+  "scripts": {
+    "qa:e2e": "bash scripts/run-qa-e2e.sh",
+    "qa:e2e:headed": "bash scripts/run-qa-e2e.sh --headed",
+    "qa:e2e:ui": "bash scripts/run-qa-e2e.sh --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
+  }
+}

@@ -26,13 +26,19 @@ jobs:
         image: redis:alpine
         ports:
           - 11000:6379
-      mariadb:
-        image: mariadb:11.8
+      # Alineado a prod/dev (PostgreSQL v14). MariaDB provocaba fallos masivos
+      # por SQL PG-only (Socio) y faltaban tablas de ERPNext en el site de test.
+      postgresql:
+        image: postgres:14
         env:
-          MYSQL_ROOT_PASSWORD: root
+          POSTGRES_PASSWORD: root
         ports:
-          - 3306:3306
-        options: --health-cmd="mariadb-admin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Clone
@@ -75,22 +81,36 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
 
-      - name: Install MariaDB Client
+      - name: Install PostgreSQL client
         run: |
           sudo apt update
-          sudo apt-get install mariadb-client
+          sudo apt-get install -y postgresql-client libpq-dev
 
       - name: Setup
         run: |
           pip install frappe-bench
           bench init --skip-redis-config-generation --skip-assets --python "$(which python)" ~/frappe-bench
+          cd ~/frappe-bench
+          bench set-config -g db_host 127.0.0.1
+          bench set-config -g db_port 5432
+          bench set-config -g redis_cache redis://127.0.0.1:13000
+          bench set-config -g redis_queue redis://127.0.0.1:11000
+          bench set-config -g redis_socketio redis://127.0.0.1:11000
 
       - name: Install
         working-directory: /home/runner/frappe-bench
         run: |
+          bench get-app --branch version-16 https://github.com/frappe/erpnext.git
           bench get-app club_management $GITHUB_WORKSPACE
           bench setup requirements --dev
-          bench new-site --db-root-password root --admin-password admin test_site
+          bench new-site test_site \
+            --db-type postgres \
+            --db-host 127.0.0.1 \
+            --db-port 5432 \
+            --db-root-username postgres \
+            --db-root-password root \
+            --admin-password admin \
+            --install-app erpnext
           bench --site test_site install-app club_management
           bench build
         env:

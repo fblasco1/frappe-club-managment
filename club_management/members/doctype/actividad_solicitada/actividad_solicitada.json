@@ -1,0 +1,29 @@
+{
+ "actions": [],
+ "creation": "2026-08-07 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "actividad",
+  "grupo_actividad",
+  "notas"
+ ],
+ "fields": [
+  { "fieldname": "actividad", "fieldtype": "Link", "label": "Actividad", "options": "Actividad", "reqd": 1, "in_list_view": 1 },
+  { "fieldname": "grupo_actividad", "fieldtype": "Link", "label": "Grupo / plan", "options": "Grupo Actividad", "in_list_view": 1, "description": "Solo cuando el grupo define el plan y el arancel (ej. 1 clase por semana). Las tiras deportivas las asigna Secretar\u00eda." },
+  { "fieldname": "notas", "fieldtype": "Small Text", "label": "Notas del solicitante" }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-07 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Members",
+ "name": "Actividad Solicitada",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": [],
+ "track_changes": 0
+}

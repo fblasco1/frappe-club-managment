@@ -1,0 +1,191 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:titulo",
+ "creation": "2026-08-20 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "titulo",
+  "tipo",
+  "alquilable",
+  "habilitado",
+  "capacidad_personas",
+  "tarifa_socio",
+  "tarifa_externo",
+  "imagen",
+  "imagen_portal",
+  "notas",
+  "section_combo",
+  "combo_con",
+  "section_horarios",
+  "horarios"
+ ],
+ "fields": [
+  {
+   "fieldname": "titulo",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "T\u00edtulo",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "tipo",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Tipo",
+   "options": "Cancha\nGimnasio\nSalon\nOtro",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "alquilable",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Alquilable",
+   "description": "Metadato para portal/alquiler externo futuro; no restringe uso interno."
+  },
+  {
+   "default": "1",
+   "fieldname": "habilitado",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Habilitado"
+  },
+  {
+   "default": "0",
+   "fieldname": "capacidad_personas",
+   "fieldtype": "Int",
+   "label": "Capacidad (personas)",
+   "description": "Capacidad f\u00edsica del espacio (distinta de cupos de inscripci\u00f3n)."
+  },
+  {
+   "depends_on": "eval:doc.alquilable",
+   "description": "Tarifa canal socio (portal). Si est\u00e1 vac\u00eda, se usa el \u00edtem ICDPE-ALQ-ARS-TEMP.",
+   "fieldname": "tarifa_socio",
+   "fieldtype": "Currency",
+   "label": "Tarifa socio"
+  },
+  {
+   "depends_on": "eval:doc.alquilable",
+   "description": "Tarifa canal externo (guest). Si est\u00e1 vac\u00eda/0, se usa el \u00edtem ICDPE-ALQ-ARS-TEMP.",
+   "fieldname": "tarifa_externo",
+   "fieldtype": "Currency",
+   "label": "Tarifa externo"
+  },
+  {
+   "depends_on": "eval:doc.alquilable",
+   "fieldname": "imagen",
+   "fieldtype": "Attach Image",
+   "label": "Imagen"
+  },
+  {
+   "depends_on": "eval:doc.alquilable",
+   "description": "Ruta p\u00fablica del portal (ej. /images/salon.png) si no hay Attach.",
+   "fieldname": "imagen_portal",
+   "fieldtype": "Data",
+   "label": "Imagen portal (URL relativa)"
+  },
+  {
+   "fieldname": "notas",
+   "fieldtype": "Small Text",
+   "label": "Notas"
+  },
+  {
+   "depends_on": "eval:doc.alquilable",
+   "fieldname": "section_combo",
+   "fieldtype": "Section Break",
+   "label": "Reserva conjunta"
+  },
+  {
+   "depends_on": "eval:doc.alquilable",
+   "description": "Espacios que se pueden (y suelen) reservar junto con este en el mismo horario.",
+   "fieldname": "combo_con",
+   "fieldtype": "Table",
+   "label": "Se reserva junto con",
+   "options": "Espacio Combo"
+  },
+  {
+   "fieldname": "section_horarios",
+   "fieldtype": "Section Break",
+   "label": "Grilla de entrenamientos"
+  },
+  {
+   "fieldname": "horarios",
+   "fieldtype": "Table",
+   "label": "Horarios",
+   "options": "Horario Entrenamiento"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [
+  {
+   "group": "Reservas",
+   "link_doctype": "Reserva Espacio",
+   "link_fieldname": "espacio"
+  }
+ ],
+ "modified": "2026-09-12 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Spaces",
+ "name": "Espacio",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Coordinacion",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Secretaria",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Tesoreria",
+   "share": 0,
+   "write": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
