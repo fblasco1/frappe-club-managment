@@ -390,6 +390,25 @@ class TestSocioContactoDomicilio(MembersTestCase):
         self.assertEqual(socio.telefono_movil, "+541112345678")
 
 
+class TestSocioNumeracionDialect(MembersTestCase):
+    """Autonumeración compatible con PostgreSQL (prod) y MariaDB (CI)."""
+
+    def test_siguiente_numero_socio_no_rompe_en_db_actual(self) -> None:
+        from club_management.members.doctype.socio.socio import Socio
+
+        n = Socio._siguiente_numero_socio()
+        self.assertIsInstance(n, int)
+        self.assertGreaterEqual(n, 1)
+
+    def test_max_name_numerico_acepta_dialectos(self) -> None:
+        from club_management.members.doctype.socio.socio import Socio
+
+        # Smoke: la consulta dialect-aware debe ejecutarse sin ProgrammingError.
+        max_name = Socio._max_name_numerico()
+        self.assertIsInstance(max_name, int)
+        self.assertGreaterEqual(max_name, 0)
+
+
 class TestSocioFichaMedica(MembersTestCase):
     """Validación de MIME y tamaño de la ficha médica."""
 

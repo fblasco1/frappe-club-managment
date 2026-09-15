@@ -55,27 +55,43 @@ class Socio(Document):
 		self.name = str(self.numero_socio)
 
 	@staticmethod
+	def _max_name_numerico() -> int:
+		"""Máximo ``name`` puramente numérico (legado SOC→número).
+
+		PostgreSQL (prod/dev): ``name::INTEGER`` + operador ``~``.
+		MariaDB/MySQL (CI portable): ``CAST AS UNSIGNED`` + ``REGEXP``.
+		"""
+		if frappe.db.db_type == "postgres":
+			row = frappe.db.sql(
+				"""
+				SELECT MAX(name::INTEGER)
+				FROM "tabSocio"
+				WHERE name ~ '^[0-9]+$'
+				"""
+			)
+		else:
+			row = frappe.db.sql(
+				"""
+				SELECT MAX(CAST(`name` AS UNSIGNED))
+				FROM `tabSocio`
+				WHERE `name` REGEXP '^[0-9]+$'
+				"""
+			)
+		return int((row[0][0] if row and row[0] else 0) or 0)
+
+	@staticmethod
 	def _siguiente_numero_socio() -> int:
-		"""Devuelve el siguiente número de socio para PostgreSQL v14.
+		"""Devuelve el siguiente número de socio (PostgreSQL v14 o MariaDB).
 
 		Prioriza ``MAX(numero_socio)`` (columna entera del DocType). Durante la
 		migración desde series ``SOC-…``, filas legacy pueden tener
 		``numero_socio = 0`` pero ``name`` ya numérico; en ese caso se usa
-		``MAX(name::INTEGER)`` solo sobre nombres puramente numéricos.
+		el máximo de ``name`` numérico vía :meth:`_max_name_numerico`.
 		"""
 		socio = frappe.qb.DocType("Socio")
 		resultado = frappe.qb.from_(socio).select(Max(socio.numero_socio)).run()
 		max_numero = int((resultado[0][0] if resultado and resultado[0] else 0) or 0)
-
-		max_name = frappe.db.sql(
-			"""
-			SELECT MAX(name::INTEGER)
-			FROM "tabSocio"
-			WHERE name ~ '^[0-9]+$'
-			"""
-		)[0][0]
-		max_name = int(max_name or 0)
-
+		max_name = Socio._max_name_numerico()
 		return max(max_numero, max_name) + 1
 
 	def validate(self) -> None:
