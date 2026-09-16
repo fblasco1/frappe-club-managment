@@ -133,6 +133,7 @@ def expand_grid_for_date(espacio: str, fecha: date | str) -> list[dict[str, Any]
 				"hora_desde": row.hora_desde,
 				"hora_hasta": row.hora_hasta,
 				"titulo": row.titulo,
+				"etiqueta": getattr(row, "etiqueta", None),
 				"tipo_sesion": getattr(row, "tipo_sesion", None),
 				"actividad": row.actividad,
 				"grupo_actividad": row.grupo_actividad,
@@ -151,7 +152,12 @@ def expand_excepciones_for_date(espacio: str, fecha: date | str) -> list[dict[st
 			continue
 		if (exc.get("accion") or "Reubicar").strip() == "Suspender":
 			continue
-		titulo = exc.titulo_origen or exc.motivo or _("Entrenamiento reubicado")
+		titulo_origen = (exc.titulo_origen or "").strip()
+		titulo = titulo_origen or exc.motivo or _("Entrenamiento reubicado")
+		etiqueta = None
+		horario_row = (exc.horario_row or "").strip()
+		if horario_row:
+			etiqueta = frappe.db.get_value("Horario Entrenamiento", horario_row, "etiqueta")
 		out.append(
 			{
 				"source": "excepcion",
@@ -159,8 +165,10 @@ def expand_excepciones_for_date(espacio: str, fecha: date | str) -> list[dict[st
 				"hora_desde": exc.hora_desde,
 				"hora_hasta": exc.hora_hasta,
 				"titulo": titulo,
+				"titulo_origen": titulo_origen or titulo,
+				"etiqueta": etiqueta,
 				"motivo": exc.motivo,
-				"horario_row": exc.horario_row,
+				"horario_row": horario_row,
 				"espacio_origen": exc.espacio_origen,
 			}
 		)

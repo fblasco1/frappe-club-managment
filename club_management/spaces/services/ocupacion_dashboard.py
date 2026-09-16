@@ -40,6 +40,93 @@ def _fmt_hhmm(total_min: int) -> str:
 	return f"{m // 60:02d}:{m % 60:02d}"
 
 
+_ETIQUETA_SEP = " — "
+
+
+def _split_etiqueta(etiqueta: str | None) -> tuple[str, str]:
+	"""Separa «grupo/actividad — profesor» (formato importación CSV)."""
+	raw = (etiqueta or "").strip()
+	if not raw:
+		return "", ""
+	if _ETIQUETA_SEP in raw:
+		left, right = raw.split(_ETIQUETA_SEP, 1)
+		return left.strip(), right.strip()
+	return raw, ""
+
+
+def _display_link_titulo(doctype: str, name: str | None) -> str:
+	if not name:
+		return ""
+	titulo = frappe.db.get_value(doctype, name, "titulo")
+	return str(titulo or name).strip()
+
+
+def _linea_actividad(item: dict[str, Any]) -> str:
+	"""Actividad / grupo(s) visibles en la planilla (sin tipo de sesión)."""
+	grupo_etiq, _ = _split_etiqueta(item.get("etiqueta"))
+	if grupo_etiq:
+		return grupo_etiq
+
+	for key, doctype in (
+		("equipo_actividad", "Equipo Actividad"),
+		("grupo_actividad", "Grupo Actividad"),
+		("actividad", "Actividad"),
+	):
+		label = _display_link_titulo(doctype, item.get(key))
+		if label:
+			return label
+
+	# Excepciones / grilla: título origen antes que motivo operativo
+	for key in ("titulo_origen", "titulo"):
+		titulo = (item.get(key) or "").strip()
+		if not titulo:
+			continue
+		if _ETIQUETA_SEP in titulo:
+			cuerpo = titulo.split(_ETIQUETA_SEP, 1)[1].strip()
+			grupo, _ = _split_etiqueta(cuerpo)
+			return grupo or cuerpo
+		return titulo
+
+	return (item.get("motivo") or "").strip()
+
+
+def _linea_responsable(item: dict[str, Any]) -> str:
+	arrendatario = (item.get("arrendatario_nombre") or "").strip()
+	if arrendatario:
+		return arrendatario
+	_, profesor = _split_etiqueta(item.get("etiqueta"))
+	if profesor:
+		return profesor
+	# Fallback: «Entrenamiento — GRUPO — PROFESOR» en titulo / titulo_origen
+	for key in ("titulo_origen", "titulo"):
+		titulo = (item.get(key) or "").strip()
+		if _ETIQUETA_SEP not in titulo:
+			continue
+		cuerpo = titulo.split(_ETIQUETA_SEP, 1)[1].strip()
+		_, profesor = _split_etiqueta(cuerpo)
+		if profesor:
+			return profesor
+	return ""
+
+
+def format_etiqueta_planilla(
+	item: dict[str, Any],
+	*,
+	inicio: str,
+	fin: str,
+) -> str:
+	"""Etiqueta multilínea: actividad/grupo · horario · profesor/arrendatario."""
+	lines: list[str] = []
+	actividad = _linea_actividad(item)
+	if actividad:
+		lines.append(actividad)
+	lines.append(f"{inicio} - {fin}")
+	responsable = _linea_responsable(item)
+	if responsable:
+		lines.append(responsable)
+	return "\n".join(lines)
+
+
 def build_time_slots() -> list[str]:
 	"""Etiquetas de inicio de cada franja de 30 min en la ventana."""
 	slots: list[str] = []
@@ -73,10 +160,20 @@ def _interval_from_times(hora_desde: Any, hora_hasta: Any, *, day_offset: int) -
 def _enrich_horario_slot(raw: dict[str, Any], espacio_name: str) -> dict[str, Any]:
 	out = dict(raw)
 	out["espacio"] = espacio_name
-	if not out.get("tipo_sesion") and out.get("row_name"):
-		out["tipo_sesion"] = frappe.db.get_value(
-			"Horario Entrenamiento", out["row_name"], "tipo_sesion"
+	if out.get("row_name") and (
+		not out.get("tipo_sesion") or out.get("etiqueta") is None
+	):
+		row_vals = frappe.db.get_value(
+			"Horario Entrenamiento",
+			out["row_name"],
+			["tipo_sesion", "etiqueta"],
+			as_dict=True,
 		)
+		if row_vals:
+			if not out.get("tipo_sesion"):
+				out["tipo_sesion"] = row_vals.get("tipo_sesion")
+			if out.get("etiqueta") is None and row_vals.get("etiqueta"):
+				out["etiqueta"] = row_vals.get("etiqueta")
 	if not out.get("titulo"):
 		if out.get("source") == "excepcion":
 			out["titulo"] = out.get("motivo") or _("Entrenamiento reubicado")
@@ -134,6 +231,8 @@ def _blocks_for_espacio(espacio_name: str, fecha: date) -> list[dict[str, Any]]:
 
 def _finalize_block(item: dict[str, Any], start_min: int, end_min: int) -> dict[str, Any]:
 	titulo = item.get("titulo") or item.get("motivo") or item.get("name") or ""
+	inicio = _fmt_hhmm(start_min)
+	fin = _fmt_hhmm(end_min)
 	block = {
 		"espacio": item.get("espacio"),
 		"titulo": str(titulo),
@@ -142,8 +241,8 @@ def _finalize_block(item: dict[str, Any], start_min: int, end_min: int) -> dict[
 		"tipo_sesion": item.get("tipo_sesion"),
 		"ref": item.get("name") or item.get("row_name"),
 		"horario_row": item.get("row_name") or item.get("horario_row"),
-		"inicio": _fmt_hhmm(start_min),
-		"fin": _fmt_hhmm(end_min),
+		"inicio": inicio,
+		"fin": fin,
 		"inicio_min": start_min,
 		"fin_min": end_min,
 	}
@@ -151,6 +250,11 @@ def _finalize_block(item: dict[str, Any], start_min: int, end_min: int) -> dict[
 		block["estado"] = str(item["estado"])
 	if item.get("arrendatario_nombre"):
 		block["arrendatario_nombre"] = str(item["arrendatario_nombre"])
+	if item.get("etiqueta"):
+		block["etiqueta"] = str(item["etiqueta"])
+	if item.get("titulo_origen"):
+		block["titulo_origen"] = str(item["titulo_origen"])
+	block["etiqueta_planilla"] = format_etiqueta_planilla(item, inicio=inicio, fin=fin)
 	block["categoria"] = categoria_evento(block)
 	block["color"] = color_for_block(block)
 	return block

@@ -16,7 +16,19 @@ from club_management.spaces.services.ocupacion_dashboard import (
 )
 
 MAX_DIAS_REPORTE = 31
-_SLOT_PX = 18
+_SLOT_PX = 16
+
+
+def ocupacion_pdf_wkhtml_options() -> dict[str, str]:
+	"""Opciones wkhtmltopdf: A4 horizontal, sin márgenes (la grilla usa todo el ancho)."""
+	return {
+		"orientation": "Landscape",
+		"page-size": "A4",
+		"margin-top": "0mm",
+		"margin-bottom": "0mm",
+		"margin-left": "0mm",
+		"margin-right": "0mm",
+	}
 
 
 def _parse_fechas_list(raw: str | list | None) -> list[date]:
@@ -79,6 +91,9 @@ def normalize_fechas_reporte(
 
 
 def _block_label(bloque: dict[str, Any]) -> str:
+	etiqueta = (bloque.get("etiqueta_planilla") or "").strip()
+	if etiqueta:
+		return etiqueta.replace("\n", " · ")
 	parts: list[str] = []
 	titulo = (bloque.get("titulo") or "").strip()
 	if titulo:
@@ -192,41 +207,55 @@ def build_ocupacion_reporte_html_from_payloads(payloads: list[dict[str, Any]]) -
 <meta charset="utf-8"/>
 <title>{escape_html(_("Ocupación de espacios"))}</title>
 <style>
-  @page {{ size: A4 landscape; margin: 10mm; }}
-  body {{ font-family: DejaVu Sans, sans-serif; font-size: 8pt; color: #222; }}
-  h1 {{ font-size: 14pt; margin: 0 0 6px; }}
-  h2 {{ font-size: 11pt; margin: 14px 0 4px; page-break-after: avoid; }}
-  .ventana {{ margin: 0 0 8px; color: #555; }}
-  .leyenda {{ margin-bottom: 10px; }}
-  .leyenda-item {{ display: inline-block; margin-right: 10px; }}
-  .swatch {{ display: inline-block; width: 10px; height: 10px; margin-right: 3px;
+  @page {{ size: A4 landscape; margin: 0; }}
+  .print-format {{
+    margin-top: 0mm;
+    margin-bottom: 0mm;
+    margin-left: 0mm;
+    margin-right: 0mm;
+    orientation: Landscape;
+    page-size: A4;
+  }}
+  html, body {{ margin: 0; padding: 0; }}
+  body {{ font-family: DejaVu Sans, sans-serif; font-size: 7pt; color: #222; }}
+  .print-format {{ padding: 2mm; box-sizing: border-box; width: 100%; }}
+  h1 {{ font-size: 11pt; margin: 0 0 3px; }}
+  h2 {{ font-size: 9pt; margin: 6px 0 2px; page-break-after: avoid; }}
+  .ventana {{ margin: 0 0 4px; color: #555; font-size: 7pt; }}
+  .leyenda {{ margin-bottom: 4px; font-size: 6.5pt; }}
+  .leyenda-item {{ display: inline-block; margin-right: 8px; }}
+  .swatch {{ display: inline-block; width: 8px; height: 8px; margin-right: 2px;
             vertical-align: middle; border: 1px solid #999; }}
   .pendiente-swatch {{ background: #fff; border-style: dashed; border-color: #e67e22; }}
   .confirmada-swatch {{ background: #fff; border-style: solid; border-color: #27ae60;
                        border-width: 2px; }}
-  .dia {{ page-break-inside: avoid; margin-bottom: 16px; }}
-  .grilla {{ display: table; width: 100%; border-collapse: collapse; }}
+  .dia {{ page-break-inside: avoid; margin-bottom: 8px; page-break-after: always; }}
+  .dia:last-child {{ page-break-after: auto; }}
+  .grilla {{ display: table; width: 100%; table-layout: fixed; border-collapse: collapse; }}
   .col-hora, .col-espacio {{ display: table-cell; vertical-align: top;
-                             border: 1px solid #ccc; min-width: 70px; }}
-  .col-hora {{ width: 48px; }}
+                             border: 1px solid #ccc; overflow: hidden; }}
+  .col-hora {{ width: 28px; }}
   .col-head {{ background: #f0f0f0; font-weight: bold; text-align: center;
-              padding: 4px 2px; border-bottom: 1px solid #ccc; font-size: 7pt; }}
+              padding: 2px 1px; border-bottom: 1px solid #ccc; font-size: 6pt;
+              word-break: break-word; line-height: 1.15; }}
   .col-body {{ position: relative; background: repeating-linear-gradient(
                  to bottom, #fafafa 0, #fafafa {_SLOT_PX - 1}px,
                  #e8e8e8 {_SLOT_PX - 1}px, #e8e8e8 {_SLOT_PX}px); }}
-  .slot-label {{ font-size: 6.5pt; padding-left: 2px; box-sizing: border-box; }}
-  .abs-bloque {{ position: absolute; left: 2px; right: 2px; overflow: hidden;
-                 font-size: 6.5pt; line-height: 1.15; padding: 1px 2px;
-                 border: 1px solid rgba(0,0,0,0.25); border-radius: 2px;
-                 box-sizing: border-box; }}
+  .slot-label {{ font-size: 5.5pt; padding-left: 1px; box-sizing: border-box; }}
+  .abs-bloque {{ position: absolute; left: 1px; right: 1px; overflow: hidden;
+                 font-size: 5.5pt; line-height: 1.1; padding: 0 1px;
+                 border: 1px solid rgba(0,0,0,0.25); border-radius: 1px;
+                 box-sizing: border-box; word-break: break-word; }}
   .abs-bloque.pendiente {{ border: 1.5px dashed #e67e22; opacity: 0.92; }}
   .abs-bloque.confirmada {{ border: 2px solid #27ae60; }}
 </style>
 </head>
 <body>
+<div class="print-format">
   <h1>{escape_html(_("Reporte de ocupación de espacios"))}</h1>
   <div class="leyenda">{"".join(leyenda_items)}</div>
   {"".join(sections)}
+</div>
 </body>
 </html>
 """
@@ -264,7 +293,7 @@ def build_ocupacion_reporte_pdf_bytes(
 		fecha_hasta=fecha_hasta,
 		fechas=fechas,
 	)
-	return get_pdf(html)
+	return get_pdf(html, options=ocupacion_pdf_wkhtml_options())
 
 
 def reporte_pdf_filename(

@@ -130,3 +130,132 @@ class TestOcupacionDashboard(MembersTestCase):
 				get_ocupacion_dashboard(fecha="2026-09-05")
 		finally:
 			frappe.set_user("Administrator")
+
+	def test_etiqueta_planilla_entrenamiento_y_alquiler(self) -> None:
+		from club_management.spaces.helpers import ensure_actividad_tree
+		from club_management.spaces.services.ocupacion_dashboard import (
+			format_etiqueta_planilla,
+		)
+
+		# Formato puro (sin DB)
+		label = format_etiqueta_planilla(
+			{
+				"etiqueta": "U15 AZUL — TOMAS CURI",
+				"hora_desde": "16:00:00",
+				"hora_hasta": "18:30:00",
+			},
+			inicio="16:00",
+			fin="18:30",
+		)
+		self.assertEqual(label, "U15 AZUL\n16:00 - 18:30\nTOMAS CURI")
+
+		act, grupo, equipo = ensure_actividad_tree(
+			"Basquet Etiqueta Dash",
+			"Basquet Etiqueta Dash / U15",
+			"Basquet Etiqueta Dash / U15 / Azul",
+		)
+		espacio = insert_espacio(
+			"Cancha Etiqueta Dash",
+			alquilable=1,
+			horarios=[
+				{
+					"dia_semana": "Sabado",
+					"hora_desde": "16:00:00",
+					"hora_hasta": "18:30:00",
+					"tipo_sesion": "Entrenamiento",
+					"actividad": act,
+					"grupo_actividad": grupo,
+					"equipo_actividad": equipo,
+					"etiqueta": "U15 AZUL — TOMAS CURI",
+				}
+			],
+		)
+		frappe.get_doc(
+			{
+				"doctype": "Reserva Espacio",
+				"espacio": espacio,
+				"fecha": "2026-09-05",
+				"hora_desde": "19:00:00",
+				"hora_hasta": "21:00:00",
+				"tipo": "Alquiler externo",
+				"modalidad_alquiler": "Temporal",
+				"estado": "Confirmada",
+				"motivo": "Alquiler cancha",
+				"arrendatario_nombre": "Club Visitante SA",
+			}
+		).insert(ignore_permissions=True)
+
+		payload = get_ocupacion_dashboard_payload(fecha="2026-09-05")
+		bloques = [b for b in payload["bloques"] if b["espacio"] == espacio]
+		ent = next(b for b in bloques if b["source"] == "horario")
+		self.assertEqual(
+			ent["etiqueta_planilla"],
+			"U15 AZUL\n16:00 - 18:30\nTOMAS CURI",
+		)
+		# Sin prefijo de tipo de sesión en la etiqueta visible
+		self.assertNotIn("Entrenamiento", ent["etiqueta_planilla"].split("\n")[0])
+
+		alq = next(b for b in bloques if b["source"] == "reserva")
+		self.assertEqual(
+			alq["etiqueta_planilla"],
+			"Alquiler cancha\n19:00 - 21:00\nClub Visitante SA",
+		)
+
+	def test_etiqueta_planilla_excepcion_usa_titulo_origen(self) -> None:
+		from club_management.spaces.services.excepcion_horario import upsert_excepcion_horario_dia
+		from club_management.spaces.services.ocupacion_dashboard import (
+			format_etiqueta_planilla,
+		)
+
+		# Motivo operativo no debe reemplazar el título original
+		label = format_etiqueta_planilla(
+			{
+				"source": "excepcion",
+				"titulo_origen": "Entrenamiento — U15 AZUL — TOMAS CURI",
+				"titulo": "Entrenamiento — U15 AZUL — TOMAS CURI",
+				"motivo": "Ajuste por superposición / cronograma del día",
+				"etiqueta": "U15 AZUL — TOMAS CURI",
+			},
+			inicio="18:00",
+			fin="19:30",
+		)
+		self.assertEqual(label, "U15 AZUL\n18:00 - 19:30\nTOMAS CURI")
+		self.assertNotIn("Ajuste", label)
+
+		origen = insert_espacio(
+			"Cancha Exc Origen Label",
+			horarios=[
+				{
+					"dia_semana": "Sabado",
+					"hora_desde": "16:00:00",
+					"hora_hasta": "18:00:00",
+					"tipo_sesion": "Entrenamiento",
+					"etiqueta": "U17 ROJO — MARIA LOPEZ",
+				}
+			],
+		)
+		destino = insert_espacio("Cancha Exc Destino Label")
+		doc = frappe.get_doc("Espacio", origen)
+		row = doc.horarios[0].name
+		upsert_excepcion_horario_dia(
+			fecha="2026-09-05",
+			espacio_origen=origen,
+			horario_row=row,
+			espacio_destino=destino,
+			hora_desde="17:00:00",
+			hora_hasta="18:30:00",
+			motivo="Partido local — no usar como etiqueta",
+		)
+
+		payload = get_ocupacion_dashboard_payload(fecha="2026-09-05")
+		exc_bloques = [
+			b
+			for b in payload["bloques"]
+			if b["espacio"] == destino and b["source"] == "excepcion"
+		]
+		self.assertEqual(len(exc_bloques), 1)
+		self.assertEqual(
+			exc_bloques[0]["etiqueta_planilla"],
+			"U17 ROJO\n17:00 - 18:30\nMARIA LOPEZ",
+		)
+		self.assertNotIn("Partido local", exc_bloques[0]["etiqueta_planilla"])

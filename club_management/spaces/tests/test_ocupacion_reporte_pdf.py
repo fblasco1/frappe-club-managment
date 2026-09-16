@@ -125,3 +125,32 @@ class TestOcupacionReportePdf(MembersTestCase):
 		self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
 		self.assertIn("&lt;script&gt;evil()&lt;/script&gt;", html)
 		self.assertIn("Pendiente", html)
+
+	def test_html_y_opciones_pdf_landscape_sin_margenes(self) -> None:
+		from club_management.spaces.services.ocupacion_reporte_pdf import (
+			ocupacion_pdf_wkhtml_options,
+		)
+
+		payload = {
+			"fecha": "2026-09-05",
+			"dia_semana": "Sabado",
+			"slots": ["08:00", "08:30"],
+			"espacios": [
+				{"name": f"Esp {i}", "titulo_planilla": f"Col {i}", "titulo": f"Col {i}"}
+				for i in range(10)
+			],
+			"bloques": [],
+			"leyenda": [{"label": "Entrenamiento", "color": "#f5a3c7"}],
+			"ventana": {"desde": "08:00", "hasta": "04:00", "slot_minutos": 30},
+		}
+		html = build_ocupacion_reporte_html_from_payloads([payload])
+		self.assertIn("size: A4 landscape", html)
+		self.assertIn("margin: 0", html)
+		self.assertIn("table-layout: fixed", html)
+		self.assertIn('class="print-format"', html)
+
+		opts = ocupacion_pdf_wkhtml_options()
+		self.assertEqual(opts["orientation"], "Landscape")
+		self.assertEqual(opts["page-size"], "A4")
+		for side in ("margin-top", "margin-bottom", "margin-left", "margin-right"):
+			self.assertEqual(opts[side], "0mm", msg=side)

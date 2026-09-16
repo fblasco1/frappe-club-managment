@@ -35,6 +35,29 @@ Then cada bloque trae un `color` estable para distinguir categorías.
 
 ---
 
+## Scenario: etiqueta multilínea en la planilla
+
+Given un entrenamiento de grilla con grupo/equipo (p. ej. «U15 AZUL»), horario 16:00–18:30
+y profesor o etiqueta «… — TOMAS CURI»
+When Coordinación consulta `/desk/ocupacion-espacios` para ese día
+Then el bloque expone `etiqueta_planilla` con tres líneas:
+  1. actividad / grupo(s) que entrenan (sin prefijo de tipo de sesión)
+  2. horario de inicio – horario de fin (`16:00 - 18:30`)
+  3. profesor a cargo o, en alquileres, el arrendatario
+And la celda de la planilla muestra esas líneas (no un solo título plano).
+
+Given una reserva de alquiler externo Confirmada con `arrendatario_nombre`
+When se arma el payload del día
+Then la tercera línea de `etiqueta_planilla` es el arrendatario.
+
+Given una `Excepcion Horario Dia` Activa (reubicación) con `titulo_origen` del entrenamiento
+y un `motivo` operativo (p. ej. «Ajuste por superposición»)
+When se arma el payload del día destino
+Then `etiqueta_planilla` usa el título/etiqueta original del entrenamiento (grupo y profesor),
+no el texto del motivo de la excepción.
+
+---
+
 ## Scenario: orden fijo de columnas (espacios)
 
 Given espacios habilitados del catálogo ICDPE

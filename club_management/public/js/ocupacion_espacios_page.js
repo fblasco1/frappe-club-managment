@@ -346,7 +346,9 @@
 								ROW_H * 0.6
 							);
 							const stagger = (idx % 4) * 6;
-							const title = frappe.utils.escape_html(b.titulo || "");
+							const title = frappe.utils.escape_html(
+								b.etiqueta_planilla || b.titulo || ""
+							);
 							const color = frappe.utils.escape_html(b.color || "#d0d7de");
 							const ref = frappe.utils.escape_html(b.ref || "");
 							const source = frappe.utils.escape_html(b.source || "");
@@ -357,15 +359,18 @@
 							const superClass = b.superposicion ? " club-ocupacion-block--superposicion" : "";
 							const inicioMin = b.inicio_min;
 							const finMin = b.fin_min;
+							const titleAttr = frappe.utils.escape_html(
+								(b.etiqueta_planilla || b.titulo || "").replace(/\n/g, " · ")
+							);
 							return `<div class="club-ocupacion-block${superClass}"
 								data-source="${source}" data-ref="${ref}"
 								data-espacio="${espacio}" data-horario-row="${horarioRow}"
-								data-inicio="${inicio}" data-fin="${fin}" data-titulo="${title}"
+								data-inicio="${inicio}" data-fin="${fin}" data-titulo="${titleAttr}"
 								data-inicio-min="${inicioMin}" data-fin-min="${finMin}"
 								data-superposicion="${b.superposicion ? 1 : 0}"
 								style="top:${top}px;height:${height}px;left:calc(4px + ${stagger}px);right:4px;background:${color}"
-								title="${title}">
-								<span class="club-ocupacion-block-text">${title}</span>
+								title="${titleAttr}">
+								<span class="club-ocupacion-block-text">${title.replace(/\n/g, "<br>")}</span>
 							</div>`;
 						})
 						.join("");
@@ -443,8 +448,13 @@
 		},
 
 		_label_for_block(block) {
+			const base =
+				(block.etiqueta_planilla || block.titulo || __("Sin título")).replace(
+					/\n/g,
+					" · "
+				);
 			const tipo = block.categoria || block.tipo || block.tipo_sesion || __("Evento");
-			return `${block.titulo || __("Sin título")} (${block.inicio}–${block.fin}) — ${tipo}`;
+			return `${base} — ${tipo}`;
 		},
 
 		open_superposicion_picker(blocks) {

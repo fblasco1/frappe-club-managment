@@ -66,3 +66,13 @@ Given Secretaria en `/desk/ocupacion-espacios`
 When usa el botón **Exportar PDF**
 Then un diálogo pide fecha desde / fecha hasta (default = fecha actual de la planilla)
 And al confirmar se descarga el PDF del rango.
+
+---
+
+## Scenario: página landscape sin márgenes (un día)
+
+Given un reporte PDF de ocupación de un día con todas las columnas de espacios habilitados
+When se genera el PDF
+Then la hoja es **A4 horizontal (landscape)**
+And los márgenes de página son **0**
+And la grilla usa ancho completo (`table-layout: fixed`) para que las columnas no se corten al borde.
