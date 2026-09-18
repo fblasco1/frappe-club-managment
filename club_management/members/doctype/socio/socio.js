@@ -1591,26 +1591,174 @@ club_management_socio_desk.render_historial_pagos = function (frm) {
 				</table>
 			`);
 			const $tbody = $table.find("tbody");
-			rows.forEach((row, idx) => {
+			rows.forEach((row) => {
 				const $tr = $(`
 					<tr>
 						<td>${frappe.utils.escape_html(String(row.posting_date || ""))}</td>
 						<td>${frappe.utils.escape_html(row.mode_of_payment || "")}</td>
 						<td>${frappe.utils.escape_html(row.concepto || "")}</td>
 						<td>${frappe.utils.escape_html(row.periodo || "")}</td>
-						<td class="text-right"></td>
+						<td class="text-right" style="white-space:nowrap;"></td>
 					</tr>
 				`);
+				const $acciones = $tr.find("td").last();
 				const $detalleBtn = $(
 					`<button type="button" class="btn btn-xs btn-default">${__("Ver detalle")}</button>`
 				);
 				$detalleBtn.on("click", () => {
 					club_management_socio_desk.show_historial_pago_detalle(row);
 				});
-				$tr.find("td").last().append($detalleBtn);
+				const $imprimirBtn = $(
+					`<button type="button" class="btn btn-xs btn-primary ml-1">${__(
+						"Imprimir ticket"
+					)}</button>`
+				);
+				$imprimirBtn.on("click", () => {
+					club_management_socio_desk.imprimir_ticket_historial(row.payment_entry);
+				});
+				const $corrBtn = $(
+					`<button type="button" class="btn btn-xs btn-default ml-1">${__(
+						"Corregir medio"
+					)}</button>`
+				);
+				$corrBtn.on("click", () => {
+					club_management_socio_desk.corregir_medio_pago_historial(frm, row);
+				});
+				$acciones.append($detalleBtn, $imprimirBtn, $corrBtn);
 				$tbody.append($tr);
 			});
 			$panel.empty().append($title, $btn, $table);
+		},
+	});
+};
+
+club_management_socio_desk.imprimir_ticket_historial = function (payment_entry) {
+	if (!payment_entry) {
+		frappe.msgprint(__("No hay Payment Entry para imprimir."));
+		return;
+	}
+	frappe.call({
+		method: "club_management.members.api.cobranza_desk.get_recibo_pago",
+		args: { payment_entry },
+		freeze: true,
+		freeze_message: __("Preparando ticket…"),
+		callback(r) {
+			if (r.exc || !r.message) {
+				frappe.msgprint(__("No se pudo generar el ticket del pago."));
+				return;
+			}
+			if (club_management_recibo_pago?.imprimir) {
+				club_management_recibo_pago.imprimir(r.message);
+			} else {
+				frappe.msgprint(__("Módulo de impresión de recibo no disponible."));
+			}
+		},
+	});
+};
+
+club_management_socio_desk.corregir_medio_pago_historial = function (frm, row) {
+	const pe = row?.payment_entry;
+	if (!pe) {
+		frappe.msgprint(__("No hay Payment Entry para corregir."));
+		return;
+	}
+	const medioActual = row.mode_of_payment || "";
+
+	frappe.call({
+		method: "club_management.members.api.cobranza_desk.list_modos_pago_cobranza",
+		callback(r) {
+			if (r.exc) {
+				frappe.msgprint(__("No se pudieron cargar los medios de pago."));
+				return;
+			}
+			const modos = (r.message || []).filter((m) => m.value !== medioActual);
+			if (!modos.length) {
+				frappe.msgprint(__("No hay otro medio de pago disponible para corregir."));
+				return;
+			}
+			const d = new frappe.ui.Dialog({
+				title: __("Corregir medio de pago"),
+				fields: [
+					{
+						fieldtype: "HTML",
+						fieldname: "info",
+						options: `<p class="text-muted small">${frappe.utils.escape_html(
+							__("Cobro")
+						)}: <strong>${frappe.utils.escape_html(pe)}</strong><br/>
+						${frappe.utils.escape_html(__("Medio actual"))}: <strong>${frappe.utils.escape_html(
+							medioActual || "—"
+						)}</strong></p>
+						<p class="text-muted small">${__(
+							"Se cancela este cobro y se registra uno nuevo con el mismo monto y facturas."
+						)}</p>`,
+					},
+					{
+						fieldname: "mode_of_payment",
+						fieldtype: "Select",
+						label: __("Nuevo medio"),
+						reqd: 1,
+						options: modos.map((m) => m.value).join("\n"),
+						default: modos[0].value,
+					},
+					{
+						fieldname: "motivo",
+						fieldtype: "Small Text",
+						label: __("Motivo"),
+						reqd: 1,
+					},
+				],
+				primary_action_label: __("Corregir"),
+				primary_action(values) {
+					if (!(values.motivo || "").trim()) {
+						frappe.msgprint(__("Indicá el motivo de la corrección."));
+						return;
+					}
+					d.hide();
+					frappe.call({
+						method: "club_management.members.api.cobranza_desk.corregir_medio_pago",
+						args: {
+							payment_entry: pe,
+							mode_of_payment: values.mode_of_payment,
+							motivo: values.motivo,
+						},
+						freeze: true,
+						freeze_message: __("Corrigiendo medio de pago…"),
+						callback(res) {
+							if (res.exc || !res.message) {
+								frappe.msgprint(__("No se pudo corregir el medio de pago."));
+								return;
+							}
+							frappe.show_alert({
+								message: __("Medio de pago corregido"),
+								indicator: "green",
+							});
+							if (frm) {
+								frm.reload_doc();
+							}
+							const recibo = res.message.recibo;
+							if (recibo && club_management_recibo_pago?.imprimir) {
+								frappe.confirm(
+									__("¿Imprimir el ticket con el medio corregido?"),
+									() => club_management_recibo_pago.imprimir(recibo)
+								);
+							}
+						},
+					});
+				},
+			});
+			// Mostrar etiquetas amigables en el select si Frappe no las traduce
+			const $select = d.fields_dict.mode_of_payment.$input;
+			if ($select && $select.length) {
+				$select.empty();
+				modos.forEach((m) => {
+					$select.append(
+						$("<option>")
+							.attr("value", m.value)
+							.text(m.label || m.value)
+					);
+				});
+			}
+			d.show();
 		},
 	});
 };
@@ -1670,5 +1818,8 @@ club_management_socio_desk.show_historial_pago_detalle = function (row) {
 		</p>
 		${facturasHtml}
 	`);
+	d.set_primary_action(__("Imprimir ticket"), () => {
+		club_management_socio_desk.imprimir_ticket_historial(pe);
+	});
 	d.show();
 };

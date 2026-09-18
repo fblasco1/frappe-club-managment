@@ -177,6 +177,56 @@ def _fecha_hora_cobro(payment_entry_name: str) -> tuple[str, str]:
 	return fecha, hora
 
 
+def _socio_desde_payment_entry(payment_entry_name: str) -> dict[str, Any]:
+	"""Resuelve nombre y número de socio desde las facturas del PE."""
+	from club_management.members.services.cobranza_manual import (
+		SOCIO_DOCTYPE,
+		_campo_socio_en,
+	)
+
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	if not campo_socio:
+		return {"socio_nombre": "", "numero_socio": None}
+
+	invoice_names = frappe.get_all(
+		"Payment Entry Reference",
+		filters={
+			"parent": payment_entry_name,
+			"reference_doctype": SALES_INVOICE_DOCTYPE,
+		},
+		pluck="reference_name",
+	)
+	if not invoice_names:
+		return {"socio_nombre": "", "numero_socio": None}
+
+	socio_name = None
+	for inv in invoice_names:
+		socio_name = frappe.db.get_value(SALES_INVOICE_DOCTYPE, inv, campo_socio)
+		if socio_name:
+			break
+	if not socio_name:
+		return {"socio_nombre": "", "numero_socio": None}
+
+	row = frappe.db.get_value(
+		SOCIO_DOCTYPE,
+		socio_name,
+		["nombre", "apellido", "numero_socio"],
+		as_dict=True,
+	)
+	if not row:
+		return {"socio_nombre": "", "numero_socio": None}
+	apellido = (row.apellido or "").strip()
+	nombre = (row.nombre or "").strip()
+	if apellido and nombre:
+		socio_nombre = f"{apellido}, {nombre}"
+	else:
+		socio_nombre = apellido or nombre
+	return {
+		"socio_nombre": socio_nombre,
+		"numero_socio": row.numero_socio,
+	}
+
+
 def build_recibo_pago(payment_entry_name: str) -> dict[str, Any]:
 	"""Arma el payload del recibo a partir de un Payment Entry submitted."""
 	if not frappe.db.exists("Payment Entry", payment_entry_name):
@@ -191,11 +241,14 @@ def build_recibo_pago(payment_entry_name: str) -> dict[str, Any]:
 
 	total = sum(flt(row["monto"]) for row in lineas)
 	fecha, hora = _fecha_hora_cobro(payment_entry_name)
+	socio_info = _socio_desde_payment_entry(payment_entry_name)
 
 	data: dict[str, Any] = {
 		"comprobante": payment_entry_name,
 		"fecha": fecha,
 		"hora": hora,
+		"socio_nombre": socio_info["socio_nombre"],
+		"numero_socio": socio_info["numero_socio"],
 		"lineas": lineas,
 		"total": total,
 		"mensaje_pie": config["mensaje_pie"],
@@ -235,6 +288,16 @@ def render_recibo_texto(data: dict[str, Any]) -> str:
 	fecha_hora = f"Fecha: {data.get('fecha', '')}  Hora: {data.get('hora', '')}"
 	for fh_linea in _wrap_text(fecha_hora, ancho):
 		lineas_txt.append(fh_linea)
+
+	socio_nombre = (data.get("socio_nombre") or "").strip()
+	if socio_nombre:
+		for socio_linea in _wrap_text(f"Socio: {socio_nombre}", ancho):
+			lineas_txt.append(socio_linea)
+	numero_socio = data.get("numero_socio")
+	if numero_socio not in (None, ""):
+		for nro_linea in _wrap_text(f"Nº socio: {numero_socio}", ancho):
+			lineas_txt.append(nro_linea)
+
 	lineas_txt.append(_separador(ancho))
 	hdr_esp = ancho - len("CONCEPTO") - len("VALOR")
 	lineas_txt.append(f"CONCEPTO{' ' * hdr_esp}VALOR")

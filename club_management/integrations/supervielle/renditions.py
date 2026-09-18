@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
+from datetime import datetime
 from typing import Any
 
 import frappe
 import requests
 from frappe import _
 
+from club_management.finance.services.payment_log import PROVIDER_SUPERVIELLE
 from club_management.integrations.supervielle.payload import (
 	assert_sandbox_url_matches_mode,
 	digits_only,
@@ -39,6 +42,10 @@ RENDITION_REQUEST_FIELDS = (
 	"FechaPagoInstrumentoHasta",
 )
 _TIMEOUT_SECONDS = 30
+_POLL_MERCHANT_ID = "RENDITION-POLL"
+_POLL_GATEWAY_ID = "RENDITION-POLL-ERROR"
+_POLL_ERROR_RESULT = "poll_error"
+_SEVERITY_HIGH = "High"
 
 
 def build_rendition_request(
@@ -176,3 +183,70 @@ def preview_renditions(filters: dict[str, Any] | None = None) -> dict[str, Any]:
 	if not {"System Manager", "Tesoreria"}.intersection(frappe.get_roles()):
 		frappe.throw(_("No autorizado para consultar rendiciones"), frappe.PermissionError)
 	return fetch_renditions_preview(filters=filters)
+
+
+def _polling_enabled() -> bool:
+	return bool(frappe.db.get_single_value("Supervielle Settings", "enable_automated_polling"))
+
+
+def _record_polling_failure(exc: BaseException) -> str | None:
+	"""Audita timeout/HTTP de Cobrand sin secretos ni Hash."""
+	occurred_at = datetime.now()
+	snapshot = {
+		"error": type(exc).__name__,
+		"message": str(exc)[:500],
+	}
+	identity = "|".join(
+		[
+			PROVIDER_SUPERVIELLE,
+			_POLL_MERCHANT_ID,
+			_POLL_ERROR_RESULT,
+			str(occurred_at),
+			snapshot["error"],
+			snapshot["message"],
+		]
+	)
+	event_key = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+	try:
+		existing = frappe.db.get_value("Payment Gateway Event", {"event_key": event_key}, "name")
+		if existing:
+			return str(existing)
+		doc = frappe.get_doc(
+			{
+				"doctype": "Payment Gateway Event",
+				"event_key": event_key,
+				"provider": PROVIDER_SUPERVIELLE,
+				"merchant_transaction_id": _POLL_MERCHANT_ID,
+				"gateway_transaction_id": _POLL_GATEWAY_ID,
+				"status_code": "POLL_ERROR",
+				"status_description": str(exc)[:140],
+				"state_changed_at": occurred_at,
+				"processing_result": _POLL_ERROR_RESULT,
+				"severity": _SEVERITY_HIGH,
+				"event_payload_json": frappe.as_json(snapshot),
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		return doc.name
+	except Exception:
+		frappe.log_error(
+			title="Supervielle renditions poll",
+			message=f"{type(exc).__name__}: {str(exc)[:500]}",
+		)
+		return None
+
+
+def process_renditions_scheduler_tick(*, session: Any | None = None) -> dict[str, Any]:
+	"""Job horario: consulta rendiciones si el polling está habilitado.
+
+	Timeout o HTTP != 200 se registran en Payment Gateway Event (High)
+	y no se re-lanzan, para no interrumpir la cola de Frappe.
+	"""
+	if not _polling_enabled():
+		return {"skipped": True, "reason": "polling_disabled"}
+	try:
+		preview = fetch_renditions_preview(session=session)
+		return {"skipped": False, "rows": preview.get("rows") or []}
+	except Exception as exc:
+		event_name = _record_polling_failure(exc)
+		return {"skipped": False, "error": str(exc), "event": event_name}

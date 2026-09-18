@@ -18,6 +18,7 @@
   "convenio",
   "rendicion_api_url",
   "rendicion_apply_enabled",
+  "enable_automated_polling",
   "mode_of_payment",
   "clearing_account"
  ],
@@ -91,6 +92,13 @@
    "label": "Aplicar rendiciones automáticamente"
   },
   {
+   "default": "0",
+   "description": "Consulta periódica de rendiciones vía scheduler. Pausar o reactivar desde Desk sin tocar hooks.",
+   "fieldname": "enable_automated_polling",
+   "fieldtype": "Check",
+   "label": "Polling automático de rendiciones"
+  },
+  {
    "default": "Cobros Plus (ARS)",
    "fieldname": "mode_of_payment",
    "fieldtype": "Link",
@@ -138,6 +146,7 @@
  ],
  "quick_entry": 0,
  "read_only": 0,
+ "modified": "2026-09-18 14:20:00.000000",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

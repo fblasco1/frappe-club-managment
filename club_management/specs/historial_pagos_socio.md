@@ -38,6 +38,8 @@ When carga el panel de historial
 Then ve una sección **Historial de pagos** debajo de la deuda
 And la tabla muestra columnas: **Fecha**, **Medio**, **Concepto**, **Período**, **Ver detalle**
 And **Ver detalle** abre un modal con las facturas del cobro y el Payment Entry asociado
+And cada fila tiene **Imprimir ticket** que reimprime el recibo ESC/POS vía `get_recibo_pago`
+And cada fila tiene **Corregir medio** (cancela y recrea el PE; ver `corregir_medio_pago_cobro.md`)
 And puede copiar un resumen de texto de los últimos pagos.
 
 ---

@@ -19,6 +19,7 @@ IMMUTABLE_FIELDS = (
 	"payment_log",
 	"payment_entry",
 	"processing_result",
+	"severity",
 	"event_payload_json",
 )
 

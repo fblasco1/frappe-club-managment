@@ -209,6 +209,22 @@ def get_recibo_pago(payment_entry: str) -> dict:
 
 
 @frappe.whitelist()
+def corregir_medio_pago(
+	payment_entry: str,
+	mode_of_payment: str,
+	motivo: str,
+) -> dict:
+	"""Cancela y recrea el PE con otro medio (Secretaría)."""
+	from club_management.members.services.cobranza_manual import corregir_medio_pago_cobro
+
+	return corregir_medio_pago_cobro(
+		payment_entry,
+		mode_of_payment=mode_of_payment,
+		motivo=motivo,
+	)
+
+
+@frappe.whitelist()
 def actualizar_saldo_deuda(socio: str) -> dict[str, float]:
 	ensure_secretaria_operacion_access()
 	saldo = sync_saldo_deuda_socio(socio)

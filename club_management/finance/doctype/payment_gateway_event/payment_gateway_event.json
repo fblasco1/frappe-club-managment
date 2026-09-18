@@ -16,6 +16,7 @@
   "payment_log",
   "payment_entry",
   "processing_result",
+  "severity",
   "event_payload_json"
  ],
  "fields": [
@@ -78,7 +79,7 @@
    "label": "Payment Log",
    "options": "Payment Log",
    "read_only": 1,
-   "reqd": 1
+   "reqd": 0
   },
   {
    "fieldname": "payment_entry",
@@ -95,6 +96,13 @@
    "reqd": 1
   },
   {
+   "fieldname": "severity",
+   "fieldtype": "Select",
+   "label": "Severidad",
+   "options": "\nLow\nMedium\nHigh",
+   "read_only": 1
+  },
+  {
    "fieldname": "event_payload_json",
    "fieldtype": "Code",
    "label": "Payload JSON sanitizado",
@@ -105,7 +113,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-09-08 00:00:00.000000",
+ "modified": "2026-09-18 14:20:00.000000",
  "modified_by": "Administrator",
  "module": "Finance",
  "name": "Payment Gateway Event",

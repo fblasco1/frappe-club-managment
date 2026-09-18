@@ -83,6 +83,26 @@ Given `RC`, `RD` o `ES`
 When se procesa la rendición
 Then nunca crea Payment Entry.
 
+## Scenario: polling horario con flag de Desk
+
+Given el Single `Supervielle Settings` con `enable_automated_polling = 0`
+When corre el job `process_renditions_scheduler_tick` (hook `scheduler_events["hourly"]`)
+Then no llama a la API de rendiciones de Cobrand / Supervielle
+And no interrumpe la cola de Frappe.
+
+Given `enable_automated_polling = 1`
+When el scheduler dispara el tick
+Then consulta `/rest/rendicion` en preview
+And no aplica Payment Entry salvo que `rendicion_apply_enabled` esté activo (fuera de este corte).
+
+## Scenario: timeout o HTTP no 200 no tumba la cola
+
+Given el polling automático habilitado
+When la API de Cobrand responde timeout o HTTP distinto de 200
+Then el tick registra un `Payment Gateway Event` con `severity = High`
+And el job termina sin excepción (la cola de Frappe sigue)
+And no se loguean `secret_key` ni `Hash`.
+
 ## Permisos y datos
 
 - El callback puede ser guest únicamente con la firma como gate explícito.

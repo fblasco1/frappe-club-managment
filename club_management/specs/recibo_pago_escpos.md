@@ -28,11 +28,33 @@ When la API `registrar_cobro` responde con éxito
 Then incluye un objeto `recibo` con:
   - `comprobante` = nombre del `Payment Entry`
   - `fecha` y `hora` del cobro (posting_date + hora local)
+  - `socio_nombre` = apellido y nombre del socio (p. ej. `Pérez, Ana`)
+  - `numero_socio` = número de socio cuando exista
   - `lineas[]` con `concepto` y `monto` de cada ítem de la factura pagada
   - `total` = suma de montos
   - `texto` = vista previa en texto plano
   - `escpos_base64` = bytes ESC/POS codificados en base64
   - `ancho_papel_mm` según Club Settings
+
+---
+
+## Scenario: el ticket muestra el nombre del socio
+
+Given un cobro de un `Socio` con apellido `Pérez` y nombre `Ana`
+When se genera el recibo (tras cobro o vía `get_recibo_pago`)
+Then el payload incluye `socio_nombre` = `Pérez, Ana`
+And el texto del ticket muestra una línea `Socio: Pérez, Ana` después de fecha/hora
+And si el socio tiene `numero_socio`, también aparece `Nº socio: …`.
+
+---
+
+## Scenario: reimpresión desde historial en Desk
+
+Given un `Payment Entry` submitted del socio
+When Secretaría pulsa **Imprimir ticket** en el historial de pagos del formulario `Socio`
+Then llama `get_recibo_pago` con ese PE
+And dispara la misma impresión ESC/POS / vista previa que tras el cobro
+And no modifica el Payment Entry.
 
 ---
 
@@ -58,8 +80,9 @@ Then el texto incluye (en este orden):
   4. Separador `---`
   5. `COMPROBANTE` y número
   6. Fecha y hora
-  7. Tabla `CONCEPTO` / `VALOR` con cada línea y total
-  8. Mensaje de pie
+  7. `Socio:` apellido, nombre (y `Nº socio` si aplica)
+  8. Tabla `CONCEPTO` / `VALOR` con cada línea y total
+  9. Mensaje de pie
 
 And los montos usan formato argentino (`$29.000`).
 

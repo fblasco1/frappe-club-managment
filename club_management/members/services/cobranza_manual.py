@@ -1192,3 +1192,119 @@ def list_historial_pagos_socio(socio_name: str, *, limit: int = 50) -> list[dict
 			}
 		)
 	return result
+
+
+def corregir_medio_pago_cobro(
+	payment_entry_name: str,
+	*,
+	mode_of_payment: str,
+	motivo: str,
+) -> dict[str, Any]:
+	"""Cancela un PE submitted y recrea otro con el mismo cobro y otro medio.
+
+	No aplica a cobros vinculados a Payment Log (Supervielle / Cobrand).
+	"""
+	from club_management.integrations.payment_ledger_postgres import apply_patch
+	from club_management.members.services.modos_pago_desk import validar_modo_pago_desk
+
+	apply_patch()
+	ensure_secretaria_operacion_access()
+
+	pe_name = (payment_entry_name or "").strip()
+	if not pe_name:
+		frappe.throw(_("Payment Entry es obligatorio."), frappe.ValidationError)
+	if not frappe.db.exists("Payment Entry", pe_name):
+		frappe.throw(_("Payment Entry no encontrado."), frappe.DoesNotExistError)
+
+	motivo_txt = (motivo or "").strip()
+	if not motivo_txt:
+		frappe.throw(_("Indicá el motivo de la corrección."), frappe.ValidationError)
+
+	nuevo_modo = validar_modo_pago_desk(mode_of_payment)
+	pe = frappe.get_doc("Payment Entry", pe_name)
+	if pe.docstatus != 1:
+		frappe.throw(_("Solo se pueden corregir cobros confirmados."), frappe.ValidationError)
+
+	modo_actual = (pe.mode_of_payment or "").strip()
+	if modo_actual == nuevo_modo:
+		frappe.throw(
+			_("El cobro ya está registrado con el medio {0}.").format(nuevo_modo),
+			frappe.ValidationError,
+		)
+
+	if frappe.db.exists("DocType", "Payment Log") and frappe.db.exists(
+		"Payment Log", {"payment_entry": pe_name}
+	):
+		frappe.throw(
+			_(
+				"Este cobro está vinculado a la pasarela (Supervielle/Cobrand). "
+				"No se puede corregir el medio desde Desk."
+			),
+			frappe.ValidationError,
+		)
+
+	refs = frappe.get_all(
+		"Payment Entry Reference",
+		filters={
+			"parent": pe_name,
+			"reference_doctype": SALES_INVOICE_DOCTYPE,
+		},
+		fields=["reference_name", "allocated_amount"],
+		order_by="idx asc",
+	)
+	asignaciones: list[tuple[str, float]] = []
+	for row in refs:
+		amt = flt(row.allocated_amount)
+		if amt <= 0:
+			continue
+		asignaciones.append((str(row.reference_name), amt))
+	if not asignaciones:
+		frappe.throw(_("El cobro no tiene facturas imputadas."), frappe.ValidationError)
+
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	socio_name = None
+	if campo_socio:
+		for invoice_name, _amt in asignaciones:
+			socio_name = frappe.db.get_value(SALES_INVOICE_DOCTYPE, invoice_name, campo_socio)
+			if socio_name:
+				break
+	if not socio_name:
+		frappe.throw(_("No se pudo resolver el socio del cobro."), frappe.ValidationError)
+
+	posting_date = getdate(pe.posting_date)
+	reference_no = (pe.reference_no or "").strip() or None
+
+	pe.flags.ignore_permissions = True
+	pe.cancel()
+
+	pe_nuevo = _payment_entry_para_asignaciones(
+		asignaciones,
+		mode_of_payment=nuevo_modo,
+		posting_date=posting_date,
+		reference_no=reference_no,
+		auto_submit=True,
+	)
+
+	nota_cancelado = _(
+		"Medio de pago corregido: {0} → {1}. Reemplazado por {2}. Motivo: {3}"
+	).format(modo_actual or "—", nuevo_modo, pe_nuevo, motivo_txt)
+	nota_nuevo = _(
+		"Corrección de medio de pago. Reemplaza a {0} ({1} → {2}). Motivo: {3}"
+	).format(pe_name, modo_actual or "—", nuevo_modo, motivo_txt)
+
+	frappe.get_doc("Payment Entry", pe_name).add_comment("Comment", text=nota_cancelado)
+	frappe.get_doc("Payment Entry", pe_nuevo).add_comment("Comment", text=nota_nuevo)
+
+	saldo = sync_saldo_deuda_socio(str(socio_name))
+	from club_management.members.services.recibo_pago import build_recibo_pago
+
+	recibo = build_recibo_pago(pe_nuevo)
+	return {
+		"status": "ok",
+		"payment_entry_cancelado": pe_name,
+		"payment_entry": pe_nuevo,
+		"mode_of_payment": nuevo_modo,
+		"saldo_deuda": saldo,
+		"socio": socio_name,
+		"recibo": recibo,
+	}

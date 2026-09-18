@@ -55,7 +55,7 @@ Orden de entrega. Solo el ítem 1–4 entra en el primer corte usable.
 | 6 | Ver inscripciones actuales (solo lectura) | Hecho (en Actividades) | Sin baja ni cambio post-alta |
 | 7 | Enlace al área de pago cuando exista gateway | Fuera de BL-6 | Supervielle / Cobrand |
 | 8 | Carnet digital | Parcial | Resumen + foto en Inicio; QR formal fuera de MVP |
-| 9 | Historial de pagos del socio | Fuera de MVP portal | Hoy es Desk (`historial_pagos_socio.md`) |
+| 9 | Historial de pagos del socio | Backend BL-6d | `portal_socio_estado_cuenta.md` — deuda exigible + últimos 5 PE |
 | 10 | Perfil (datos personales + foto 4×4; actualización) | Hecho | `portal_socio_perfil.md` — Mis datos en shell del portal |
 | 11 | Reserva de espacios alquilables | Backend SP-7 | `reservas_espacio_portal.md` — `get_espacios_disponibles`, `solicitar_reserva_espacio` |
 

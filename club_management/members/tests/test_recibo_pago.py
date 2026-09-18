@@ -45,6 +45,8 @@ class TestReciboPagoFormato(MembersTestCase):
 			"comprobante": "ACC-PAY-2026-00001",
 			"fecha": "01/07/2026",
 			"hora": "17:49",
+			"socio_nombre": "Pérez, Ana",
+			"numero_socio": 11479,
 			"lineas": [
 				{"concepto": "CUOTA SOCIAL ACTIVO", "monto": 29000},
 				{"concepto": "ARANCEL BASQUET FEMENINO", "monto": 21500},
@@ -60,6 +62,8 @@ class TestReciboPagoFormato(MembersTestCase):
 		self.assertIn("CUIT: 30-12345678-9", texto)
 		self.assertIn("COMPROBANTE", texto)
 		self.assertIn("ACC-PAY-2026-00001", texto)
+		self.assertIn("Socio: Pérez, Ana", texto)
+		self.assertIn("Nº socio: 11479", texto)
 		self.assertIn("CUOTA SOCIAL ACTIVO", texto)
 		self.assertIn("$29.000", texto)
 		self.assertIn("TOTAL: $50.500", texto)
@@ -191,6 +195,9 @@ class TestReciboPagoIntegracion(MembersTestCase):
 
 		self.assertEqual(recibo["ancho_papel_mm"], 58)
 		self.assertIn("INSTITUCION CULTURAL", recibo["texto"])
+		self.assertIn(socio.apellido, recibo["socio_nombre"])
+		self.assertIn(socio.nombre, recibo["socio_nombre"])
+		self.assertIn("Socio:", recibo["texto"])
 
 	def test_recibo_incluye_periodo_en_concepto(self) -> None:
 		socio = insert_socio(dni="99004005", email="recibo.periodo@example.com")
