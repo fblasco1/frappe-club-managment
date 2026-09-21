@@ -411,27 +411,117 @@ class TestLiquidacionEquipo(MembersTestCase):
 				"actividad": self._actividad,
 			}
 		)
-		equipo_rows = [r for r in rows if int(r.get("indent") or 0) == 2]
+		# Árbol padre→hijos: Total(0) → actividad(1) → grupo(2) → equipo(3) → socio(4)
+		self.assertEqual(rows[0]["nivel"], "Total")
+		self.assertEqual(int(rows[0]["indent"]), 0)
+		self.assertEqual(rows[0]["deuda_arancel"], 12000.0)
+		# 2 deudores / 3 inscritos activos (incluye socio solo con cuota social)
+		self.assertEqual(rows[0]["socios_deudores"], "2 (67%)")
+
+		indents = [int(r.get("indent") or 0) for r in rows]
+		for i in range(1, len(rows)):
+			self.assertLessEqual(
+				indents[i],
+				indents[i - 1] + 1,
+				msg=f"Salto de indent inválido en fila {i}: {indents[i - 1]} → {indents[i]}",
+			)
+			if indents[i] > indents[i - 1]:
+				self.assertEqual(indents[i], indents[i - 1] + 1)
+
+		act_sub = next(r for r in rows if int(r.get("indent") or 0) == 1)
+		self.assertEqual(act_sub["actividad"], self._actividad)
+		self.assertEqual(act_sub["deuda_arancel"], 12000.0)
+		self.assertEqual(act_sub["socios_deudores"], "2 (67%)")
+		self.assertLess(rows.index(rows[0]), rows.index(act_sub))
+
+		grupo_sub = next(r for r in rows if int(r.get("indent") or 0) == 2)
+		self.assertEqual(grupo_sub["deuda_arancel"], 12000.0)
+		self.assertEqual(grupo_sub["socios_deudores"], "2 (67%)")
+		self.assertLess(rows.index(act_sub), rows.index(grupo_sub))
+
+		equipo_rows = [r for r in rows if int(r.get("indent") or 0) == 3]
 		self.assertEqual(len(equipo_rows), 2)
 		by_equipo = {r["equipo_actividad"]: r for r in equipo_rows}
 		self.assertEqual(by_equipo[self._equipo]["deuda_arancel"], 5000.0)
+		# 1 deudor + socio_cuota sin arancel en el mismo equipo
+		self.assertEqual(by_equipo[self._equipo]["socios_deudores"], "1 (50%)")
 		self.assertEqual(by_equipo[equipo_b]["deuda_arancel"], 7000.0)
+		self.assertEqual(by_equipo[equipo_b]["socios_deudores"], "1 (100%)")
+		self.assertLess(rows.index(grupo_sub), rows.index(equipo_rows[0]))
 
-		grupo_sub = next(r for r in rows if int(r.get("indent") or 0) == 1)
-		self.assertEqual(grupo_sub["deuda_arancel"], 12000.0)
-		self.assertEqual(grupo_sub["socios_deudores"], 2)
+		socio_rows = [r for r in rows if int(r.get("indent") or 0) == 4]
+		self.assertEqual(len(socio_rows), 2)
+		by_socio = {r["socio"]: r for r in socio_rows}
+		self.assertEqual(by_socio[socio.name]["deuda_arancel"], 5000.0)
+		self.assertEqual(by_socio[socio.name]["socios_deudores"], "1")
+		self.assertEqual(by_socio[socio_b.name]["deuda_arancel"], 7000.0)
+		self.assertTrue(all(r.get("nivel") for r in socio_rows))
+		# Cada socio aparece después de su fila de equipo
+		for srow in socio_rows:
+			equipo_idx = next(
+				i
+				for i, r in enumerate(rows)
+				if int(r.get("indent") or 0) == 3 and r["equipo_actividad"] == srow["equipo_actividad"]
+			)
+			self.assertGreater(rows.index(srow), equipo_idx)
 
-		act_sub = next(
+	def test_deuda_por_actividad_omite_nivel_sin_equipo(self) -> None:
+		# Arancel resuelto por grupo cuando no hay equipo (equipo → grupo → actividad)
+		frappe.db.set_value("Grupo Actividad", self._grupo, "item", ARANCEL_ITEM_CODE)
+		socio = self._socio_activo(dni="74001021", email="club.sin.eq@example.com")
+		frappe.get_doc(
+			{
+				"doctype": "Inscripcion Actividad",
+				"socio": socio.name,
+				"actividad": self._actividad,
+				"grupo_actividad": self._grupo,
+				"equipo_actividad": "",
+				"estado": "Activa",
+			}
+		).insert(ignore_permissions=True)
+		self._crear_factura_items(
+			socio.name,
+			"2026-03-20",
+			[{"item_code": ARANCEL_ITEM_CODE, "qty": 1, "rate": 4500}],
+		)
+
+		rows = get_deuda_por_actividad_data(
+			{
+				"fecha_desde": self._MARZO_DESDE,
+				"fecha_hasta": self._MARZO_HASTA,
+				"actividad": self._actividad,
+			}
+		)
+		placeholders = [
 			r
 			for r in rows
-			if int(r.get("indent") or 0) == 0 and r["actividad"] == self._actividad and r["nivel"] != "Total"
-		)
-		self.assertEqual(act_sub["deuda_arancel"], 12000.0)
+			if "Sin equipo" in str(r.get("nivel") or "") or "sin equipo" in str(r.get("nivel") or "").lower()
+		]
+		self.assertEqual(placeholders, [], msg="No debe emitirse fila placeholder sin equipo/categoría")
 
-		total_row = rows[-1]
-		self.assertEqual(total_row["nivel"], "Total")
-		self.assertEqual(total_row["deuda_arancel"], 12000.0)
-		self.assertEqual(total_row["socios_deudores"], 2)
+		socio_row = next(r for r in rows if r.get("socio") == socio.name)
+		self.assertEqual(int(socio_row["indent"]), 3)
+		self.assertEqual(socio_row["deuda_arancel"], 4500.0)
+		self.assertEqual(socio_row["equipo_actividad"], "")
+
+		grupo_idx = next(i for i, r in enumerate(rows) if int(r.get("indent") or 0) == 2)
+		self.assertGreater(rows.index(socio_row), grupo_idx)
+
+	def test_deuda_por_actividad_tiene_plantilla_pdf_a4(self) -> None:
+		from pathlib import Path
+
+		html_path = (
+			Path(__file__).resolve().parents[1]
+			/ "report"
+			/ "deuda_por_actividad"
+			/ "deuda_por_actividad.html"
+		)
+		self.assertTrue(html_path.is_file(), msg=f"Falta plantilla PDF: {html_path}")
+		content = html_path.read_text(encoding="utf-8")
+		self.assertIn("A4 portrait", content)
+		self.assertIn("Nivel / Socio", content)
+		self.assertIn("original_data", content)
+		self.assertNotIn("Grupo / tira", content)
 
 	def test_pagos_arancel_proporcional_pago_parcial(self) -> None:
 		socio = self._socio_activo(dni="74001014", email="pagos.prop@example.com")

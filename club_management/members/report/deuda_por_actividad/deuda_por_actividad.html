@@ -1,0 +1,160 @@
+<style>
+	@page {
+		size: A4 portrait;
+		margin: 12mm 10mm;
+	}
+
+	.deuda-actividad-pdf {
+		font-family: DejaVu Sans, Arial, Helvetica, sans-serif;
+		font-size: 10px;
+		color: #111;
+		width: 100%;
+	}
+
+	.deuda-actividad-pdf h2 {
+		text-align: center;
+		font-size: 14px;
+		margin: 0 0 4px 0;
+	}
+
+	.deuda-actividad-pdf .meta {
+		text-align: center;
+		color: #444;
+		font-size: 9px;
+		margin-bottom: 10px;
+	}
+
+	.deuda-actividad-pdf table {
+		width: 100%;
+		border-collapse: collapse;
+		table-layout: fixed;
+	}
+
+	.deuda-actividad-pdf thead {
+		display: table-header-group;
+	}
+
+	.deuda-actividad-pdf th,
+	.deuda-actividad-pdf td {
+		border: 1px solid #bbb;
+		padding: 4px 6px;
+		vertical-align: top;
+		line-height: 1.35;
+	}
+
+	.deuda-actividad-pdf th {
+		background: #f2f2f2;
+		font-size: 9px;
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
+	}
+
+	.deuda-actividad-pdf .col-nivel {
+		width: 58%;
+		word-break: normal;
+		overflow-wrap: break-word;
+		white-space: normal;
+	}
+
+	.deuda-actividad-pdf .col-deuda {
+		width: 22%;
+		text-align: right;
+		white-space: nowrap;
+	}
+
+	.deuda-actividad-pdf .col-socios {
+		width: 20%;
+		text-align: right;
+		white-space: nowrap;
+	}
+
+	.deuda-actividad-pdf tr.agg td {
+		font-weight: bold;
+		background: #fafafa;
+	}
+
+	.deuda-actividad-pdf tr.leaf td {
+		font-weight: normal;
+		background: #fff;
+	}
+
+	.deuda-actividad-pdf .indent {
+		display: inline-block;
+	}
+
+	.deuda-actividad-pdf .socio-id {
+		color: #555;
+		font-weight: normal;
+		font-size: 9px;
+	}
+
+	.deuda-actividad-pdf .footer {
+		margin-top: 8px;
+		text-align: right;
+		color: #777;
+		font-size: 8px;
+	}
+</style>
+
+{%
+	var rows = (original_data && original_data.length) ? original_data : data;
+%}
+
+<div class="deuda-actividad-pdf">
+	<h2>{%= __(title || report.report_name) %}</h2>
+	<div class="meta">
+		{% if (filters && filters.fecha_desde) { %}
+			{%= frappe.datetime.str_to_user(filters.fecha_desde) %}
+			— {%= frappe.datetime.str_to_user(filters.fecha_hasta) %}
+		{% } %}
+		{% if (filters && filters.actividad) { %}
+			· {%= __("Actividad") %}: {%= filters.actividad %}
+		{% } %}
+	</div>
+
+	{% if subtitle %}
+		<div class="meta">{%= subtitle %}</div>
+	{% endif %}
+
+	<table>
+		<thead>
+			<tr>
+				<th class="col-nivel">{%= __("Nivel / Socio") %}</th>
+				<th class="col-deuda">{%= __("Deuda aranceles") %}</th>
+				<th class="col-socios">{%= __("Socios deudores") %}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for (var i = 0; i < rows.length; i++) { %}
+				{%
+					var row = rows[i];
+					var indent = cint(row.indent);
+					var is_leaf = row.socio ? true : false;
+					var nivel = row.nivel || "";
+					if (is_leaf && row.socio) {
+						nivel = nivel + " · N° " + row.socio;
+					}
+					var row_class = is_leaf ? "leaf" : "agg";
+				%}
+				<tr class="{%= row_class %}">
+					<td class="col-nivel">
+						<span class="indent" style="padding-left: {%= indent * 1.1 %}em">
+							{%= nivel %}
+						</span>
+					</td>
+					<td class="col-deuda">
+						{%= frappe.format(row.deuda_arancel, { fieldtype: "Currency" }) %}
+					</td>
+					<td class="col-socios">
+						{%= row.socios_deudores || "" %}
+					</td>
+				</tr>
+			{% } %}
+		</tbody>
+	</table>
+
+	<p class="footer">
+		{%= __("Impreso el {0}", [frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string())]) %}
+		· A4 {%= __("vertical") %}
+	</p>
+</div>
