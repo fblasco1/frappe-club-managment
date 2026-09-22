@@ -7,14 +7,28 @@ y el orden de firma de la respuesta anidada.
 ## Scenario: autenticación antes de cualquier efecto
 
 Given un callback JSON de Cobranza Ágil
+And `strict=True` (producción / `sandbox_mode=0`)
 When falta el `Hash`, no coincide o el esquema excede el contrato
 Then responde 403
 And no consulta ni modifica Sales Invoice, Payment Log o Payment Entry.
+
+Given el mismo callback con hash inválido
+And `strict=False` (sandbox audit / `sandbox_mode=1`)
+When se procesa
+Then registra un `Payment Gateway Event` de advertencia (`hash_warning`)
+And continúa el procesamiento del lote/payload sin abortar la request.
 
 Given un callback válido
 When se autentica
 Then usa SHA-256 de los valores en el orden contractual, excluye `Hash`,
 anexa `secret_key` y compara con `hmac.compare_digest`.
+
+## Scenario: idempotencia por gateway_transaction_id en Payment Entry
+
+Given ya existe un `Payment Entry` submitted con `reference_no = IdPagoPortal`
+When el banco reintenta el callback estado `5`
+Then responde HTTP 200 / `{status: ok, replayed: true}`
+And no crea un segundo asiento contable.
 
 ## Scenario: identidad local y bancaria
 
