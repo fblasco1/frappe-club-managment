@@ -7,14 +7,28 @@ y el orden de firma de la respuesta anidada.
 ## Scenario: autenticación antes de cualquier efecto
 
 Given un callback JSON de Cobranza Ágil
+And `strict=True` (producción / `sandbox_mode=0`)
 When falta el `Hash`, no coincide o el esquema excede el contrato
 Then responde 403
 And no consulta ni modifica Sales Invoice, Payment Log o Payment Entry.
+
+Given el mismo callback con hash inválido
+And `strict=False` (sandbox audit / `sandbox_mode=1`)
+When se procesa
+Then registra un `Payment Gateway Event` de advertencia (`hash_warning`)
+And continúa el procesamiento del lote/payload sin abortar la request.
 
 Given un callback válido
 When se autentica
 Then usa SHA-256 de los valores en el orden contractual, excluye `Hash`,
 anexa `secret_key` y compara con `hmac.compare_digest`.
+
+## Scenario: idempotencia por gateway_transaction_id en Payment Entry
+
+Given ya existe un `Payment Entry` submitted con `reference_no = IdPagoPortal`
+When el banco reintenta el callback estado `5`
+Then responde HTTP 200 / `{status: ok, replayed: true}`
+And no crea un segundo asiento contable.
 
 ## Scenario: identidad local y bancaria
 
@@ -83,25 +97,59 @@ Given `RC`, `RD` o `ES`
 When se procesa la rendición
 Then nunca crea Payment Entry.
 
-## Scenario: polling horario con flag de Desk
+## Scenario: tick de scheduler y polling
 
-Given el Single `Supervielle Settings` con `enable_automated_polling = 0`
-When corre el job `process_renditions_scheduler_tick` (hook `scheduler_events["hourly"]`)
-Then no llama a la API de rendiciones de Cobrand / Supervielle
-And no interrumpe la cola de Frappe.
+Given `Supervielle Settings.sandbox_mode = 1` **o** `polling_enabled = 1`
+When corre el job `process_renditions_scheduler_tick`
+Then consulta el lote de rendiciones en el host configurado
+And procesa cada respuesta del lote sin aplicar Payment Entry automáticamente
+mientras `rendicion_apply_enabled` esté desactivado.
 
-Given `enable_automated_polling = 1`
-When el scheduler dispara el tick
-Then consulta `/rest/rendicion` en preview
-And no aplica Payment Entry salvo que `rendicion_apply_enabled` esté activo (fuera de este corte).
+Given `sandbox_mode = 0` **y** `polling_enabled = 0`
+When corre el mismo job
+Then no llama a la API de rendiciones
+And retorna un resultado vacío / `skipped`.
 
-## Scenario: timeout o HTTP no 200 no tumba la cola
+## Scenario: verificación de hash anidado (vector provisional)
 
-Given el polling automático habilitado
-When la API de Cobrand responde timeout o HTTP distinto de 200
-Then el tick registra un `Payment Gateway Event` con `severity = High`
-And el job termina sin excepción (la cola de Frappe sigue)
-And no se loguean `secret_key` ni `Hash`.
+El banco aún no confirmó el vector oficial de firma de la respuesta anidada v6.2.
+Hasta entonces se usa un hash provisional: SHA-256 de los valores escalares en
+recorrido DFS (dict/list), excluyendo claves `Hash`/`hash`, más `secret_key`.
+
+Given una respuesta de rendiciones con `Hash` ausente o distinto al provisional
+And `sandbox_mode = 1` (modo auditoría, `strict=False`)
+When el verificador independiente evalúa el payload
+Then no lanza error ni interrumpe el tick del scheduler
+And registra un `Payment Gateway Event` con `processing_result` /
+`status_description` = `Error de Verificación`
+And emite una advertencia estructurada en el logger (`rendition_hash_mismatch`)
+And el payload persistido omite `Hash` / secretos
+And `hash_verified` queda en falso
+And el parseo preview del resto del lote continúa.
+
+Given la misma discrepancia de hash
+And `sandbox_mode = 0` (producción, `strict=True`)
+When el verificador evalúa el payload
+Then lanza `SupervielleIntegrationError`
+And no crea Payment Entry ni aplica conciliación.
+
+Given un payload anidado cuyo `Hash` coincide con el provisional
+When se verifica en cualquier modo
+Then `hash_verified` es verdadero
+And no se registra evento de error de verificación.
+
+## Scenario: persistencia cruda e idempotencia de red
+
+Given una respuesta de rendición procesada por el tick
+When se persiste el evento
+Then `Payment Gateway Event` guarda el payload crudo sanitizado (sin `Hash`)
+And la clave idempotente combina proveedor, identidad de rendición/instrumento
+(o firma de contenido) y resultado.
+
+Given el mismo lote se reintenta por timeout/red
+When se procesa otra vez con la misma identidad
+Then no duplica el `Payment Gateway Event`
+And reutiliza el `event_key` existente.
 
 ## Permisos y datos
 

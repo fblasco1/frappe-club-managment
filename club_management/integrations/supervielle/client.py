@@ -62,6 +62,8 @@ def get_runtime_settings() -> SupervielleRuntimeSettings:
 		convenio=str(settings.convenio or "").strip(),
 		mode_of_payment=str(settings.mode_of_payment or "").strip(),
 		clearing_account=str(settings.clearing_account or "").strip(),
+		polling_enabled=bool(getattr(settings, "polling_enabled", 0)),
+		rendicion_apply_enabled=bool(getattr(settings, "rendicion_apply_enabled", 0)),
 	)
 	for fieldname in (
 		"cuit_emisor",
@@ -148,6 +150,41 @@ def _sanitized_request(payload: dict[str, Any]) -> dict[str, Any]:
 	return {key: value for key, value in payload.items() if key not in {"Hash", "Token", "AccessLink"}}
 
 
+def _record_publish_iniciado(log: Any, merchant_id: str, source: CheckoutSource) -> str | None:
+	"""Persiste Payment Gateway Event Iniciado (idempotente por merchant_id)."""
+	from frappe.utils import now_datetime
+
+	gateway_placeholder = f"PENDING:{merchant_id}"
+	identity = "|".join([PROVIDER_SUPERVIELLE, merchant_id, "Iniciado", gateway_placeholder])
+	event_key = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+	existing = frappe.db.get_value("Payment Gateway Event", {"event_key": event_key}, "name")
+	if existing:
+		return str(existing)
+	doc = frappe.get_doc(
+		{
+			"doctype": "Payment Gateway Event",
+			"event_key": event_key,
+			"provider": PROVIDER_SUPERVIELLE,
+			"merchant_transaction_id": merchant_id,
+			"gateway_transaction_id": gateway_placeholder,
+			"status_code": "0",
+			"status_description": "Iniciado",
+			"state_changed_at": now_datetime(),
+			"payment_log": log.name,
+			"processing_result": "Iniciado",
+			"event_payload_json": frappe.as_json(
+				{
+					"sales_invoice": source.invoice_name,
+					"amount": source.amount,
+					"socio": source.socio_name,
+				}
+			),
+		}
+	)
+	doc.insert(ignore_permissions=True)
+	return doc.name
+
+
 def _reject_log(log: Any, message: str) -> None:
 	log.status = "Rechazado"
 	log.error_message = str(message)[:2000]
@@ -187,6 +224,7 @@ def publicar_boton_pago(
 	if log.status != "Recibido":
 		log.status = "Recibido"
 		log.save(ignore_permissions=True)
+	_record_publish_iniciado(log, merchant_id, source)
 	try:
 		response = _post_json(settings.api_url, signed_payload, session=session)
 		if int(response.status_code) < 200 or int(response.status_code) >= 300:

@@ -16,6 +16,6 @@ class SupervielleSettings(Document):
 	convenio: str
 	rendicion_api_url: str
 	rendicion_apply_enabled: int
-	enable_automated_polling: int
+	polling_enabled: int
 	mode_of_payment: str
 	clearing_account: str | None
