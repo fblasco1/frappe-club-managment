@@ -62,6 +62,8 @@ def get_runtime_settings() -> SupervielleRuntimeSettings:
 		convenio=str(settings.convenio or "").strip(),
 		mode_of_payment=str(settings.mode_of_payment or "").strip(),
 		clearing_account=str(settings.clearing_account or "").strip(),
+		polling_enabled=bool(getattr(settings, "polling_enabled", 0)),
+		rendicion_apply_enabled=bool(getattr(settings, "rendicion_apply_enabled", 0)),
 	)
 	for fieldname in (
 		"cuit_emisor",

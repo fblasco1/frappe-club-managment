@@ -38,8 +38,13 @@ CALLBACK_FIELDS = (
 )
 _MAX_CALLBACK_BYTES = 64 * 1024
 _AUDIT_ONLY_STATES = {"0", "1", "2", "3", "4"}
-_CONCILE_STATE = "5"
+_CONCILE_STATE = "5"  # Validado / Aprobado — único estado que crea Payment Entry
 _MANUAL_REVIEW_STATES = {"6", "7", "8", "9"}
+
+
+def can_auto_create_payment_entry(codigo_estado: str | int | None) -> bool:
+	"""Gate único: Payment Entry automático solo con CodigoEstado == 5."""
+	return str(codigo_estado or "").strip() == _CONCILE_STATE
 
 
 def build_callback_hash(payload: dict[str, Any], secret_key: str) -> str:
@@ -200,7 +205,7 @@ def process_callback(
 	_validate_transition(log, validated)
 	status_code = str(validated["CodigoEstado"])
 	payment_entry = None
-	if status_code == _CONCILE_STATE:
+	if can_auto_create_payment_entry(status_code):
 		if log.payment_entry:
 			payment_entry = log.payment_entry
 		else:

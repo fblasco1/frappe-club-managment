@@ -38,9 +38,26 @@ from club_management.spaces.services.portal_reservas import (
 ITEM_ALQUILER_EXTERNO = ITEM_ALQUILER_SOCIO  # ICDPE-ALQ-ARS-TEMP
 RESERVA_DOCTYPE = "Reserva Espacio"
 
+CHANNEL_DISABLED_CODE = "CHANNEL_DISABLED"
+CHANNEL_DISABLED_MESSAGE = "Canal de alquileres externo deshabilitado"
+CHANNEL_DISABLED_BODY: dict[str, str] = {
+	"status": "error",
+	"code": CHANNEL_DISABLED_CODE,
+	"message": CHANNEL_DISABLED_MESSAGE,
+}
+
 
 def _deny() -> None:
 	frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+
+def raise_channel_disabled() -> None:
+	"""HTTP 403 estructurado cuando el canal guest está apagado."""
+	frappe.local.response["http_status_code"] = 403
+	frappe.local.response["channel_disabled_body"] = dict(CHANNEL_DISABLED_BODY)
+	exc = frappe.PermissionError(CHANNEL_DISABLED_MESSAGE)
+	exc.http_status_code = 403  # type: ignore[attr-defined]
+	raise exc
 
 
 def require_canal_externo_habilitado() -> None:
@@ -49,7 +66,7 @@ def require_canal_externo_habilitado() -> None:
 		frappe.db.get_single_value("Club Settings", "espacios_reserva_externa_habilitada") or 0
 	)
 	if not enabled:
-		_deny()
+		raise_channel_disabled()
 
 
 def require_sesion_externa(sesion_token: str | None) -> None:
