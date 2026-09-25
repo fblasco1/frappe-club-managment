@@ -47,6 +47,7 @@ When Secretaria consulta el dashboard
 Then la card **Socios en mora** cuenta solo los de `estado = Moroso`
 And no incluye activos que solo deben el período en curso
 And muestra el **monto total adeudado** (suma de `saldo_deuda` de morosos)
+And muestra clasificación de mora por períodos impagos (**1–3 meses** / **4+ meses**)
 And **Ver más** abre `Socio` filtrado a `Moroso`.
 
 ---
@@ -105,8 +106,8 @@ And **Ver más** abre la lista filtrada a esos estados.
 
 Given Secretaria en el dashboard
 When usa las acciones rápidas
-Then puede abrir **Nueva alta de socio** (flujo guiado existente)
-And **Emitir cupón / Registrar cobro** abre socios con deuda pendiente
+Then puede abrir **+ Nuevo Socio** (flujo guiado existente)
+And **no** ve «Emitir cupón / Registrar cobro» ni «Registrar Nuevo Gasto / Comprobante»
 And **Enviar recordatorio masivo** aparece deshabilitado (futuro).
 
 ---

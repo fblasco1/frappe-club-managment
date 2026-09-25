@@ -9,7 +9,7 @@ import frappe
 INICIO_WORKSPACE_NAME = "Inicio"
 LEGACY_INICIO_WORKSPACE_NAME = "Inicio Club"
 GESTION_ACTIVIDADES_WORKSPACE_NAME = "Gestión de Actividades"
-SECRETARIA_WORKSPACE_NAME = "Secretaría"
+SECRETARIA_WORKSPACE_NAME = "Socios"
 
 CLUB_DESK_NAV_TABS: list[tuple[str, str]] = [
 	("Gestión de Socios", SECRETARIA_WORKSPACE_NAME),

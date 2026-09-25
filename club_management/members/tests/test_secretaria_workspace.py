@@ -12,7 +12,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from club_management.members.setup.inicio_workspace import INICIO_WORKSPACE_NAME
-from club_management.members.setup.secretaria_workspace import WORKSPACE_NAME
+from club_management.members.setup.secretaria_workspace import WORKSPACE_LABEL, WORKSPACE_NAME
 from club_management.members.test_helpers import ensure_role_secretaria_exists
 
 
@@ -27,6 +27,11 @@ def _workspace_json_path() -> str:
 
 
 class TestSecretariaWorkspace(FrappeTestCase):
+	def test_workspace_label_visible_socios(self) -> None:
+		"""Spec portal_socios_ux_ajustes: name y label Socios (ruta /desk/socios)."""
+		self.assertEqual(WORKSPACE_NAME, "Socios")
+		self.assertEqual(WORKSPACE_LABEL, "Socios")
+
 	def test_fixture_workspace_sin_widgets_nativos(self) -> None:
 		with open(_workspace_json_path(), encoding="utf-8") as handle:
 			data = json.load(handle)
@@ -38,7 +43,9 @@ class TestSecretariaWorkspace(FrappeTestCase):
 		self.assertTrue(os.path.isfile(path))
 		with open(path, encoding="utf-8") as handle:
 			data = json.load(handle)
-		self.assertEqual(data.get("label"), WORKSPACE_NAME)
+		self.assertEqual(data.get("name"), WORKSPACE_NAME)
+		self.assertEqual(data.get("label"), "Socios")
+		self.assertEqual(data.get("title"), "Socios")
 		self.assertEqual(data.get("module"), "Members")
 		link_targets = {row.get("link_to") for row in data.get("links") or []}
 		self.assertNotIn("Solicitud Asociacion", link_targets)

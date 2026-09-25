@@ -25,7 +25,7 @@
 
 			label: __("Gestión de Socios"),
 
-			workspace: "Secretaría",
+			workspace: "Socios",
 
 			icon: "users",
 
@@ -189,7 +189,7 @@
 
 	club_management.club_desk_navigation.SLUG_ALIASES = {
 
-		secretaria: "Secretaría",
+		secretaria: "Socios",
 
 		"gestion-de-actividades": "Gestión de Actividades",
 		"gestión-de-actividades": "Gestión de Actividades",
@@ -197,11 +197,11 @@
 		"gestion-de-espacios-y-canchas": "Gestión de Espacios y Canchas",
 		"gestión-de-espacios-y-canchas": "Gestión de Espacios y Canchas",
 
-		"gestion-de-socios": "Secretaría",
+		"gestion-de-socios": "Socios",
 
-		"inicio-club": "Secretaría",
+		"inicio-club": "Socios",
 
-		inicio: "Secretaría",
+		inicio: "Socios",
 
 	};
 
@@ -421,7 +421,7 @@
 
 		return (
 
-			active === "Secretaría" ||
+			active === "Socios" ||
 
 			active === "Gestión de Actividades" ||
 
@@ -479,7 +479,7 @@
 
 		if (this.is_club_socio_page()) {
 
-			return this.TABS.find((tab) => tab.workspace === "Secretaría") || null;
+			return this.TABS.find((tab) => tab.workspace === "Socios") || null;
 
 		}
 
@@ -588,7 +588,7 @@
 
 		}
 
-		if (workspace === "Secretaría") {
+		if (workspace === "Socios") {
 
 			club_management.secretaria_sidebar?.refresh?.();
 
@@ -634,7 +634,7 @@
 
 			if (HIDDEN_WORKSPACES.has(workspace)) {
 
-				this.navigate_to_workspace("Secretaría");
+				this.navigate_to_workspace("Socios");
 
 				return;
 
@@ -1016,7 +1016,7 @@
 
 		const workspace = this.get_club_workspace_name();
 
-		if (workspace === "Secretaría") {
+		if (workspace === "Socios") {
 
 			club_management.secretaria_sidebar?.refresh?.();
 

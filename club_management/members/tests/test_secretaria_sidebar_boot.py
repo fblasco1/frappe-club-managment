@@ -39,7 +39,7 @@ class TestSecretariaSidebarBoot(MembersTestCase):
 		self.assertIn(key, bootinfo.get("workspace_sidebar_item", {}))
 		items = bootinfo["workspace_sidebar_item"][key]["items"]
 		labels = [row["label"] for row in items]
-		self.assertIn("Secretaría", labels)
+		self.assertIn("Socios", labels)
 		self.assertIn("Valores de Cuota Social", labels)
 
 	def test_apply_boot_no_inyecta_para_guest(self) -> None:

@@ -6,7 +6,7 @@
 
 
 
-	const SECRETARIA_WORKSPACE_NAME = "Secretaría";
+	const SECRETARIA_WORKSPACE_NAME = "Socios";
 
 	const PANEL_ID = "club-secretaria-lists";
 
@@ -395,6 +395,29 @@
 			`;
 		},
 
+		render_mora_clasificacion(clasificacion) {
+			const tramos = clasificacion?.tramos || [];
+			if (!tramos.length) {
+				return "";
+			}
+			const rows = tramos
+				.map(
+					(tramo) => `
+				<div class="club-secretaria-kpi-breakdown-row">
+					<span>${frappe.utils.escape_html(tramo.label || "")}:</span>
+					<strong>${tramo.cantidad ?? 0}</strong>
+					<span class="text-muted">· ${frappe.utils.escape_html(tramo.monto_label || "")}</span>
+				</div>`
+				)
+				.join("");
+			return `
+				<div class="club-secretaria-kpi-breakdown club-secretaria-mora-clasificacion">
+					<p class="club-secretaria-kpi-subtitle text-muted small mb-1">${__("Clasificación por antigüedad")}</p>
+					${rows}
+				</div>
+			`;
+		},
+
 		render_kpi_cards(metricas) {
 			const socios = metricas.socios || {};
 			const morososDeudaLabel =
@@ -423,6 +446,7 @@
 						<p class="club-secretaria-kpi-title">${__("Socios en mora")}</p>
 						<div class="club-secretaria-kpi-value">${socios.morosos ?? 0}</div>
 						<p class="club-secretaria-kpi-deuda">${frappe.utils.escape_html(morososDeudaLabel)}</p>
+						${this.render_mora_clasificacion(socios.mora_clasificacion)}
 						<div class="club-secretaria-kpi-footer">
 							${this.render_ver_mas_btn(verMas.socios_morosos_doctype, verMas.socios_morosos_filters)}
 						</div>
@@ -709,15 +733,9 @@
 
 		render_quick_actions() {
 			return `
-				<div class="club-secretaria-quick-actions">
+				<div class="club-secretaria-quick-actions club-portal-cta-row">
 					<button type="button" class="btn btn-primary club-secretaria-nuevo-socio">
-						${__("+ Nueva alta de socio")}
-					</button>
-					<button type="button" class="btn btn-secondary club-secretaria-cobranza">
-						${__("Emitir cupón / Registrar cobro")}
-					</button>
-					<button type="button" class="btn btn-secondary club-secretaria-nuevo-gasto">
-						${__("Registrar Nuevo Gasto / Comprobante")}
+						${__("+ Nuevo Socio")}
 					</button>
 					<button type="button" class="btn btn-default" disabled title="${__("Próximamente")}">
 						${__("Enviar recordatorio de deuda masivo")}

@@ -22,10 +22,10 @@
 
 	const SIDEBAR_ITEMS = [
 		{
-			label: __("Secretaría"),
+			label: __("Socios"),
 			type: "Link",
 			link_type: "Workspace",
-			link_to: "Secretaría",
+			link_to: "Socios",
 			icon: "home",
 		},
 		{
@@ -118,7 +118,7 @@
 		const existing = boot[SIDEBAR_KEY]?.items;
 		const items = mergeSidebarItems(existing, SIDEBAR_ITEMS);
 		boot[SIDEBAR_KEY] = {
-			label: __("Secretaría"),
+			label: __("Socios"),
 			items,
 			header_icon: "users",
 			module: "Members",
@@ -129,7 +129,7 @@
 	club_management.secretaria_sidebar.refresh = function () {
 		this.ensure_boot();
 		if (frappe.app?.sidebar) {
-			frappe.app.sidebar.setup(__("Secretaría"));
+			frappe.app.sidebar.setup(__("Socios"));
 		}
 	};
 })();

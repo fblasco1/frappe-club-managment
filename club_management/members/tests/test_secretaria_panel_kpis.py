@@ -15,6 +15,7 @@ from club_management.members.services.cobranza_periodica import format_periodo_c
 from club_management.members.services.cuotas_sociales_setup import sync_cuotas_sociales_club
 from club_management.members.services.secretaria_panel_kpis import (
 	count_socios_total,
+	get_mora_clasificacion_payload,
 	get_morosos_deuda_total,
 	get_panel_metricas_payload,
 	get_recaudacion_mes_payload,
@@ -51,6 +52,23 @@ class TestSecretariaPanelKpis(MembersTestCase):
 		self.assertIn("total_mes_anterior", data)
 		self.assertIn("morosos_deuda", data)
 		self.assertIn("morosos_deuda_label", data)
+		self.assertIn("mora_clasificacion", data)
+		tramos = data["mora_clasificacion"]["tramos"]
+		self.assertEqual([t["key"] for t in tramos], ["1_3", "4_mas"])
+
+	def test_mora_clasificacion_tramos_vacios_estructura(self) -> None:
+		"""Spec portal_socios_ux_ajustes: KPI mora expone tramos 1–3 y 4+."""
+		data = get_mora_clasificacion_payload()
+		self.assertIn("tramos", data)
+		keys = [t["key"] for t in data["tramos"]]
+		self.assertEqual(keys, ["1_3", "4_mas"])
+		for tramo in data["tramos"]:
+			self.assertIn("label", tramo)
+			self.assertIn("cantidad", tramo)
+			self.assertIn("monto", tramo)
+			self.assertIn("monto_label", tramo)
+			self.assertGreaterEqual(tramo["cantidad"], 0)
+			self.assertGreaterEqual(tramo["monto"], 0)
 
 	def test_morosos_deuda_suma_saldo_deuda(self) -> None:
 		insert_socio(dni="73101010", email="mor.d1@example.com", estado="Moroso", saldo_deuda=1500)

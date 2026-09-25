@@ -216,7 +216,7 @@ club_management_socio_desk.render_datos_criticos_alert = function (frm) {
 };
 
 club_management_socio_desk.add_alta_guiada_button = function (frm) {
-	frm.page.set_primary_action(__("Alta guiada"), () =>
+	frm.page.set_primary_action(__("Alta de Socio"), () =>
 		club_management_socio_alta_guiada.open(frm)
 	);
 };

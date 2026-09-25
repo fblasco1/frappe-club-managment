@@ -1,17 +1,11 @@
 /* global frappe */
 frappe.provide("club_management_socio_alta_guiada");
 
-club_management_socio_alta_guiada.FLUJO_OPCIONES = [
-	"Activar ahora (recomendado)",
-	"Pendiente de inscripción (sin pago online)",
-	"Pendiente de pago",
-];
-
 club_management_socio_alta_guiada.open = function (frm) {
 	const prefill = frm ? club_management_socio_alta_guiada._collect_from_frm(frm) : {};
 	const d = new frappe.ui.Dialog({
-		title: __("Alta guiada de socio"),
-		size: "large",
+		title: __("Alta de Socio"),
+		size: "extra-large",
 		fields: [
 			{ fieldtype: "Section Break", label: __("Datos personales") },
 			{
@@ -23,6 +17,7 @@ club_management_socio_alta_guiada.open = function (frm) {
 				),
 				default: prefill.numero_socio,
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "nombre",
 				fieldtype: "Data",
@@ -30,6 +25,7 @@ club_management_socio_alta_guiada.open = function (frm) {
 				reqd: 1,
 				default: prefill.nombre,
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "apellido",
 				fieldtype: "Data",
@@ -37,6 +33,7 @@ club_management_socio_alta_guiada.open = function (frm) {
 				reqd: 1,
 				default: prefill.apellido,
 			},
+			{ fieldtype: "Section Break" },
 			{
 				fieldname: "dni",
 				fieldtype: "Data",
@@ -44,6 +41,7 @@ club_management_socio_alta_guiada.open = function (frm) {
 				reqd: 1,
 				default: prefill.dni,
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "nacionalidad",
 				fieldtype: "Link",
@@ -52,6 +50,7 @@ club_management_socio_alta_guiada.open = function (frm) {
 				reqd: 1,
 				default: prefill.nacionalidad || "Argentina",
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "fecha_nacimiento",
 				fieldtype: "Date",
@@ -60,6 +59,7 @@ club_management_socio_alta_guiada.open = function (frm) {
 				default: prefill.fecha_nacimiento,
 				onchange: () => club_management_socio_alta_guiada._sugerir_categoria(d),
 			},
+			{ fieldtype: "Section Break" },
 			{
 				fieldname: "genero",
 				fieldtype: "Select",
@@ -68,6 +68,7 @@ club_management_socio_alta_guiada.open = function (frm) {
 				reqd: 1,
 				default: prefill.genero,
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "email",
 				fieldtype: "Data",
@@ -76,12 +77,14 @@ club_management_socio_alta_guiada.open = function (frm) {
 				reqd: 1,
 				default: prefill.email,
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "telefono_fijo",
 				fieldtype: "Data",
 				label: __("Teléfono fijo"),
 				default: prefill.telefono_fijo,
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "telefono_movil",
 				fieldtype: "Data",
@@ -96,42 +99,49 @@ club_management_socio_alta_guiada.open = function (frm) {
 				label: __("Calle"),
 				default: prefill.calle,
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "numero",
 				fieldtype: "Data",
 				label: __("Número"),
 				default: prefill.numero,
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "piso",
 				fieldtype: "Data",
 				label: __("Piso"),
 				default: prefill.piso,
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "departamento",
 				fieldtype: "Data",
 				label: __("Departamento"),
 				default: prefill.departamento,
 			},
+			{ fieldtype: "Section Break" },
 			{
 				fieldname: "provincia",
 				fieldtype: "Data",
 				label: __("Provincia"),
 				default: prefill.provincia,
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "ciudad",
 				fieldtype: "Data",
 				label: __("Ciudad"),
 				default: prefill.ciudad,
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "localidad_barrio",
 				fieldtype: "Data",
 				label: __("Localidad / Barrio"),
 				default: prefill.localidad_barrio,
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "codigo_postal",
 				fieldtype: "Data",
@@ -148,6 +158,7 @@ club_management_socio_alta_guiada.open = function (frm) {
 				default: prefill.categoria || "Activo",
 				onchange: () => club_management_socio_alta_guiada._wire_tutor_fields(d),
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "tipo_tutor",
 				fieldtype: "Select",
@@ -160,6 +171,7 @@ club_management_socio_alta_guiada.open = function (frm) {
 				default: prefill.tipo_tutor,
 				onchange: () => club_management_socio_alta_guiada._wire_tutor_fields(d),
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "tutor_socio",
 				fieldtype: "Link",
@@ -178,23 +190,13 @@ club_management_socio_alta_guiada.open = function (frm) {
 				depends_on: "eval:doc.categoria=='Menor' && doc.tipo_tutor=='Tutor No Socio'",
 				default: prefill.tipo_tutor === "Tutor No Socio" ? prefill.tutor : "",
 			},
-			{ fieldtype: "Section Break", label: __("Después del alta") },
-			{
-				fieldname: "flujo_destino",
-				fieldtype: "Select",
-				label: __("Destino"),
-				options: club_management_socio_alta_guiada.FLUJO_OPCIONES.join("\n"),
-				default: "Activar ahora (recomendado)",
-				description: __(
-					"Activar ahora deja al socio operativo. Pendiente de inscripción salta el cobro online y permite inscribir actividades."
-				),
-			},
 			{ fieldtype: "Section Break", label: __("Inscripción (opcional)") },
 			{
 				fieldname: "inscribir_actividad",
 				fieldtype: "Check",
 				label: __("Inscribir en actividad al guardar"),
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "actividad",
 				fieldtype: "Link",
@@ -204,6 +206,7 @@ club_management_socio_alta_guiada.open = function (frm) {
 				get_query: () => ({ filters: { habilitada: 1 } }),
 				onchange: () => club_management.inscripcion_cascada.load_grupos_dialog(d),
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "grupo",
 				fieldtype: "Link",
@@ -212,6 +215,7 @@ club_management_socio_alta_guiada.open = function (frm) {
 				depends_on: "eval:doc.inscribir_actividad",
 				onchange: () => club_management.inscripcion_cascada.load_equipos_dialog(d),
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "equipo",
 				fieldtype: "Link",
@@ -219,13 +223,24 @@ club_management_socio_alta_guiada.open = function (frm) {
 				options: "Equipo Actividad",
 				depends_on: "eval:doc.inscribir_actividad",
 			},
+			{ fieldtype: "Section Break" },
+			{
+				fieldname: "crear_socio_btn",
+				fieldtype: "Button",
+				label: __("Crear socio"),
+				click() {
+					const values = d.get_values();
+					if (!values) {
+						return;
+					}
+					club_management_socio_alta_guiada._crear_socio(d, values, frm);
+				},
+			},
 		],
-		primary_action_label: __("Crear socio"),
-		primary_action(values) {
-			club_management_socio_alta_guiada._crear_socio(d, values, frm);
-		},
 	});
 	d.show();
+	d.$wrapper.addClass("club-alta-socio-dialog");
+	d.$wrapper.find(".modal-footer").hide();
 	club_management.inscripcion_cascada.setup_dialog_cascada(d);
 	club_management_socio_alta_guiada._wire_tutor_fields(d);
 	if (prefill.fecha_nacimiento) {
@@ -268,8 +283,11 @@ club_management_socio_alta_guiada._abrir_dialog_tutor_no_socio = function (paren
 		fields: [
 			{ fieldtype: "Section Break", label: __("Datos personales") },
 			{ fieldname: "nombre", fieldtype: "Data", label: __("Nombre"), reqd: 1 },
+			{ fieldtype: "Column Break" },
 			{ fieldname: "apellido", fieldtype: "Data", label: __("Apellido"), reqd: 1 },
+			{ fieldtype: "Column Break" },
 			{ fieldname: "dni", fieldtype: "Data", label: __("DNI"), reqd: 1 },
+			{ fieldtype: "Section Break" },
 			{
 				fieldname: "nacionalidad",
 				fieldtype: "Link",
@@ -278,12 +296,14 @@ club_management_socio_alta_guiada._abrir_dialog_tutor_no_socio = function (paren
 				reqd: 1,
 				default: "Argentina",
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "fecha_nacimiento",
 				fieldtype: "Date",
 				label: __("Fecha de nacimiento"),
 				reqd: 1,
 			},
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "genero",
 				fieldtype: "Select",
@@ -291,6 +311,7 @@ club_management_socio_alta_guiada._abrir_dialog_tutor_no_socio = function (paren
 				options: "\nMasculino\nFemenino\nOtro\nPrefiero no decir",
 				reqd: 1,
 			},
+			{ fieldtype: "Section Break" },
 			{
 				fieldname: "email",
 				fieldtype: "Data",
@@ -298,7 +319,9 @@ club_management_socio_alta_guiada._abrir_dialog_tutor_no_socio = function (paren
 				options: "Email",
 				reqd: 1,
 			},
+			{ fieldtype: "Column Break" },
 			{ fieldname: "telefono_fijo", fieldtype: "Data", label: __("Teléfono fijo") },
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "telefono_movil",
 				fieldtype: "Data",
@@ -307,17 +330,24 @@ club_management_socio_alta_guiada._abrir_dialog_tutor_no_socio = function (paren
 			},
 			{ fieldtype: "Section Break", label: __("Domicilio") },
 			{ fieldname: "calle", fieldtype: "Data", label: __("Calle"), reqd: 1 },
+			{ fieldtype: "Column Break" },
 			{ fieldname: "numero", fieldtype: "Data", label: __("Número") },
+			{ fieldtype: "Column Break" },
 			{ fieldname: "piso", fieldtype: "Data", label: __("Piso") },
+			{ fieldtype: "Column Break" },
 			{ fieldname: "departamento", fieldtype: "Data", label: __("Departamento") },
+			{ fieldtype: "Section Break" },
 			{ fieldname: "provincia", fieldtype: "Data", label: __("Provincia"), reqd: 1 },
+			{ fieldtype: "Column Break" },
 			{ fieldname: "ciudad", fieldtype: "Data", label: __("Ciudad") },
+			{ fieldtype: "Column Break" },
 			{
 				fieldname: "localidad_barrio",
 				fieldtype: "Data",
 				label: __("Localidad / Barrio"),
 				reqd: 1,
 			},
+			{ fieldtype: "Column Break" },
 			{ fieldname: "codigo_postal", fieldtype: "Data", label: __("Código postal"), reqd: 1 },
 		],
 		primary_action_label: __("Guardar y volver al alta"),
@@ -431,16 +461,6 @@ club_management_socio_alta_guiada._load_equipos = function (d) {
 	club_management.inscripcion_cascada.load_equipos_dialog(d);
 };
 
-club_management_socio_alta_guiada._map_flujo = function (flujo) {
-	if (flujo === "Activar ahora (recomendado)") {
-		return { activar_al_guardar: 1, omitir_pago_al_guardar: 0 };
-	}
-	if (flujo === "Pendiente de inscripción (sin pago online)") {
-		return { activar_al_guardar: 0, omitir_pago_al_guardar: 1 };
-	}
-	return { activar_al_guardar: 0, omitir_pago_al_guardar: 0 };
-};
-
 club_management_socio_alta_guiada._build_datos = function (values) {
 	const datos = {
 		nombre: values.nombre,
@@ -494,7 +514,6 @@ club_management_socio_alta_guiada._build_selecciones = function (values) {
 };
 
 club_management_socio_alta_guiada._crear_socio = function (d, values, frm) {
-	const flujo = club_management_socio_alta_guiada._map_flujo(values.flujo_destino);
 	const datos = club_management_socio_alta_guiada._build_datos(values);
 	const selecciones = club_management_socio_alta_guiada._build_selecciones(values);
 
@@ -502,8 +521,8 @@ club_management_socio_alta_guiada._crear_socio = function (d, values, frm) {
 		method: "club_management.members.api.socio_operaciones_desk.crear_socio_desk",
 		args: {
 			datos: JSON.stringify(datos),
-			activar_al_guardar: flujo.activar_al_guardar,
-			omitir_pago_al_guardar: flujo.omitir_pago_al_guardar,
+			activar_al_guardar: 1,
+			omitir_pago_al_guardar: 0,
 			selecciones,
 		},
 		freeze: true,

@@ -6,7 +6,7 @@ from typing import Any
 
 import frappe
 
-from club_management.members.setup.secretaria_workspace import WORKSPACE_NAME
+from club_management.members.setup.secretaria_workspace import WORKSPACE_LABEL, WORKSPACE_NAME
 from club_management.members.setup.secretaria_workspace_sidebar import SIDEBAR_ITEMS
 from club_management.utils.desk_sidebar_boot import enrich_sidebar_link_item
 
@@ -67,7 +67,7 @@ def apply_secretaria_sidebar_to_boot(bootinfo: dict[str, Any]) -> None:
 		return
 	sidebars = bootinfo.setdefault("workspace_sidebar_item", {})
 	sidebars[key] = {
-		"label": WORKSPACE_NAME,
+		"label": WORKSPACE_LABEL,
 		"items": items,
 		"header_icon": "users",
 		"module": "Members",

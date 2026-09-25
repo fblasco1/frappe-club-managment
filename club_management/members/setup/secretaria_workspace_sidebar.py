@@ -11,7 +11,7 @@ VALORES_CUOTA_SOCIAL_PAGE = "valores-cuota-social"
 
 SIDEBAR_ITEMS: list[dict] = [
 	{
-		"label": "Secretaría",
+		"label": "Socios",
 		"type": "Link",
 		"link_type": "Workspace",
 		"link_to": WORKSPACE_NAME,
@@ -57,7 +57,7 @@ def secretaria_sidebar_fixture_path() -> str:
 	return frappe.get_app_path(
 		"club_management",
 		"workspace_sidebar",
-		"secretaria.json",
+		"socios.json",
 	)
 
 

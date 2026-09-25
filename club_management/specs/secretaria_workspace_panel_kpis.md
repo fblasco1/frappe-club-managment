@@ -9,10 +9,11 @@ editables. Reemplaza el encabezado «Panel Secretaría» y las number cards nati
 
 ## Scenario: encabezado operativo sin título estático
 
-Given Secretaria abre el workspace **Secretaría**
+Given Secretaria abre el workspace **Secretaría** (label visible **Socios**)
 When carga el panel custom
 Then no ve el encabezado «Panel Secretaría»
-And ve el botón **Nuevo socio** (alta guiada) como acción principal.
+And ve el botón **+ Nuevo Socio** (alta guiada) como acción principal
+And no ve «Emitir cupón / Registrar cobro» ni «Registrar Nuevo Gasto / Comprobante».
 
 ---
 
@@ -22,6 +23,7 @@ Given existen socios con `estado = Moroso`
 When Secretaria consulta el panel
 Then ve una card **Socios en mora** con la cantidad total de morosos
 And debajo ve el **monto total adeudado** (suma de `saldo_deuda` de esos socios)
+And ve el desglose de clasificación de mora (**1–3 meses** / **4+ meses**) con cantidad y monto
 And un enlace **Ver más** abre la lista de `Socio` filtrada a `Moroso`.
 
 ---

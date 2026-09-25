@@ -3,6 +3,7 @@
 # Read docs to understand patches: https://docs.frappe.io/framework/user/en/database-migrations
 club_management.patches.v1_0.migrate_solicitud_rechazada_to_correccion
 club_management.patches.v1_0.ensure_spaces_module
+club_management.patches.v1_0.rename_secretaria_workspace_to_socios
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
@@ -94,3 +95,4 @@ club_management.patches.v1_0.add_reserva_fixture_unique_index
 club_management.patches.v1_0.add_reserva_slot_unique_index
 club_management.patches.v1_0.backfill_supervielle_settings_v26
 club_management.patches.v1_0.sync_reservas_espacio_externo
+club_management.patches.v1_0.rename_secretaria_workspace_label_socios

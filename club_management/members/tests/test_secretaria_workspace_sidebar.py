@@ -30,7 +30,7 @@ class TestSecretariaWorkspaceSidebar(MembersTestCase):
 		self.assertEqual(data.get("title"), WORKSPACE_NAME)
 		self.assertEqual(data.get("app"), "club_management")
 		labels = [row.get("label") for row in data.get("items") or []]
-		self.assertEqual(labels[0], "Secretaría")
+		self.assertEqual(labels[0], "Socios")
 		self.assertIn("Socio", labels)
 		self.assertIn("Valores de Cuota Social", labels)
 		self.assertIn("Informes", labels)
@@ -41,7 +41,8 @@ class TestSecretariaWorkspaceSidebar(MembersTestCase):
 
 	def test_setup_constants_alineadas_al_fixture(self) -> None:
 		labels = [row["label"] for row in SIDEBAR_ITEMS]
-		self.assertIn("Secretaría", labels)
+		self.assertIn("Socios", labels)
+		self.assertNotIn("Secretaría", labels)
 		self.assertIn("Socio", labels)
 		self.assertIn("Valores de Cuota Social", labels)
 		self.assertIn("Informes", labels)
@@ -75,8 +76,9 @@ class TestSecretariaWorkspaceSidebar(MembersTestCase):
 			order_by="`tabWorkspace Sidebar Item`.idx asc",
 		)
 		labels = [row["label"] for row in items]
-		self.assertIn("Secretaría", labels)
+		self.assertIn("Socios", labels)
 		self.assertIn("Socio", labels)
+		self.assertNotIn("Secretaría", labels)
 		self.assertIn("Valores de Cuota Social", labels)
 		self.assertIn("Informes", labels)
 		for hidden in HIDDEN_SIDEBAR_LINKS:

@@ -134,13 +134,15 @@ Then recibe `PermissionError`.
 
 ---
 
-## Scenario: alta guiada sin solicitud digital (sprint operación Desk)
+## Scenario: alta Desk sin solicitud digital (sprint operación Desk)
 
 Given no hay flujo de solicitud pública activo en este sprint
-When Secretaría usa **Alta guiada** desde workspace o formulario `Socio` nuevo
+When Secretaría usa **Alta de Socio** desde workspace o formulario `Socio` nuevo
 Then completa datos personales y domicilio en un asistente (sin adjuntos obligatorios)
-And puede elegir destino: **Activar ahora** (default), **Pendiente de inscripción** u **Pendiente de pago**
+And el título del diálogo es **Alta de Socio**
+And **no** hay selector «Después del alta»; el destino por defecto es **Activar ahora**
 And opcionalmente inscribir en una actividad en el mismo paso
+And el botón **Crear socio** está al final del formulario
 And los adjuntos (`foto_perfil`, DNI, ficha médica) quedan **opcionales** en alta manual Desk
   (siguen obligatorios en solicitud pública cuando exista).
 
@@ -158,14 +160,14 @@ Then se sugiere `categoria = Menor` y se muestran campos de tutor/grupo.
 
 Given el formulario `Socio` abierto por Secretaría
 When el socio es nuevo (`__islocal`)
-Then muestra **Alta guiada** como acción principal (asistente)
+Then muestra **Alta de Socio** como acción principal (asistente)
 And oculta la sección de documentos adjuntos como obligatoria en pantalla
 When el socio existe
 Then los campos editables siguen las reglas del DocType (estado read-only).
 
-Given workspace **Secretaría**
-When Secretaría hace clic en **Nuevo socio**
-Then abre el mismo asistente de alta guiada.
+Given workspace **Secretaría** (label **Socios**)
+When Secretaría hace clic en **+ Nuevo Socio**
+Then abre el mismo asistente de alta.
 
 ---
 

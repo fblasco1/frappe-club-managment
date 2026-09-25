@@ -113,6 +113,11 @@ class TestGestionSociosDashboardCategorias(MembersTestCase):
 		self.assertIn("segmentos", socios)
 		self.assertIn("altas_bajas", socios)
 		self.assertIn("mora_1_3", socios)
+		self.assertIn("mora_clasificacion", socios)
+		self.assertEqual(
+			[t["key"] for t in socios["mora_clasificacion"]["tramos"]],
+			["1_3", "4_mas"],
+		)
 		self.assertIn("tendencia_recaudacion", data)
 		self.assertIn("medios_pago", data)
 

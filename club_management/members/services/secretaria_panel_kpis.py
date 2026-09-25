@@ -175,23 +175,45 @@ def _count_periodos_cuota_impagos(socio_name: str) -> int:
 
 def get_mora_1_3_meses_payload() -> dict[str, Any]:
 	"""Socios con 1–3 períodos mensuales impagos y monto total de su deuda."""
+	clasificacion = get_mora_clasificacion_payload()
+	tramo = next(t for t in clasificacion["tramos"] if t["key"] == "1_3")
+	return {
+		"cantidad": tramo["cantidad"],
+		"monto": tramo["monto"],
+		"monto_label": tramo["monto_label"],
+	}
+
+
+def get_mora_clasificacion_payload() -> dict[str, Any]:
+	"""Clasifica deuda por antigüedad (períodos mensuales impagos): 1–3 y 4+."""
+	buckets = {
+		"1_3": {"key": "1_3", "label": "1–3 meses", "cantidad": 0, "monto": 0.0},
+		"4_mas": {"key": "4_mas", "label": "4+ meses", "cantidad": 0, "monto": 0.0},
+	}
 	rows = frappe.get_all(
 		SOCIO_DOCTYPE,
 		filters={"estado": ["not in", list(ESTADOS_EXCLUIDOS_TOTAL)], "saldo_deuda": [">", 0]},
 		fields=["name", "saldo_deuda"],
 	)
-	cantidad = 0
-	monto = 0.0
 	for row in rows:
 		periodos = _count_periodos_cuota_impagos(row.name)
-		if 1 <= periodos <= 3:
-			cantidad += 1
-			monto += flt(row.saldo_deuda)
-	return {
-		"cantidad": cantidad,
-		"monto": monto,
-		"monto_label": format_monto_ar(monto),
-	}
+		if periodos < 1:
+			continue
+		key = "1_3" if periodos <= 3 else "4_mas"
+		buckets[key]["cantidad"] += 1
+		buckets[key]["monto"] += flt(row.saldo_deuda)
+
+	tramos: list[dict[str, Any]] = []
+	for key in ("1_3", "4_mas"):
+		bucket = buckets[key]
+		tramos.append(
+			{
+				**bucket,
+				"monto": round(flt(bucket["monto"]), 2),
+				"monto_label": format_monto_ar(bucket["monto"]),
+			}
+		)
+	return {"tramos": tramos}
 
 
 def _finalize_tendencia_dias(dias: list[dict[str, Any]]) -> None:
@@ -475,7 +497,11 @@ def get_socio_metricas_payload(*, reference_date: str | date | None = None) -> d
 	delta = total - total_mes_anterior
 	morosos = frappe.db.count(SOCIO_DOCTYPE, {"estado": "Moroso"})
 	morosos_deuda = get_morosos_deuda_total()
-	mora_1_3 = get_mora_1_3_meses_payload()
+	mora_clasificacion = get_mora_clasificacion_payload()
+	mora_1_3 = next(
+		(t for t in mora_clasificacion["tramos"] if t["key"] == "1_3"),
+		{"cantidad": 0, "monto": 0.0, "monto_label": format_monto_ar(0)},
+	)
 	return {
 		"total": total,
 		"segmentos": segmentos,
@@ -485,7 +511,12 @@ def get_socio_metricas_payload(*, reference_date: str | date | None = None) -> d
 		"morosos": morosos,
 		"morosos_deuda": morosos_deuda,
 		"morosos_deuda_label": format_monto_ar(morosos_deuda),
-		"mora_1_3": mora_1_3,
+		"mora_1_3": {
+			"cantidad": mora_1_3["cantidad"],
+			"monto": mora_1_3["monto"],
+			"monto_label": mora_1_3["monto_label"],
+		},
+		"mora_clasificacion": mora_clasificacion,
 	}
 
 

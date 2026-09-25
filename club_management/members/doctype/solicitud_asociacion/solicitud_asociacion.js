@@ -3,10 +3,7 @@
 frappe.ui.form.on("Solicitud Asociacion", {
 	refresh(frm) {
 		const state = frm.doc.workflow_state;
-		if (
-			state === "Pendiente" ||
-			state === "Requiere Corrección"
-		) {
+		if (state === "Pendiente" || state === "Requiere Corrección") {
 			frm.set_intro(
 				__(
 					"Para rechazar: complete «Motivos de rechazo», guarde el documento y luego use la acción «Rechazar» del workflow."
@@ -14,5 +11,8 @@ frappe.ui.form.on("Solicitud Asociacion", {
 				"blue"
 			);
 		}
+		frm.add_custom_button(__("Volver a Socios"), () => {
+			frappe.set_route("Workspaces", "Socios");
+		});
 	},
 });
