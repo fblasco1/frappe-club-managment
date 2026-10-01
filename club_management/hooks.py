@@ -174,7 +174,6 @@ doc_events = {
 scheduler_events = {
 	"daily": [
 		"club_management.members.jobs.cobranza_periodica.run_generar_deuda_si_corresponde",
-		"club_management.members.jobs.cobranza_periodica.run_recargos_si_corresponde",
 		"club_management.members.jobs.moroso_automatico.run_evaluar_morosos_si_corresponde",
 	],
 	"hourly": [

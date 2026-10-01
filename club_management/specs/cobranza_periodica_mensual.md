@@ -106,7 +106,57 @@ scheduler_events = {
 }
 ```
 
-El job diario verifica si hoy == `dia_generacion_deuda` (y no corrió ya este mes).
+El job diario es liviano: solo decide si corresponde y **encola** la generación en la cola `long`.
+
+**Incidente 01/10/2026 (causa raíz):** la frecuencia `daily` corre en la cola `default` con timeout de **300 s**;
+la generación (~1000 socios) tarda 8–16 min en una sola transacción. RQ mataba el work-horse a los 360 s
+(«Work-horse terminated unexpectedly»), se revertía todo y no quedaba Error Log. Jul/Ago/Sep/Oct se generaron a mano.
+
+### Reglas
+
+- `DEUDA_JOB_TIMEOUT` = 2 h; `job_id` = `deuda_mensual_<MM-YYYY>` (deduplicado: no encola dos veces el mismo período).
+- La ejecución encolada hace **commit por socio** (un corte no pierde lo ya emitido) y rollback del socio que falla.
+- Al terminar el recorrido se marca el período como generado (`frappe.db.set_global(MARCA_DEUDA_MENSUAL, "MM/YYYY")`)
+  y se registra un **resumen** en Error Log (`Deuda mensual MM/YYYY — resumen`).
+- **Reintento:** desde `dia_generacion_deuda` y antes de `dia_primer_vencimiento`, si el período no está marcado,
+  el job diario vuelve a encolar (idempotente por `factura_periodo_existe`).
+
+## Scenario: el job diario encola la generación en la cola long
+
+Given hoy es `dia_generacion_deuda`
+And el período del mes no está marcado como generado
+When corre `run_generar_deuda_si_corresponde`
+Then se encola `ejecutar_generacion_deuda_mensual` en la cola `long`
+And con `timeout` = `DEUDA_JOB_TIMEOUT` y `job_id` = `deuda_mensual_<MM-YYYY>`
+And el job diario no genera facturas por sí mismo.
+
+## Scenario: reintento si la generación anterior no terminó
+
+Given hoy es posterior a `dia_generacion_deuda` y anterior a `dia_primer_vencimiento`
+And el período del mes no está marcado como generado
+When corre `run_generar_deuda_si_corresponde`
+Then se vuelve a encolar la generación del período.
+
+## Scenario: no reencola un período ya generado ni fuera de ventana
+
+Given el período del mes ya está marcado como generado
+Or hoy es igual o posterior a `dia_primer_vencimiento`
+When corre `run_generar_deuda_si_corresponde`
+Then no se encola nada.
+
+## Scenario: ejecución encolada con commit por socio, marca y resumen
+
+When corre `ejecutar_generacion_deuda_mensual(reference_date)`
+Then llama `generar_deuda_mensual_socios(..., commit_por_socio=True)`
+And marca el período como generado
+And crea un Error Log `Deuda mensual MM/YYYY — resumen` con facturas creadas, omitidos y errores.
+
+## Scenario: un socio con error no revierte a los demás (commit por socio)
+
+Given `commit_por_socio=True`
+And la factura de un socio falla
+When corre `generar_deuda_mensual_socios`
+Then se hace rollback solo de ese socio, se registra el error y se continúa con el resto.
 
 ---
 

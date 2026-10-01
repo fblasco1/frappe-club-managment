@@ -152,8 +152,13 @@ def generar_deuda_mensual_socio(
 def generar_deuda_mensual_socios(
 	*,
 	reference_date: str | date | None = None,
+	commit_por_socio: bool = False,
 ) -> dict[str, Any]:
-	"""Procesa todos los socios elegibles; devuelve resumen de ejecución."""
+	"""Procesa todos los socios elegibles; devuelve resumen de ejecución.
+
+	`commit_por_socio` solo para ejecución en background: un corte del worker no
+	revierte las facturas ya emitidas.
+	"""
 	ref = getdate(reference_date or today())
 	periodo = format_periodo_cobro(ref)
 	creadas: list[str] = []
@@ -167,12 +172,18 @@ def generar_deuda_mensual_socios(
 				creadas.append(invoice_name)
 			else:
 				omitidas.append(socio_name)
+			if commit_por_socio:
+				frappe.db.commit()
 		except Exception as exc:
+			if commit_por_socio:
+				frappe.db.rollback()
 			errores.append({"socio": socio_name, "error": str(exc)})
 			frappe.log_error(
 				title=_("Deuda mensual — error en socio {0}").format(socio_name),
 				message=frappe.get_traceback(),
 			)
+			if commit_por_socio:
+				frappe.db.commit()
 
 	result = {
 		"periodo": periodo,

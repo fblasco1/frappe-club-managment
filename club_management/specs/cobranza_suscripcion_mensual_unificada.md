@@ -84,7 +84,7 @@ And no se duplica factura del mismo período (idempotencia).
 
 Given factura mensual con saldo > 0 al cierre del 1.er vencimiento
 And hoy es el 2.º vencimiento del mes (`Ultimo dia del mes` por default)
-When corre `run_recargos_si_corresponde`
+When corre `run_recargos_si_corresponde` (job legado, **desprogramado**: la mora se calcula al cobrar)
 Then se aplica recargo según `cobranza_recargo_segundo_vencimiento.md`
 And no se duplica recargo del mismo período.
 

@@ -67,7 +67,16 @@ Then `Socio.saldo_deuda` refleja factura original + recargo pendiente.
 
 ## Scheduler
 
-Mismo patrón diario que cobranza periódica: ejecutar solo si hoy == 2do vencimiento del mes.
+**Desprogramado (01/10/2026).** La mora se calcula **al cobrar** (`recargos_mora_dos_tramos.md`, decisión D4);
+programar este job generaría un recargo adicional (doble cobro). `run_recargos_si_corresponde` **no** figura en
+`scheduler_events`; `aplicar_recargos_segundo_vencimiento` queda solo para uso manual / histórico.
+
+## Scenario: el recargo legado no está programado
+
+Given `hooks.scheduler_events`
+When se listan los jobs diarios
+Then `run_recargos_si_corresponde` no está programado
+And `run_generar_deuda_si_corresponde` sí.
 
 ---
 
