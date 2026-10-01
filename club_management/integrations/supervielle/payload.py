@@ -62,6 +62,8 @@ class SupervielleRuntimeSettings:
 	convenio: str
 	mode_of_payment: str
 	clearing_account: str
+	polling_enabled: bool = False
+	rendicion_apply_enabled: bool = False
 
 
 def digits_only(value: str | None) -> str:

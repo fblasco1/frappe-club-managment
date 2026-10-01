@@ -66,7 +66,8 @@ When se inicia el intento
 Then se crea un `Payment Log` con `merchant_transaction_id = DatoLibreEmp`
 And `gateway_transaction_id` queda vacío hasta recibir `IdPagoPortal`
 And se vinculan Sales Invoice, Socio, importe y moneda
-And el snapshot no contiene secret, Hash, Token ni AccessLink.
+And el snapshot no contiene secret, Hash, Token ni AccessLink
+And se persiste un `Payment Gateway Event` con `processing_result = Iniciado`.
 
 Given se reintenta la misma referencia local
 When el servicio registra el intento

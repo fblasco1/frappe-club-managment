@@ -81,9 +81,16 @@ class TestExternoReservas(MembersTestCase):
 			)
 
 	def test_canal_deshabilitado_permission_error(self) -> None:
+		from club_management.spaces.services.externo_reservas import CHANNEL_DISABLED_BODY
+
 		self._enable_canal(0)
-		with as_user("Guest"), self.assertRaises(frappe.PermissionError):
+		with as_user("Guest"), self.assertRaises(frappe.PermissionError) as ctx:
 			externo_api().abrir_sesion_reserva_externa()
+		self.assertIn(CHANNEL_DISABLED_BODY["message"], str(ctx.exception))
+		self.assertEqual(
+			frappe.local.response.get("channel_disabled_body"),
+			CHANNEL_DISABLED_BODY,
+		)
 		self.assertFalse(
 			frappe.db.exists(
 				"Reserva Espacio",
