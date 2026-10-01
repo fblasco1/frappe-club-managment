@@ -89,9 +89,9 @@ def _montos_cuota_con_mora(tarifa: float) -> tuple[float, float, float]:
 
 
 def _tarifas_cuota_social_catalogo() -> list[float]:
-	from club_management.members.data.cuotas_sociales_vigentes import CUOTAS_SOCIALES_VIGENTES
+	from club_management.members.data.cuotas_sociales_vigentes import TARIFAS_CUOTA_SOCIAL_CATALOGO
 
-	return [flt(monto, 2) for _categoria, monto in CUOTAS_SOCIALES_VIGENTES]
+	return [flt(monto, 2) for monto in TARIFAS_CUOTA_SOCIAL_CATALOGO]
 
 
 def _tarifa_por_monto_cuota_informe(monto: float, *, tolerance: float = 0.01) -> float | None:
