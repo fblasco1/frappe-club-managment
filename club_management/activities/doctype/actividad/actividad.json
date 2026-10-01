@@ -10,6 +10,7 @@
   "item",
   "usa_grupos",
   "tipo_inscripcion_portal",
+  "admite_no_socios",
   "habilitada",
   "capacidad",
   "orden",
@@ -49,6 +50,13 @@
    "reqd": 1
   },
   {
+   "default": "0",
+   "fieldname": "admite_no_socios",
+   "fieldtype": "Check",
+   "label": "Admite practicantes No Socio",
+   "description": "Si est\u00e1 marcado, los practicantes de categor\u00eda No Socio pueden inscribirse."
+  },
+  {
    "default": "1",
    "fieldname": "habilitada",
    "fieldtype": "Check",
@@ -60,7 +68,7 @@
    "fieldname": "capacidad",
    "fieldtype": "Int",
    "label": "Capacidad (cupos)",
-   "description": "Cupos máximos cuando la actividad no usa grupos/tiras."
+   "description": "Cupos m\u00e1ximos cuando la actividad no usa grupos/tiras."
   },
   {
    "default": "0",
@@ -87,7 +95,7 @@
    "link_fieldname": "actividad"
   }
  ],
- "modified": "2026-05-27 00:00:00",
+ "modified": "2026-10-01 10:00:00",
  "modified_by": "Administrator",
  "module": "Activities",
  "name": "Actividad",

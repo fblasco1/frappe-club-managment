@@ -275,3 +275,34 @@ def cargo_socio_has_permission(
 		return False
 	socio_user = frappe.db.get_value("Socio", socio_name, "user")
 	return bool(socio_user) and socio_user == user
+
+
+# -----------------------------------------------------------------------------
+# Bonificacion Recurrente
+# -----------------------------------------------------------------------------
+
+
+def bonificacion_recurrente_query_conditions(user: str | None = None) -> str:
+	user = user or frappe.session.user
+	if _es_full_access(user):
+		return ""
+	socio_names = frappe.get_all("Socio", filters={"user": user}, pluck="name")
+	if not socio_names:
+		return "1=0"
+	escaped = ", ".join(frappe.db.escape(name) for name in socio_names)
+	return f"`tabBonificacion Recurrente`.socio IN ({escaped})"
+
+
+def bonificacion_recurrente_has_permission(
+	doc: Any, ptype: str | None = None, user: str | None = None, **kwargs: Any
+) -> bool:
+	user = user or frappe.session.user
+	if _es_full_access(user):
+		return True
+	if ptype not in (None, "read"):
+		return False
+	socio_name = _doc_field(doc, "Bonificacion Recurrente", "socio")
+	if not socio_name:
+		return False
+	socio_user = frappe.db.get_value("Socio", socio_name, "user")
+	return bool(socio_user) and socio_user == user

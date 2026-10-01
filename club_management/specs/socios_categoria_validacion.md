@@ -57,6 +57,17 @@ And no category row in Club Settings is required to store Vitalicio with amount 
 
 ---
 
+## Scenario: categoría No Socio (practicante de gimnasio)
+
+Given a Socio with `categoria` = "No Socio"
+Then its `name` uses the `NS-#####` series and `numero_socio` is empty
+And its cuota social resolves to 0
+And it is excluded from padrón KPIs and from the 25-year Vitalicio promotion
+And it is never offered in public request flows.
+See `gimnasio_cobro_socios_no_socios.md`.
+
+---
+
 ## Scenario: cuota_social determined by category table in Club Settings
 
 Given Club Settings has a child table mapping categories (Activo, Adherente, Jubilado, Menor) to `cuota_social` amounts

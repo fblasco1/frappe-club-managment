@@ -41,6 +41,7 @@ def upsert_grupo_actividad(
 		"orden": grupo.orden,
 		"habilitada": 1,
 		"item": item_link,
+		"condicion_socio": grupo.condicion_socio or "",
 	}
 
 	if frappe.db.exists("Grupo Actividad", name):
@@ -142,6 +143,10 @@ def seed_estructura_actividades_completa(*, crear_equipos: bool = True) -> dict[
 		if not actividad:
 			continue
 		frappe.db.set_value("Actividad", actividad, "usa_grupos", 1, update_modified=False)
+		admite_no_socios = int(any(g.condicion_socio == "No Socio" for g in estructura.grupos))
+		frappe.db.set_value(
+			"Actividad", actividad, "admite_no_socios", admite_no_socios, update_modified=False
+		)
 		expected_grupos = {g.titulo for g in estructura.grupos}
 
 		for grupo_seed in estructura.grupos:

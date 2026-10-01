@@ -275,6 +275,7 @@ club_management_socio_desk.add_operaciones_buttons = function (frm) {
 			group
 		);
 	}
+	const es_no_socio = frm.doc.categoria === club_management_socio_desk.CATEGORIA_NO_SOCIO;
 	if (estado !== "Baja") {
 		frm.add_custom_button(__("Crear beca"), () => club_management_socio_desk.crear_beca(frm), group);
 		frm.add_custom_button(
@@ -283,13 +284,33 @@ club_management_socio_desk.add_operaciones_buttons = function (frm) {
 			group
 		);
 		frm.add_custom_button(
-			__("Corregir número de socio"),
-			() => club_management_socio_desk.dialog_corregir_numero(frm),
+			__("Nueva bonificación recurrente"),
+			() => club_management_socio_desk.crear_bonificacion_recurrente(frm),
 			group
 		);
+		if (es_no_socio) {
+			frm.add_custom_button(
+				__("Convertir a socio"),
+				() => club_management_socio_desk.dialog_convertir_no_socio(frm),
+				group
+			);
+		} else {
+			frm.add_custom_button(
+				__("Corregir número de socio"),
+				() => club_management_socio_desk.dialog_corregir_numero(frm),
+				group
+			);
+		}
 	}
 
 	const cobranza = __("Cobranza manual");
+	if (es_no_socio && estado !== "Baja") {
+		frm.add_custom_button(
+			__("Cobrar quincena / entrenamiento por hora"),
+			() => club_management_socio_desk.dialog_pase_gimnasio(frm),
+			cobranza
+		);
+	}
 	frm.add_custom_button(
 		__("Nuevo cargo extra"),
 		() => club_management_socio_desk.nuevo_cargo_extra(frm),
@@ -639,6 +660,120 @@ club_management_socio_desk.crear_beca = function (frm) {
 club_management_socio_desk.crear_bonificacion_arancel = function (frm) {
 	frappe.route_options = { socio: frm.doc.name };
 	frappe.new_doc("Bonificacion Arancel");
+};
+
+club_management_socio_desk.CATEGORIA_NO_SOCIO = "No Socio";
+club_management_socio_desk.TIPOS_PASE_GIMNASIO = ["Entrenamiento por Hora Gimnasio", "Quincena Gimnasio"];
+
+club_management_socio_desk.crear_bonificacion_recurrente = function (frm) {
+	frappe.route_options = { socio: frm.doc.name };
+	frappe.new_doc("Bonificacion Recurrente");
+};
+
+club_management_socio_desk.dialog_pase_gimnasio = function (frm) {
+	frappe.call({
+		method: "club_management.members.api.gimnasio_desk.precios_pases_gimnasio",
+		callback(r) {
+			const precios = r.message || {};
+			const tipos = club_management_socio_desk.TIPOS_PASE_GIMNASIO;
+			const d = new frappe.ui.Dialog({
+				title: __("Cobrar quincena / entrenamiento por hora"),
+				fields: [
+					{
+						fieldname: "tipo",
+						fieldtype: "Select",
+						label: __("Concepto"),
+						options: tipos.join("\n"),
+						default: tipos[0],
+						reqd: 1,
+						onchange() {
+							d.set_value("monto", flt(precios[d.get_value("tipo")]) || null);
+						},
+					},
+					{
+						fieldname: "monto",
+						fieldtype: "Currency",
+						label: __("Monto"),
+						default: flt(precios[tipos[0]]) || null,
+						reqd: 1,
+					},
+					{
+						fieldname: "registrar_pago",
+						fieldtype: "Check",
+						label: __("Registrar el pago ahora"),
+						default: 1,
+					},
+					{
+						fieldname: "mode_of_payment",
+						fieldtype: "Link",
+						label: __("Medio de pago"),
+						options: "Mode of Payment",
+						default: "Cash",
+						depends_on: "eval:doc.registrar_pago",
+						mandatory_depends_on: "eval:doc.registrar_pago",
+					},
+				],
+				primary_action_label: __("Generar"),
+				primary_action(values) {
+					frappe.call({
+						method: "club_management.members.api.gimnasio_desk.generar_cargo_gimnasio_desk",
+						args: {
+							socio: frm.doc.name,
+							tipo: values.tipo,
+							monto: values.monto,
+							registrar_pago: values.registrar_pago ? 1 : 0,
+							mode_of_payment: values.mode_of_payment,
+						},
+						freeze: true,
+						callback(res) {
+							if (res.exc || !res.message) {
+								return;
+							}
+							d.hide();
+							const msg = res.message.payment_entry
+								? __("Cargo {0} facturado y cobrado.", [res.message.cargo])
+								: __("Cargo {0} facturado (pendiente de cobro).", [res.message.cargo]);
+							frappe.show_alert({ message: frappe.utils.escape_html(msg), indicator: "green" });
+							frm.reload_doc();
+						},
+					});
+				},
+			});
+			d.show();
+		},
+	});
+};
+
+club_management_socio_desk.dialog_convertir_no_socio = function (frm) {
+	frappe.prompt(
+		[
+			{
+				fieldname: "categoria",
+				fieldtype: "Select",
+				label: __("Categoría de socio"),
+				options: ["Activo", "Menor", "2° Hermano", "3° Hermano", "Adherente", "Jubilado"].join("\n"),
+				default: "Activo",
+				reqd: 1,
+				description: __(
+					"Asigna el próximo número de socio y conserva facturas e inscripciones. El gimnasio pasa al arancel Socio."
+				),
+			},
+		],
+		(values) => {
+			frappe.call({
+				method: "club_management.members.api.gimnasio_desk.convertir_no_socio_a_socio_desk",
+				args: { socio: frm.doc.name, categoria: values.categoria },
+				freeze: true,
+				callback(r) {
+					if (!r.exc && r.message && r.message.socio) {
+						frappe.set_route("Form", "Socio", r.message.socio);
+					}
+				},
+			});
+		},
+		__("Convertir practicante en socio"),
+		__("Convertir")
+	);
 };
 
 club_management_socio_desk._vigencia_indicator = function (label) {

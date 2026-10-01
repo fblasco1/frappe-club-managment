@@ -77,6 +77,8 @@ class GrupoSeed:
 	"""Arancel único del grupo si todos los equipos comparten ítem."""
 	equipos: tuple[EquipoSeed, ...] = ()
 	"""Equipos con ítem propio (básquet ICDPE). Vacío → seed genérico `CATEGORIAS_EQUIPO`."""
+	condicion_socio: str | None = None
+	"""`Socio` / `No Socio`: restringe el grupo según la categoría del practicante."""
 
 
 @dataclass(frozen=True)
@@ -93,12 +95,19 @@ def _eq_basquet(titulo: str, orden: int, item_code: str, descripcion: str = "") 
 	return _eq(titulo, orden, item_code, descripcion)
 
 
-def _grupo_leaf(grupo_titulo: str, orden: int, item_code: str) -> GrupoSeed:
+def _grupo_leaf(
+	grupo_titulo: str,
+	orden: int,
+	item_code: str,
+	*,
+	condicion_socio: str | None = None,
+) -> GrupoSeed:
 	return GrupoSeed(
 		grupo_titulo,
 		orden,
 		item_code=item_code,
 		equipos=(_eq(grupo_titulo, 10, item_code),),
+		condicion_socio=condicion_socio,
 	)
 
 
@@ -304,8 +313,8 @@ ESTRUCTURA_YOGA = ActividadEstructuraSeed(
 ESTRUCTURA_GIMNASIO_FITNESS = ActividadEstructuraSeed(
 	"Gimnasio Fitness",
 	(
-		_grupo_leaf("No Socio", 10, ITEM_GYM_NO_SOCIO),
-		_grupo_leaf("Socio", 20, ITEM_GYM_SOCIO),
+		_grupo_leaf("No Socio", 10, ITEM_GYM_NO_SOCIO, condicion_socio="No Socio"),
+		_grupo_leaf("Socio", 20, ITEM_GYM_SOCIO, condicion_socio="Socio"),
 	),
 )
 

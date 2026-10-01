@@ -24,6 +24,8 @@ from frappe.utils import getdate, today
 
 
 ESTADOS_BLOQUEADOS_MANUALMENTE = {"Vitalicio"}
+CATEGORIA_NO_SOCIO = "No Socio"
+SERIE_NO_SOCIO = "NS-.#####"
 
 
 def format_socio_nombre_completo(apellido: str | None, nombre: str | None) -> str:
@@ -47,12 +49,25 @@ class Socio(Document):
 		Se ejecuta antes de `set_new_name`; con `autoname = "field:numero_socio"`
 		Frappe deriva el `name` desde este campo. Se fija `self.name` explícitamente
 		para dejar la invariante (PK == número de socio) clara y robusta.
+
+		- **Practicante No Socio:** serie propia `NS-#####` sin `numero_socio`
+		  (no consume numeración del padrón).
 		"""
+		if self.categoria == CATEGORIA_NO_SOCIO:
+			self.numero_socio = None
+			return
 		if self.numero_socio:
 			self.numero_socio = int(self.numero_socio)
 		else:
 			self.numero_socio = self._siguiente_numero_socio()
 		self.name = str(self.numero_socio)
+
+	def autoname(self) -> None:
+		# `set_new_name` limpia `name` antes de nombrar; `field:numero_socio` no aplica a No Socio.
+		if self.categoria == CATEGORIA_NO_SOCIO:
+			from frappe.model.naming import make_autoname
+
+			self.name = make_autoname(SERIE_NO_SOCIO, doc=self)
 
 	@staticmethod
 	def _max_name_numerico() -> int:
@@ -113,6 +128,12 @@ class Socio(Document):
 		pisa_adjuntos_reemplazados(self, CAMPOS_SOCIO)
 		asegurar_adjuntos_privados(self, CAMPOS_SOCIO)
 		aplicar_edicion_parcial_secretaria(self)
+
+	def on_update(self) -> None:
+		# `_sync_autoname_field` copia `name` (NS-…) a `numero_socio` en cada guardado;
+		# el practicante No Socio no tiene número de socio (Int NOT NULL → 0).
+		if self.categoria == CATEGORIA_NO_SOCIO and self.numero_socio:
+			self.db_set("numero_socio", 0, update_modified=False)
 
 	def after_insert(self) -> None:
 		from club_management.members.services.documentacion_adjuntos import (

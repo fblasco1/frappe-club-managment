@@ -86,7 +86,7 @@ class TestPatinOtrasActividadesArancelesIcdpe(MembersTestCase):
 		gym = frappe.db.get_value("Actividad", {"titulo": "Gimnasio Fitness"}, "name")
 		equipo = f"{gym} / Socio / Socio"
 		self.assertEqual(frappe.db.get_value("Equipo Actividad", equipo, "item"), ITEM_GYM_SOCIO)
-		self.assertEqual(frappe.db.get_value("Item", ITEM_GYM_SOCIO, "standard_rate"), 22000)
+		self.assertEqual(frappe.db.get_value("Item", ITEM_GYM_SOCIO, "standard_rate"), 24000)
 
 	def test_seed_iniciacion_dos_clases(self) -> None:
 		from club_management.activities.data.otras_actividades_aranceles_icdpe import (

@@ -11,6 +11,7 @@
   "item",
   "pct_liquidacion_entrenador",
   "portal_socio_elige",
+  "condicion_socio",
   "habilitada",
   "capacidad",
   "orden",
@@ -55,6 +56,14 @@
    "label": "Seleccionable por socio"
   },
   {
+   "description": "Restringe el grupo a socios o a practicantes No Socio (p. ej. aranceles del gimnasio). Vacío = sin restricción.",
+   "fieldname": "condicion_socio",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Condición socio",
+   "options": "\nSocio\nNo Socio"
+  },
+  {
    "default": "1",
    "fieldname": "habilitada",
    "fieldtype": "Check",
@@ -93,7 +102,7 @@
    "link_fieldname": "grupo_actividad"
   }
  ],
- "modified": "2026-06-04 00:00:00",
+ "modified": "2026-10-01 10:00:00",
  "modified_by": "Administrator",
  "module": "Activities",
  "name": "Grupo Actividad",

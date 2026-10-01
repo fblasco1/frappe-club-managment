@@ -26,6 +26,11 @@ def corregir_numero_socio(socio: str, nuevo_numero: int | str) -> str:
 		frappe.throw(_("Indique el socio a corregir."), frappe.ValidationError)
 	if not frappe.db.exists("Socio", socio_name):
 		frappe.throw(_("Socio {0} no existe.").format(socio_name), frappe.DoesNotExistError)
+	if frappe.db.get_value("Socio", socio_name, "categoria") == "No Socio":
+		frappe.throw(
+			_("Un practicante No Socio no tiene número de socio; use «Convertir a socio»."),
+			frappe.ValidationError,
+		)
 
 	try:
 		destino = int(nuevo_numero)

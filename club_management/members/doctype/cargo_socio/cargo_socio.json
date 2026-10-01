@@ -42,7 +42,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Tipo de cargo",
-   "options": "Cuota Federativa\nMulta\nViaje\nOtro",
+   "options": "Cuota Federativa\nMulta\nViaje\nOtro\nQuincena Gimnasio\nEntrenamiento por Hora Gimnasio",
    "reqd": 1
   },
   {
@@ -111,7 +111,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-12 17:30:00",
+ "modified": "2026-10-01 12:00:00",
  "modified_by": "Administrator",
  "module": "Members",
  "name": "Cargo Socio",

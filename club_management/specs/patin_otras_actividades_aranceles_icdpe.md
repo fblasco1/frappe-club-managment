@@ -49,7 +49,7 @@ Then devuelve `ICDPE-PATIN-ADULTO` con tarifa 26.500.
 | Gimnasia Artistica | 1 / 2 clases por semana | 15.500 / 20.500 |
 | Boxeo | 1 / 2 / 3 clases por semana | 14.500 / 26.000 / 38.000 |
 | Yoga | 1 / 2 clases por semana | 23.500 / 28.500 |
-| Gimnasio Fitness | No Socio / Socio | 44.000 / 22.000 |
+| Gimnasio Fitness | No Socio / Socio | 49.000 / 24.000 |
 | Iniciacion Deportiva | 1 / 2 clases por semana | 15.500 / 20.500 |
 | Funcional | GAP / CROSSFIT / Funcional × 1–2×sem + profe | 18.000 / 27.500 |
 
@@ -92,7 +92,11 @@ Then devuelve `ICDPE-INICIACION-DEPORTIVA-1-CLASE` con tarifa 15.500.
 
 Given `Gimnasio Fitness` / `Socio`
 When se resuelve el arancel
-Then devuelve `ICDPE-GYM-PASE-LIBRE-SOCIO` con tarifa 22.000.
+Then devuelve `ICDPE-GYM-PASE-LIBRE-SOCIO` con tarifa 24.000.
+
+Los grupos del gimnasio llevan `condicion_socio` (`No Socio` / `Socio`) y la
+actividad `admite_no_socios = 1`. Quincena, Entrenamiento por hora y descuentos: ver
+`gimnasio_cobro_socios_no_socios.md`.
 
 ## Actividades planas (`usa_grupos = 0`)
 

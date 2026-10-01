@@ -31,6 +31,7 @@ from club_management.members.services.concepto_informe_label import (
 
 SOCIO_DOCTYPE = "Socio"
 ESTADOS_EXCLUIDOS_TOTAL = frozenset({"Baja"})
+CATEGORIA_NO_SOCIO = "No Socio"
 SALES_INVOICE_ITEM_DOCTYPE = "Sales Invoice Item"
 PAYMENT_ENTRY_DOCTYPE = "Payment Entry"
 PAYMENT_ENTRY_REFERENCE_DOCTYPE = "Payment Entry Reference"
@@ -64,7 +65,10 @@ def _pct(recaudado: float, emitido: float) -> float:
 
 
 def count_socios_total(*, as_of: date | None = None) -> int:
-	filters: dict[str, Any] = {"estado": ["not in", list(ESTADOS_EXCLUIDOS_TOTAL)]}
+	filters: dict[str, Any] = {
+		"estado": ["not in", list(ESTADOS_EXCLUIDOS_TOTAL)],
+		"categoria": ["!=", CATEGORIA_NO_SOCIO],
+	}
 	if as_of:
 		filters["creation"] = ["<=", as_of]
 	return frappe.db.count(SOCIO_DOCTYPE, filters)
@@ -136,12 +140,14 @@ def count_altas_bajas_mes(*, reference_date: str | date | None = None) -> dict[s
 		{
 			"fecha_alta": ["between", [first, last]],
 			"estado": ["not in", list(ESTADOS_EXCLUIDOS_TOTAL)],
+			"categoria": ["!=", CATEGORIA_NO_SOCIO],
 		},
 	)
 	bajas = frappe.db.count(
 		SOCIO_DOCTYPE,
 		{
 			"estado": "Baja",
+			"categoria": ["!=", CATEGORIA_NO_SOCIO],
 			"ultimo_cambio_estado_en": ["between", [f"{first} 00:00:00", f"{last} 23:59:59"]],
 		},
 	)

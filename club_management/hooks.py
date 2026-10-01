@@ -129,6 +129,7 @@ permission_query_conditions = {
 	"Tutor No Socio": "club_management.members.permissions.tutor_no_socio_query_conditions",
 	"Grupo Familiar": "club_management.members.permissions.grupo_familiar_query_conditions",
 	"Cargo Socio": "club_management.members.permissions.cargo_socio_query_conditions",
+	"Bonificacion Recurrente": "club_management.members.permissions.bonificacion_recurrente_query_conditions",
 	"Inscripcion Actividad": (
 		"club_management.activities.permissions.inscripcion_actividad_query_conditions"
 	),
@@ -139,6 +140,7 @@ has_permission = {
 	"Tutor No Socio": "club_management.members.permissions.tutor_no_socio_has_permission",
 	"Grupo Familiar": "club_management.members.permissions.grupo_familiar_has_permission",
 	"Cargo Socio": "club_management.members.permissions.cargo_socio_has_permission",
+	"Bonificacion Recurrente": "club_management.members.permissions.bonificacion_recurrente_has_permission",
 	"Inscripcion Actividad": (
 		"club_management.activities.permissions.inscripcion_actividad_has_permission"
 	),

@@ -13,7 +13,29 @@ class InscripcionActividad(Document):
 	def validate(self) -> None:
 		assert_inscripcion_socio_matches_session(self)
 		self._validate_actividad_grupo_equipo()
+		self._validate_condicion_socio()
 		self._validate_unica_activa()
+
+	def _validate_condicion_socio(self) -> None:
+		"""Spec gimnasio_cobro_socios_no_socios.md: grupo y actividad según categoría."""
+		from club_management.members.doctype.socio.socio import CATEGORIA_NO_SOCIO
+
+		es_no_socio = frappe.db.get_value("Socio", self.socio, "categoria") == CATEGORIA_NO_SOCIO
+		if es_no_socio and not frappe.db.get_value("Actividad", self.actividad, "admite_no_socios"):
+			frappe.throw(
+				_("La actividad {0} no admite practicantes No Socio.").format(self.actividad)
+			)
+		if not self.grupo_actividad:
+			return
+		condicion = frappe.db.get_value("Grupo Actividad", self.grupo_actividad, "condicion_socio")
+		if condicion == "No Socio" and not es_no_socio:
+			frappe.throw(_("El grupo {0} es solo para practicantes No Socio.").format(self.grupo_actividad))
+		if condicion == "Socio" and es_no_socio:
+			frappe.throw(_("El grupo {0} es solo para socios.").format(self.grupo_actividad))
+		if es_no_socio and condicion != "No Socio":
+			frappe.throw(
+				_("Un practicante No Socio solo puede inscribirse en grupos para No Socio.")
+			)
 
 	def _validate_actividad_grupo_equipo(self) -> None:
 		actividad = frappe.db.get_value(

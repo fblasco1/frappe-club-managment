@@ -14,6 +14,7 @@ from club_management.activities.services.inscripcion_socio import (
 	INSCRIPCION_DOCTYPE,
 	resolve_monto_arancel_inscripcion,
 )
+from club_management.members.services.bonificacion_recurrente import aplicar_bonificacion_recurrente
 from club_management.members.services.socio_operaciones_secretaria import (
 	ensure_secretaria_operacion_access,
 	reactivar_socio,
@@ -169,8 +170,10 @@ def cargo_extra_linea_facturada_en_periodo(
 
 def resolve_cuota_social(socio_name: str) -> tuple[float, str | None]:
 	"""Devuelve `(monto, item_code)` de cuota social según categoría del socio."""
+	from club_management.members.doctype.socio.socio import CATEGORIA_NO_SOCIO
+
 	socio = frappe.get_doc(SOCIO_DOCTYPE, socio_name)
-	if socio.categoria == "Vitalicio":
+	if socio.categoria in ("Vitalicio", CATEGORIA_NO_SOCIO):
 		return 0.0, None
 
 	settings = get_club_settings()
@@ -346,8 +349,16 @@ def build_invoice_items_for_socio(
 			if item_code:
 				if beca and beca.exime_arancel:
 					continue
-				rate_arancel = beca.rate_arancel(monto) if beca else monto
-				_append_item(item_code, rate_arancel, _("Arancel actividad"))
+				descripcion = _("Arancel actividad")
+				if beca:
+					rate_arancel = beca.rate_arancel(monto)
+				else:
+					rate_arancel, etiqueta = aplicar_bonificacion_recurrente(
+						socio_name, ins, monto, reference_date=ref
+					)
+					if etiqueta:
+						descripcion = f"{descripcion} ({etiqueta})"
+				_append_item(item_code, rate_arancel, descripcion)
 
 	if incluir_cargos_extra:
 		for row in _cargos_extra_items_for_socio(socio_name, reference_date=reference_date):
