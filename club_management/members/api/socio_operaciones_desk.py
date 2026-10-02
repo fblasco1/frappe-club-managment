@@ -220,3 +220,19 @@ def list_becas_socio(socio: str) -> list[dict[str, Any]]:
 	from club_management.members.services.beca_socio import list_becas_socio_desk
 
 	return list_becas_socio_desk(socio)
+
+
+@frappe.whitelist()
+def list_bonificaciones_activas_socio(socio: str) -> list[dict[str, Any]]:
+	ensure_secretaria_operacion_access()
+	from club_management.members.services.bonificaciones_socio import list_bonificaciones_activas
+
+	return list_bonificaciones_activas(socio)
+
+
+@frappe.whitelist(methods=["POST"])
+def cancelar_bonificacion_socio(doctype: str, name: str, socio: str) -> dict[str, Any]:
+	ensure_secretaria_operacion_access()
+	from club_management.members.services.bonificaciones_socio import cancelar_bonificacion
+
+	return {"estado": cancelar_bonificacion(doctype, name, socio)}

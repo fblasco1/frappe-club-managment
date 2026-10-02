@@ -37,6 +37,7 @@ frappe.ui.form.on("Socio", {
 		club_management_socio_desk.render_datos_criticos_alert(frm);
 		club_management_socio_desk.render_inscripciones(frm);
 		club_management_socio_desk.render_becas(frm);
+		club_management_socio_desk.render_bonificaciones_activas(frm);
 		club_management_socio_desk.render_deuda_pendiente(frm);
 		club_management_socio_desk.render_historial_pagos(frm);
 	},
@@ -872,6 +873,124 @@ club_management_socio_desk.render_becas = function (frm) {
 
 			$panel.empty().append($title, $table);
 		},
+	});
+};
+
+club_management_socio_desk.render_bonificaciones_activas = function (frm) {
+	if (!frm.fields_dict.actividad || frm.is_new()) {
+		return;
+	}
+
+	const $section = frm.fields_dict.actividad.$wrapper.closest(".form-section");
+	let $panel = $section.find(".club-bonificaciones-activas-panel");
+	if (!$panel.length) {
+		$panel = $('<div class="club-bonificaciones-activas-panel" style="margin-top: 1rem;"></div>');
+		const $becas = $section.find(".club-becas-panel");
+		const $inscripciones = $section.find(".club-inscripciones-panel");
+		if ($becas.length) {
+			$becas.before($panel);
+		} else if ($inscripciones.length) {
+			$inscripciones.after($panel);
+		} else {
+			frm.fields_dict.actividad.$wrapper.after($panel);
+		}
+	}
+
+	$panel.html(`<p class="text-muted small">${__("Cargando bonificaciones…")}</p>`);
+
+	frappe.call({
+		method: "club_management.members.api.socio_operaciones_desk.list_bonificaciones_activas_socio",
+		args: { socio: frm.doc.name },
+		callback(r) {
+			if (r.exc) {
+				$panel.empty();
+				return;
+			}
+			const rows = r.message || [];
+			const $title = $(`<h6 class="mb-2">${__("Bonificaciones activas")}</h6>`);
+			if (!rows.length) {
+				$panel
+					.empty()
+					.append(
+						$title,
+						$(`<div class="text-muted small">${__("Sin bonificaciones activas.")}</div>`)
+					);
+				return;
+			}
+
+			const esc = frappe.utils.escape_html;
+			const $table = $(`
+				<table class="table table-bordered table-sm club-bonificaciones-activas-table">
+					<thead>
+						<tr>
+							<th>${__("Tipo")}</th>
+							<th>${__("Descuento")}</th>
+							<th>${__("Alcance")}</th>
+							<th>${__("Vigencia / Período")}</th>
+							<th>${__("Motivo")}</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody></tbody>
+				</table>
+			`);
+			const $tbody = $table.find("tbody");
+
+			rows.forEach((row) => {
+				const $tr = $(`
+					<tr>
+						<td>${esc(row.tipo || "")}</td>
+						<td>${esc(row.descuento || "")}</td>
+						<td>${esc(row.alcance || "")}</td>
+						<td>${esc(row.vigencia || "")}</td>
+						<td>${esc(row.motivo || "")}</td>
+						<td class="text-right text-nowrap"></td>
+					</tr>
+				`);
+				const $ver = $(`<button type="button" class="btn btn-xs btn-default">${__("Ver")}</button>`);
+				$ver.on("click", () => frappe.set_route("Form", row.doctype, row.name));
+				const $cancelar = $(
+					`<button type="button" class="btn btn-xs btn-danger ml-1">${__("Cancelar")}</button>`
+				);
+				$cancelar.on("click", () =>
+					club_management_socio_desk.cancelar_bonificacion(frm, row)
+				);
+				$tr.find("td:last").append($ver, $cancelar);
+				$tbody.append($tr);
+			});
+
+			$panel.empty().append($title, $table);
+		},
+	});
+};
+
+club_management_socio_desk.cancelar_bonificacion = function (frm, row) {
+	const esc = frappe.utils.escape_html;
+	let mensaje = __("¿Cancelar {0} ({1})? Solo afecta la deuda que se genere de ahora en adelante.", [
+		esc(row.tipo || ""),
+		esc(row.descuento || ""),
+	]);
+	if (row.doctype === "Bonificacion Arancel") {
+		mensaje +=
+			"<br><br>" +
+			__(
+				"Si esta bonificación ya se aplicó en un cobro, la nota de crédito emitida no se revierte."
+			);
+	}
+	frappe.confirm(mensaje, () => {
+		frappe.call({
+			method: "club_management.members.api.socio_operaciones_desk.cancelar_bonificacion_socio",
+			args: { doctype: row.doctype, name: row.name, socio: frm.doc.name },
+			freeze: true,
+			callback(r) {
+				if (r.exc) {
+					return;
+				}
+				frappe.show_alert({ message: __("Bonificación cancelada"), indicator: "green" });
+				club_management_socio_desk.render_bonificaciones_activas(frm);
+				club_management_socio_desk.render_becas(frm);
+			},
+		});
 	});
 };
 
