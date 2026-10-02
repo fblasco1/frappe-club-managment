@@ -169,9 +169,21 @@ def calcular_bonificacion_factura(invoice_name: str, socio_name: str) -> dict[st
 	periodo = ""
 	if campo_periodo:
 		periodo = (frappe.db.get_value(SALES_INVOICE_DOCTYPE, invoice_name, campo_periodo) or "").strip()
+	from club_management.members.services.bonificacion_recurrente import (
+		bonificaciones_recurrentes_al_cobro,
+	)
+
 	arancel = monto_arancel_en_factura(invoice_name, socio_name)
 	bons = list_bonificaciones_aplicables(socio_name, periodo)
 	calc = calcular_monto_bonificacion(monto_arancel=arancel, bonificaciones=bons)
+	for rec in bonificaciones_recurrentes_al_cobro(invoice_name, socio_name):
+		parte = min(flt(rec["monto"], 2), flt(arancel - calc["monto_bonificacion"], 2))
+		if parte <= 0.005:
+			break
+		calc["monto_bonificacion"] = flt(calc["monto_bonificacion"] + parte, 2)
+		calc["detalle"].append({**rec, "monto": parte})
+		if rec.get("motivo"):
+			calc["motivos"].append(rec["motivo"])
 	return {
 		"invoice": invoice_name,
 		"periodo": periodo,

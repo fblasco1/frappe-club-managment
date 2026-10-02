@@ -183,6 +183,21 @@ When se arman las líneas de la deuda mensual
 Then la línea del gimnasio es 21.600 con descripción que indica la bonificación
 And la otra actividad no cambia.
 
+## Scenario: bonificación recurrente creada con la factura del mes ya emitida (02/10/2026)
+
+Given la factura 10/2026 ya emitida con el arancel del gimnasio completo (24.000, sin «bonif.» en la descripción)
+And luego se crea una `Bonificacion Recurrente` Activa 10 % para Gimnasio Fitness con vigencia que se superpone con 10/2026
+When Secretaría abre **Registrar cobro** sobre esa factura
+Then la vista previa resta 2.400 como bonificación (solo sobre la línea del arancel de esa actividad)
+And al confirmar se emite la nota de crédito de bonificación (mismo mecanismo que `bonificacion_arancel_al_cobro.md`)
+And el ticket muestra la bonificación.
+
+Given la línea ya salió con la bonificación aplicada al generar la deuda («bonif.» en la descripción)
+Then al cobrar **no** se vuelve a descontar.
+
+Given el socio tiene `Beca Socio` vigente en ese período
+Then la recurrente no se aplica al cobro (prioridad de la beca, igual que al generar).
+
 ## Scenario: bonificación fuera de vigencia o anulada
 
 Given una bonificación cuya vigencia terminó o en estado Anulada

@@ -55,7 +55,7 @@ class TestBonificacionArancelFormula(MembersTestCase):
 		self.assertAlmostEqual(calc["monto_bonificacion"], 7125.0)
 
 
-class TestBonificacionArancelIntegracion(MembersTestCase):
+class _BonificacionArancelFixtures(MembersTestCase):
 	_ITEM_BONIF = "TEST-ITEM-BONIF-ARANCEL"
 	_ITEM_ARANCEL = "TEST-ITEM-ARANCEL-BONIF"
 	_ITEM_CUOTA = "TEST-ITEM-CUOTA-BONIF"
@@ -172,6 +172,8 @@ class TestBonificacionArancelIntegracion(MembersTestCase):
 		doc.insert(ignore_permissions=True)
 		return doc.name
 
+
+class TestBonificacionArancelIntegracion(_BonificacionArancelFixtures):
 	def test_monto_arancel_excluye_cuota(self) -> None:
 		socio = self._socio_activo(dni="88001001", email="bonif.arancel@example.com")
 		inv = self._crear_si(socio.name)
@@ -292,3 +294,135 @@ class TestBonificacionArancelIntegracion(MembersTestCase):
 		det = calcular_detalle_mora_factura(inv, posting_date="2026-08-10")
 		self.assertAlmostEqual(det["monto_bonificacion"], 7125.0)
 		self.assertAlmostEqual(det["monto_exigido"], 21375.0)
+
+
+class TestBonificacionRecurrenteAlCobro(_BonificacionArancelFixtures):
+	"""Recurrente creada con la factura del mes ya emitida (spec gimnasio_cobro_socios_no_socios.md)."""
+
+	_ACTIVIDAD = "TEST Bonif Recurrente Cobro"
+	_ITEM_OTRA = "TEST-ITEM-OTRA-ACT-BONIF"
+
+	def setUp(self) -> None:
+		super().setUp()
+		if not frappe.db.exists("DocType", "Bonificacion Recurrente"):
+			self.skipTest("DocType Bonificacion Recurrente no migrado")
+		if not frappe.db.exists("Item", self._ITEM_OTRA):
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": self._ITEM_OTRA,
+					"item_name": "Otra actividad test",
+					"item_group": frappe.db.get_value("Item Group", {"is_group": 0}, "name") or "Products",
+					"is_stock_item": 0,
+					"is_sales_item": 1,
+					"standard_rate": 10000,
+				}
+			).insert(ignore_permissions=True)
+		if not frappe.db.exists("Actividad", self._ACTIVIDAD):
+			frappe.get_doc(
+				{"doctype": "Actividad", "titulo": self._ACTIVIDAD, "habilitada": 1}
+			).insert(ignore_permissions=True)
+		frappe.db.set_value("Actividad", self._ACTIVIDAD, "item", self._ITEM_ARANCEL)
+
+	def _socio_inscripto(self, dni: str):
+		socio = self._socio_activo(dni=dni, email=f"bonif.rec.{dni}@example.com")
+		frappe.get_doc(
+			{
+				"doctype": "Inscripcion Actividad",
+				"socio": socio.name,
+				"actividad": self._ACTIVIDAD,
+				"estado": "Activa",
+			}
+		).insert(ignore_permissions=True)
+		return socio
+
+	def _si_items(self, socio_name: str, items: list[tuple[str, float, str]]) -> str:
+		doc = frappe.get_doc(
+			{
+				"doctype": SALES_INVOICE_DOCTYPE,
+				"customer": ensure_customer_for_socio(socio_name),
+				"company": _default_company(),
+				"posting_date": today(),
+				"due_date": today(),
+				_campo_socio_en(SALES_INVOICE_DOCTYPE): socio_name,
+				_campo_periodo_cobro(): self._PERIODO,
+				"items": [
+					{"item_code": code, "qty": 1, "rate": rate, "description": desc}
+					for code, rate, desc in items
+				],
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		doc.submit()
+		return doc.name
+
+	def _recurrente(self, socio_name: str, **kwargs) -> str:
+		payload = {
+			"doctype": "Bonificacion Recurrente",
+			"socio": socio_name,
+			"estado": "Activa",
+			"tipo_descuento": "Porcentaje",
+			"valor": 10,
+			"actividad": self._ACTIVIDAD,
+			"fecha_desde": "2026-08-02",
+			"motivo": "dcto familiar",
+		}
+		payload.update(kwargs)
+		return frappe.get_doc(payload).insert(ignore_permissions=True).name
+
+	def test_recurrente_descuenta_solo_su_actividad(self) -> None:
+		socio = self._socio_inscripto("88002001")
+		inv = self._si_items(
+			socio.name,
+			[
+				(self._ITEM_CUOTA, 26500, "Cuota social"),
+				(self._ITEM_ARANCEL, 28500, "Arancel actividad"),
+				(self._ITEM_OTRA, 10000, "Arancel actividad"),
+			],
+		)
+		bre = self._recurrente(socio.name)
+		info = calcular_bonificacion_factura(inv, socio.name)
+		self.assertAlmostEqual(info["monto_bonificacion"], 2850.0)
+		self.assertIn(bre, [d["bonificacion"] for d in info["detalle"]])
+		self.assertIn("dcto familiar", info["motivos"])
+
+	def test_linea_ya_bonificada_al_generar_no_descuenta_de_nuevo(self) -> None:
+		socio = self._socio_inscripto("88002002")
+		inv = self._si_items(
+			socio.name, [(self._ITEM_ARANCEL, 25650, "Arancel actividad (bonif. 10%)")]
+		)
+		self._recurrente(socio.name)
+		self.assertAlmostEqual(calcular_bonificacion_factura(inv, socio.name)["monto_bonificacion"], 0.0)
+
+	def test_recurrente_fuera_del_periodo_no_aplica(self) -> None:
+		socio = self._socio_inscripto("88002003")
+		inv = self._si_items(socio.name, [(self._ITEM_ARANCEL, 28500, "Arancel actividad")])
+		self._recurrente(socio.name, fecha_desde="2026-09-01")
+		self.assertAlmostEqual(calcular_bonificacion_factura(inv, socio.name)["monto_bonificacion"], 0.0)
+
+	def test_beca_vigente_tiene_prioridad(self) -> None:
+		socio = self._socio_inscripto("88002004")
+		inv = self._si_items(socio.name, [(self._ITEM_ARANCEL, 28500, "Arancel actividad")])
+		self._recurrente(socio.name)
+		frappe.get_doc(
+			{
+				"doctype": "Beca Socio",
+				"socio": socio.name,
+				"tipo_beca": "Parcial Exime Cuota",
+				"fecha_desde": "2026-07-01",
+				"fecha_hasta": "2026-12-31",
+				"estado": "Activa",
+			}
+		).insert(ignore_permissions=True)
+		self.assertAlmostEqual(calcular_bonificacion_factura(inv, socio.name)["monto_bonificacion"], 0.0)
+
+	def test_cobro_emite_nota_de_credito_por_la_recurrente(self) -> None:
+		socio = self._socio_inscripto("88002005")
+		inv = self._si_items(
+			socio.name,
+			[(self._ITEM_CUOTA, 26500, "Cuota social"), (self._ITEM_ARANCEL, 28500, "Arancel actividad")],
+		)
+		self._recurrente(socio.name)
+		prep = preparar_facturas_cobro_con_mora(socio.name, [inv], posting_date="2026-08-10")
+		self.assertTrue(prep["credit_notes"])
+		self.assertAlmostEqual(flt(prep["total_exigido"]), 26500 + 28500 - 2850, places=2)
