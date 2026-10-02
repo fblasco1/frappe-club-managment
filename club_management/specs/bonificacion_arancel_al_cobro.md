@@ -72,6 +72,16 @@ Then `monto_bonificacion = 0`.
 
 ---
 
+## Scenario: factura exenta de mora también descuenta la bonificación
+
+Given una SI con línea de arancel cuyo ítem no está sujeto a mora (exenta)
+And una bonificación aplicable de 25 %
+When se calcula el detalle del cobro (día 10, sin mora)
+Then el detalle informa `monto_bonificacion` y `monto_exigido = outstanding − bonificación`
+(igual que una factura sujeta a mora; la exención solo evita el recargo).
+
+---
+
 ## Scenario: preview no crea credit note
 
 Given bonificación aplicable

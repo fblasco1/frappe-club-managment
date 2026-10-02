@@ -431,9 +431,9 @@ def calcular_detalle_mora_factura(
 		result["concepto"] = (invoice.items[0].description or invoice.items[0].item_code or "").strip()
 
 	if not socio_name or not periodo:
-		return result
+		return _aplicar_bonificacion_detalle(result, invoice_name, None)
 	if periodo_es_ajuste_mora(periodo) or periodo_es_recargo_legado(periodo):
-		return result
+		return _aplicar_bonificacion_detalle(result, invoice_name, None)
 
 	outstanding_grupo = _outstanding_grupo(invoice_name, socio_name)
 	result["outstanding_grupo"] = outstanding_grupo
@@ -444,7 +444,7 @@ def calcular_detalle_mora_factura(
 		result["tramo"] = "ninguno"
 		result["paga_despues_dia_vencimiento"] = False
 		result["aplica_mora"] = False
-		return result
+		return _aplicar_bonificacion_detalle(result, invoice_name, socio_name)
 
 	dia_v1 = int(settings.dia_primer_vencimiento or 10)
 	dia_v2 = settings.dia_segundo_vencimiento or "20"
@@ -493,9 +493,12 @@ def calcular_detalle_mora_factura(
 def _aplicar_bonificacion_detalle(
 	result: dict[str, Any],
 	invoice_name: str,
-	socio_name: str,
+	socio_name: str | None,
 ) -> dict[str, Any]:
-	"""Resta bonificación de arancel al monto exigido (preview / detalle)."""
+	"""Resta bonificación de arancel al monto exigido (preview / detalle).
+
+	Sin `socio_name` solo completa las claves de bonificación en cero.
+	"""
 	from club_management.members.services.bonificacion_arancel import (
 		_monto_cn_ya_aplicado,
 		calcular_bonificacion_factura,

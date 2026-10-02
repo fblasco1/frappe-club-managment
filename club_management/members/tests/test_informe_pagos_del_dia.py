@@ -23,7 +23,7 @@ from club_management.members.services.informe_pagos_del_dia import (
 	get_pagos_del_dia_report_summary,
 )
 from club_management.members.services.socio_transitions import cambiar_estado
-from club_management.members.setup.inicio_workspace import CLUB_DESK_REPORTS
+from club_management.members.setup.inicio_workspace import CLUB_DESK_REPORTS, CLUB_DESK_REPORTS_LEGACY
 from club_management.members.test_helpers import MembersTestCase, insert_socio, make_secretaria_user
 
 
@@ -93,8 +93,12 @@ class TestInformePagosDelDia(MembersTestCase):
 		return doc.name
 
 	def test_informe_en_listado_gestion_socios(self) -> None:
-		self.assertIn("Recaudacion por concepto", CLUB_DESK_REPORTS)
+		"""Spec `informes_secretaria_menu.md`: Cobranza por fechas absorbe pagos del día y recaudación."""
+		self.assertIn("Cobranza por fechas", CLUB_DESK_REPORTS)
 		self.assertNotIn("Pagos del dia", CLUB_DESK_REPORTS)
+		self.assertNotIn("Recaudacion por concepto", CLUB_DESK_REPORTS)
+		self.assertIn("Pagos del dia", CLUB_DESK_REPORTS_LEGACY)
+		self.assertIn("Recaudacion por concepto", CLUB_DESK_REPORTS_LEGACY)
 
 	def test_informe_del_dia_totales_medio_y_concepto(self) -> None:
 		socio = insert_socio(dni="99330001", email="informe.dia@example.com")

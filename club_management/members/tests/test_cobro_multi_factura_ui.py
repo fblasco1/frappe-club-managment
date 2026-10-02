@@ -31,7 +31,7 @@ class TestCobroMultiFacturaUi(unittest.TestCase):
 	def test_fecha_cobro_arriba_de_facturas_en_dialogo(self) -> None:
 		"""Spec: `registrar_cobro_fecha.md` — Fecha de cobro arriba de todo."""
 		text = _SOCIO_JS.read_text(encoding="utf-8")
-		marker = "prompt_cobro_multi_factura"
+		marker = "prompt_cobro_multi_factura = function"
 		start = text.find(marker)
 		self.assertGreater(start, 0)
 		# Primer bloque fields del diálogo Registrar cobro.
