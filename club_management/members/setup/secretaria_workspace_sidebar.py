@@ -9,6 +9,8 @@ from club_management.members.setup.secretaria_workspace import WORKSPACE_NAME
 
 VALORES_CUOTA_SOCIAL_PAGE = "valores-cuota-social"
 
+SECRETARIA_EXTRA_REPORTS: tuple[str, ...] = ("Deuda cuotas sociales",)
+
 SIDEBAR_ITEMS: list[dict] = [
 	{
 		"label": "Socios",
@@ -46,7 +48,7 @@ SIDEBAR_ITEMS: list[dict] = [
 			"icon": "table",
 			"child": 1,
 		}
-		for report_name in CLUB_DESK_REPORTS
+		for report_name in (*CLUB_DESK_REPORTS, *SECRETARIA_EXTRA_REPORTS)
 	],
 ]
 

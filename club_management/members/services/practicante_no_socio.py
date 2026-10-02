@@ -62,6 +62,14 @@ def crear_practicante_no_socio(datos: dict[str, Any], *, inscribir_gimnasio: boo
 			frappe.throw(_("No está configurado el grupo No Socio del gimnasio."), frappe.ValidationError)
 		selecciones = [{"actividad": ACTIVIDAD_GIMNASIO, "grupo": grupo}]
 
+	ex_socio = frappe.db.get_value(
+		SOCIO_DOCTYPE,
+		{"dni": (payload.get("dni") or "").strip(), "estado": "Baja"},
+		"name",
+	)
+	if ex_socio:
+		return _reingresar_ex_socio_como_no_socio(ex_socio, payload, selecciones)
+
 	return crear_socio_desk(
 		payload,
 		activar_al_guardar=True,
@@ -69,10 +77,47 @@ def crear_practicante_no_socio(datos: dict[str, Any], *, inscribir_gimnasio: boo
 	)
 
 
-def convertir_no_socio_a_socio(socio_name: str, *, categoria: str) -> str:
-	"""Renombra un practicante NS al próximo número de socio y le asigna `categoria`.
+_CAMPOS_NO_ACTUALIZABLES_REINGRESO = frozenset({"dni", "categoria", "numero_socio", "tipo_tutor", "tutor"})
 
-	Las inscripciones activas al grupo No Socio del gimnasio pasan al grupo Socio.
+
+def _reingresar_ex_socio_como_no_socio(
+	socio_name: str,
+	payload: dict[str, Any],
+	selecciones: list[dict[str, Any]] | None,
+) -> str:
+	"""Reutiliza la ficha del ex socio dado de baja como practicante No Socio (conserva historial y `name`)."""
+	from club_management.members.services.cobranza_manual import (
+		ensure_customer_for_socio,
+		erpnext_cobranza_disponible,
+	)
+	from club_management.members.services.socio_transitions import cambiar_estado
+
+	socio = frappe.get_doc(SOCIO_DOCTYPE, socio_name)
+	for campo, valor in payload.items():
+		if campo in _CAMPOS_NO_ACTUALIZABLES_REINGRESO or valor in (None, ""):
+			continue
+		if socio.meta.has_field(campo):
+			socio.set(campo, valor)
+	socio.categoria = CATEGORIA_NO_SOCIO
+	socio.save(ignore_permissions=True)
+
+	cambiar_estado(socio_name, "Activo", motivo=_("Reingreso como practicante No Socio"))
+	if erpnext_cobranza_disponible():
+		ensure_customer_for_socio(socio_name, skip_permission_check=True)
+
+	if selecciones:
+		from club_management.activities.services.inscripcion_socio import inscribir_actividades_desk
+
+		inscribir_actividades_desk(socio_name, selecciones)
+	return socio_name
+
+
+def convertir_no_socio_a_socio(socio_name: str, *, categoria: str) -> str:
+	"""Pasa un practicante NS a socio con `categoria`.
+
+	Un NS de serie `NS-` se renombra al próximo número de socio; un ex socio que había
+	reingresado como NS conserva su número. Las inscripciones activas al grupo No Socio
+	del gimnasio pasan al grupo Socio.
 	"""
 	ensure_secretaria_operacion_access()
 	if not frappe.db.exists(SOCIO_DOCTYPE, socio_name):
@@ -84,14 +129,18 @@ def convertir_no_socio_a_socio(socio_name: str, *, categoria: str) -> str:
 	if not categoria or categoria not in opciones or categoria in CATEGORIAS_NO_CONVERTIBLES:
 		frappe.throw(_("Categoría de socio inválida: {0}").format(categoria), frappe.ValidationError)
 
-	numero = Socio._siguiente_numero_socio()
-	nuevo = frappe.rename_doc(
-		SOCIO_DOCTYPE,
-		socio_name,
-		str(numero),
-		force=True,
-		show_alert=False,
-	)
+	if socio_name.isdigit():
+		numero = int(socio_name)
+		nuevo = socio_name
+	else:
+		numero = Socio._siguiente_numero_socio()
+		nuevo = frappe.rename_doc(
+			SOCIO_DOCTYPE,
+			socio_name,
+			str(numero),
+			force=True,
+			show_alert=False,
+		)
 
 	socio = frappe.get_doc(SOCIO_DOCTYPE, nuevo)
 	socio.numero_socio = numero

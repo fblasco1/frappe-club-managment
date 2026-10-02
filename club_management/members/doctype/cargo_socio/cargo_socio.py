@@ -20,13 +20,9 @@ class CargoSocio(Document):
 		self._validate_vigencia()
 
 	def _validate_tipo_gimnasio(self) -> None:
-		"""Quincena / Entrenamiento por hora: solo practicantes No Socio, siempre cobro único."""
+		"""Quincena / Entrenamiento por hora (socios y No Socios): siempre cobro único."""
 		if self.tipo_cargo not in TIPOS_CARGO_GIMNASIO_NO_SOCIO:
 			return
-		from club_management.members.doctype.socio.socio import CATEGORIA_NO_SOCIO
-
-		if frappe.db.get_value("Socio", self.socio, "categoria") != CATEGORIA_NO_SOCIO:
-			frappe.throw(_("{0} es solo para practicantes No Socio.").format(self.tipo_cargo))
 		self.modo_cobro = "Unico"
 		self.fecha_hasta = None
 

@@ -74,26 +74,34 @@ class TestGimnasioPaseQuincena(MembersTestCase):
 			flt(frappe.db.get_value("Sales Invoice", result["sales_invoice"], "outstanding_amount")), 31000
 		)
 
-	def test_socio_no_puede_comprar_entrenamiento_hora(self) -> None:
+	def test_socio_tambien_compra_entrenamiento_hora(self) -> None:
 		socio = insert_socio(dni="79001003", email="gym.pase.socio@example.com")
-		with self.assertRaises(frappe.ValidationError):
-			generar_cargo_gimnasio(socio.name, TIPO_ENTRENAMIENTO_HORA, registrar_pago=False)
+		cambiar_estado(socio.name, "Activo", motivo="Test pase gimnasio socio")
+		result = generar_cargo_gimnasio(socio.name, TIPO_ENTRENAMIENTO_HORA, registrar_pago=True, mode_of_payment="Cash")
+		cargo = frappe.get_doc("Cargo Socio", result["cargo"])
+		self.assertEqual(cargo.estado, "Facturado")
+		self.assertEqual(flt(cargo.monto), 5000)
+		self.assertTrue(result["payment_entry"])
 
-	def test_cargo_socio_directo_rechaza_socio(self) -> None:
+	def test_cargo_socio_directo_acepta_socio_y_fuerza_unico(self) -> None:
 		socio = insert_socio(dni="79001004", email="gym.cargo.socio@example.com")
-		with self.assertRaises(frappe.ValidationError):
-			frappe.get_doc(
+		frappe.flags.skip_cargo_auto_invoice = True
+		try:
+			doc = frappe.get_doc(
 				{
 					"doctype": "Cargo Socio",
 					"socio": socio.name,
 					"titulo": "Quincena",
 					"tipo_cargo": TIPO_QUINCENA,
-					"modo_cobro": "Unico",
+					"modo_cobro": "Recurrente",
 					"item": ITEM_GYM_QUINCENA_NO_SOCIO,
 					"monto": 31000,
 					"fecha_desde": "2026-10-01",
 				}
 			).insert(ignore_permissions=True)
+		finally:
+			frappe.flags.skip_cargo_auto_invoice = False
+		self.assertEqual(doc.modo_cobro, "Unico")
 
 	def test_tipo_gimnasio_fuerza_unico(self) -> None:
 		ns = self._no_socio("79001005", "gym.recurrente@example.com")

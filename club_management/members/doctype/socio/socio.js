@@ -304,7 +304,7 @@ club_management_socio_desk.add_operaciones_buttons = function (frm) {
 	}
 
 	const cobranza = __("Cobranza manual");
-	if (es_no_socio && estado !== "Baja") {
+	if (estado !== "Baja") {
 		frm.add_custom_button(
 			__("Cobrar quincena / entrenamiento por hora"),
 			() => club_management_socio_desk.dialog_pase_gimnasio(frm),

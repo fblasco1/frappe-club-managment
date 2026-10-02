@@ -18,6 +18,10 @@
 			report_type: "Script Report",
 			ref_doctype: "Actividad",
 		},
+		"Deuda cuotas sociales": {
+			report_type: "Script Report",
+			ref_doctype: "Socio",
+		},
 	};
 
 	const SIDEBAR_ITEMS = [
@@ -69,6 +73,14 @@
 			type: "Link",
 			link_type: "Report",
 			link_to: "Deuda por actividad",
+			icon: "table",
+			child: 1,
+		},
+		{
+			label: __("Deuda cuotas sociales"),
+			type: "Link",
+			link_type: "Report",
+			link_to: "Deuda cuotas sociales",
 			icon: "table",
 			child: 1,
 		},

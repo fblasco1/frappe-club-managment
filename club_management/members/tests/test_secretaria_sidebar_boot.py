@@ -29,6 +29,9 @@ class TestSecretariaSidebarBoot(MembersTestCase):
 		self.assertNotIn("Deuda por equipo", items)
 		self.assertNotIn("Pagos del dia", items)
 		self.assertNotIn("Recaudacion por concepto", items)
+		cuotas = items["Deuda cuotas sociales"].get("report") or {}
+		self.assertEqual(cuotas.get("report_type"), "Script Report")
+		self.assertEqual(cuotas.get("ref_doctype"), "Socio")
 
 
 	def test_apply_boot_inyecta_sidebar_para_secretaria(self) -> None:

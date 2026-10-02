@@ -16,6 +16,15 @@ And **no** ve como ítems de menú: «Pagos del dia», «Recaudacion por concept
 
 ---
 
+## Scenario: informe exclusivo de Secretaría
+
+Given rol Secretaría o System Manager
+When abre el menú de informes del workspace **Socios**
+Then además de los tres canónicos ve **Deuda cuotas sociales** (spec `deuda_cuotas_sociales.md`)
+And ese informe no aparece en el menú de Gestión de Actividades.
+
+---
+
 ## Scenario: Cobranza por fechas absorbe rendición y pagos del día
 
 Given cobros imputados en un rango (o un solo día con Desde = Hasta)

@@ -32,7 +32,8 @@ _DEFAULT_PIE = "SOMOS ECHAGUE, SOMOS FAMILIA !!"
 def format_monto_ar(monto: float) -> str:
 	"""Formato `$29.000` (pesos argentinos, separador de miles con punto)."""
 	valor = int(round(flt(monto)))
-	return f"${valor:,}".replace(",", ".")
+	signo = "-" if valor < 0 else ""
+	return f"{signo}${abs(valor):,}".replace(",", ".")
 
 
 def ancho_caracteres(ancho_papel_mm: int) -> int:
@@ -147,7 +148,66 @@ def _lineas_desde_payment_entry(payment_entry_name: str) -> list[dict[str, Any]]
 					"sales_invoice": ref.reference_name,
 				}
 			)
-	lineas.sort(key=lambda r: (_periodo_sort_key(r.get("periodo_cobro")), r.get("concepto") or ""))
+		bonificaciones = _lineas_bonificacion(ref.reference_name, periodo)
+		lineas.extend(bonificaciones)
+		neto_factura = sum(
+			flt(r["monto"]) for r in lineas if r.get("sales_invoice") == ref.reference_name
+		)
+		no_cubierto = flt(neto_factura - flt(ref.allocated_amount), 2)
+		if no_cubierto > 0.005:
+			lineas.append(
+				{
+					"concepto": _("Saldo no cubierto por este cobro"),
+					"monto": -no_cubierto,
+					"periodo_cobro": periodo,
+					"sales_invoice": ref.reference_name,
+					"tipo": "no_cubierto",
+				}
+			)
+	lineas.sort(
+		key=lambda r: (
+			_periodo_sort_key(r.get("periodo_cobro")),
+			1 if r.get("tipo") else 0,
+			r.get("concepto") or "",
+		)
+	)
+	return lineas
+
+
+def _lineas_bonificacion(invoice_name: str, periodo: str) -> list[dict[str, Any]]:
+	"""Líneas negativas de las notas de crédito de bonificación aplicadas a la factura."""
+	from club_management.members.services.bonificacion_arancel import BONIF_REMARKS_PREFIX
+
+	notas = frappe.get_all(
+		SALES_INVOICE_DOCTYPE,
+		filters={
+			"is_return": 1,
+			"docstatus": 1,
+			"return_against": invoice_name,
+			"remarks": ["like", f"%{BONIF_REMARKS_PREFIX}{invoice_name}%"],
+		},
+		pluck="name",
+		order_by="creation asc",
+	)
+	lineas: list[dict[str, Any]] = []
+	for nota in notas:
+		for item in frappe.get_all(
+			"Sales Invoice Item",
+			filters={"parent": nota},
+			fields=["description", "amount"],
+			order_by="idx asc",
+		):
+			detalle = (item.description or "").strip()
+			concepto = detalle if detalle.upper().startswith("BONIFICACI") else f"Bonificación: {detalle}"
+			lineas.append(
+				{
+					"concepto": concepto,
+					"monto": -abs(flt(item.amount)),
+					"periodo_cobro": periodo,
+					"sales_invoice": invoice_name,
+					"tipo": "bonificacion",
+				}
+			)
 	return lineas
 
 
@@ -239,7 +299,11 @@ def build_recibo_pago(payment_entry_name: str) -> dict[str, Any]:
 	if not lineas:
 		frappe.throw(_("No hay conceptos para el recibo."), frappe.ValidationError)
 
-	total = sum(flt(row["monto"]) for row in lineas)
+	total = flt(frappe.db.get_value("Payment Entry", payment_entry_name, "paid_amount")) or sum(
+		flt(row["monto"]) for row in lineas
+	)
+	descuento_total = -sum(flt(r["monto"]) for r in lineas if r.get("tipo") == "bonificacion")
+	subtotal = sum(flt(r["monto"]) for r in lineas if not r.get("tipo"))
 	fecha, hora = _fecha_hora_cobro(payment_entry_name)
 	socio_info = _socio_desde_payment_entry(payment_entry_name)
 
@@ -250,6 +314,8 @@ def build_recibo_pago(payment_entry_name: str) -> dict[str, Any]:
 		"socio_nombre": socio_info["socio_nombre"],
 		"numero_socio": socio_info["numero_socio"],
 		"lineas": lineas,
+		"subtotal": subtotal,
+		"descuento_total": descuento_total,
 		"total": total,
 		"mensaje_pie": config["mensaje_pie"],
 		"ancho_papel_mm": config["ancho_papel_mm"],
@@ -307,6 +373,10 @@ def render_recibo_texto(data: dict[str, Any]) -> str:
 		lineas_txt.append(_linea_concepto_monto(row.get("concepto", ""), flt(row.get("monto")), ancho))
 
 	lineas_txt.append(_separador(ancho))
+	descuento = flt(data.get("descuento_total"))
+	if descuento > 0:
+		lineas_txt.append(_linea_concepto_monto("SUBTOTAL", flt(data.get("subtotal")), ancho))
+		lineas_txt.append(_linea_concepto_monto("BONIFICACIÓN", -descuento, ancho))
 	total_txt = f"TOTAL: {format_monto_ar(flt(data.get('total')))}"
 	lineas_txt.append(total_txt[:ancho])
 	lineas_txt.append(_separador(ancho))

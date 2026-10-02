@@ -44,7 +44,8 @@ El antiguo "Pase por día" se reemplaza por **Entrenamiento por hora**: el patch
 
 ### Quincena y Entrenamiento por hora
 
-- Solo practicantes No Socio registrados; no exigen inscripción activa.
+- Para practicantes No Socio **y socios** (cualquier categoría; 02/10/2026), mismo precio; no exigen inscripción activa.
+  Desde el panel de Secretaría el acceso lista socios y No Socios no dados de baja.
 - Se generan desde Secretaría como `Cargo Socio` `modo_cobro = Unico` (factura al crearse).
 - Opcionalmente se registra el pago en el mismo paso (`Payment Entry`).
 - Monto: `Item Price` / `standard_rate` del ítem (editable); si es 0, se rechaza
@@ -131,11 +132,27 @@ Given un practicante No Socio
 When Secretaría genera `Quincena Gimnasio` con `registrar_pago = 0`
 Then se crea el cargo facturado por 31.000 y la factura queda impaga.
 
-## Scenario: socio no puede comprar Quincena / Entrenamiento por hora
+## Scenario: socio también compra Quincena / Entrenamiento por hora
 
 Given un socio (categoría distinta de No Socio)
-When se intenta crear un `Cargo Socio` de tipo `Quincena Gimnasio` o `Entrenamiento por Hora Gimnasio`
-Then se rechaza.
+When Secretaría genera `Entrenamiento por Hora Gimnasio` o `Quincena Gimnasio`
+Then se crea el `Cargo Socio` Único facturado al mismo precio que para No Socio (5.000 / 31.000)
+And el tipo de cargo fuerza `modo_cobro = Unico`.
+
+## Scenario: ex socio dado de baja vuelve como practicante No Socio
+
+Given un `Socio` en estado `Baja` con DNI 30111222
+When Secretaría da de alta un practicante No Socio con DNI 30111222
+Then no se crea una ficha nueva: se reutiliza la del ex socio
+And queda con `categoria = "No Socio"`, estado `Activo`, mismo `name` / historial
+And queda inscripto en Gimnasio Fitness, grupo No Socio
+And los datos de contacto informados en el alta actualizan la ficha.
+
+## Scenario: DNI de socio no dado de baja sigue rechazado
+
+Given un `Socio` Activo (o en cualquier estado distinto de `Baja`) con DNI 30111223
+When Secretaría intenta dar de alta un practicante No Socio con ese DNI
+Then se rechaza indicando que el DNI ya pertenece a un socio vigente.
 
 ## Scenario: sincronizar precios del gimnasio
 

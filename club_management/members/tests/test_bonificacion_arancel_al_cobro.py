@@ -256,6 +256,35 @@ class TestBonificacionArancelIntegracion(MembersTestCase):
 		self.assertTrue(result["payment_entries"])
 		self.assertEqual(flt(sync_saldo_deuda_socio(socio.name)), 0)
 
+	def test_recibo_muestra_bonificacion_y_total_neto(self) -> None:
+		from club_management.members.services.recibo_pago import build_recibo_pago, format_monto_ar
+
+		socio = self._socio_activo(dni="88001008", email="bonif.recibo@example.com")
+		inv = self._crear_si(socio.name, con_cuota=False, con_arancel=True)
+		self._crear_bonif(socio=socio.name, tipo_descuento="Monto fijo", valor=5000)
+		frappe.set_user(self._secretaria)
+		try:
+			result = registrar_cobro_compuesto(
+				socio.name,
+				[inv],
+				[{"mode_of_payment": "Cash", "amount": 23500}],
+				posting_date="2026-08-10",
+			)
+		finally:
+			frappe.set_user("Administrator")
+		pe = result["payment_entries"][0]
+		recibo = build_recibo_pago(pe)
+		self.assertAlmostEqual(flt(recibo["total"]), 23500.0, places=2)
+		self.assertAlmostEqual(flt(recibo["total"]), flt(frappe.db.get_value("Payment Entry", pe, "paid_amount")))
+		self.assertAlmostEqual(sum(flt(r["monto"]) for r in recibo["lineas"]), 23500.0, places=2)
+		bonif = [r for r in recibo["lineas"] if "BONIFICACI" in (r["concepto"] or "").upper()]
+		self.assertEqual(len(bonif), 1)
+		self.assertAlmostEqual(flt(bonif[0]["monto"]), -5000.0, places=2)
+		self.assertAlmostEqual(flt(recibo["descuento_total"]), 5000.0, places=2)
+		self.assertAlmostEqual(flt(recibo["subtotal"]), 28500.0, places=2)
+		self.assertIn("SUBTOTAL", recibo["texto"])
+		self.assertIn(f"TOTAL: {format_monto_ar(23500)}", recibo["texto"])
+
 	def test_detalle_dia_10_con_bonif(self) -> None:
 		socio = self._socio_activo(dni="88001007", email="bonif.det@example.com")
 		inv = self._crear_si(socio.name, con_cuota=False)

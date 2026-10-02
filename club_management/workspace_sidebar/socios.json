@@ -88,6 +88,18 @@
    "link_type": "Report",
    "show_arrow": 0,
    "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "table",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Deuda cuotas sociales",
+   "link_to": "Deuda cuotas sociales",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
   }
  ],
  "modified": "2026-09-04 18:05:22.806330",

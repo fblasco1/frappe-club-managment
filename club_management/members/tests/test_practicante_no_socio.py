@@ -95,6 +95,46 @@ class TestPracticanteNoSocio(MembersTestCase):
 		self.assertFalse(frappe.db.exists("Socio", name))
 		self.assertTrue(frappe.db.exists("Inscripcion Actividad", {"socio": nuevo}))
 
+	def _ex_socio_baja(self, dni: str, email: str) -> str:
+		from club_management.members.services.socio_transitions import cambiar_estado
+
+		socio = insert_socio(dni=dni, email=email)
+		cambiar_estado(socio.name, "Activo", motivo="Test")
+		cambiar_estado(socio.name, "Baja", motivo="Test baja")
+		return socio.name
+
+	def test_ex_socio_baja_reingresa_como_no_socio(self) -> None:
+		ex = self._ex_socio_baja("76001020", "ns.ex.socio@example.com")
+		name = crear_practicante_no_socio(
+			_datos_practicante(dni="76001020", email="ns.ex.nuevo@example.com")
+		)
+		self.assertEqual(name, ex)
+		doc = frappe.get_doc("Socio", name)
+		self.assertEqual(doc.categoria, CATEGORIA_NO_SOCIO)
+		self.assertEqual(doc.estado, "Activo")
+		self.assertEqual(doc.email, "ns.ex.nuevo@example.com")
+		self.assertEqual(frappe.db.count("Socio", {"dni": "76001020"}), 1)
+		self.assertTrue(
+			frappe.db.exists(
+				"Inscripcion Actividad",
+				{"socio": name, "grupo_actividad": GRUPO_GIMNASIO_NO_SOCIO, "estado": "Activa"},
+			)
+		)
+
+	def test_dni_de_socio_vigente_sigue_rechazado(self) -> None:
+		insert_socio(dni="76001021", email="ns.vigente@example.com")
+		with self.assertRaises(frappe.ValidationError):
+			crear_practicante_no_socio(_datos_practicante(dni="76001021", email="ns.vigente2@example.com"))
+
+	def test_convertir_ex_socio_conserva_su_numero(self) -> None:
+		ex = self._ex_socio_baja("76001022", "ns.ex.conv@example.com")
+		crear_practicante_no_socio(_datos_practicante(dni="76001022", email="ns.ex.conv2@example.com"))
+		nuevo = convertir_no_socio_a_socio(ex, categoria="Activo")
+		self.assertEqual(nuevo, ex)
+		doc = frappe.get_doc("Socio", nuevo)
+		self.assertEqual(doc.categoria, "Activo")
+		self.assertEqual(int(doc.numero_socio), int(ex))
+
 	def test_convertir_rechaza_si_no_es_no_socio(self) -> None:
 		socio = insert_socio(dni="76001010", email="ns.conv.rech@example.com")
 		with self.assertRaises(frappe.ValidationError):

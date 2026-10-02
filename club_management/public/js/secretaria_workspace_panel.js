@@ -852,7 +852,7 @@
 			});
 
 			$panel.find(".club-secretaria-pase-gimnasio").on("click", () => {
-				frappe.route_options = { categoria: "No Socio", estado: ["!=", "Baja"] };
+				frappe.route_options = { estado: ["!=", "Baja"] };
 				frappe.set_route("List", "Socio");
 			});
 

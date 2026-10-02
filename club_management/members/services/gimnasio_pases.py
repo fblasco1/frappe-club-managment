@@ -1,4 +1,4 @@
-"""Quincena y Entrenamiento por hora del gimnasio para No Socios (spec gimnasio_cobro_socios_no_socios.md)."""
+"""Quincena y Entrenamiento por hora del gimnasio, socios y No Socios (spec gimnasio_cobro_socios_no_socios.md)."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ from club_management.activities.data.otras_actividades_aranceles_icdpe import (
 	ITEM_GYM_QUINCENA_NO_SOCIO,
 	OTRAS_ACTIVIDADES_ITEM_SPECS,
 )
-from club_management.members.services.practicante_no_socio import es_no_socio
 from club_management.members.services.socio_operaciones_secretaria import (
 	ensure_secretaria_operacion_access,
 )
@@ -121,8 +120,6 @@ def generar_cargo_gimnasio(
 		frappe.throw(_("Tipo de cargo de gimnasio inválido: {0}").format(tipo), frappe.ValidationError)
 	if not frappe.db.exists("Socio", socio_name):
 		frappe.throw(_("Socio no encontrado"), frappe.DoesNotExistError)
-	if not es_no_socio(socio_name):
-		frappe.throw(_("{0} es solo para practicantes No Socio.").format(tipo), frappe.ValidationError)
 
 	item_code = ITEM_POR_TIPO[tipo]
 	if not frappe.db.exists("Item", item_code):

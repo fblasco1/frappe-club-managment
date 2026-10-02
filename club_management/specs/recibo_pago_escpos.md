@@ -20,6 +20,23 @@ comprobante impreso en la impresora térmica **Star Micronics BSC-10UD**
 
 ---
 
+## Scenario: cobro con bonificación de arancel (incidente 02/10/2026)
+
+Given una factura de arancel por 28.500 y una `Bonificacion Arancel` de 5.000
+And Secretaría registra el cobro neto de 23.500 (nota de crédito + `Payment Entry`)
+When se arma el recibo
+Then incluye una línea `BONIFICACIÓN …` con monto -5.000 (desde la nota de crédito `return_against` la factura)
+And `descuento_total` = 5.000 y `subtotal` = 28.500
+And el texto muestra `SUBTOTAL`, `BONIFICACIÓN` y `TOTAL: $ 23.500`
+And `total` = 23.500 = `paid_amount` del `Payment Entry`.
+
+## Scenario: cobro que no cubre toda la factura (parcial o medios mixtos)
+
+Given un `Payment Entry` cuyo `allocated_amount` para una factura es menor que su saldo neto
+When se arma el recibo
+Then se agrega la línea `Saldo no cubierto por este cobro` con la diferencia en negativo
+And `total` = `paid_amount` del `Payment Entry`.
+
 ## Scenario: datos del recibo tras registrar cobro
 
 Given un `Socio` con factura pendiente y líneas de concepto (cuota, arancel, etc.)
@@ -31,7 +48,8 @@ Then incluye un objeto `recibo` con:
   - `socio_nombre` = apellido y nombre del socio (p. ej. `Pérez, Ana`)
   - `numero_socio` = número de socio cuando exista
   - `lineas[]` con `concepto` y `monto` de cada ítem de la factura pagada
-  - `total` = suma de montos
+    (más las líneas de bonificación y de saldo no cubierto, ver escenarios abajo)
+  - `total` = `paid_amount` del `Payment Entry` (= suma de líneas)
   - `texto` = vista previa en texto plano
   - `escpos_base64` = bytes ESC/POS codificados en base64
   - `ancho_papel_mm` según Club Settings

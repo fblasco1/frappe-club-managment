@@ -91,6 +91,8 @@
 
 		"Deuda por actividad",
 
+		"Deuda cuotas sociales",
+
 	]);
 
 
@@ -102,6 +104,8 @@
 		"Pagos por equipo",
 
 		"Deuda por actividad",
+
+		"Deuda cuotas sociales",
 
 	]);
 
