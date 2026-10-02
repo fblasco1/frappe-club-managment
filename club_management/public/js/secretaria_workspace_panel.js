@@ -740,9 +740,6 @@
 					<button type="button" class="btn btn-default club-secretaria-practicante-gimnasio">
 						${__("+ Practicante gimnasio (No Socio)")}
 					</button>
-					<button type="button" class="btn btn-default club-secretaria-pase-gimnasio">
-						${__("Cobrar quincena / entrenamiento por hora")}
-					</button>
 					<button type="button" class="btn btn-default" disabled title="${__("Próximamente")}">
 						${__("Enviar recordatorio de deuda masivo")}
 					</button>
@@ -849,11 +846,6 @@
 				if (club_management_practicante_gimnasio?.open) {
 					club_management_practicante_gimnasio.open();
 				}
-			});
-
-			$panel.find(".club-secretaria-pase-gimnasio").on("click", () => {
-				frappe.route_options = { estado: ["!=", "Baja"] };
-				frappe.set_route("List", "Socio");
 			});
 
 			$panel.find(".club-secretaria-cobranza").on("click", () => {

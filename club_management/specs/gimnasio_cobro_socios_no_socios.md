@@ -45,7 +45,8 @@ El antiguo "Pase por día" se reemplaza por **Entrenamiento por hora**: el patch
 ### Quincena y Entrenamiento por hora
 
 - Para practicantes No Socio **y socios** (cualquier categoría; 02/10/2026), mismo precio; no exigen inscripción activa.
-  Desde el panel de Secretaría el acceso lista socios y No Socios no dados de baja.
+  Se cobran desde la ficha del socio / No Socio (botón «Cobrar quincena / entrenamiento por hora»);
+  el panel de Secretaría **no** tiene acceso rápido para esto.
 - Se generan desde Secretaría como `Cargo Socio` `modo_cobro = Unico` (factura al crearse).
 - Opcionalmente se registra el pago en el mismo paso (`Payment Entry`).
 - Monto: `Item Price` / `standard_rate` del ítem (editable); si es 0, se rechaza
