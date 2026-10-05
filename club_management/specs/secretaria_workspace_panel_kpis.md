@@ -60,6 +60,10 @@ Then ve el **% recaudado** = monto cobrado de cuotas / monto emitido × 100
 And debajo del porcentaje ve **Total cobrado** y **Saldo por cobrar** del mes (o de la categoría filtrada)
 And si no hay deuda emitida en el mes, muestra 0 %.
 
+Given líneas con el ítem legado `CLUB-Cuota-Social-Base` (facturas emitidas antes de la consolidación)
+When se calcula la vista **Cuotas sociales**
+Then esas líneas cuentan como cuota social por su código, aunque la descripción o el grupo del ítem no lo indiquen.
+
 ---
 
 ## Scenario: porcentaje aranceles recaudados con detalle por actividad

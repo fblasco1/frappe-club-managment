@@ -29,7 +29,7 @@ from club_management.members.services.cobranza_manual import (
 	sync_saldo_deuda_socio,
 )
 
-ESTADOS_ELEGIBLES = frozenset({"Activo", "Moroso"})
+ESTADOS_ELEGIBLES = frozenset({"Activo", "Moroso", "Vitalicio"})
 
 
 def es_dia_generacion_deuda(reference_date: str | date | None = None) -> bool:

@@ -24,6 +24,16 @@ Then la deuda del socio es $36.000
 
 ---
 
+## Scenario: ítem legado de cuota social
+
+Given facturas mensuales emitidas por la suscripción con el ítem legado `CLUB-Cuota-Social-Base`
+(además del canónico `ICDPE-CUOTA-SOCIAL` de Club Settings)
+When se ejecuta el informe para ese período
+Then la línea con el ítem legado cuenta como cuota social impaga
+And el socio figura como deudor igual que con el ítem canónico.
+
+---
+
 ## Scenario: cobros parciales imputados por concepto
 
 Given una factura con cuota social y arancel

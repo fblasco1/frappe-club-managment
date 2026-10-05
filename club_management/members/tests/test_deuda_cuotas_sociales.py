@@ -7,7 +7,10 @@ from unittest.mock import patch
 import frappe
 from frappe.utils import flt, today
 
-from club_management.members.data.cuotas_sociales_vigentes import CUOTA_SOCIAL_ITEM_CODE
+from club_management.members.data.cuotas_sociales_vigentes import (
+	CUOTA_SOCIAL_ITEM_CODE,
+	CUOTA_SOCIAL_LEGACY_ITEM_CODE,
+)
 from club_management.members.services.cobranza_manual import (
 	SALES_INVOICE_DOCTYPE,
 	_campo_periodo_cobro,
@@ -91,6 +94,29 @@ class TestDeudaCuotasSociales(MembersTestCase):
 		self._factura(socio, "10/2026", [(CUOTA_SOCIAL_ITEM_CODE, 36_000), (OTRO_ITEM, 20_000)])
 		_columns, data, *_rest = get_deuda_cuotas_sociales({})
 		self.assertEqual(flt(self._fila(data, socio.name)["deuda"]), 36_000.0)
+
+	def test_item_legado_cuenta_como_cuota_social(self) -> None:
+		if not frappe.db.exists("Item", CUOTA_SOCIAL_LEGACY_ITEM_CODE):
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": CUOTA_SOCIAL_LEGACY_ITEM_CODE,
+					"item_name": CUOTA_SOCIAL_LEGACY_ITEM_CODE,
+					"item_group": frappe.db.get_value("Item Group", {"is_group": 0}, "name")
+					or "All Item Groups",
+					"is_stock_item": 0,
+					"is_sales_item": 1,
+					"standard_rate": 31_000,
+				}
+			).insert(ignore_permissions=True)
+		socio = self._socio("75001009")
+		self._factura(socio, "09/2026", [(CUOTA_SOCIAL_LEGACY_ITEM_CODE, 31_000), (OTRO_ITEM, 20_000)])
+		_columns, data, *_rest = get_deuda_cuotas_sociales(
+			{"periodo_desde": "09/2026", "periodo_hasta": "09/2026"}
+		)
+		fila = self._fila(data, socio.name)
+		self.assertIsNotNone(fila)
+		self.assertEqual(flt(fila["deuda"]), 31_000.0)
 
 	def test_socio_sin_deuda_de_cuota_no_aparece(self) -> None:
 		socio = self._socio("75001003")

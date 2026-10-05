@@ -53,6 +53,17 @@ Then sigue permitido (`activar_socio_manual` actual).
 
 ---
 
+## Scenario: socio Vitalicio se inscribe en cualquier actividad
+
+Given un `Socio` con `estado = Vitalicio` (categoría Vitalicio)
+When Secretaría abre su ficha
+Then ve el botón **Inscribir en actividades** (igual que un socio `Activo`)
+When lo inscribe en cualquier actividad habilitada (incluidos grupos para socios)
+Then se crea la `Inscripcion Actividad` en `Activa`
+And el socio **conserva** `estado = Vitalicio` (no pasa a `Activo`).
+
+---
+
 ## Scenario: acceso restringido
 
 Given usuario sin `Secretaria` / `System Manager`
