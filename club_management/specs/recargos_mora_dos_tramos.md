@@ -21,7 +21,8 @@ si pago > 2.º venc. del período        → valor_mes_pago × (1 + 0,15)
 
 La mora al cobro aplica **solo** a:
 
-- **Cuota social**
+- **Cuota social** — ítem de Club Settings y el ítem legado `CLUB-Cuota-Social-Base` (presente en
+  facturas emitidas, p. ej. 08–09/2026), reconocido por código aunque cambie su grupo de ítem
 - **Aranceles de actividad** (ítem enlazado a Actividad / Grupo / Equipo)
 
 **No** aplican interés (ni post día 10 / 1.er vencimiento, ni post 2.º vencimiento / mes vencido):

@@ -1,0 +1,164 @@
+<style>
+	@page {
+		size: A4 portrait;
+		margin: 12mm 10mm;
+	}
+
+	.deuda-socios-pdf {
+		font-family: DejaVu Sans, Arial, Helvetica, sans-serif;
+		font-size: 10px;
+		color: #111;
+		width: 100%;
+	}
+
+	.deuda-socios-pdf h2 {
+		text-align: center;
+		font-size: 14px;
+		margin: 0 0 4px 0;
+	}
+
+	.deuda-socios-pdf .meta {
+		text-align: center;
+		color: #444;
+		font-size: 9px;
+		margin-bottom: 10px;
+	}
+
+	.deuda-socios-pdf table {
+		width: 100%;
+		border-collapse: collapse;
+		table-layout: fixed;
+	}
+
+	.deuda-socios-pdf thead {
+		display: table-header-group;
+	}
+
+	.deuda-socios-pdf th,
+	.deuda-socios-pdf td {
+		border: 1px solid #bbb;
+		padding: 4px 6px;
+		vertical-align: top;
+		line-height: 1.35;
+	}
+
+	.deuda-socios-pdf th {
+		background: #f2f2f2;
+		font-size: 9px;
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
+	}
+
+	.deuda-socios-pdf .col-nombre {
+		overflow-wrap: break-word;
+		white-space: normal;
+	}
+
+	.deuda-socios-pdf .col-periodos {
+		width: 22%;
+		white-space: normal;
+	}
+
+	.deuda-socios-pdf .col-deuda {
+		width: 13%;
+		text-align: right;
+		white-space: nowrap;
+	}
+
+	.deuda-socios-pdf .col-socios {
+		width: 11%;
+		text-align: right;
+		white-space: nowrap;
+	}
+
+	.deuda-socios-pdf tr.agg td {
+		font-weight: bold;
+		background: #fafafa;
+	}
+
+	.deuda-socios-pdf .socio-id {
+		color: #555;
+		font-size: 9px;
+	}
+
+	.deuda-socios-pdf .footer {
+		margin-top: 8px;
+		text-align: right;
+		color: #777;
+		font-size: 8px;
+	}
+</style>
+
+{%
+	var rows = (original_data && original_data.length) ? original_data : data;
+	var f = filters || {};
+	var es_lista = f.vista === "Lista de socios";
+	var concepto = f.concepto || "Todo";
+	var ver_cuota = concepto !== "Solo arancel";
+	var ver_arancel = concepto !== "Solo cuota social";
+	var ver_total = concepto === "Todo";
+%}
+
+<div class="deuda-socios-pdf">
+	<h2>{%= __(title || report.report_name) %}</h2>
+	<div class="meta">
+		{%= __(f.vista || "Por actividad") %} · {%= __(concepto) %}
+		{% if (f.periodo_desde || f.periodo_hasta) { %}
+			· {%= __("Períodos") %}: {%= frappe.utils.escape_html(f.periodo_desde || "…") %} — {%= frappe.utils.escape_html(f.periodo_hasta || "…") %}
+		{% } %}
+		{% if (f.categoria) { %} · {%= __("Categoría") %}: {%= frappe.utils.escape_html(f.categoria) %}{% } %}
+		{% if (f.estado) { %} · {%= __("Estado") %}: {%= frappe.utils.escape_html(f.estado) %}{% } %}
+		{% if (f.actividad) { %} · {%= __("Actividad") %}: {%= frappe.utils.escape_html(f.actividad) %}{% } %}
+		{% if (f.grupo_actividad) { %} · {%= __("Grupo") %}: {%= frappe.utils.escape_html(f.grupo_actividad) %}{% } %}
+		{% if (f.equipo_actividad) { %} · {%= __("Equipo") %}: {%= frappe.utils.escape_html(f.equipo_actividad) %}{% } %}
+	</div>
+
+	<table>
+		<thead>
+			<tr>
+				<th class="col-nombre">{%= es_lista ? __("Socio") : __("Nivel / Socio") %}</th>
+				<th class="col-periodos">{%= __("Períodos adeudados") %}</th>
+				{% if (ver_cuota) { %}<th class="col-deuda">{%= __("Cuota social") %}</th>{% } %}
+				{% if (ver_arancel) { %}<th class="col-deuda">{%= __("Arancel") %}</th>{% } %}
+				{% if (ver_total) { %}<th class="col-deuda">{%= __("Total") %}</th>{% } %}
+				{% if (!es_lista) { %}<th class="col-socios">{%= __("Socios deudores") %}</th>{% } %}
+			</tr>
+		</thead>
+		<tbody>
+			{% for (var i = 0; i < rows.length; i++) { %}
+				{%
+					var row = rows[i];
+					var indent = cint(row.indent);
+					var is_leaf = row.socio ? true : false;
+					var nombre = es_lista ? (row.nombre || row.socio) : (row.nivel || "");
+				%}
+				<tr class="{%= is_leaf ? "leaf" : "agg" %}">
+					<td class="col-nombre">
+						<span style="padding-left: {%= es_lista ? 0 : indent * 1.1 %}em">{%= frappe.utils.escape_html(nombre) %}</span>
+						{% if (is_leaf) { %}
+							<span class="socio-id">· N° {%= frappe.utils.escape_html(row.socio) %}{% if (row.actividades) { %} ({%= frappe.utils.escape_html(row.actividades) %}){% } %}</span>
+						{% } %}
+					</td>
+					<td class="col-periodos">{%= frappe.utils.escape_html(row.periodos || "") %}</td>
+					{% if (ver_cuota) { %}
+						<td class="col-deuda">{%= frappe.format(row.deuda_cuota_social, { fieldtype: "Currency" }) %}</td>
+					{% } %}
+					{% if (ver_arancel) { %}
+						<td class="col-deuda">{%= frappe.format(row.deuda_arancel, { fieldtype: "Currency" }) %}</td>
+					{% } %}
+					{% if (ver_total) { %}
+						<td class="col-deuda">{%= frappe.format(row.deuda_total, { fieldtype: "Currency" }) %}</td>
+					{% } %}
+					{% if (!es_lista) { %}
+						<td class="col-socios">{%= row.socios_deudores || "" %}</td>
+					{% } %}
+				</tr>
+			{% } %}
+		</tbody>
+	</table>
+
+	<p class="footer">
+		{%= __("Impreso el {0}", [frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string())]) %}
+		· A4 {%= __("vertical") %}
+	</p>
+</div>

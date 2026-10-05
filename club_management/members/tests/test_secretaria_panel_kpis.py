@@ -32,6 +32,26 @@ from club_management.members.test_helpers import MembersTestCase, insert_socio
 class TestSecretariaPanelKpis(MembersTestCase):
 	_REFERENCE = "2026-06-15"
 
+	def test_item_legado_cuenta_como_cuota_por_codigo(self) -> None:
+		from club_management.members.data.cuotas_sociales_vigentes import CUOTA_SOCIAL_LEGACY_ITEM_CODE
+		from club_management.members.services.cobranza_manual import get_club_settings
+		from club_management.members.services.secretaria_panel_kpis import (
+			_clasificar_linea_vista,
+			_cuota_item_codes,
+		)
+
+		cuota_items = _cuota_item_codes(get_club_settings())
+		self.assertIn(CUOTA_SOCIAL_LEGACY_ITEM_CODE, cuota_items)
+		self.assertEqual(
+			_clasificar_linea_vista(
+				CUOTA_SOCIAL_LEGACY_ITEM_CODE,
+				"Concepto sin etiqueta",
+				cuota_items=cuota_items,
+				arancel_map={},
+			),
+			"cuota",
+		)
+
 	def test_cuotas_sociales_kpi_saldo_por_cobrar(self) -> None:
 		data = _cuotas_sociales_kpi_payload(emitido=10_000.0, recaudado=6_500.0)
 		self.assertEqual(data["saldo_por_cobrar"], 3_500.0)
@@ -40,13 +60,14 @@ class TestSecretariaPanelKpis(MembersTestCase):
 		self.assertIn("saldo_por_cobrar_label", data)
 
 	def test_socio_metricas_total_y_delta(self) -> None:
+		morosos_antes = frappe.db.count("Socio", {"estado": "Moroso"})
 		insert_socio(dni="73101001", email="kpi.a@example.com", estado="Activo", saldo_deuda=5000)
 		insert_socio(dni="73101002", email="kpi.b@example.com", estado="Moroso")
 		insert_socio(dni="73101003", email="kpi.c@example.com", estado="Baja")
 
 		data = get_socio_metricas_payload(reference_date=self._REFERENCE)
 		self.assertEqual(data["morosos"], frappe.db.count("Socio", {"estado": "Moroso"}))
-		self.assertEqual(data["morosos"], 1)
+		self.assertEqual(data["morosos"], morosos_antes + 1)
 		self.assertGreaterEqual(data["total"], 2)
 		self.assertIn("delta_mes", data)
 		self.assertIn("total_mes_anterior", data)
@@ -71,10 +92,11 @@ class TestSecretariaPanelKpis(MembersTestCase):
 			self.assertGreaterEqual(tramo["monto"], 0)
 
 	def test_morosos_deuda_suma_saldo_deuda(self) -> None:
+		antes = get_morosos_deuda_total()
 		insert_socio(dni="73101010", email="mor.d1@example.com", estado="Moroso", saldo_deuda=1500)
 		insert_socio(dni="73101011", email="mor.d2@example.com", estado="Moroso", saldo_deuda=500)
 		insert_socio(dni="73101012", email="mor.d3@example.com", estado="Activo", saldo_deuda=9999)
-		self.assertEqual(get_morosos_deuda_total(), 2000.0)
+		self.assertAlmostEqual(get_morosos_deuda_total() - antes, 2000.0, places=2)
 
 	def test_count_socios_excluye_baja(self) -> None:
 		before = count_socios_total()

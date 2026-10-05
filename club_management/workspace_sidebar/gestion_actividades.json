@@ -118,14 +118,14 @@
    "icon": "table",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Deuda por actividad",
-   "link_to": "Deuda por actividad",
+   "label": "Deuda de socios",
+   "link_to": "Deuda de socios",
    "link_type": "Report",
    "show_arrow": 0,
    "type": "Link"
   }
  ],
- "modified": "2026-07-02 12:00:00.000000",
+ "modified": "2026-10-05 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Activities",
  "name": "Gestión de Actividades",

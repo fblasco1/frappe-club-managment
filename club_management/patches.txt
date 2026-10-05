@@ -99,3 +99,4 @@ club_management.patches.v1_0.rename_secretaria_workspace_label_socios
 club_management.patches.v1_0.gimnasio_cobro_no_socios
 club_management.patches.v1_0.gimnasio_precios_entrenamiento_hora
 club_management.patches.v1_0.sync_secretaria_sidebar_deuda_cuotas_sociales
+club_management.patches.v1_0.menu_deuda_de_socios

@@ -24,14 +24,14 @@ class TestSecretariaSidebarBoot(MembersTestCase):
 		pagos = items["Pagos por equipo"].get("report") or {}
 		self.assertEqual(pagos.get("report_type"), "Script Report")
 		self.assertEqual(pagos.get("ref_doctype"), "Inscripcion Actividad")
-		club_report = items["Deuda por actividad"].get("report") or {}
-		self.assertEqual(club_report.get("ref_doctype"), "Actividad")
 		self.assertNotIn("Deuda por equipo", items)
 		self.assertNotIn("Pagos del dia", items)
 		self.assertNotIn("Recaudacion por concepto", items)
-		cuotas = items["Deuda cuotas sociales"].get("report") or {}
-		self.assertEqual(cuotas.get("report_type"), "Script Report")
-		self.assertEqual(cuotas.get("ref_doctype"), "Socio")
+		self.assertNotIn("Deuda por actividad", items)
+		self.assertNotIn("Deuda cuotas sociales", items)
+		deuda = items["Deuda de socios"].get("report") or {}
+		self.assertEqual(deuda.get("report_type"), "Script Report")
+		self.assertEqual(deuda.get("ref_doctype"), "Socio")
 
 
 	def test_apply_boot_inyecta_sidebar_para_secretaria(self) -> None:

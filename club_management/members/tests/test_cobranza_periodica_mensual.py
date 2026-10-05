@@ -144,6 +144,48 @@ class TestCobranzaPeriodicaMensual(MembersTestCase):
 		result = generar_deuda_mensual_socios(reference_date=self._REFERENCE)
 		self.assertNotIn(socio.name, result.get("invoice_names", []))
 
+	def test_vitalicio_inscripto_recibe_solo_arancel_en_job_masivo(self) -> None:
+		actividad, item_code = self._actividad_con_arancel()
+		socio = insert_socio(dni="73001007", email="deuda.vital.arancel@example.com", categoria="Vitalicio")
+		frappe.db.set_value("Socio", socio.name, "estado", "Vitalicio")
+		inscribir_socio_selecciones(socio.name, [{"actividad": actividad}], activar=False)
+
+		result = generar_deuda_mensual_socios(reference_date=self._REFERENCE)
+		invoice_name = frappe.db.get_value(
+			SALES_INVOICE_DOCTYPE, {"socio": socio.name, "docstatus": 1}, "name"
+		)
+		self.assertIn(invoice_name, result.get("invoice_names", []))
+		item_codes = {row.item_code for row in frappe.get_doc(SALES_INVOICE_DOCTYPE, invoice_name).items}
+		self.assertEqual(item_codes, {item_code})
+
+	def _actividad_con_arancel(self) -> tuple[str, str]:
+		item_code = "TEST-ARANCEL-PERIODICO"
+		if not frappe.db.exists("Item", item_code):
+			item_group = frappe.db.get_value("Item Group", {}, "name") or "All Item Groups"
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": item_code,
+					"item_name": item_code,
+					"item_group": item_group,
+					"is_stock_item": 0,
+					"is_sales_item": 1,
+					"standard_rate": 7500,
+				}
+			).insert(ignore_permissions=True)
+		if frappe.db.exists("Actividad", "Zumba Periodico"):
+			return "Zumba Periodico", item_code
+		actividad = frappe.get_doc(
+			{
+				"doctype": "Actividad",
+				"titulo": "Zumba Periodico",
+				"habilitada": 1,
+				"usa_grupos": 0,
+				"item": item_code,
+			}
+		).insert(ignore_permissions=True).name
+		return actividad, item_code
+
 	def test_incluye_arancel_inscripcion_activa(self) -> None:
 		item_code = "TEST-ARANCEL-PERIODICO"
 		if not frappe.db.exists("Item", item_code):

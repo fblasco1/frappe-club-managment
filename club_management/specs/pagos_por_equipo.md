@@ -29,6 +29,26 @@ And **no** incluye la cuota social ni otros ítems.
 
 ---
 
+## Scenario: socio dado de baja después de pagar dentro del rango
+
+Given socio inscripto en `Equipo Actividad` E que pagó el arancel de septiembre
+And luego, en septiembre, se lo dio de baja (socio en `Baja` e inscripción pasada a `Baja`)
+When Secretaría ejecuta **Pagos por equipo** filtrando por E del 01/09 al 30/09
+Then la fila del socio figura con el arancel cobrado y su liquidación de entrenador
+And la columna **Estado** muestra `Baja`.
+
+Given una inscripción pasada a `Baja` **antes** de `fecha_desde`
+Then esa inscripción no se considera para el rango.
+
+Given una inscripción en `Baja` sin arancel cobrado en el rango
+When se marca «Incluir saldo cero»
+Then esa inscripción **no** agrega una fila en cero (solo las activas lo hacen).
+
+La fecha de baja de la inscripción es su última modificación (`modified`): la
+inscripción en `Baja` no se vuelve a editar en el flujo normal.
+
+---
+
 ## Scenario: liquidación entrenador con porcentaje configurable
 
 Given `Equipo Actividad` E con `pct_liquidacion_entrenador` = 70
@@ -74,6 +94,19 @@ And un `Payment Entry` imputado al concepto «Cuota Social …»
 When se calcula el arancel pagado del equipo
 Then el importe de arancel cobrado es **0** (no se prorratea el pago de cuota)
 And un excedente de mora sobre la cuota tampoco se cuenta como arancel.
+
+---
+
+## Scenario: cobro parcial sin concepto se imputa por línea
+
+Given SI con cuota social 10.000 (línea 1) y arancel 5.000 (línea 2)
+And un `Payment Entry` parcial de 12.500 sin concepto en la referencia
+When se calcula el arancel pagado en el rango del cobro
+Then el cobro cubre primero la cuota (10.000) y el resto va al arancel
+And el arancel cobrado es **2.500** con `cantidad_pagos` = 1.
+
+Los tests registran cobros reales (`Payment Entry`); bajar `outstanding_amount`
+a mano no cuenta como pago.
 
 ---
 

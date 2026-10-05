@@ -6,7 +6,6 @@ import json
 import os
 
 import frappe
-from frappe.tests.utils import FrappeTestCase
 
 from club_management.members.setup.inicio_workspace import (
 	CLUB_DESK_NAV_TABS,
@@ -16,7 +15,7 @@ from club_management.members.setup.inicio_workspace import (
 	SECRETARIA_WORKSPACE_NAME,
 	set_secretaria_default_workspace,
 )
-from club_management.members.test_helpers import ensure_role_secretaria_exists
+from club_management.members.test_helpers import MembersTestCase, ensure_role_secretaria_exists
 
 
 def _inicio_json_path() -> str:
@@ -39,7 +38,7 @@ def _gestion_actividades_json_path() -> str:
 	)
 
 
-class TestInicioWorkspace(FrappeTestCase):
+class TestInicioWorkspace(MembersTestCase):
 	def test_inicio_fixture_esta_oculto_y_vacio(self) -> None:
 		with open(_inicio_json_path(), encoding="utf-8") as handle:
 			data = json.load(handle)
@@ -81,7 +80,7 @@ class TestInicioWorkspace(FrappeTestCase):
 		self.assertEqual(len(CLUB_DESK_REPORTS), 3)
 		self.assertEqual(
 			list(CLUB_DESK_REPORTS),
-			["Cobranza por fechas", "Pagos por equipo", "Deuda por actividad"],
+			["Cobranza por fechas", "Pagos por equipo", "Deuda de socios"],
 		)
 		self.assertNotIn("Pagos del dia", CLUB_DESK_REPORTS)
 		self.assertNotIn("Recaudacion por concepto", CLUB_DESK_REPORTS)

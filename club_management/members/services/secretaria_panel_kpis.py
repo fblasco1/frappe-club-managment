@@ -14,6 +14,7 @@ from club_management.activities.services.inscripcion_socio import (
 	INSCRIPCION_DOCTYPE,
 	resolve_item_arancel_inscripcion,
 )
+from club_management.members.data.cuotas_sociales_vigentes import CUOTA_SOCIAL_LEGACY_ITEM_CODE
 from club_management.members.services.cobranza_manual import (
 	SALES_INVOICE_DOCTYPE,
 	_campo_socio_en,
@@ -527,7 +528,7 @@ def get_socio_metricas_payload(*, reference_date: str | date | None = None) -> d
 
 
 def _cuota_item_codes(settings: frappe._dict) -> set[str]:
-	codes = {settings.item_cuota_social}
+	codes = {settings.item_cuota_social, CUOTA_SOCIAL_LEGACY_ITEM_CODE}
 	for row in settings.cuotas_categoria or []:
 		if row.item:
 			codes.add(row.item)

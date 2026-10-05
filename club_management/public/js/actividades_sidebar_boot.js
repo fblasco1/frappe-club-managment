@@ -14,9 +14,9 @@
 			report_type: "Script Report",
 			ref_doctype: "Inscripcion Actividad",
 		},
-		"Deuda por actividad": {
+		"Deuda de socios": {
 			report_type: "Script Report",
-			ref_doctype: "Actividad",
+			ref_doctype: "Socio",
 		},
 	};
 
@@ -87,10 +87,10 @@
 			child: 1,
 		},
 		{
-			label: __("Deuda por actividad"),
+			label: __("Deuda de socios"),
 			type: "Link",
 			link_type: "Report",
-			link_to: "Deuda por actividad",
+			link_to: "Deuda de socios",
 			icon: "table",
 			child: 1,
 		},

@@ -589,6 +589,16 @@ class TestMoraExencionFederativaYCargoExtra(MembersTestCase):
 		if cuota:
 			self.assertTrue(concepto_sujeto_a_mora(cuota))
 
+	def test_item_legado_cuota_social_sujeto_a_mora_por_codigo(self) -> None:
+		from club_management.finance.setup.icdpe_income_item_groups import LEAF_CARGOS
+		from club_management.members.data.cuotas_sociales_vigentes import CUOTA_SOCIAL_LEGACY_ITEM_CODE
+		from club_management.members.services.mora_al_cobro import _item_codes_cuota_social
+
+		self.assertIn(CUOTA_SOCIAL_LEGACY_ITEM_CODE, _item_codes_cuota_social())
+		self._ensure_item(CUOTA_SOCIAL_LEGACY_ITEM_CODE, "Cuota Social Base", 31000, item_group=LEAF_CARGOS)
+		frappe.db.set_value("Item", CUOTA_SOCIAL_LEGACY_ITEM_CODE, "item_group", LEAF_CARGOS)
+		self.assertTrue(concepto_sujeto_a_mora(CUOTA_SOCIAL_LEGACY_ITEM_CODE))
+
 	def test_federativa_sin_mora_post_vencimiento(self) -> None:
 		from club_management.finance.setup.icdpe_income_item_groups import LEAF_FEDERATIVAS
 		from club_management.members.services.mora_al_cobro import asegurar_ajuste_mora_factura

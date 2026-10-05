@@ -75,10 +75,10 @@ SIDEBAR_ITEMS: list[dict] = [
 		"child": 1,
 	},
 	{
-		"label": "Deuda por actividad",
+		"label": "Deuda de socios",
 		"type": "Link",
 		"link_type": "Report",
-		"link_to": "Deuda por actividad",
+		"link_to": "Deuda de socios",
 		"icon": "table",
 		"child": 1,
 	},

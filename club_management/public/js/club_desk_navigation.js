@@ -93,6 +93,8 @@
 
 		"Deuda cuotas sociales",
 
+		"Deuda de socios",
+
 	]);
 
 
@@ -107,6 +109,8 @@
 
 		"Deuda cuotas sociales",
 
+		"Deuda de socios",
+
 	]);
 
 
@@ -118,6 +122,8 @@
 		"Pagos por equipo",
 
 		"Deuda por actividad",
+
+		"Deuda de socios",
 
 	]);
 

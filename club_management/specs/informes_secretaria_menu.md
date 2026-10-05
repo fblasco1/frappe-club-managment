@@ -11,17 +11,17 @@ When abre el menú de informes
 Then ve exactamente estos Script Reports (labels):
 - **Cobranza por fechas**
 - **Pagos por equipo**
-- **Deuda por actividad**
-And **no** ve como ítems de menú: «Pagos del dia», «Recaudacion por concepto», «Deuda por equipo».
+- **Deuda de socios** (spec `deuda_socios.md`)
+And **no** ve como ítems de menú: «Pagos del dia», «Recaudacion por concepto», «Deuda por equipo», «Deuda por actividad», «Deuda cuotas sociales».
 
 ---
 
-## Scenario: informe exclusivo de Secretaría
+## Scenario: informes de deuda unificados
 
-Given rol Secretaría o System Manager
-When abre el menú de informes del workspace **Socios**
-Then además de los tres canónicos ve **Deuda cuotas sociales** (spec `deuda_cuotas_sociales.md`)
-And ese informe no aparece en el menú de Gestión de Actividades.
+Given los informes legados **Deuda por actividad** y **Deuda cuotas sociales**
+When Secretaría o Actividades abren el menú de informes
+Then solo ven **Deuda de socios** (mismo ítem en ambos workspaces)
+And los legados siguen accesibles por URL directa.
 
 ---
 

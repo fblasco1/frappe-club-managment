@@ -19,6 +19,7 @@ from frappe import _
 from frappe.utils import flt, getdate, today
 
 from club_management.finance.setup.icdpe_income_item_groups import LEAF_CUOTAS
+from club_management.members.data.cuotas_sociales_vigentes import CUOTA_SOCIAL_LEGACY_ITEM_CODE
 from club_management.members.services.cargo_extra_conceptos import item_es_arancel_actividad
 from club_management.members.services.cobranza_manual import (
 	SALES_INVOICE_DOCTYPE,
@@ -42,7 +43,7 @@ TramoMora = Literal["ninguno", "post_primer", "post_segundo"]
 def _item_codes_cuota_social() -> set[str]:
 	"""Ítems de cuota social configurados en Club Settings."""
 	settings = get_club_settings()
-	codes: set[str] = set()
+	codes: set[str] = {CUOTA_SOCIAL_LEGACY_ITEM_CODE}
 	base = (getattr(settings, "item_cuota_social", None) or "").strip()
 	if base:
 		codes.add(base)

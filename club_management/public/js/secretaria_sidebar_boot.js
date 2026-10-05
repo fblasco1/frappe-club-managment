@@ -14,11 +14,7 @@
 			report_type: "Script Report",
 			ref_doctype: "Inscripcion Actividad",
 		},
-		"Deuda por actividad": {
-			report_type: "Script Report",
-			ref_doctype: "Actividad",
-		},
-		"Deuda cuotas sociales": {
+		"Deuda de socios": {
 			report_type: "Script Report",
 			ref_doctype: "Socio",
 		},
@@ -69,18 +65,10 @@
 			child: 1,
 		},
 		{
-			label: __("Deuda por actividad"),
+			label: __("Deuda de socios"),
 			type: "Link",
 			link_type: "Report",
-			link_to: "Deuda por actividad",
-			icon: "table",
-			child: 1,
-		},
-		{
-			label: __("Deuda cuotas sociales"),
-			type: "Link",
-			link_type: "Report",
-			link_to: "Deuda cuotas sociales",
+			link_to: "Deuda de socios",
 			icon: "table",
 			child: 1,
 		},
@@ -114,6 +102,8 @@
 			"Report:Deuda por equipo",
 			"Report:Recaudacion por concepto",
 			"Report:Pagos del dia",
+			"Report:Deuda por actividad",
+			"Report:Deuda cuotas sociales",
 		]);
 		const filtered = enriched.filter((item) => !legacyReportLinks.has(item_key(item)));
 		const filteredKeys = new Set(filtered.map((item) => item_key(item)));

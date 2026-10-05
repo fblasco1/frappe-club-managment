@@ -270,6 +270,37 @@ class TestInscripcionGestionDesk(MembersTestCase):
 		finally:
 			frappe.set_user("Administrator")
 
+	def test_vitalicio_se_inscribe_y_conserva_estado(self) -> None:
+		actividad = self._ensure_actividad("Actividad Vitalicio Insc")
+		socio = insert_socio(dni="72001007", email="vitalicio.insc@example.com", categoria="Vitalicio")
+		frappe.db.set_value("Socio", socio.name, "estado", "Vitalicio")
+
+		frappe.set_user(self._secretaria)
+		try:
+			result = inscribir_actividades_desk(socio.name, [{"actividad": actividad}])
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(result["estado"], "Vitalicio")
+		self.assertTrue(
+			frappe.db.exists(
+				"Inscripcion Actividad",
+				{"socio": socio.name, "actividad": actividad, "estado": "Activa"},
+			)
+		)
+
+	def test_boton_inscribir_visible_para_vitalicio(self) -> None:
+		from pathlib import Path
+
+		js = (
+			Path(__file__).resolve().parents[1] / "doctype" / "socio" / "socio.js"
+		).read_text(encoding="utf-8")
+		self.assertIn("ESTADOS_INSCRIBIBLES", js)
+		inicio = js.index("ESTADOS_INSCRIBIBLES = [")
+		lista = js[inicio : js.index("]", inicio)]
+		for estado in ("Pendiente de Inscripción", "Activo", "Vitalicio"):
+			self.assertIn(f'"{estado}"', lista)
+
 	def test_usuario_sin_rol_no_puede_listar_ni_dar_baja(self) -> None:
 		socio = insert_socio(dni="72001005", email="perm.insc@example.com")
 		ins_name = self._inscribir_zumba(socio.name)

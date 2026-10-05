@@ -12,9 +12,20 @@ Job programado que emite deuda a todos los socios elegibles el **primer día** (
 Incluir socios con `estado` en:
 - `Activo`
 - `Moroso` (nueva deuda del mes igualmente; moroso se reevalúa aparte)
+- `Vitalicio`: la cuota social resuelve a 0, así que solo se factura si tiene aranceles
+  de actividades o cargos extra; sin líneas no se emite factura.
 
 Excluir:
-- `Baja`, `Vitalicio` (cuota 0), `Pendiente de Validación`, `Pendiente de Pago`, `Pendiente de Inscripción`, `Suspendido` (configurable; default excluir Suspendido).
+- `Baja`, `Pendiente de Validación`, `Pendiente de Pago`, `Pendiente de Inscripción`, `Suspendido` (configurable; default excluir Suspendido).
+
+---
+
+## Scenario: vitalicio inscripto en una actividad paga solo el arancel
+
+Given un `Socio` con `estado = Vitalicio` (categoría Vitalicio) inscripto en una actividad con arancel
+When corre el job `generar_deuda_mensual_socios`
+Then se emite su factura del mes con **solo** la línea del arancel (sin cuota social)
+And un vitalicio sin actividades ni cargos no recibe factura.
 
 ---
 

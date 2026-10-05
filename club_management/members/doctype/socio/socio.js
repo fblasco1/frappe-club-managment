@@ -236,7 +236,7 @@ club_management_socio_desk.add_operaciones_buttons = function (frm) {
 	if (["Pendiente de Pago", "Pendiente de Inscripción", "Suspendido", "Pendiente de Validación"].includes(estado)) {
 		frm.add_custom_button(__("Activar socio"), () => club_management_socio_desk.call_op(frm, "activar_socio"), group);
 	}
-	if (estado === "Pendiente de Inscripción" || estado === "Activo") {
+	if (club_management_socio_desk.ESTADOS_INSCRIBIBLES.includes(estado)) {
 		frm.add_custom_button(
 			__("Inscribir en actividades"),
 			() => club_management_socio_desk.dialog_inscripcion(frm),
@@ -664,6 +664,7 @@ club_management_socio_desk.crear_bonificacion_arancel = function (frm) {
 };
 
 club_management_socio_desk.CATEGORIA_NO_SOCIO = "No Socio";
+club_management_socio_desk.ESTADOS_INSCRIBIBLES = ["Pendiente de Inscripción", "Activo", "Vitalicio"];
 club_management_socio_desk.TIPOS_PASE_GIMNASIO = ["Entrenamiento por Hora Gimnasio", "Quincena Gimnasio"];
 
 club_management_socio_desk.crear_bonificacion_recurrente = function (frm) {

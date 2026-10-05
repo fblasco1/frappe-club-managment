@@ -19,7 +19,7 @@ CLUB_DESK_NAV_TABS: list[tuple[str, str]] = [
 CLUB_DESK_REPORTS: tuple[str, ...] = (
 	"Cobranza por fechas",
 	"Pagos por equipo",
-	"Deuda por actividad",
+	"Deuda de socios",
 )
 
 # Informes retirados del menú (aliases / absorbidos).
@@ -27,6 +27,8 @@ CLUB_DESK_REPORTS_LEGACY: tuple[str, ...] = (
 	"Recaudacion por concepto",
 	"Pagos del dia",
 	"Deuda por equipo",
+	"Deuda por actividad",
+	"Deuda cuotas sociales",
 )
 
 RETIRED_INICIO_CONTENT: list[dict] = []
