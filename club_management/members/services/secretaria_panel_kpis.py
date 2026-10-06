@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date, timedelta
 from typing import Any
 
@@ -29,6 +30,10 @@ from club_management.members.services.concepto_informe_label import (
 	agrupacion_tipo_concepto,
 	etiqueta_concepto_informe_desde_linea_si,
 )
+from club_management.members.services.mora_al_cobro import (
+	MORA_SUFFIX,
+	fechas_vencimiento_periodo,
+)
 
 SOCIO_DOCTYPE = "Socio"
 ESTADOS_EXCLUIDOS_TOTAL = frozenset({"Baja"})
@@ -48,6 +53,13 @@ COBRABILIDAD_VISTAS = (
 	("federativa", "Federativas"),
 	("otro", "Otros conceptos"),
 )
+TRAMOS_MORA = (
+	("1", "1 mes"),
+	("2", "2 meses"),
+	("3", "3 meses"),
+	("4_mas", "+4 meses"),
+)
+TRAMOS_MORA_1_3 = frozenset({"1", "2", "3"})
 CATEGORIAS_HERMANO = frozenset({"2° Hermano", "3° Hermano"})
 _EDAD_MAYORIA = 18
 
@@ -155,63 +167,102 @@ def count_altas_bajas_mes(*, reference_date: str | date | None = None) -> dict[s
 	return {"altas": altas, "bajas": bajas}
 
 
-def _count_periodos_cuota_impagos(socio_name: str) -> int:
-	if not erpnext_cobranza_disponible():
-		return 0
-	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
-	campo_periodo = _campo_periodo_cobro()
-	if not campo_socio or not campo_periodo:
-		return 0
-	rows = frappe.get_all(
-		SALES_INVOICE_DOCTYPE,
-		filters={
-			campo_socio: socio_name,
-			"docstatus": 1,
-			"outstanding_amount": [">", 0],
-		},
-		fields=["name", campo_periodo],
-	)
-	periodos: set[str] = set()
-	for row in rows:
-		periodo = (row.get(campo_periodo) or "").strip()
-		if not periodo or periodo.endswith(RECARGO_SUFFIX):
-			continue
-		periodos.add(periodo)
-	return len(periodos)
+def _periodo_mes_base(periodo: str | None) -> str:
+	raw = (periodo or "").strip()
+	for suffix in (MORA_SUFFIX, RECARGO_SUFFIX):
+		if raw.endswith(suffix):
+			return raw[: -len(suffix)]
+	return raw
 
 
-def get_mora_1_3_meses_payload() -> dict[str, Any]:
-	"""Socios con 1–3 períodos mensuales impagos y monto total de su deuda."""
-	clasificacion = get_mora_clasificacion_payload()
-	tramo = next(t for t in clasificacion["tramos"] if t["key"] == "1_3")
+def contar_meses_vencidos(
+	periodos: list[str],
+	*,
+	as_of: date,
+	dia_primer_vencimiento: int = 10,
+	dia_segundo_vencimiento: str | None = "20",
+) -> int:
+	"""Meses distintos impagos cuyo 2.º vencimiento ya pasó a `as_of`."""
+	vencidos: set[str] = set()
+	for periodo in periodos:
+		base = _periodo_mes_base(periodo)
+		fechas = fechas_vencimiento_periodo(
+			base,
+			dia_primer_vencimiento=dia_primer_vencimiento,
+			dia_segundo_vencimiento=dia_segundo_vencimiento,
+		)
+		if fechas and as_of > fechas[1]:
+			vencidos.add(base)
+	return len(vencidos)
+
+
+def tramo_mora_por_meses(meses: int) -> str | None:
+	if meses < 1:
+		return None
+	return "4_mas" if meses >= 4 else str(meses)
+
+
+def get_mora_1_3_meses_payload(*, reference_date: str | date | None = None) -> dict[str, Any]:
+	"""Socios con 1 a 3 meses vencidos impagos y monto total de su deuda."""
+	tramos = get_mora_clasificacion_payload(reference_date=reference_date)["tramos"]
+	seleccion = [t for t in tramos if t["key"] in TRAMOS_MORA_1_3]
+	monto = round(sum(flt(t["monto"]) for t in seleccion), 2)
 	return {
-		"cantidad": tramo["cantidad"],
-		"monto": tramo["monto"],
-		"monto_label": tramo["monto_label"],
+		"cantidad": sum(int(t["cantidad"]) for t in seleccion),
+		"monto": monto,
+		"monto_label": format_monto_ar(monto),
 	}
 
 
-def get_mora_clasificacion_payload() -> dict[str, Any]:
-	"""Clasifica deuda por antigüedad (períodos mensuales impagos): 1–3 y 4+."""
+def get_mora_clasificacion_payload(*, reference_date: str | date | None = None) -> dict[str, Any]:
+	"""Clasifica socios por cantidad de meses vencidos impagos: 1, 2, 3, +4."""
+	as_of = getdate(reference_date or today())
 	buckets = {
-		"1_3": {"key": "1_3", "label": "1–3 meses", "cantidad": 0, "monto": 0.0},
-		"4_mas": {"key": "4_mas", "label": "4+ meses", "cantidad": 0, "monto": 0.0},
+		key: {"key": key, "label": label, "cantidad": 0, "monto": 0.0} for key, label in TRAMOS_MORA
 	}
-	rows = frappe.get_all(
-		SOCIO_DOCTYPE,
-		filters={"estado": ["not in", list(ESTADOS_EXCLUIDOS_TOTAL)], "saldo_deuda": [">", 0]},
-		fields=["name", "saldo_deuda"],
-	)
-	for row in rows:
-		periodos = _count_periodos_cuota_impagos(row.name)
-		if periodos < 1:
-			continue
-		key = "1_3" if periodos <= 3 else "4_mas"
-		buckets[key]["cantidad"] += 1
-		buckets[key]["monto"] += flt(row.saldo_deuda)
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE) if erpnext_cobranza_disponible() else None
+	campo_periodo = _campo_periodo_cobro() if campo_socio else None
+	if campo_socio and campo_periodo:
+		settings = get_club_settings()
+		dia_v1 = int(settings.dia_primer_vencimiento or 10)
+		dia_v2 = settings.dia_segundo_vencimiento or "20"
+		socios = {
+			row.name: flt(row.saldo_deuda)
+			for row in frappe.get_all(
+				SOCIO_DOCTYPE,
+				filters={"estado": ["not in", list(ESTADOS_EXCLUIDOS_TOTAL)]},
+				fields=["name", "saldo_deuda"],
+			)
+		}
+		periodos_por_socio: dict[str, list[str]] = {}
+		for row in frappe.get_all(
+			SALES_INVOICE_DOCTYPE,
+			filters={
+				campo_socio: ["is", "set"],
+				"docstatus": 1,
+				"outstanding_amount": [">", 0],
+			},
+			fields=[campo_socio, campo_periodo],
+		):
+			socio = row.get(campo_socio)
+			if socio in socios:
+				periodos_por_socio.setdefault(socio, []).append(row.get(campo_periodo) or "")
+		for socio, periodos in periodos_por_socio.items():
+			key = tramo_mora_por_meses(
+				contar_meses_vencidos(
+					periodos,
+					as_of=as_of,
+					dia_primer_vencimiento=dia_v1,
+					dia_segundo_vencimiento=dia_v2,
+				)
+			)
+			if not key:
+				continue
+			buckets[key]["cantidad"] += 1
+			buckets[key]["monto"] += socios[socio]
 
 	tramos: list[dict[str, Any]] = []
-	for key in ("1_3", "4_mas"):
+	for key, _label in TRAMOS_MORA:
 		bucket = buckets[key]
 		tramos.append(
 			{
@@ -223,7 +274,80 @@ def get_mora_clasificacion_payload() -> dict[str, Any]:
 	return {"tramos": tramos}
 
 
-def _finalize_tendencia_dias(dias: list[dict[str, Any]]) -> None:
+def _bajas_inscripcion_en_rango(desde: date, hasta: date) -> list[str]:
+	"""Inscripciones cuyo `estado` pasó a Baja dentro del rango (historial de versiones)."""
+	rows = frappe.get_all(
+		"Version",
+		filters={
+			"ref_doctype": INSCRIPCION_DOCTYPE,
+			"creation": ["between", [f"{desde} 00:00:00", f"{hasta} 23:59:59"]],
+			"data": ["like", '%"estado"%'],
+		},
+		fields=["docname", "data"],
+	)
+	bajas: list[str] = []
+	for row in rows:
+		try:
+			changed = json.loads(row.data or "{}").get("changed") or []
+		except ValueError:
+			continue
+		if any(len(c) >= 3 and c[0] == "estado" and c[2] == "Baja" for c in changed):
+			bajas.append(row.docname)
+	return bajas
+
+
+def get_actividades_movimientos(
+	*,
+	reference_date: str | date | None = None,
+	dias: int = 30,
+	limit: int | None = 3,
+) -> dict[str, Any]:
+	"""Actividades con más altas + bajas de inscripciones en los últimos `dias` días."""
+	hasta = getdate(reference_date or today())
+	desde = hasta - timedelta(days=dias - 1)
+	stats: dict[str, dict[str, Any]] = {}
+
+	def _row(actividad: str) -> dict[str, Any]:
+		return stats.setdefault(
+			actividad, {"actividad": actividad, "altas": 0, "bajas": 0, "total": 0}
+		)
+
+	for actividad in frappe.get_all(
+		INSCRIPCION_DOCTYPE,
+		filters={"fecha_inscripcion": ["between", [desde, hasta]]},
+		pluck="actividad",
+	):
+		if actividad:
+			_row(actividad)["altas"] += 1
+
+	bajas = _bajas_inscripcion_en_rango(desde, hasta)
+	if bajas:
+		actividad_por_inscripcion = dict(
+			frappe.get_all(
+				INSCRIPCION_DOCTYPE,
+				filters={"name": ["in", sorted(set(bajas))]},
+				fields=["name", "actividad"],
+				as_list=True,
+			)
+		)
+		for inscripcion in bajas:
+			actividad = actividad_por_inscripcion.get(inscripcion)
+			if actividad:
+				_row(actividad)["bajas"] += 1
+
+	for row in stats.values():
+		row["total"] = row["altas"] + row["bajas"]
+	ordenadas = sorted(
+		(row for row in stats.values() if row["total"] > 0),
+		key=lambda r: (-r["total"], -r["altas"], r["actividad"]),
+	)
+	if limit is not None:
+		ordenadas = ordenadas[:limit]
+	return {"desde": str(desde), "hasta": str(hasta), "dias": dias, "actividades": ordenadas}
+
+
+def _finalize_tendencia_dias(dias: list[dict[str, Any]]) -> dict[str, Any]:
+	"""Acumula la serie y devuelve el resumen del mes (emitido, recaudado, %, saldo)."""
 	emitido_acum = 0.0
 	recaudado_acum = 0.0
 	for row in dias:
@@ -231,6 +355,25 @@ def _finalize_tendencia_dias(dias: list[dict[str, Any]]) -> None:
 		recaudado_acum += flt(row.pop("recaudado_dia", 0))
 		row["recaudado"] = round(recaudado_acum, 2)
 		row["deuda"] = round(max(emitido_acum - recaudado_acum, 0), 2)
+	emitido = round(emitido_acum, 2)
+	recaudado = round(recaudado_acum, 2)
+	saldo = round(max(emitido_acum - recaudado_acum, 0), 2)
+	return {
+		"emitido": emitido,
+		"recaudado": recaudado,
+		"porcentaje": _pct(recaudado, emitido),
+		"saldo": saldo,
+		"emitido_label": format_monto_ar(emitido),
+		"recaudado_label": format_monto_ar(recaudado),
+		"saldo_label": format_monto_ar(saldo),
+	}
+
+
+def _tendencia_hasta_dia(first: date, last: date) -> int:
+	hoy = getdate(today())
+	if first <= hoy <= last:
+		return hoy.day
+	return last.day
 
 
 def _dia_en_mes_periodo(
@@ -310,16 +453,15 @@ def get_recaudacion_tendencia_payload(
 		"disponible": False,
 		"vista": vista_norm,
 		"vistas": vistas,
+		"hasta_dia": _tendencia_hasta_dia(first, last),
 	}
 	if not erpnext_cobranza_disponible():
-		_finalize_tendencia_dias(dias)
-		return payload
+		return {**payload, "resumen": _finalize_tendencia_dias(dias)}
 
 	campo_periodo = _campo_periodo_cobro()
 	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
 	if not campo_periodo or not campo_socio:
-		_finalize_tendencia_dias(dias)
-		return payload
+		return {**payload, "resumen": _finalize_tendencia_dias(dias)}
 
 	settings = get_club_settings()
 	cuota_items = _cuota_item_codes(settings)
@@ -331,8 +473,8 @@ def get_recaudacion_tendencia_payload(
 		fields=["name", "posting_date", "grand_total", campo_socio],
 	)
 	if not invoices:
-		_finalize_tendencia_dias(dias)
-		return {**payload, "dias": dias, "disponible": True}
+		resumen = _finalize_tendencia_dias(dias)
+		return {**payload, "dias": dias, "disponible": True, "resumen": resumen}
 
 	socio_ids = {row.get(campo_socio) for row in invoices if row.get(campo_socio)}
 	socio_categorias: dict[str, str | None] = {}
@@ -428,8 +570,8 @@ def get_recaudacion_tendencia_payload(
 				continue
 			by_day[day]["recaudado_dia"] += paid
 
-	_finalize_tendencia_dias(dias)
-	return {**payload, "dias": dias, "disponible": True}
+	resumen = _finalize_tendencia_dias(dias)
+	return {**payload, "dias": dias, "disponible": True, "resumen": resumen}
 
 
 def _agrupar_modo_pago(mode: str | None) -> str:
@@ -505,16 +647,20 @@ def get_socio_metricas_payload(*, reference_date: str | date | None = None) -> d
 	morosos = frappe.db.count(SOCIO_DOCTYPE, {"estado": "Moroso"})
 	morosos_deuda = get_morosos_deuda_total()
 	mora_clasificacion = get_mora_clasificacion_payload()
-	mora_1_3 = next(
-		(t for t in mora_clasificacion["tramos"] if t["key"] == "1_3"),
-		{"cantidad": 0, "monto": 0.0, "monto_label": format_monto_ar(0)},
-	)
+	tramos_1_3 = [t for t in mora_clasificacion["tramos"] if t["key"] in TRAMOS_MORA_1_3]
+	monto_1_3 = round(sum(flt(t["monto"]) for t in tramos_1_3), 2)
+	mora_1_3 = {
+		"cantidad": sum(int(t["cantidad"]) for t in tramos_1_3),
+		"monto": monto_1_3,
+		"monto_label": format_monto_ar(monto_1_3),
+	}
 	return {
 		"total": total,
 		"segmentos": segmentos,
 		"total_mes_anterior": total_mes_anterior,
 		"delta_mes": delta,
 		"altas_bajas": count_altas_bajas_mes(reference_date=ref),
+		"actividades_movimientos": get_actividades_movimientos(reference_date=ref),
 		"morosos": morosos,
 		"morosos_deuda": morosos_deuda,
 		"morosos_deuda_label": format_monto_ar(morosos_deuda),
@@ -570,6 +716,7 @@ def _cuotas_sociales_kpi_payload(*, emitido: float, recaudado: float) -> dict[st
 		"emitido": emitido,
 		"recaudado": recaudado,
 		"saldo_por_cobrar": pendiente,
+		"emitido_label": format_monto_ar(emitido),
 		"recaudado_label": format_monto_ar(recaudado),
 		"saldo_por_cobrar_label": format_monto_ar(pendiente),
 		"porcentaje": _pct(recaudado, emitido),

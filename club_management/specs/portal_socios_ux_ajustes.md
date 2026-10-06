@@ -57,6 +57,6 @@ Given socios con `saldo_deuda > 0` y distintos períodos mensuales impagos
 When Secretaria consulta el panel
 Then la card **Socios en mora** sigue mostrando cantidad `estado = Moroso` y deuda total de morosos
 And debajo muestra el desglose de deuda por **clasificación de mora**:
-  - **1–3 meses** (1 a 3 períodos mensuales impagos)
-  - **4+ meses** (4 o más períodos mensuales impagos)
+  - **1 mes**, **2 meses**, **3 meses**, **+4 meses** (meses impagos con el 2.º vencimiento ya pasado;
+    regla completa en `secretaria_workspace_panel_kpis.md`)
 And cada tramo incluye cantidad de socios y monto (`saldo_deuda` sumado).

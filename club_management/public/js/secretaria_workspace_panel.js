@@ -46,8 +46,8 @@
 
 		render_tendencia_month_input(selectedMonth) {
 			return `
-				<label class="club-secretaria-trend-month">
-					<span class="text-muted small">${__("Mes")}</span>
+				<label class="club-portal-field club-secretaria-filter">
+					<span>${__("Mes")}</span>
 					<input type="month" class="form-control form-control-sm club-secretaria-trend-month-input"
 						value="${frappe.utils.escape_html(selectedMonth)}" />
 				</label>
@@ -64,21 +64,42 @@
 				{ value: "otro", label: __("Otros conceptos") },
 			];
 			const selected = this.get_tendencia_vista();
-			const options = vistas
+			const pills = vistas
 				.map((opt) => {
-					const value = frappe.utils.escape_html(opt.value);
-					const label = frappe.utils.escape_html(opt.label);
-					const sel = opt.value === selected ? " selected" : "";
-					return `<option value="${value}"${sel}>${label}</option>`;
+					const active = opt.value === selected;
+					return `<button type="button" role="tab" aria-selected="${active}"
+						class="club-secretaria-segmented-btn${active ? " is-active" : ""}"
+						data-vista="${frappe.utils.escape_html(opt.value)}">${frappe.utils.escape_html(
+						opt.label
+					)}</button>`;
 				})
 				.join("");
 			return `
-				<label class="club-secretaria-cobrabilidad-filter club-secretaria-trend-vista">
-					<span class="text-muted small">${__("Vista")}</span>
-					<select class="form-control form-control-sm club-secretaria-trend-vista-select">
-						${options}
-					</select>
-				</label>
+				<div class="club-portal-field club-secretaria-filter">
+					<span>${__("Vista")}</span>
+					<div class="club-secretaria-segmented club-secretaria-trend-vista" role="tablist">
+						${pills}
+					</div>
+				</div>
+			`;
+		},
+
+		render_tendencia_resumen(tendencia) {
+			const r = tendencia?.resumen;
+			if (!r) {
+				return "";
+			}
+			const pct = Number(r.porcentaje) || 0;
+			const tile = (label, value, mod = "") => `
+				<div class="club-secretaria-stat${mod ? ` club-secretaria-stat--${mod}` : ""}">
+					<span class="club-secretaria-stat-label">${label}</span>
+					<strong class="club-secretaria-stat-value">${frappe.utils.escape_html(value)}</strong>
+				</div>`;
+			return `
+				${tile(__("Emitido"), r.emitido_label || "")}
+				${tile(__("Recaudado"), r.recaudado_label || "", "ok")}
+				${tile(__("% cobrado"), `${pct}%`, "accent")}
+				${tile(__("Saldo"), r.saldo_label || "", "warn")}
 			`;
 		},
 
@@ -188,7 +209,63 @@
 		render_altas_bajas(altasBajas) {
 			const altas = Number(altasBajas?.altas) || 0;
 			const bajas = Number(altasBajas?.bajas) || 0;
-			return `<span class="club-secretaria-altas-bajas">+${altas} / -${bajas}</span>`;
+			return `<span class="club-secretaria-altas-bajas">
+				<span class="is-up">+${altas}</span> / <span class="is-down">-${bajas}</span>
+			</span>`;
+		},
+
+		render_actividades_movimientos(movimientos) {
+			const rows = movimientos?.actividades || [];
+			const dias = movimientos?.dias || 30;
+			const body = rows.length
+				? rows
+						.map(
+							(row) => `
+					<li class="club-secretaria-mov-row">
+						<span class="club-secretaria-mov-name" title="${frappe.utils.escape_html(row.actividad)}">
+							${frappe.utils.escape_html(row.actividad)}
+						</span>
+						<span class="club-secretaria-mov-chips">
+							<span class="club-secretaria-chip is-up">+${Number(row.altas) || 0}</span>
+							<span class="club-secretaria-chip is-down">-${Number(row.bajas) || 0}</span>
+						</span>
+					</li>`
+						)
+						.join("")
+				: `<li class="text-muted small">${__("Sin movimientos en actividades")}</li>`;
+			return `
+				<div class="club-secretaria-kpi-section">
+					<p class="club-secretaria-kpi-subtitle">${__("Actividades con más movimiento · últimos {0} días", [dias])}</p>
+					<ul class="club-secretaria-mov-list">${body}</ul>
+				</div>
+			`;
+		},
+
+		render_socios_categorias(segmentos) {
+			const s = segmentos || {};
+			const total = Number(s.total) || 0;
+			const categorias = [
+				["Activo", __("Activo")],
+				["Menor", __("Menor")],
+				["Adherente", __("Adherente")],
+				["Vitalicio", __("Vitalicio")],
+				["Jubilado", __("Jubilado")],
+			];
+			const rows = categorias
+				.map(([key, label]) => {
+					const cantidad = Number(s[key]) || 0;
+					const pct = total > 0 ? Math.round((cantidad / total) * 1000) / 10 : 0;
+					return `
+					<li class="club-secretaria-cat-row">
+						<span class="club-secretaria-cat-dot club-secretaria-cat-dot--${key.toLowerCase()}"></span>
+						<span class="club-secretaria-cat-name">${label}</span>
+						<strong class="club-secretaria-cat-count">${cantidad}</strong>
+						<span class="club-secretaria-cat-pct">${pct}%</span>
+						<span class="club-secretaria-bar"><span class="club-secretaria-bar-fill club-secretaria-cat-dot--${key.toLowerCase()}" style="width:${pct}%"></span></span>
+					</li>`;
+				})
+				.join("");
+			return `<ul class="club-secretaria-cat-list">${rows}</ul>`;
 		},
 
 		get_cobrabilidad_slice(recaudacion, vista, detalle) {
@@ -272,10 +349,20 @@
 			const pendiente =
 				data.saldo_por_cobrar_label ||
 				frappe.format(data.saldo_por_cobrar ?? 0, { fieldtype: "Currency" });
+			const emitido = data.emitido_label || format_currency(data.emitido || 0, null, 0);
+			const pct = Math.min(Math.max(Number(data.porcentaje) || 0, 0), 100);
 			const reportLink = this.get_cobrabilidad_report_link(cobranza, vista);
 			return `
 				<div class="club-secretaria-kpi-value club-secretaria-kpi-value--pct">${data.porcentaje ?? 0}%</div>
+				<span class="club-secretaria-bar club-secretaria-bar--lg" role="progressbar"
+					aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
+					<span class="club-secretaria-bar-fill is-ok" style="width:${pct}%"></span>
+				</span>
 				<div class="club-secretaria-kpi-breakdown">
+					<div class="club-secretaria-kpi-breakdown-row">
+						<span>${__("Emitido")}:</span>
+						<strong>${frappe.utils.escape_html(emitido)}</strong>
+					</div>
 					<div class="club-secretaria-kpi-breakdown-row">
 						<span>${__("Total cobrado")}:</span>
 						<strong>${frappe.utils.escape_html(cobrado)}</strong>
@@ -306,8 +393,8 @@
 				),
 			].join("");
 			return `
-				<label class="club-secretaria-cobrabilidad-filter">
-					<span class="text-muted small">${__("Detalle")}</span>
+				<label class="club-portal-field club-secretaria-filter">
+					<span>${__("Detalle")}</span>
 					<select class="form-control form-control-sm club-secretaria-cobrabilidad-detalle">
 						${rows}
 					</select>
@@ -370,23 +457,23 @@
 					data-recaudacion='${recaudacionJson.replace(/"/g, "&quot;")}'
 					data-cobranza='${cobranzaJson.replace(/"/g, "&quot;")}'>
 					<div class="club-secretaria-cobrabilidad-header">
-						<div>
-							<p class="club-secretaria-kpi-title">${__("Tasa de cobrabilidad del mes")}</p>
-							<span class="text-muted small">${__("Mes")} ${frappe.utils.escape_html(periodo)}</span>
-						</div>
-						<label class="club-secretaria-cobrabilidad-filter">
-							<span class="text-muted small">${__("Período")}</span>
+						<p class="club-secretaria-kpi-title">${__("Tasa de cobrabilidad del mes")}</p>
+						<span class="club-secretaria-periodo-chip">${frappe.utils.escape_html(periodo)}</span>
+					</div>
+					<div class="club-secretaria-filters">
+						<label class="club-portal-field club-secretaria-filter">
+							<span>${__("Período")}</span>
 							<input type="month" class="form-control form-control-sm club-secretaria-cobrabilidad-month-input"
 								value="${frappe.utils.escape_html(this.get_cobrabilidad_month_value())}" />
 						</label>
-						<label class="club-secretaria-cobrabilidad-filter">
-							<span class="text-muted small">${__("Vista")}</span>
+						<label class="club-portal-field club-secretaria-filter">
+							<span>${__("Vista")}</span>
 							<select class="form-control form-control-sm club-secretaria-cobrabilidad-vista">
 								${vistaOptions}
 							</select>
 						</label>
+						<div class="club-secretaria-cobrabilidad-detalle-wrap" style="display:none"></div>
 					</div>
-					<div class="club-secretaria-cobrabilidad-detalle-wrap" style="display:none"></div>
 					<div class="club-secretaria-cobrabilidad-metrics">
 						${this.render_cobrabilidad_metrics(slice, cobranza, "total")}
 					</div>
@@ -413,20 +500,24 @@
 			if (!tramos.length) {
 				return "";
 			}
+			const max = Math.max(...tramos.map((t) => Number(t.cantidad) || 0), 1);
 			const rows = tramos
-				.map(
-					(tramo) => `
-				<div class="club-secretaria-kpi-breakdown-row">
-					<span>${frappe.utils.escape_html(tramo.label || "")}:</span>
-					<strong>${tramo.cantidad ?? 0}</strong>
-					<span class="text-muted">· ${frappe.utils.escape_html(tramo.monto_label || "")}</span>
-				</div>`
-				)
+				.map((tramo) => {
+					const cantidad = Number(tramo.cantidad) || 0;
+					const width = Math.round((cantidad / max) * 100);
+					return `
+				<li class="club-secretaria-mora-row club-secretaria-mora-row--${frappe.utils.escape_html(tramo.key || "")}">
+					<span class="club-secretaria-mora-label">${frappe.utils.escape_html(tramo.label || "")}</span>
+					<strong class="club-secretaria-mora-count">${cantidad}</strong>
+					<span class="club-secretaria-mora-monto">${frappe.utils.escape_html(tramo.monto_label || "")}</span>
+					<span class="club-secretaria-bar"><span class="club-secretaria-bar-fill" style="width:${width}%"></span></span>
+				</li>`;
+				})
 				.join("");
 			return `
-				<div class="club-secretaria-kpi-breakdown club-secretaria-mora-clasificacion">
-					<p class="club-secretaria-kpi-subtitle text-muted small mb-1">${__("Clasificación por antigüedad")}</p>
-					${rows}
+				<div class="club-secretaria-kpi-section club-secretaria-mora-clasificacion">
+					<p class="club-secretaria-kpi-subtitle">${__("Clasificación por meses vencidos")}</p>
+					<ul class="club-secretaria-mora-list">${rows}</ul>
 				</div>
 			`;
 		},
@@ -443,8 +534,9 @@
 					<div class="club-secretaria-kpi-card">
 						<p class="club-secretaria-kpi-title">${__("Total socios activos")}</p>
 						<div class="club-secretaria-kpi-value">${socios.total ?? 0}</div>
+						${this.render_delta(socios.delta_mes)}
+						${this.render_socios_categorias(socios.segmentos)}
 						<div class="club-secretaria-kpi-footer">
-							${this.render_delta(socios.delta_mes)}
 							${this.render_ver_mas_btn(verMas.socios_total_doctype, verMas.socios_total_filters)}
 						</div>
 					</div>
@@ -454,6 +546,8 @@
 						<div class="club-secretaria-kpi-value club-secretaria-kpi-value--ratio">
 							${this.render_altas_bajas(socios.altas_bajas)}
 						</div>
+						<span class="club-secretaria-kpi-hint">${__("Socios")}</span>
+						${this.render_actividades_movimientos(socios.actividades_movimientos)}
 					</div>
 					<div class="club-secretaria-kpi-card club-secretaria-kpi-card--morosos">
 						<p class="club-secretaria-kpi-title">${__("Socios en mora")}</p>
@@ -498,12 +592,14 @@
 						<div class="club-secretaria-chart-header">
 							<div class="club-secretaria-chart-header-title">
 								<h6>${__("Tendencia de recaudación")}</h6>
+								<span class="text-muted small">${__("Acumulado diario del período: deuda pendiente vs recaudado")}</span>
 							</div>
 							<div class="club-secretaria-chart-header-filters">
 								${this.render_tendencia_vista_select(tendencia)}
 								${this.render_tendencia_month_input(this.get_tendencia_month_value())}
 							</div>
 						</div>
+						<div class="club-secretaria-trend-resumen">${this.render_tendencia_resumen(tendencia)}</div>
 						<div class="club-secretaria-chart-trend"></div>
 					</div>
 				</div>`
@@ -531,19 +627,25 @@
 				this._chart_trend = null;
 				return;
 			}
+			const hastaDia = Number(data.hasta_dia) || data.dias.length;
+			const dias = data.dias.slice(0, Math.max(hastaDia, 1));
 			this._chart_trend = new frappe.Chart($container[0], {
 				type: "line",
-				height: 220,
-				colors: ["#e74c3c", "#29cd42"],
+				height: 240,
+				colors: ["#dc2626", "#059669"],
 				data: {
-					labels: data.dias.map((row) => row.label),
+					labels: dias.map((row) => row.label),
 					datasets: [
-						{ name: __("Deuda del mes"), values: data.dias.map((r) => r.deuda) },
-						{ name: __("Recaudado"), values: data.dias.map((r) => r.recaudado) },
+						{ name: __("Deuda pendiente"), values: dias.map((r) => r.deuda) },
+						{ name: __("Recaudado"), values: dias.map((r) => r.recaudado) },
 					],
 				},
+				lineOptions: { regionFill: 1, hideDots: dias.length > 12 ? 1 : 0 },
 				truncateLegends: 1,
-				axisOptions: { shortenYAxisNumbers: 1 },
+				axisOptions: { shortenYAxisNumbers: 1, xIsSeries: 1 },
+				tooltipOptions: {
+					formatTooltipY: (value) => format_currency(value || 0, null, 0),
+				},
 			});
 		},
 
@@ -642,7 +744,9 @@
 					vista: this.get_tendencia_vista(),
 				},
 				callback: (r) => {
-					this.mount_trend_chart($trend, r.message || {});
+					const tendencia = r.message || {};
+					$panelEl.find(".club-secretaria-trend-resumen").html(this.render_tendencia_resumen(tendencia));
+					this.mount_trend_chart($trend, tendencia);
 				},
 			});
 		},
@@ -853,8 +957,15 @@
 				}
 			});
 
-			$panel.find(".club-secretaria-trend-vista-select").on("change", (e) => {
-				this._selected_tendencia_vista = e.currentTarget.value || "total";
+			$panel.find(".club-secretaria-trend-vista .club-secretaria-segmented-btn").on("click", (e) => {
+				const $btn = $(e.currentTarget);
+				const vista = $btn.attr("data-vista") || "total";
+				if (vista === this.get_tendencia_vista()) {
+					return;
+				}
+				this._selected_tendencia_vista = vista;
+				$btn.siblings().removeClass("is-active").attr("aria-selected", "false");
+				$btn.addClass("is-active").attr("aria-selected", "true");
 				this.refresh_tendencia_chart($panel);
 			});
 

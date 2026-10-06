@@ -58,6 +58,7 @@ class TestSecretariaPanelKpis(MembersTestCase):
 		self.assertEqual(data["porcentaje"], 65.0)
 		self.assertIn("recaudado_label", data)
 		self.assertIn("saldo_por_cobrar_label", data)
+		self.assertIn("emitido_label", data)
 
 	def test_socio_metricas_total_y_delta(self) -> None:
 		morosos_antes = frappe.db.count("Socio", {"estado": "Moroso"})
@@ -75,14 +76,14 @@ class TestSecretariaPanelKpis(MembersTestCase):
 		self.assertIn("morosos_deuda_label", data)
 		self.assertIn("mora_clasificacion", data)
 		tramos = data["mora_clasificacion"]["tramos"]
-		self.assertEqual([t["key"] for t in tramos], ["1_3", "4_mas"])
+		self.assertEqual([t["key"] for t in tramos], ["1", "2", "3", "4_mas"])
 
 	def test_mora_clasificacion_tramos_vacios_estructura(self) -> None:
-		"""Spec portal_socios_ux_ajustes: KPI mora expone tramos 1–3 y 4+."""
+		"""Spec secretaria_workspace_panel_kpis: KPI mora expone tramos 1, 2, 3 y +4 meses."""
 		data = get_mora_clasificacion_payload()
 		self.assertIn("tramos", data)
 		keys = [t["key"] for t in data["tramos"]]
-		self.assertEqual(keys, ["1_3", "4_mas"])
+		self.assertEqual(keys, ["1", "2", "3", "4_mas"])
 		for tramo in data["tramos"]:
 			self.assertIn("label", tramo)
 			self.assertIn("cantidad", tramo)

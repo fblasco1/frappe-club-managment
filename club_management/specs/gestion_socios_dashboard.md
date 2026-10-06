@@ -47,7 +47,7 @@ When Secretaria consulta el dashboard
 Then la card **Socios en mora** cuenta solo los de `estado = Moroso`
 And no incluye activos que solo deben el período en curso
 And muestra el **monto total adeudado** (suma de `saldo_deuda` de morosos)
-And muestra clasificación de mora por períodos impagos (**1–3 meses** / **4+ meses**)
+And muestra clasificación de mora por meses vencidos (**1 mes** / **2 meses** / **3 meses** / **+4 meses**; ver `secretaria_workspace_panel_kpis.md`)
 And **Ver más** abre `Socio` filtrado a `Moroso`.
 
 ---
