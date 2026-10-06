@@ -61,6 +61,12 @@ And debajo lista las **3 actividades** con más movimientos (altas + bajas de in
 And cada actividad muestra sus altas y bajas por separado
 And si no hubo movimientos, muestra «Sin movimientos en actividades».
 
+Given una `Actividad` con **Contar movimientos desde** (`contar_movimientos_desde`) cargado (p. ej. el día siguiente a una carga masiva inicial)
+When se calculan las actividades con más movimiento
+Then las altas con `fecha_inscripcion` anterior a esa fecha **no** cuentan
+And las bajas registradas antes de esa fecha **no** cuentan
+And las actividades sin la fecha cargada cuentan todos sus movimientos del rango.
+
 ---
 
 ## Scenario: resumen y corte al día en la tendencia de recaudación

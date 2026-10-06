@@ -274,7 +274,7 @@ def get_mora_clasificacion_payload(*, reference_date: str | date | None = None) 
 	return {"tramos": tramos}
 
 
-def _bajas_inscripcion_en_rango(desde: date, hasta: date) -> list[str]:
+def _bajas_inscripcion_en_rango(desde: date, hasta: date) -> list[tuple[str, date]]:
 	"""Inscripciones cuyo `estado` pasó a Baja dentro del rango (historial de versiones)."""
 	rows = frappe.get_all(
 		"Version",
@@ -283,17 +283,25 @@ def _bajas_inscripcion_en_rango(desde: date, hasta: date) -> list[str]:
 			"creation": ["between", [f"{desde} 00:00:00", f"{hasta} 23:59:59"]],
 			"data": ["like", '%"estado"%'],
 		},
-		fields=["docname", "data"],
+		fields=["docname", "data", "creation"],
 	)
-	bajas: list[str] = []
+	bajas: list[tuple[str, date]] = []
 	for row in rows:
 		try:
 			changed = json.loads(row.data or "{}").get("changed") or []
 		except ValueError:
 			continue
 		if any(len(c) >= 3 and c[0] == "estado" and c[2] == "Baja" for c in changed):
-			bajas.append(row.docname)
+			bajas.append((row.docname, getdate(row.creation)))
 	return bajas
+
+
+def _cortes_movimientos_por_actividad() -> dict[str, date]:
+	return {
+		row.name: getdate(row.contar_movimientos_desde)
+		for row in frappe.get_all("Actividad", fields=["name", "contar_movimientos_desde"])
+		if row.contar_movimientos_desde
+	}
 
 
 def get_actividades_movimientos(
@@ -312,27 +320,35 @@ def get_actividades_movimientos(
 			actividad, {"actividad": actividad, "altas": 0, "bajas": 0, "total": 0}
 		)
 
-	for actividad in frappe.get_all(
+	cortes = _cortes_movimientos_por_actividad()
+
+	def _cuenta(actividad: str | None, fecha: date) -> bool:
+		if not actividad:
+			return False
+		corte = cortes.get(actividad)
+		return corte is None or fecha >= corte
+
+	for row in frappe.get_all(
 		INSCRIPCION_DOCTYPE,
 		filters={"fecha_inscripcion": ["between", [desde, hasta]]},
-		pluck="actividad",
+		fields=["actividad", "fecha_inscripcion"],
 	):
-		if actividad:
-			_row(actividad)["altas"] += 1
+		if _cuenta(row.actividad, getdate(row.fecha_inscripcion)):
+			_row(row.actividad)["altas"] += 1
 
 	bajas = _bajas_inscripcion_en_rango(desde, hasta)
 	if bajas:
 		actividad_por_inscripcion = dict(
 			frappe.get_all(
 				INSCRIPCION_DOCTYPE,
-				filters={"name": ["in", sorted(set(bajas))]},
+				filters={"name": ["in", sorted({name for name, _ in bajas})]},
 				fields=["name", "actividad"],
 				as_list=True,
 			)
 		)
-		for inscripcion in bajas:
+		for inscripcion, fecha_baja in bajas:
 			actividad = actividad_por_inscripcion.get(inscripcion)
-			if actividad:
+			if _cuenta(actividad, fecha_baja):
 				_row(actividad)["bajas"] += 1
 
 	for row in stats.values():

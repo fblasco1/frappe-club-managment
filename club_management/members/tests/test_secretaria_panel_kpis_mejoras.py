@@ -198,6 +198,31 @@ class TestActividadesMovimientos(MembersTestCase):
 		self.assertLessEqual(len(top["actividades"]), 3)
 		self.assertEqual(top["actividades"], data["actividades"][: len(top["actividades"])])
 
+	def test_fecha_de_corte_por_actividad_ignora_carga_masiva(self) -> None:
+		socios = [
+			insert_socio(dni=f"7330200{i}", email=f"mov.corte{i}@example.com").name for i in range(1, 6)
+		]
+		gym = self._actividad("KPI Corte Gym")
+		otra = self._actividad("KPI Corte Otra")
+		frappe.db.set_value("Actividad", gym, "contar_movimientos_desde", "2026-10-02")
+
+		for socio in socios[:3]:
+			self._inscripcion(socio, gym, "2026-10-01")
+		self._inscripcion(socios[3], gym, "2026-10-03")
+		baja_previa = self._inscripcion(socios[0], otra, "2026-06-01")
+		self._baja(baja_previa, "2026-09-20 10:00:00")
+		self._inscripcion(socios[1], otra, "2026-09-25")
+
+		ins_gym_baja = self._inscripcion(socios[4], gym, "2026-05-01")
+		self._baja(ins_gym_baja, "2026-09-30 10:00:00")
+
+		data = get_actividades_movimientos(reference_date=_HOY, dias=30, limit=None)
+		por_nombre = {row["actividad"]: row for row in data["actividades"]}
+		self.assertEqual(por_nombre[gym]["altas"], 1)
+		self.assertEqual(por_nombre[gym]["bajas"], 0)
+		self.assertEqual(por_nombre[otra]["altas"], 1)
+		self.assertEqual(por_nombre[otra]["bajas"], 1)
+
 	def test_metricas_socios_incluye_movimientos_actividades(self) -> None:
 		data = get_socio_metricas_payload(reference_date=_HOY)
 		self.assertIn("actividades_movimientos", data)
