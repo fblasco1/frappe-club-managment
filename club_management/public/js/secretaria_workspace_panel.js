@@ -17,17 +17,23 @@
 		_refresh_timer: null,
 		_selected_tendencia_month: null,
 		_selected_tendencia_vista: "total",
+		_selected_cobrabilidad_month: null,
 		_$panel: null,
 
 
 
-		get_tendencia_month_value() {
-			if (this._selected_tendencia_month) {
-				return this._selected_tendencia_month;
-			}
+		current_month_value() {
 			const now = frappe.datetime.str_to_obj(frappe.datetime.get_today());
 			const month = String(now.getMonth() + 1).padStart(2, "0");
 			return `${now.getFullYear()}-${month}`;
+		},
+
+		get_tendencia_month_value() {
+			return this._selected_tendencia_month || this.current_month_value();
+		},
+
+		get_cobrabilidad_month_value() {
+			return this._selected_cobrabilidad_month || this.current_month_value();
 		},
 
 		tendencia_reference_date() {
@@ -336,9 +342,11 @@
 		},
 
 		render_cobrabilidad_card(metricas) {
-			const recaudacion = metricas.recaudacion || {};
 			const verMas = metricas.ver_mas || {};
-			const cobranza = verMas.cobranza || {};
+			return this.render_cobrabilidad_card_html(metricas.recaudacion || {}, verMas.cobranza || {});
+		},
+
+		render_cobrabilidad_card_html(recaudacion, cobranza) {
 			const periodo = cobranza.periodo || recaudacion.periodo || "";
 			const vistas = recaudacion.cobrabilidad_vistas || [
 				{ value: "total", label: __("Total") },
@@ -366,6 +374,11 @@
 							<p class="club-secretaria-kpi-title">${__("Tasa de cobrabilidad del mes")}</p>
 							<span class="text-muted small">${__("Mes")} ${frappe.utils.escape_html(periodo)}</span>
 						</div>
+						<label class="club-secretaria-cobrabilidad-filter">
+							<span class="text-muted small">${__("Período")}</span>
+							<input type="month" class="form-control form-control-sm club-secretaria-cobrabilidad-month-input"
+								value="${frappe.utils.escape_html(this.get_cobrabilidad_month_value())}" />
+						</label>
 						<label class="club-secretaria-cobrabilidad-filter">
 							<span class="text-muted small">${__("Vista")}</span>
 							<select class="form-control form-control-sm club-secretaria-cobrabilidad-vista">
@@ -634,6 +647,40 @@
 			});
 		},
 
+		refresh_cobrabilidad_card($panel) {
+			const $panelEl = $panel || this._$panel;
+			const $card = $panelEl?.find(".club-secretaria-kpi-card--cobrabilidad");
+			if (!$card?.length) {
+				return;
+			}
+			const vista = $card.find(".club-secretaria-cobrabilidad-vista").val() || "total";
+			const detalle = $card.find(".club-secretaria-cobrabilidad-detalle").val() || "";
+			$card.find(".club-secretaria-cobrabilidad-metrics").html(
+				`<div class="text-muted small py-3">${__("Cargando…")}</div>`
+			);
+			frappe.call({
+				method: "club_management.members.api.secretaria_workspace.get_cobrabilidad",
+				args: {
+					cobrabilidad_reference_date: `${this.get_cobrabilidad_month_value()}-01`,
+				},
+				callback: (r) => {
+					const data = r.message || {};
+					const $nuevo = $(this.render_cobrabilidad_card_html(data.recaudacion || {}, data.cobranza || {}));
+					$card.replaceWith($nuevo);
+					const $vista = $nuevo.find(".club-secretaria-cobrabilidad-vista");
+					if ($vista.find(`option[value="${CSS.escape(vista)}"]`).length) {
+						$vista.val(vista);
+					}
+					this.update_cobrabilidad_card($nuevo);
+					const $detalle = $nuevo.find(".club-secretaria-cobrabilidad-detalle");
+					if (detalle && $detalle.find(`option[value="${CSS.escape(detalle)}"]`).length) {
+						$detalle.val(detalle);
+						this.update_cobrabilidad_card($nuevo);
+					}
+				},
+			});
+		},
+
 		_destroy_charts() {
 			this._chart_trend = null;
 			this._chart_segmentos = null;
@@ -832,9 +879,23 @@
 				this.update_cobrabilidad_card($card);
 			});
 
+			$panel
+				.off("change.cobrabilidadMes")
+				.on("change.cobrabilidadMes", ".club-secretaria-cobrabilidad-month-input", (e) => {
+					const value = e.currentTarget.value;
+					if (value) {
+						this._selected_cobrabilidad_month = value;
+						this.refresh_cobrabilidad_card($panel);
+					}
+				});
+
 			$panel.find(".club-secretaria-kpi-card--cobrabilidad").each((_, el) => {
 				this.update_cobrabilidad_card($(el));
 			});
+
+			if (this.get_cobrabilidad_month_value() !== this.current_month_value()) {
+				this.refresh_cobrabilidad_card($panel);
+			}
 
 			$panel.find(".club-secretaria-nuevo-socio").on("click", () => {
 				if (club_management_socio_alta_guiada?.open) {

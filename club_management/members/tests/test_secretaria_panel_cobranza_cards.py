@@ -8,14 +8,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import frappe
 from frappe.utils import get_first_day, get_last_day, getdate
 
+from club_management.members.api.secretaria_workspace import get_cobrabilidad
 from club_management.members.services.cobranza_periodica import format_periodo_cobro
 from club_management.members.services.secretaria_panel_kpis import (
+	get_cobrabilidad_payload,
 	get_cobranza_panel_links,
 	get_panel_metricas_payload,
 )
-from club_management.members.test_helpers import MembersTestCase
+from club_management.members.test_helpers import MembersTestCase, make_secretaria_user
 
 
 class TestSecretariaPanelCobranzaCards(MembersTestCase):
@@ -85,3 +88,47 @@ class TestSecretariaPanelCobranzaCards(MembersTestCase):
 		self.assertIn("report_by_vista", js)
 		self.assertIn("Tasa de cobrabilidad del mes", js)
 		self.assertIn("club-secretaria-ver-report", js)
+
+	def test_cobrabilidad_payload_respeta_periodo_elegido(self) -> None:
+		data = get_cobrabilidad_payload(reference_date="2026-07-01")
+		self.assertEqual(data["periodo"], "07/2026")
+		self.assertEqual(data["recaudacion"]["periodo"], "07/2026")
+		self.assertIn("cobrabilidad_vistas", data["recaudacion"])
+		self.assertEqual(data["cobranza"]["periodo"], "07/2026")
+		filtros = data["cobranza"]["report_by_vista"]["total"]["filters"]
+		self.assertEqual(filtros["fecha_desde"], "2026-07-01")
+		self.assertEqual(filtros["fecha_hasta"], "2026-07-31")
+		self.assertEqual(filtros["periodo_cobro"], "07/2026")
+
+	def test_api_cobrabilidad_periodo_secretaria(self) -> None:
+		frappe.set_user(make_secretaria_user())
+		try:
+			data = get_cobrabilidad(cobrabilidad_reference_date="2026-07-01")
+		finally:
+			frappe.set_user("Administrator")
+		self.assertEqual(data["periodo"], "07/2026")
+
+	def test_api_cobrabilidad_periodo_rechaza_sin_rol(self) -> None:
+		email = "sin.rol.cobrabilidad@example.com"
+		if not frappe.db.exists("User", email):
+			frappe.get_doc(
+				{"doctype": "User", "email": email, "first_name": "Sin rol", "send_welcome_email": 0}
+			).insert(ignore_permissions=True)
+		frappe.set_user(email)
+		try:
+			with self.assertRaises(frappe.PermissionError):
+				get_cobrabilidad(cobrabilidad_reference_date="2026-07-01")
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_panel_js_cobrabilidad_selector_mes(self) -> None:
+		js_path = (
+			Path(__file__).resolve().parents[2]
+			/ "public"
+			/ "js"
+			/ "secretaria_workspace_panel.js"
+		)
+		js = js_path.read_text(encoding="utf-8")
+		self.assertIn("club-secretaria-cobrabilidad-month-input", js)
+		self.assertIn("club_management.members.api.secretaria_workspace.get_cobrabilidad", js)
+		self.assertIn("cobrabilidad_reference_date", js)

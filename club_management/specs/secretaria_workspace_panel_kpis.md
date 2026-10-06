@@ -52,6 +52,21 @@ And **no** hay cards separadas duplicando la misma información.
 
 ---
 
+## Scenario: elegir el período de la tasa de cobrabilidad
+
+Given la card «Tasa de cobrabilidad del mes» muestra por defecto el período corriente (`MM/YYYY`)
+When Secretaria elige otro **mes** en el selector de período de la card
+Then la card se recalcula para ese `periodo_cobro` (% recaudado, total cobrado, saldo por cobrar, vistas y detalle)
+And el encabezado muestra el período elegido
+And «Ver informe» abre el reporte con fechas y `periodo_cobro` del mes elegido
+And el resto del panel (KPIs de socios, gráficos) **no** se recarga.
+
+Given un usuario sin rol `Secretaria` ni `System Manager`
+When consulta la cobrabilidad de un período por API
+Then recibe `PermissionError`.
+
+---
+
 ## Scenario: porcentaje cuotas sociales recaudadas en el mes
 
 Given facturas mensuales del período corriente (`periodo_cobro = MM/YYYY`) con líneas de cuota social

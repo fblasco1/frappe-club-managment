@@ -16,7 +16,10 @@ import frappe
 
 
 
-from club_management.members.services.secretaria_panel_kpis import get_recaudacion_tendencia_payload
+from club_management.members.services.secretaria_panel_kpis import (
+	get_cobrabilidad_payload,
+	get_recaudacion_tendencia_payload,
+)
 from club_management.members.services.secretaria_workspace_panel import (
 	get_cuotas_sociales_payload,
 	get_panel_lists_payload,
@@ -77,6 +80,13 @@ def get_tendencia_recaudacion(
 		reference_date=tendencia_reference_date,
 		vista=vista or "total",
 	)
+
+
+@frappe.whitelist()
+def get_cobrabilidad(cobrabilidad_reference_date: str | None = None) -> dict[str, Any]:
+	"""Tasa de cobrabilidad de un período (sin recargar todo el panel)."""
+	_ensure_secretaria_panel_access()
+	return get_cobrabilidad_payload(reference_date=cobrabilidad_reference_date)
 
 
 @frappe.whitelist()

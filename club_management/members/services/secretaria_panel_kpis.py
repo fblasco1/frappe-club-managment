@@ -832,6 +832,16 @@ def get_cobranza_panel_links(*, reference_date: str | date | None = None) -> dic
 	}
 
 
+def get_cobrabilidad_payload(*, reference_date: str | date | None = None) -> dict[str, Any]:
+	"""Card de cobrabilidad recalculada para el mes de `reference_date`."""
+	ref = getdate(reference_date or today())
+	return {
+		"periodo": format_periodo_cobro(ref),
+		"recaudacion": get_recaudacion_mes_payload(reference_date=ref),
+		"cobranza": get_cobranza_panel_links(reference_date=ref),
+	}
+
+
 def get_panel_metricas_payload(
 	*,
 	reference_date: str | date | None = None,
