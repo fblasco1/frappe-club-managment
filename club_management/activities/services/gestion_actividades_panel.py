@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from typing import Any
 
 import frappe
@@ -85,8 +87,13 @@ def create_actividad(*, titulo: str, usa_grupos: int = 0) -> dict[str, str]:
 	return {"name": doc.name, "titulo": doc.titulo}
 
 
-def create_grupo(*, actividad: str, titulo: str) -> dict[str, str]:
-	"""Crea un Grupo Actividad bajo la actividad indicada."""
+def create_grupo(
+	*,
+	actividad: str,
+	titulo: str,
+	monto: float | int | str | None = None,
+) -> dict[str, Any]:
+	"""Crea un Grupo Actividad; con `monto` > 0 crea además su arancel propio."""
 	_ensure_actividad(actividad)
 	title = (titulo or "").strip()
 	if not title:
@@ -101,7 +108,101 @@ def create_grupo(*, actividad: str, titulo: str) -> dict[str, str]:
 		}
 	)
 	doc.insert()
-	return {"name": doc.name, "titulo": doc.titulo}
+	result: dict[str, Any] = {"name": doc.name, "titulo": doc.titulo}
+	if flt(monto) > 0:
+		actividad_titulo = frappe.db.get_value(ACTIVIDAD_DOCTYPE, actividad, "titulo") or actividad
+		result["item"] = _crear_y_asignar_arancel(
+			GRUPO_DOCTYPE,
+			doc.name,
+			nombre_arancel(actividad_titulo, title),
+			flt(monto),
+		)
+	return result
+
+
+ACTIVIDAD_MODOS = frozenset({"unica", "grupos"})
+ARANCEL_MODOS = frozenset({"nuevo", "existente", "ninguno"})
+
+
+def create_actividad_guiada(
+	*,
+	titulo: str,
+	modo: str = "unica",
+	arancel_modo: str = "nuevo",
+	monto: float | int | str | None = None,
+	item: str | None = None,
+	grupos: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+	"""Alta en un paso: actividad + arancel (cuota única) o actividad + grupos con su arancel.
+
+	Todo o nada: si falla cualquier paso se revierte lo creado en esta llamada.
+	"""
+	if modo not in ACTIVIDAD_MODOS:
+		frappe.throw(frappe._("Modo de actividad inválido."))
+	if arancel_modo not in ARANCEL_MODOS:
+		frappe.throw(frappe._("Opción de arancel inválida."))
+	grupos = grupos or []
+	if modo == "grupos" and not grupos:
+		frappe.throw(frappe._("Agregue al menos un grupo / tira."))
+
+	savepoint = "alta_actividad_guiada"
+	frappe.db.savepoint(savepoint)
+	try:
+		created = create_actividad(titulo=titulo, usa_grupos=1 if modo == "grupos" else 0)
+		actividad = created["name"]
+		result: dict[str, Any] = {**created, "item": "", "grupos": []}
+
+		if modo == "unica":
+			if arancel_modo == "nuevo" and flt(monto) > 0:
+				result["item"] = _crear_y_asignar_arancel(
+					ACTIVIDAD_DOCTYPE, actividad, nombre_arancel(created["titulo"]), flt(monto)
+				)
+			elif arancel_modo == "existente":
+				if not (item or "").strip():
+					frappe.throw(frappe._("Seleccione el arancel existente."))
+				set_arancel(doctype=ACTIVIDAD_DOCTYPE, name=actividad, item=item, rate=monto)
+				result["item"] = item
+		else:
+			for row in grupos:
+				result["grupos"].append(
+					create_grupo(
+						actividad=actividad,
+						titulo=(row or {}).get("titulo") or "",
+						monto=(row or {}).get("monto"),
+					)
+				)
+	except Exception:
+		frappe.db.rollback(save_point=savepoint)
+		raise
+	return result
+
+
+def nombre_arancel(actividad_titulo: str, grupo_titulo: str | None = None) -> str:
+	base = frappe._("Cuota mensual {0}").format((actividad_titulo or "").strip())
+	if (grupo_titulo or "").strip():
+		return f"{base} — {grupo_titulo.strip()}"
+	return base
+
+
+def suggest_arancel_item_code(nombre: str) -> str:
+	"""Código `ARANCEL-…` en mayúsculas, sin acentos y único en `Item`."""
+	ascii_name = (
+		unicodedata.normalize("NFKD", nombre or "").encode("ascii", "ignore").decode("ascii")
+	)
+	slug = re.sub(r"[^A-Z0-9]+", "-", ascii_name.upper()).strip("-") or "ACTIVIDAD"
+	base = f"ARANCEL-{slug}"[:120]
+	code = base
+	suffix = 2
+	while frappe.db.exists("Item", code):
+		code = f"{base}-{suffix}"
+		suffix += 1
+	return code
+
+
+def _crear_y_asignar_arancel(doctype: str, name: str, item_name: str, monto: float) -> str:
+	item_code = create_arancel_item(item_code="", item_name=item_name, standard_rate=monto)["item"]
+	set_arancel(doctype=doctype, name=name, item=item_code, rate=monto)
+	return item_code
 
 
 def create_equipo(*, grupo_actividad: str, titulo: str) -> dict[str, str]:
@@ -214,13 +315,11 @@ def create_arancel_item(
 	item_name: str,
 	standard_rate: float | int | str = 0,
 ) -> dict[str, Any]:
-	"""Crea un Item de servicio ICDPE para aranceles desde el panel."""
-	code = (item_code or "").strip()
-	title = (item_name or code).strip()
-	if not code:
-		frappe.throw(frappe._("Indique el código del ítem."))
+	"""Crea un Item de servicio ICDPE para aranceles; sin código lo genera desde el nombre."""
+	title = (item_name or item_code or "").strip()
 	if not title:
-		frappe.throw(frappe._("Indique el nombre del ítem."))
+		frappe.throw(frappe._("Indique el nombre del arancel."))
+	code = (item_code or "").strip() or suggest_arancel_item_code(title)
 	if frappe.db.exists("Item", code):
 		frappe.throw(frappe._("Ya existe un ítem con el código {0}.").format(code))
 

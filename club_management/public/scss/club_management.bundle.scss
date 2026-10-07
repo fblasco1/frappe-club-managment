@@ -264,8 +264,47 @@
 	grid-template-columns: minmax(0, 1fr) 120px;
 	gap: 0.35rem 0.75rem;
 	align-items: center;
-	max-width: 480px;
+	max-width: 620px;
 	margin-bottom: 0.75rem;
+}
+
+.club-arancel-item-picker {
+	display: flex;
+	gap: 0.4rem;
+	align-items: center;
+}
+
+.club-arancel-item-actions {
+	display: flex;
+	gap: 0.35rem;
+	flex-shrink: 0;
+}
+
+.club-actividades-help {
+	font-size: var(--text-sm);
+	color: var(--text-muted);
+	background: var(--club-accent-soft, var(--subtle-fg));
+	border-radius: 8px;
+	padding: 0.6rem 0.75rem;
+	margin-bottom: 0.75rem;
+	line-height: 1.45;
+}
+
+.club-actividades-resumen {
+	border: 1px solid var(--border-color);
+	border-radius: 8px;
+	padding: 0.6rem 0.85rem;
+	font-size: var(--text-sm);
+}
+
+.club-actividades-resumen-title {
+	font-weight: 600;
+	margin-bottom: 0.3rem;
+}
+
+.club-actividades-resumen ul {
+	margin: 0;
+	padding-left: 1.1rem;
 }
 
 .club-arancel-row label {

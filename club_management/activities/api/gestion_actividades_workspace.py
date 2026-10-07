@@ -9,6 +9,7 @@ import frappe
 
 from club_management.activities.services.gestion_actividades_panel import (
 	create_actividad,
+	create_actividad_guiada,
 	create_arancel_item,
 	create_equipo,
 	create_grupo,
@@ -56,11 +57,42 @@ def create_actividad_desk(titulo: str, usa_grupos: int = 0) -> dict[str, str]:
 
 
 @frappe.whitelist()
-def create_grupo_desk(actividad: str, titulo: str) -> dict[str, str]:
+def create_actividad_guiada_desk(
+	titulo: str,
+	modo: str = "unica",
+	arancel_modo: str = "nuevo",
+	monto: float | int | str | None = None,
+	item: str | None = None,
+	grupos: str | list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+	_ensure_panel_access()
+	if not frappe.has_permission("Actividad", "create"):
+		frappe.throw(frappe._("No autorizado"), frappe.PermissionError)
+	grupos_rows = json.loads(grupos) if isinstance(grupos, str) and grupos else grupos or []
+	if not isinstance(grupos_rows, list):
+		frappe.throw(frappe._("Formato inválido."))
+	if grupos_rows and not frappe.has_permission("Grupo Actividad", "create"):
+		frappe.throw(frappe._("No autorizado"), frappe.PermissionError)
+	return create_actividad_guiada(
+		titulo=titulo,
+		modo=modo,
+		arancel_modo=arancel_modo,
+		monto=monto,
+		item=item,
+		grupos=grupos_rows,
+	)
+
+
+@frappe.whitelist()
+def create_grupo_desk(
+	actividad: str,
+	titulo: str,
+	monto: float | int | str | None = None,
+) -> dict[str, Any]:
 	_ensure_panel_access()
 	if not frappe.has_permission("Grupo Actividad", "create"):
 		frappe.throw(frappe._("No autorizado"), frappe.PermissionError)
-	return create_grupo(actividad=actividad, titulo=titulo)
+	return create_grupo(actividad=actividad, titulo=titulo, monto=monto)
 
 
 @frappe.whitelist()
@@ -86,8 +118,8 @@ def set_arancel_desk(
 
 @frappe.whitelist()
 def create_arancel_item_desk(
-	item_code: str,
 	item_name: str,
+	item_code: str | None = None,
 	standard_rate: float | int | str = 0,
 ) -> dict[str, Any]:
 	_ensure_panel_access()

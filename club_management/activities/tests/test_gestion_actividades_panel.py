@@ -19,11 +19,13 @@ from club_management.activities.api.gestion_actividades_workspace import (
 )
 from club_management.activities.services.gestion_actividades_panel import (
 	create_actividad,
+	create_actividad_guiada,
 	create_arancel_item,
 	create_equipo,
 	create_grupo,
 	get_catalog_payload,
 	set_arancel,
+	suggest_arancel_item_code,
 	update_actividad,
 	update_equipo,
 	update_grupo,
@@ -213,6 +215,116 @@ class TestGestionActividadesPanelService(MembersTestCase):
 		self.assertTrue(frappe.db.exists("Item", "TEST-NUEVO-AR-PANEL"))
 
 
+class TestCatalogoActividadesAltaGuiada(MembersTestCase):
+	def _item_rate(self, item_code: str) -> float:
+		return frappe.db.get_value("Item", item_code, "standard_rate")
+
+	def test_codigo_arancel_automatico_sin_acentos(self) -> None:
+		code = suggest_arancel_item_code("Cuota mensual Natación Guiada")
+		self.assertEqual(code, "ARANCEL-CUOTA-MENSUAL-NATACION-GUIADA")
+
+	def test_codigo_arancel_automatico_unico_con_sufijo(self) -> None:
+		first = create_arancel_item(item_code="", item_name="Cuota mensual Sufijo Test", standard_rate=10)
+		second = create_arancel_item(item_code="", item_name="Cuota mensual Sufijo Test", standard_rate=20)
+		self.assertEqual(first["item"], "ARANCEL-CUOTA-MENSUAL-SUFIJO-TEST")
+		self.assertEqual(second["item"], "ARANCEL-CUOTA-MENSUAL-SUFIJO-TEST-2")
+
+	def test_alta_guiada_cuota_unica_crea_arancel(self) -> None:
+		result = create_actividad_guiada(
+			titulo="Natación Guiada",
+			modo="unica",
+			arancel_modo="nuevo",
+			monto=15000,
+		)
+
+		self.assertEqual(result["name"], "Natación Guiada")
+		act = frappe.db.get_value(
+			"Actividad", result["name"], ["usa_grupos", "habilitada", "item"], as_dict=True
+		)
+		self.assertEqual(act.usa_grupos, 0)
+		self.assertEqual(act.habilitada, 1)
+		self.assertTrue(act.item)
+		self.assertEqual(
+			frappe.db.get_value("Item", act.item, "item_name"), "Cuota mensual Natación Guiada"
+		)
+		self.assertEqual(self._item_rate(act.item), 15000.0)
+		self.assertEqual(frappe.db.get_value("Item", act.item, "is_stock_item"), 0)
+
+	def test_alta_guiada_con_grupos_crea_arancel_por_grupo(self) -> None:
+		result = create_actividad_guiada(
+			titulo="Hockey Guiado",
+			modo="grupos",
+			grupos=[
+				{"titulo": "Formativas", "monto": 9000},
+				{"titulo": "Primera", "monto": 12000},
+			],
+		)
+
+		self.assertEqual(frappe.db.get_value("Actividad", result["name"], "usa_grupos"), 1)
+		self.assertFalse(frappe.db.get_value("Actividad", result["name"], "item"))
+		formativas = frappe.db.get_value(
+			"Grupo Actividad", "Hockey Guiado / Formativas", ["item", "habilitada"], as_dict=True
+		)
+		primera = frappe.db.get_value("Grupo Actividad", "Hockey Guiado / Primera", "item")
+		self.assertEqual(formativas.habilitada, 1)
+		self.assertEqual(
+			frappe.db.get_value("Item", formativas.item, "item_name"),
+			"Cuota mensual Hockey Guiado — Formativas",
+		)
+		self.assertEqual(self._item_rate(formativas.item), 9000.0)
+		self.assertEqual(self._item_rate(primera), 12000.0)
+		self.assertEqual(len(result["grupos"]), 2)
+
+	def test_alta_guiada_reutiliza_arancel_existente(self) -> None:
+		existing = create_arancel_item(
+			item_code="TEST-ARANCEL-REUSO", item_name="Arancel reuso", standard_rate=500
+		)["item"]
+		items_antes = frappe.db.count("Item")
+
+		result = create_actividad_guiada(
+			titulo="Actividad Reuso Guiada",
+			modo="unica",
+			arancel_modo="existente",
+			item=existing,
+			monto=700,
+		)
+
+		self.assertEqual(frappe.db.get_value("Actividad", result["name"], "item"), existing)
+		self.assertEqual(frappe.db.count("Item"), items_antes)
+		self.assertEqual(self._item_rate(existing), 700.0)
+
+	def test_alta_guiada_sin_arancel(self) -> None:
+		result = create_actividad_guiada(
+			titulo="Actividad Sin Cuota Guiada", modo="unica", arancel_modo="ninguno"
+		)
+		self.assertFalse(frappe.db.get_value("Actividad", result["name"], "item"))
+
+	def test_alta_guiada_es_atomica_si_falla_un_grupo(self) -> None:
+		with self.assertRaises(ValidationError):
+			create_actividad_guiada(
+				titulo="Actividad Atomica Guiada",
+				modo="grupos",
+				grupos=[{"titulo": "Tira OK", "monto": 100}, {"titulo": "  ", "monto": 200}],
+			)
+		self.assertFalse(frappe.db.exists("Actividad", "Actividad Atomica Guiada"))
+		self.assertFalse(
+			frappe.db.exists("Item", {"item_name": "Cuota mensual Actividad Atomica Guiada — Tira OK"})
+		)
+
+	def test_grupo_con_monto_crea_arancel_propio(self) -> None:
+		actividad = create_actividad(titulo="Act Grupo Monto", usa_grupos=1)["name"]
+
+		con_monto = create_grupo(actividad=actividad, titulo="Mayores", monto=8000)
+		sin_monto = create_grupo(actividad=actividad, titulo="Menores")
+
+		item = frappe.db.get_value("Grupo Actividad", con_monto["name"], "item")
+		self.assertEqual(
+			frappe.db.get_value("Item", item, "item_name"), "Cuota mensual Act Grupo Monto — Mayores"
+		)
+		self.assertEqual(self._item_rate(item), 8000.0)
+		self.assertFalse(frappe.db.get_value("Grupo Actividad", sin_monto["name"], "item"))
+
+
 class TestGestionActividadesEdicionPanel(MembersTestCase):
 	def test_update_actividad_persiste_metadatos(self) -> None:
 		actividad = create_actividad(titulo="Edit Act Panel", usa_grupos=0)["name"]
@@ -312,6 +424,32 @@ class TestGestionActividadesPanelPermissions(MembersTestCase):
 		result = create_actividad_desk(titulo="API Actividad Panel", usa_grupos=0)
 		self.assertEqual(result["titulo"], "API Actividad Panel")
 		frappe.set_user("Administrator")
+
+	def test_guest_no_puede_alta_guiada(self) -> None:
+		from club_management.activities.api.gestion_actividades_workspace import (
+			create_actividad_guiada_desk,
+		)
+
+		frappe.set_user("Guest")
+		with self.assertRaises(PermissionError):
+			create_actividad_guiada_desk(titulo="Guest Guiada", modo="unica")
+		frappe.set_user("Administrator")
+
+	def test_secretaria_puede_alta_guiada_con_grupos(self) -> None:
+		from club_management.activities.api.gestion_actividades_workspace import (
+			create_actividad_guiada_desk,
+		)
+
+		user = make_secretaria_user("sec.alta.guiada@example.com")
+		frappe.set_user(user)
+		result = create_actividad_guiada_desk(
+			titulo="API Guiada Grupos",
+			modo="grupos",
+			grupos='[{"titulo": "Tira A", "monto": 1000}]',
+		)
+		frappe.set_user("Administrator")
+		self.assertEqual(result["name"], "API Guiada Grupos")
+		self.assertTrue(frappe.db.get_value("Grupo Actividad", "API Guiada Grupos / Tira A", "item"))
 
 	def test_secretaria_puede_crear_grupo_y_equipo(self) -> None:
 		user = make_secretaria_user("sec.act.panel@example.com")

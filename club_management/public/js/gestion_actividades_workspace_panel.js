@@ -17,8 +17,6 @@
 		_selected_actividad: null,
 		_grupo_expandido: null,
 		_filter: "",
-		_scroll_top: 0,
-		_focus_selector: null,
 
 		_storage_key(name) {
 			return `club_actividades_panel_${name}`;
@@ -720,45 +718,128 @@
 			const catalog = this.filtered_catalog();
 			this.ensure_selected_actividad(catalog);
 
-			if (!catalog.length) {
-				const empty_msg = this._catalog.length
-					? __("No hay resultados para la búsqueda.")
-					: __("No hay actividades habilitadas. Cree la primera con el botón superior.");
-				$panel.html(`
-					${this.render_toolbar()}
-					<p class="text-muted">${empty_msg}</p>
-				`);
-				this.bind_events($panel);
-				return;
-			}
-
 			$panel.html(`
 				${this.render_toolbar()}
-				<div class="club-actividades-accordion">${this.render_actividades_accordion(catalog)}</div>
+				<div class="club-actividades-results">${this.render_results_html(catalog)}</div>
 			`);
 			this.bind_events($panel);
-			this.restore_view_position($panel);
 		},
 
-		capture_view_position($panel) {
-			const $accordion = $panel.find(".club-actividades-accordion");
-			if ($accordion.length) {
-				this._scroll_top = $accordion.scrollTop();
+		render_results_html(catalog) {
+			if (!catalog.length) {
+				const empty_msg = (this._catalog || []).length
+					? __("No hay resultados para la búsqueda.")
+					: __("No hay actividades habilitadas. Cree la primera con el botón superior.");
+				return `<p class="text-muted">${empty_msg}</p>`;
 			}
+			return `<div class="club-actividades-accordion">${this.render_actividades_accordion(catalog)}</div>`;
 		},
 
-		restore_view_position($panel) {
-			const $accordion = $panel.find(".club-actividades-accordion");
-			if ($accordion.length && this._scroll_top > 0) {
-				$accordion.scrollTop(this._scroll_top);
-			}
-			if (this._focus_selector) {
-				const $target = $panel.find(this._focus_selector).first();
-				if ($target.length) {
-					$target[0].scrollIntoView({ block: "nearest", behavior: "instant" });
+		render_results($panel) {
+			const catalog = this.filtered_catalog();
+			this.ensure_selected_actividad(catalog);
+			$panel.find(".club-actividades-results").html(this.render_results_html(catalog));
+			this.refresh_admin_links($panel);
+		},
+
+		refresh_admin_links($panel) {
+			$panel.find(".club-actividades-admin").replaceWith(this.render_admin_links());
+		},
+
+		actividad_selector(name) {
+			return `.club-actividad-card[data-actividad="${CSS.escape(name || "")}"]`;
+		},
+
+		grupo_selector(name) {
+			return `.club-grupo-card[data-grupo="${CSS.escape(name || "")}"]`;
+		},
+
+		_scroll_parent(el) {
+			let node = el?.parentElement;
+			while (node && node !== document.body && node !== document.documentElement) {
+				const overflow = getComputedStyle(node).overflowY;
+				if ((overflow === "auto" || overflow === "scroll") && node.scrollHeight > node.clientHeight) {
+					return node;
 				}
-				this._focus_selector = null;
+				node = node.parentElement;
 			}
+			return null;
+		},
+
+		capture_anchor($panel, selector) {
+			const el = selector ? $panel.find(selector)[0] : null;
+			if (!el) {
+				return null;
+			}
+			const scroller = this._scroll_parent(el);
+			return {
+				selector,
+				top: el.getBoundingClientRect().top,
+				scroller_top: scroller ? scroller.scrollTop : null,
+			};
+		},
+
+		/* Mantiene el nodo de referencia en el mismo lugar de la pantalla tras cambiar el DOM. */
+		restore_anchor($panel, anchor) {
+			if (!anchor) {
+				return false;
+			}
+			const el = $panel.find(anchor.selector)[0];
+			if (!el) {
+				return false;
+			}
+			const scroller = this._scroll_parent(el);
+			if (scroller && anchor.scroller_top !== null && scroller.scrollTop === 0) {
+				scroller.scrollTop = anchor.scroller_top;
+			}
+			const delta = el.getBoundingClientRect().top - anchor.top;
+			if (Math.abs(delta) >= 1) {
+				if (scroller) {
+					scroller.scrollTop += delta;
+				} else {
+					window.scrollBy(0, delta);
+				}
+			}
+			return true;
+		},
+
+		rerender_catalog($panel, anchor_selector) {
+			const anchor = this.capture_anchor($panel, anchor_selector);
+			this.render_catalog($panel, { actividades: this._catalog });
+			this.restore_anchor($panel, anchor);
+		},
+
+		set_node_expanded($card, kind, expanded) {
+			$card.toggleClass("is-expanded", expanded);
+			$card.children(`.club-${kind}-body`).toggleClass("is-collapsed", !expanded);
+			$card.children(`.club-${kind}-toggle`).find(`.club-${kind}-chevron`).text(expanded ? "▾" : "▸");
+			$card.children(`.club-${kind}-toggle`).attr("aria-expanded", expanded ? "true" : "false");
+		},
+
+		toggle_actividad($panel, actividad) {
+			const anchor = this.capture_anchor($panel, this.actividad_selector(actividad));
+			this._selected_actividad = this._selected_actividad === actividad ? null : actividad;
+			this._grupo_expandido = null;
+			this.persist_state();
+			$panel.find(".club-actividad-card").each((_i, el) => {
+				this.set_node_expanded($(el), "actividad", el.dataset.actividad === this._selected_actividad);
+			});
+			$panel.find(".club-grupo-card").each((_i, el) => {
+				this.set_node_expanded($(el), "grupo", false);
+			});
+			this.refresh_admin_links($panel);
+			this.restore_anchor($panel, anchor);
+		},
+
+		toggle_grupo($panel, grupo) {
+			const anchor = this.capture_anchor($panel, this.grupo_selector(grupo));
+			this._grupo_expandido = this._grupo_expandido === grupo ? null : grupo;
+			this.persist_state();
+			$panel.find(".club-grupo-card").each((_i, el) => {
+				this.set_node_expanded($(el), "grupo", el.dataset.grupo === this._grupo_expandido);
+			});
+			this.refresh_admin_links($panel);
+			this.restore_anchor($panel, anchor);
 		},
 
 		apply_item_rate_to_row($row, item, callback) {
@@ -800,7 +881,8 @@
 
 			return `
 			<div class="club-actividad-card ${expanded ? "is-expanded" : ""}" data-actividad="${frappe.utils.escape_html(act.name)}">
-				<button type="button" class="club-actividad-toggle" data-actividad="${frappe.utils.escape_html(act.name)}">
+				<button type="button" class="club-actividad-toggle" data-actividad="${frappe.utils.escape_html(act.name)}"
+					aria-expanded="${expanded ? "true" : "false"}">
 					<span class="club-actividad-chevron">${expanded ? "▾" : "▸"}</span>
 					<span class="club-actividad-toggle-text">
 						<strong>${frappe.utils.escape_html(act.titulo)}</strong>
@@ -817,7 +899,7 @@
 			const grupos = act.grupos || [];
 			const arancel_row =
 				!act.usa_grupos || !grupos.length
-					? this.render_arancel_inputs("Actividad", act.name, act.item, act.rate)
+					? this.render_arancel_inputs("Actividad", act.name, act.item, act.rate, [act.titulo])
 					: "";
 
 			const grupos_html = grupos.length
@@ -840,7 +922,8 @@
 							${__("Deshabilitar")}
 						</button>
 						<button type="button" class="btn btn-default btn-xs club-add-grupo"
-							data-actividad="${frappe.utils.escape_html(act.name)}">
+							data-actividad="${frappe.utils.escape_html(act.name)}"
+							data-titulo="${frappe.utils.escape_html(act.titulo || act.name)}">
 							+ ${__("Grupo / tira")}
 						</button>
 					</div>
@@ -884,7 +967,7 @@
 									title="${__("Deshabilitar")}">×</button>
 							</div>
 						</div>
-						${this.render_arancel_inputs("Equipo Actividad", eq.name, eq.item, eq.rate)}
+						${this.render_arancel_inputs("Equipo Actividad", eq.name, eq.item, eq.rate, [act.titulo, grupo.titulo, eq.titulo])}
 					</div>`;
 						})
 						.join("")}
@@ -893,7 +976,8 @@
 
 			return `
 			<div class="club-grupo-card ${expanded ? "is-expanded" : ""}" data-grupo="${frappe.utils.escape_html(grupo.name)}">
-				<button type="button" class="club-grupo-toggle" data-grupo="${frappe.utils.escape_html(grupo.name)}">
+				<button type="button" class="club-grupo-toggle" data-grupo="${frappe.utils.escape_html(grupo.name)}"
+					aria-expanded="${expanded ? "true" : "false"}">
 					<span class="club-grupo-chevron">${expanded ? "▾" : "▸"}</span>
 					<span class="club-grupo-toggle-text">
 						<strong>${frappe.utils.escape_html(grupo.titulo)}</strong>
@@ -917,12 +1001,13 @@
 								${__("Deshabilitar")}
 							</button>
 							<button type="button" class="btn btn-default btn-xs club-add-equipo"
-								data-grupo="${frappe.utils.escape_html(grupo.name)}">
-								+ ${__("Equipo")}
+								data-grupo="${frappe.utils.escape_html(grupo.name)}"
+								data-titulo="${frappe.utils.escape_html(grupo.titulo || grupo.name)}">
+								+ ${__("Equipo / categoría")}
 							</button>
 						</div>
 					</div>
-					${this.render_arancel_inputs("Grupo Actividad", grupo.name, grupo.item, grupo.rate)}
+					${this.render_arancel_inputs("Grupo Actividad", grupo.name, grupo.item, grupo.rate, [act.titulo, grupo.titulo])}
 					<div class="club-equipos-wrap">${equipos_html}</div>
 				</div>
 			</div>
@@ -940,24 +1025,25 @@
 			return `${label} · $${rate} (${origen})`;
 		},
 
-		render_arancel_inputs(doctype, name, item, rate) {
+		render_arancel_inputs(doctype, name, item, rate, path) {
+			const ruta = (path || []).filter(Boolean).join(" — ");
 			return `
-			<div class="club-arancel-row" data-doctype="${frappe.utils.escape_html(doctype)}" data-name="${frappe.utils.escape_html(name)}" data-item="${frappe.utils.escape_html(item || "")}">
-				<label class="small text-muted">${__("Ítem arancel")}</label>
+			<div class="club-arancel-row" data-doctype="${frappe.utils.escape_html(doctype)}" data-name="${frappe.utils.escape_html(name)}" data-item="${frappe.utils.escape_html(item || "")}" data-ruta="${frappe.utils.escape_html(ruta)}">
+				<label class="small text-muted">${__("Arancel (cuota mensual)")}</label>
 				<div class="club-arancel-item-picker">
 					<input type="text" class="form-control form-control-sm club-arancel-item" readonly
-						value="${frappe.utils.escape_html(item || "")}" placeholder="${__("Seleccionar ítem")}">
+						value="${frappe.utils.escape_html(item || "")}" placeholder="${__("Sin arancel asignado")}"
+						title="${frappe.utils.escape_html(item || __("Sin arancel asignado"))}">
 					<div class="club-arancel-item-actions">
 						<button type="button" class="btn btn-default btn-sm club-pick-arancel-item">
-							${__("Buscar")}
+							${__("Elegir existente")}
 						</button>
-						<button type="button" class="btn btn-default btn-sm club-create-arancel-item"
-							title="${__("Crear ítem de arancel")}" aria-label="${__("Crear ítem de arancel")}">
-							+
+						<button type="button" class="btn btn-default btn-sm club-create-arancel-item">
+							+ ${__("Crear arancel")}
 						</button>
 					</div>
 				</div>
-				<label class="small text-muted">${__("Tarifa")}</label>
+				<label class="small text-muted">${__("Monto mensual ($)")}</label>
 				<input type="number" class="form-control form-control-sm club-arancel-rate"
 					min="0" step="0.01" value="${frappe.utils.escape_html(String(rate || 0))}">
 			</div>
@@ -973,60 +1059,86 @@
 			};
 		},
 
+		help_html(text) {
+			return `<div class="club-actividades-help">${text}</div>`;
+		},
+
+		arancel_help_text() {
+			return __(
+				"Un <b>arancel</b> es la cuota mensual que se le cobra al socio. En contabilidad figura como <i>Producto</i>; el grupo contable se asigna solo, no hace falta elegirlo."
+			);
+		},
+
+		arancel_link_field(extra) {
+			return {
+				fieldname: "item",
+				label: __("Arancel existente"),
+				fieldtype: "Link",
+				options: "Item",
+				only_select: 1,
+				get_query: () => this.item_link_query(),
+				description: __("Escriba parte del nombre (ej.: «Cuota mensual», «Natación»)."),
+				...(extra || {}),
+			};
+		},
+
 		show_arancel_item_dialog($row) {
 			const panel = this;
-			const $input = $row.find(".club-arancel-item");
-			const target = {
-				set_input(value) {
-					const item = (value || "").trim();
+			const ruta = $row.attr("data-ruta") || "";
+			const d = new frappe.ui.Dialog({
+				title: ruta
+					? __("Elegir arancel para {0}", [frappe.utils.escape_html(ruta)])
+					: __("Elegir arancel existente"),
+				fields: [
+					{ fieldtype: "HTML", fieldname: "help", options: panel.help_html(panel.arancel_help_text()) },
+					panel.arancel_link_field({ reqd: 1, default: ($row.attr("data-item") || "").trim() }),
+				],
+				primary_action_label: __("Asignar"),
+				primary_action(values) {
+					const item = (values.item || "").trim();
 					if (!item) {
 						return;
 					}
-					$input.val(item);
+					d.hide();
+					$row.find(".club-arancel-item").val(item);
 					$row.attr("data-item", item);
 					panel.apply_item_rate_to_row($row, item, () => panel.save_arancel_row($row));
 				},
-				$input,
-				set_custom_query(args) {
-					Object.assign(args, panel.item_link_query());
-				},
-			};
-			new frappe.ui.form.LinkSelector({
-				doctype: "Item",
-				target,
-				txt: ($input.val() || "").trim(),
 			});
+			d.show();
 		},
 
 		show_create_item_dialog($row) {
 			const panel = this;
+			const ruta = $row.attr("data-ruta") || "";
 			const rate = parseFloat($row.find(".club-arancel-rate").val()) || 0;
-			frappe.prompt(
-				[
-					{
-						fieldname: "item_code",
-						label: __("Código"),
-						fieldtype: "Data",
-						reqd: 1,
-					},
+			const d = new frappe.ui.Dialog({
+				title: ruta
+					? __("Nuevo arancel para {0}", [frappe.utils.escape_html(ruta)])
+					: __("Nuevo arancel"),
+				fields: [
+					{ fieldtype: "HTML", fieldname: "help", options: panel.help_html(panel.arancel_help_text()) },
 					{
 						fieldname: "item_name",
-						label: __("Nombre"),
+						label: __("Nombre del arancel"),
 						fieldtype: "Data",
 						reqd: 1,
+						default: ruta ? __("Cuota mensual {0}", [ruta]) : "",
+						description: __("Así aparece en la factura / recibo del socio."),
 					},
 					{
 						fieldname: "standard_rate",
-						label: __("Tarifa"),
-						fieldtype: "Float",
-						default: rate,
+						label: __("Monto mensual ($)"),
+						fieldtype: "Currency",
+						reqd: 1,
+						default: rate || null,
 					},
 				],
-				(values) => {
+				primary_action_label: __("Crear y asignar"),
+				primary_action(values) {
 					frappe.call({
 						method: "club_management.activities.api.gestion_actividades_workspace.create_arancel_item_desk",
 						args: {
-							item_code: values.item_code,
 							item_name: values.item_name,
 							standard_rate: values.standard_rate || 0,
 						},
@@ -1035,6 +1147,7 @@
 							if (r.exc || !r.message?.item) {
 								return;
 							}
+							d.hide();
 							$row.find(".club-arancel-item").val(r.message.item);
 							$row.find(".club-arancel-rate").val(r.message.rate || 0);
 							$row.attr("data-item", r.message.item);
@@ -1042,9 +1155,8 @@
 						},
 					});
 				},
-				__("Crear ítem de arancel"),
-				__("Crear y aplicar")
-			);
+			});
+			d.show();
 		},
 
 		apply_arancel_to_catalog(result) {
@@ -1116,6 +1228,9 @@
 						label: __("Usa grupos / tiras"),
 						fieldtype: "Check",
 						default: act?.usa_grupos ? 1 : 0,
+						description: __(
+							"Marcar si la actividad se divide en grupos / tiras (ej.: Formativas, Primera) donde se inscriben los socios."
+						),
 					},
 					{
 						fieldname: "orden",
@@ -1214,6 +1329,310 @@
 			);
 		},
 
+		format_monto(value) {
+			return `$${Number(value || 0).toLocaleString("es-AR")}`;
+		},
+
+		resumen_nueva_actividad(values) {
+			const titulo = (values.titulo || "").trim() || __("(sin nombre)");
+			const items = [`<li>${__("Actividad")} <b>${frappe.utils.escape_html(titulo)}</b></li>`];
+			if (values.modo === "grupos") {
+				const grupos = (values.grupos || []).filter((row) => (row.titulo || "").trim());
+				if (!grupos.length) {
+					items.push(`<li class="text-muted">${__("Agregue al menos un grupo / tira en la tabla.")}</li>`);
+				}
+				for (const row of grupos) {
+					const grupo = frappe.utils.escape_html(row.titulo.trim());
+					items.push(
+						Number(row.monto) > 0
+							? `<li>${__("Grupo / tira")} <b>${grupo}</b> ${__("con arancel")} «${frappe.utils.escape_html(__("Cuota mensual {0}", [`${titulo} — ${row.titulo.trim()}`]))}» ${__("de")} ${this.format_monto(row.monto)}</li>`
+							: `<li>${__("Grupo / tira")} <b>${grupo}</b> ${__("sin cuota por ahora")}</li>`
+					);
+				}
+			} else if (values.arancel_modo === "nuevo") {
+				items.push(
+					Number(values.monto) > 0
+						? `<li>${__("Arancel")} «${frappe.utils.escape_html(__("Cuota mensual {0}", [titulo]))}» ${__("de")} ${this.format_monto(values.monto)}</li>`
+						: `<li class="text-muted">${__("Cargue el monto mensual para crear el arancel.")}</li>`
+				);
+			} else if (values.arancel_modo === "existente") {
+				items.push(
+					values.item
+						? `<li>${__("Usa el arancel existente")} <b>${frappe.utils.escape_html(values.item)}</b></li>`
+						: `<li class="text-muted">${__("Elija el arancel existente.")}</li>`
+				);
+			} else {
+				items.push(`<li>${__("Sin arancel por ahora (se puede asignar después desde el catálogo).")}</li>`);
+			}
+			return `
+				<div class="club-actividades-resumen">
+					<div class="club-actividades-resumen-title">${__("Se va a crear")}</div>
+					<ul>${items.join("")}</ul>
+				</div>`;
+		},
+
+		show_nueva_actividad_dialog() {
+			const panel = this;
+			const d = new frappe.ui.Dialog({
+				title: __("Nueva actividad"),
+				size: "large",
+				fields: [
+					{
+						fieldtype: "HTML",
+						fieldname: "help",
+						options: panel.help_html(
+							__(
+								"Cargue la actividad y cómo se cobra. El sistema crea todo junto: la actividad, sus grupos / tiras (si tiene) y el arancel mensual de cada uno."
+							)
+						),
+					},
+					{
+						fieldname: "titulo",
+						label: __("Nombre de la actividad"),
+						fieldtype: "Data",
+						reqd: 1,
+						description: __("Ej.: Natación, Hockey, Patín artístico."),
+					},
+					{
+						fieldname: "modo",
+						label: __("¿Cómo se organiza y se cobra?"),
+						fieldtype: "Select",
+						reqd: 1,
+						default: "unica",
+						options: [
+							{ value: "unica", label: __("Una sola cuota para todos los inscriptos") },
+							{
+								value: "grupos",
+								label: __("Tiene grupos / tiras (ej.: Formativas, Primera) con su propia cuota"),
+							},
+						],
+					},
+					{ fieldtype: "Section Break", label: __("Cuota mensual"), depends_on: "eval:doc.modo==='unica'" },
+					{
+						fieldname: "arancel_modo",
+						label: __("Arancel (cuota mensual)"),
+						fieldtype: "Select",
+						default: "nuevo",
+						options: [
+							{ value: "nuevo", label: __("Crear el arancel con un monto") },
+							{ value: "existente", label: __("Usar un arancel que ya existe") },
+							{ value: "ninguno", label: __("Definir la cuota más tarde") },
+						],
+					},
+					{
+						fieldname: "monto",
+						label: __("Monto mensual ($)"),
+						fieldtype: "Currency",
+						depends_on: "eval:doc.arancel_modo!=='ninguno'",
+					},
+					panel.arancel_link_field({
+						depends_on: "eval:doc.arancel_modo==='existente'",
+						description: __("Si cargó un monto arriba, se actualiza el valor de este arancel."),
+					}),
+					{ fieldtype: "Section Break", label: __("Grupos / tiras"), depends_on: "eval:doc.modo==='grupos'" },
+					{
+						fieldtype: "HTML",
+						fieldname: "grupos_help",
+						options: panel.help_html(
+							__(
+								"Un <b>grupo / tira</b> es una división de la actividad donde se inscribe el socio. No tiene relación con los «grupos de productos» de contabilidad. Si deja la cuota vacía, el grupo se crea sin arancel y se asigna después."
+							)
+						),
+					},
+					{
+						fieldname: "grupos",
+						fieldtype: "Table",
+						label: __("Grupos / tiras"),
+						in_place_edit: true,
+						data: [],
+						fields: [
+							{
+								fieldname: "titulo",
+								label: __("Nombre del grupo / tira"),
+								fieldtype: "Data",
+								in_list_view: 1,
+								reqd: 1,
+								columns: 6,
+							},
+							{
+								fieldname: "monto",
+								label: __("Cuota mensual ($)"),
+								fieldtype: "Currency",
+								in_list_view: 1,
+								columns: 4,
+							},
+						],
+					},
+					{ fieldtype: "Section Break" },
+					{ fieldtype: "HTML", fieldname: "resumen" },
+				],
+				primary_action_label: __("Crear actividad"),
+				primary_action() {
+					const values = d.get_values(true) || {};
+					const titulo = (values.titulo || "").trim();
+					const grupos = (values.grupos || [])
+						.filter((row) => (row.titulo || "").trim())
+						.map((row) => ({ titulo: row.titulo.trim(), monto: Number(row.monto) || 0 }));
+					if (!titulo) {
+						frappe.msgprint(__("Indique el nombre de la actividad."));
+						return;
+					}
+					if (values.modo === "grupos" && !grupos.length) {
+						frappe.msgprint(__("Agregue al menos un grupo / tira."));
+						return;
+					}
+					if (values.modo !== "grupos" && values.arancel_modo === "nuevo" && !(Number(values.monto) > 0)) {
+						frappe.msgprint(__("Indique el monto mensual o elija «Definir la cuota más tarde»."));
+						return;
+					}
+					if (values.modo !== "grupos" && values.arancel_modo === "existente" && !values.item) {
+						frappe.msgprint(__("Elija el arancel existente."));
+						return;
+					}
+					frappe.call({
+						method: "club_management.activities.api.gestion_actividades_workspace.create_actividad_guiada_desk",
+						args: {
+							titulo,
+							modo: values.modo,
+							arancel_modo: values.arancel_modo || "ninguno",
+							monto: values.monto || 0,
+							item: values.item || null,
+							grupos: JSON.stringify(grupos),
+						},
+						freeze: true,
+						freeze_message: __("Creando actividad…"),
+						callback: (r) => {
+							if (r.exc || !r.message?.name) {
+								return;
+							}
+							d.hide();
+							frappe.show_alert({
+								message: __("Actividad {0} creada", [frappe.utils.escape_html(r.message.titulo)]),
+								indicator: "green",
+							});
+							panel._selected_actividad = r.message.name;
+							panel._grupo_expandido = null;
+							panel._filter = "";
+							panel.persist_state();
+							panel._after_mutation(panel.actividad_selector(r.message.name), null);
+						},
+					});
+				},
+			});
+
+			const refresh_resumen = frappe.utils.debounce(() => {
+				d.fields_dict.resumen.$wrapper.html(panel.resumen_nueva_actividad(d.get_values(true) || {}));
+			}, 150);
+			d.$wrapper.on("change input", refresh_resumen);
+			d.$wrapper.on("click", ".grid-add-row, .grid-remove-rows", refresh_resumen);
+			refresh_resumen();
+			d.show();
+		},
+
+		show_nuevo_grupo_dialog(actividad, actividad_titulo) {
+			const panel = this;
+			const nombre_act = actividad_titulo || actividad;
+			const d = new frappe.ui.Dialog({
+				title: __("Nuevo grupo / tira en {0}", [frappe.utils.escape_html(nombre_act)]),
+				fields: [
+					{
+						fieldtype: "HTML",
+						fieldname: "help",
+						options: panel.help_html(
+							__(
+								"Un <b>grupo / tira</b> divide la actividad (ej.: Formativas, Primera, Tira Azul) y es donde se inscribe el socio. No tiene relación con los «grupos de productos» de contabilidad."
+							)
+						),
+					},
+					{
+						fieldname: "titulo",
+						label: __("Nombre del grupo / tira"),
+						fieldtype: "Data",
+						reqd: 1,
+					},
+					{
+						fieldname: "monto",
+						label: __("Cuota mensual del grupo ($)"),
+						fieldtype: "Currency",
+						description: __(
+							"Si la carga, se crea el arancel «Cuota mensual {0} — …» con este monto. Déjela vacía para asignarlo después.",
+							[frappe.utils.escape_html(nombre_act)]
+						),
+					},
+				],
+				primary_action_label: __("Crear grupo / tira"),
+				primary_action(values) {
+					frappe.call({
+						method: "club_management.activities.api.gestion_actividades_workspace.create_grupo_desk",
+						args: { actividad, titulo: values.titulo, monto: values.monto || 0 },
+						freeze: true,
+						callback: (r) => {
+							if (r.exc) {
+								return;
+							}
+							d.hide();
+							panel._selected_actividad = actividad;
+							panel._grupo_expandido = r.message?.name || null;
+							panel.persist_state();
+							panel._after_mutation(
+								r.message?.name ? panel.grupo_selector(r.message.name) : panel.actividad_selector(actividad),
+								panel.actividad_selector(actividad)
+							);
+						},
+					});
+				},
+			});
+			d.show();
+		},
+
+		show_nuevo_equipo_dialog(grupo_actividad, grupo_titulo) {
+			const panel = this;
+			const d = new frappe.ui.Dialog({
+				title: __("Nuevo equipo / categoría en {0}", [frappe.utils.escape_html(grupo_titulo || grupo_actividad)]),
+				fields: [
+					{
+						fieldtype: "HTML",
+						fieldname: "help",
+						options: panel.help_html(
+							__(
+								"Un <b>equipo / categoría</b> es una subdivisión del grupo / tira (ej.: U11, U13, Sub-15). Cobra la cuota del grupo, salvo que después le asigne un arancel propio."
+							)
+						),
+					},
+					{
+						fieldname: "titulo",
+						label: __("Nombre del equipo / categoría"),
+						fieldtype: "Data",
+						reqd: 1,
+					},
+				],
+				primary_action_label: __("Crear equipo / categoría"),
+				primary_action(values) {
+					frappe.call({
+						method: "club_management.activities.api.gestion_actividades_workspace.create_equipo_desk",
+						args: { grupo_actividad, titulo: values.titulo },
+						freeze: true,
+						callback: (r) => {
+							if (r.exc) {
+								return;
+							}
+							d.hide();
+							panel._grupo_expandido = grupo_actividad;
+							const actividad = (panel._catalog || []).find((row) =>
+								(row.grupos || []).some((grupo) => grupo.name === grupo_actividad)
+							);
+							if (actividad) {
+								panel._selected_actividad = actividad.name;
+							}
+							panel.persist_state();
+							panel._after_mutation(panel.grupo_selector(grupo_actividad));
+						},
+					});
+				},
+			});
+			d.show();
+		},
+
 		confirm_disable(method, name, label) {
 			frappe.confirm(
 				__("¿Deshabilitar {0}? Dejará de aparecer en inscripciones.", [label]),
@@ -1228,12 +1647,11 @@
 			);
 		},
 
-		_after_mutation(focus_selector) {
-			this._focus_selector = focus_selector || null;
-			this._refresh_catalog();
+		_after_mutation(focus_selector, anchor_selector) {
+			this._refresh_catalog(focus_selector, anchor_selector || focus_selector);
 		},
 
-		_refresh_catalog() {
+		_refresh_catalog(focus_selector, anchor_selector) {
 			if (!this.is_actividades_workspace()) {
 				return;
 			}
@@ -1242,14 +1660,20 @@
 				this.refresh();
 				return;
 			}
-			this.capture_view_position($panel);
+			const anchor = this.capture_anchor($panel, anchor_selector);
 			this.load_persisted_state();
 			frappe.call({
 				method: "club_management.activities.api.gestion_actividades_workspace.get_catalog",
 				callback: (r) => {
-					if (r.message) {
-						this.render_catalog($panel, r.message);
+					if (!r.message) {
+						return;
 					}
+					this.render_catalog($panel, r.message);
+					if (this.restore_anchor($panel, anchor) || !focus_selector) {
+						return;
+					}
+					const target = $panel.find(focus_selector)[0];
+					target?.scrollIntoView({ block: "nearest", behavior: "instant" });
 				},
 				error: () => {
 					frappe.show_alert({
@@ -1267,125 +1691,35 @@
 
 			$panel.on("input.club-actividades", ".club-actividades-filter", function () {
 				panel._filter = $(this).val() || "";
-				panel.render_catalog($panel, { actividades: panel._catalog });
+				panel.render_results($panel);
 			});
 
 			$panel.on("click.club-actividades", ".club-actividad-toggle", function (e) {
 				e.preventDefault();
-				const actividad = $(this).attr("data-actividad");
-				panel._selected_actividad = panel._selected_actividad === actividad ? null : actividad;
-				panel._grupo_expandido = null;
-				panel.persist_state();
-				panel.render_catalog($panel, { actividades: panel._catalog });
+				panel.toggle_actividad($panel, $(this).attr("data-actividad"));
 			});
 
 			$panel.on("click.club-actividades", ".club-grupo-toggle", function (e) {
 				e.preventDefault();
 				e.stopPropagation();
-				const grupo = $(this).attr("data-grupo");
-				panel._grupo_expandido = panel._grupo_expandido === grupo ? null : grupo;
-				panel.persist_state();
-				panel.render_catalog($panel, { actividades: panel._catalog });
+				panel.toggle_grupo($panel, $(this).attr("data-grupo"));
 			});
 
 			$panel.on("click.club-actividades", ".club-add-actividad", () => {
-				frappe.prompt(
-					[
-						{
-							fieldname: "titulo",
-							label: __("Nombre de la actividad"),
-							fieldtype: "Data",
-							reqd: 1,
-						},
-						{
-							fieldname: "usa_grupos",
-							label: __("Usa grupos / tiras"),
-							fieldtype: "Check",
-							default: 0,
-						},
-					],
-					(values) => {
-						frappe.call({
-							method: "club_management.activities.api.gestion_actividades_workspace.create_actividad_desk",
-							args: {
-								titulo: values.titulo,
-								usa_grupos: values.usa_grupos ? 1 : 0,
-							},
-							freeze: true,
-							callback: (r) => {
-								if (r.message?.name) {
-									panel._selected_actividad = r.message.name;
-									panel._grupo_expandido = null;
-									panel.persist_state();
-								}
-								panel._after_mutation(
-									r.message?.name
-										? `.club-actividad-card[data-actividad="${r.message.name}"]`
-										: null
-								);
-							},
-						});
-					},
-					__("Nueva actividad")
-				);
+				panel.show_nueva_actividad_dialog();
 			});
 
 			$panel.on("click.club-actividades", ".club-add-grupo", (e) => {
-				const actividad = $(e.currentTarget).data("actividad");
-				frappe.prompt(
-					[{ fieldname: "titulo", label: __("Grupo / tira"), fieldtype: "Data", reqd: 1 }],
-					(values) => {
-						frappe.call({
-							method: "club_management.activities.api.gestion_actividades_workspace.create_grupo_desk",
-							args: { actividad, titulo: values.titulo },
-							freeze: true,
-							callback: (r) => {
-								panel._selected_actividad = actividad;
-								if (r.message?.name) {
-									panel._grupo_expandido = r.message.name;
-								}
-								panel.persist_state();
-								panel._after_mutation(
-									r.message?.name
-										? `.club-grupo-card[data-grupo="${r.message.name}"]`
-										: `.club-actividad-card[data-actividad="${actividad}"]`
-								);
-							},
-						});
-					},
-					__("Nuevo grupo / tira")
-				);
+				const $btn = $(e.currentTarget);
+				panel.show_nuevo_grupo_dialog($btn.attr("data-actividad"), $btn.attr("data-titulo"));
 			});
 
 			$panel.on("click.club-actividades", ".club-add-equipo", (e) => {
-				const grupo_actividad = $(e.currentTarget).data("grupo");
-				frappe.prompt(
-					[{ fieldname: "titulo", label: __("Equipo / categoría"), fieldtype: "Data", reqd: 1 }],
-					(values) => {
-						frappe.call({
-							method: "club_management.activities.api.gestion_actividades_workspace.create_equipo_desk",
-							args: { grupo_actividad, titulo: values.titulo },
-							freeze: true,
-							callback: (r) => {
-								panel._grupo_expandido = grupo_actividad;
-								const actividad = (panel._catalog || []).find((row) =>
-									(row.grupos || []).some((grupo) => grupo.name === grupo_actividad)
-								);
-								if (actividad) {
-									panel._selected_actividad = actividad.name;
-								}
-								panel.persist_state();
-								panel._after_mutation(
-									`.club-grupo-card[data-grupo="${grupo_actividad}"]`
-								);
-							},
-						});
-					},
-					__("Nuevo equipo / categoría")
-				);
+				const $btn = $(e.currentTarget);
+				panel.show_nuevo_equipo_dialog($btn.attr("data-grupo"), $btn.attr("data-titulo"));
 			});
 
-			$panel.on("blur.club-actividades", ".club-arancel-rate", (e) => {
+			$panel.on("change.club-actividades", ".club-arancel-rate", (e) => {
 				panel.save_arancel_row($(e.currentTarget).closest(".club-arancel-row"));
 			});
 
@@ -1479,11 +1813,12 @@
 			}
 			if (!item) {
 				frappe.show_alert({
-					message: __("Seleccione un ítem de arancel antes de guardar la tarifa."),
+					message: __("Primero elija o cree el arancel; después cargue el monto."),
 					indicator: "orange",
 				});
 				return;
 			}
+			const anchor_selector = `.club-arancel-row[data-doctype="${CSS.escape(doctype)}"][data-name="${CSS.escape(name)}"]`;
 			frappe.call({
 				method: "club_management.activities.api.gestion_actividades_workspace.set_arancel_desk",
 				args: {
@@ -1500,7 +1835,7 @@
 					frappe.show_alert({ message: __("Arancel actualizado"), indicator: "green" });
 					const $panel = $(`#${PANEL_ID}`);
 					if ($panel.length) {
-						this.render_catalog($panel, { actividades: this._catalog });
+						this.rerender_catalog($panel, anchor_selector);
 					}
 				},
 			});
