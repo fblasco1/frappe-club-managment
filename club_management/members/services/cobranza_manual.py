@@ -893,6 +893,9 @@ def registrar_cobro_compuesto(
 		"status": "ok",
 		"payment_entries": payment_entries,
 		"saldo_deuda": saldo,
+		"total_exigido": prep.get("total_exigido"),
+		"ajustes_mora": prep.get("ajustes") or [],
+		"credit_notes": prep.get("credit_notes") or [],
 	}
 
 
@@ -962,17 +965,19 @@ def registrar_cobro_manual(
 	posting_date: str | date | None = None,
 ) -> str:
 	"""Compat: un PE contra una factura (saldo completo) con un medio."""
-	from club_management.members.services.mora_al_cobro import preparar_facturas_cobro_con_mora
+	from club_management.members.services.mora_al_cobro import previsualizar_cobro_con_mora
 
-	prep = preparar_facturas_cobro_con_mora(
+	# Preview (sin crear SI/CN): el monto neto. `registrar_cobro_compuesto`
+	# prepara mora + bonificación una sola vez sobre la factura origen.
+	preview = previsualizar_cobro_con_mora(
 		socio_name,
 		[sales_invoice_name],
 		posting_date=posting_date,
 	)
 	result = registrar_cobro_compuesto(
 		socio_name,
-		prep["sales_invoices"],
-		[{"mode_of_payment": mode_of_payment or "Cash", "amount": prep["total_exigido"]}],
+		[sales_invoice_name],
+		[{"mode_of_payment": mode_of_payment or "Cash", "amount": preview["total_exigido"]}],
 		posting_date=posting_date,
 	)
 	return result["payment_entries"][0]

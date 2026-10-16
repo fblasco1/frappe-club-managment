@@ -769,10 +769,19 @@ def asegurar_ajuste_mora_factura(
 		return result
 
 	outstanding_grupo = _outstanding_grupo(invoice_name, socio_name)
+	# Las CN de bonificación bajan el outstanding de la SI origen. Si no las
+	# reincorporamos al comparar, un segundo preparar (o un reintento) interpreta
+	# el faltante como mora nueva y duplica el ajuste.
+	from club_management.members.services.bonificacion_arancel import _monto_cn_ya_aplicado
+
+	ya_cn = flt(_monto_cn_ya_aplicado(socio_name, invoice_name), 2)
+	outstanding_bruto_grupo = flt(outstanding_grupo + ya_cn, 2)
+	outstanding_bruto_factura = flt(flt(invoice.outstanding_amount) + ya_cn, 2)
+
 	valor_actual = resolve_valor_actual_factura(invoice_name, socio_name)
 	monto_exigido = monto_exigido_con_piso(
 		valor_actual=valor_actual,
-		outstanding_factura=flt(invoice.outstanding_amount),
+		outstanding_factura=outstanding_bruto_factura,
 		tramo=tramo,
 		pct_post_primer=pct_post,
 		pct_extra_segundo=pct_extra,
@@ -780,7 +789,7 @@ def asegurar_ajuste_mora_factura(
 	result["monto_exigido"] = monto_exigido
 	result["outstanding_grupo"] = outstanding_grupo
 
-	diferencia = flt(monto_exigido - outstanding_grupo, 2)
+	diferencia = flt(monto_exigido - outstanding_bruto_grupo, 2)
 	if diferencia <= 0.005:
 		return result
 

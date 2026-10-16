@@ -141,27 +141,28 @@ def registrar_cobro(
 	medios: str | list | None = None,
 	posting_date: str | None = None,
 ) -> dict[str, str | float | list | dict | None]:
-	from club_management.members.services.mora_al_cobro import preparar_facturas_cobro_con_mora
+	from club_management.members.services.mora_al_cobro import previsualizar_cobro_con_mora
 
 	ensure_secretaria_operacion_access()
 	invoices: list[str] = []
 	if sales_invoices:
 		parsed = frappe.parse_json(sales_invoices) if isinstance(sales_invoices, str) else sales_invoices
-		invoices = [str(x) for x in (parsed or [])]
+		invoices = [str(x) for x in (parsed or []) if str(x).strip()]
 	elif sales_invoice:
 		invoices = [sales_invoice]
 	else:
 		frappe.throw(frappe._("Seleccioná al menos una factura."), frappe.ValidationError)
 
-	prep = preparar_facturas_cobro_con_mora(socio, invoices, posting_date=posting_date)
-	invoices = prep["sales_invoices"]
-
+	# No expandir / preparar acá: `registrar_cobro_compuesto` ya aplica mora + CN
+	# una sola vez. Preparar antes y pasar la lista expandida duplicaba la mora
+	# cuando la bonificación bajaba el outstanding de la SI origen.
 	medios_list: list[dict]
 	if medios:
 		parsed_medios = frappe.parse_json(medios) if isinstance(medios, str) else medios
 		medios_list = list(parsed_medios or [])
 	elif mode_of_payment:
-		medios_list = [{"mode_of_payment": mode_of_payment, "amount": prep["total_exigido"]}]
+		preview = previsualizar_cobro_con_mora(socio, invoices, posting_date=posting_date)
+		medios_list = [{"mode_of_payment": mode_of_payment, "amount": preview["total_exigido"]}]
 	else:
 		frappe.throw(frappe._("Indicá al menos un medio de pago."), frappe.ValidationError)
 
@@ -181,8 +182,8 @@ def registrar_cobro(
 		"estado": estado,
 		"recibo": recibos[0] if recibos else None,
 		"recibos": recibos,
-		"total_exigido": prep["total_exigido"],
-		"ajustes_mora": prep["ajustes"],
+		"total_exigido": result.get("total_exigido"),
+		"ajustes_mora": result.get("ajustes_mora") or [],
 	}
 
 

@@ -59,6 +59,8 @@ class _BonificacionArancelFixtures(MembersTestCase):
 	_ITEM_BONIF = "TEST-ITEM-BONIF-ARANCEL"
 	_ITEM_ARANCEL = "TEST-ITEM-ARANCEL-BONIF"
 	_ITEM_CUOTA = "TEST-ITEM-CUOTA-BONIF"
+	_ITEM_MORA = "TEST-ITEM-MORA-BONIF"
+	_ACTIVIDAD_MORA = "TEST Actividad Bonif Mora"
 	_PERIODO = "08/2026"
 
 	def setUp(self) -> None:
@@ -78,6 +80,7 @@ class _BonificacionArancelFixtures(MembersTestCase):
 			(self._ITEM_BONIF, 0, "Bonificacion test"),
 			(self._ITEM_ARANCEL, 28500, "Arancel test"),
 			(self._ITEM_CUOTA, 26500, "Cuota test"),
+			(self._ITEM_MORA, 0, "Mora test bonif"),
 		):
 			if not frappe.db.exists("Item", code):
 				frappe.get_doc(
@@ -93,13 +96,29 @@ class _BonificacionArancelFixtures(MembersTestCase):
 				).insert(ignore_permissions=True)
 			else:
 				frappe.db.set_value("Item", code, "standard_rate", rate)
+		# Vincular arancel a Actividad para que esté sujeto a mora al cobro.
+		if frappe.db.exists("DocType", "Actividad"):
+			if not frappe.db.exists("Actividad", self._ACTIVIDAD_MORA):
+				frappe.get_doc(
+					{
+						"doctype": "Actividad",
+						"titulo": self._ACTIVIDAD_MORA,
+						"habilitada": 1,
+						"item": self._ITEM_ARANCEL,
+					}
+				).insert(ignore_permissions=True)
+			else:
+				frappe.db.set_value("Actividad", self._ACTIVIDAD_MORA, "item", self._ITEM_ARANCEL)
 		settings = frappe.get_single("Club Settings")
 		settings.item_bonificacion_arancel = self._ITEM_BONIF
 		settings.item_cuota_social = self._ITEM_CUOTA
+		settings.item_recargo_mora = self._ITEM_MORA
 		if not settings.company:
 			settings.company = _default_company()
 		settings.dia_primer_vencimiento = 10
 		settings.dia_segundo_vencimiento = "20"
+		settings.recargo_post_vencimiento_pct = 10
+		settings.recargo_mes_vencido_pct = 5
 		for row in settings.cuotas_categoria or []:
 			if row.categoria == "Activo":
 				row.item = self._ITEM_CUOTA
@@ -170,6 +189,33 @@ class _BonificacionArancelFixtures(MembersTestCase):
 		defaults.update(kwargs)
 		doc = frappe.get_doc(defaults)
 		doc.insert(ignore_permissions=True)
+		return doc.name
+
+	def _si_arancel(self, socio_name: str, *, rate: float) -> str:
+		campo = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+		payload: dict = {
+			"doctype": SALES_INVOICE_DOCTYPE,
+			"customer": ensure_customer_for_socio(socio_name),
+			"company": _default_company(),
+			"posting_date": today(),
+			"due_date": today(),
+			"set_posting_time": 1,
+			campo: socio_name,
+			"items": [
+				{
+					"item_code": self._ITEM_ARANCEL,
+					"qty": 1,
+					"rate": rate,
+					"description": "Arancel actividad",
+				}
+			],
+		}
+		campo_periodo = _campo_periodo_cobro()
+		if campo_periodo:
+			payload[campo_periodo] = self._PERIODO
+		doc = frappe.get_doc(payload)
+		doc.insert(ignore_permissions=True)
+		doc.submit()
 		return doc.name
 
 
@@ -294,6 +340,57 @@ class TestBonificacionArancelIntegracion(_BonificacionArancelFixtures):
 		det = calcular_detalle_mora_factura(inv, posting_date="2026-08-10")
 		self.assertAlmostEqual(det["monto_bonificacion"], 7125.0)
 		self.assertAlmostEqual(det["monto_exigido"], 21375.0)
+
+	def test_mora_mas_bonificacion_no_duplica_ajuste_ni_falla_medios(self) -> None:
+		"""Regresión: mora + bonif. familiar (CN) no debe regenerar mora en 2.º preparar.
+
+		Preview: 24.000 + 10% mora − 2.400 bonif = 24.000.
+		Sin el fix, un segundo preparar creaba otra mora (+2.400) y el cobro
+		fallaba con «suma de medios (24000) ≠ total (26400)».
+		"""
+		socio = self._socio_activo(dni="88001009", email="bonif.mora@example.com")
+		frappe.db.set_value("Item", self._ITEM_ARANCEL, "standard_rate", 24000)
+		inv = self._si_arancel(socio.name, rate=24000)
+		self._crear_bonif(socio=socio.name, tipo_descuento="Monto fijo", valor=2400)
+
+		frappe.set_user(self._secretaria)
+		try:
+			preview = previsualizar_cobro_con_mora(
+				socio.name, [inv], posting_date="2026-08-15"
+			)
+		finally:
+			frappe.set_user("Administrator")
+		self.assertAlmostEqual(preview["total_exigido"], 24000.0, places=2)
+		self.assertAlmostEqual(preview["total_ajustes"], 2400.0, places=2)
+		self.assertAlmostEqual(preview["total_bonificacion"], 2400.0, places=2)
+
+		first = preparar_facturas_cobro_con_mora(
+			socio.name, [inv], posting_date="2026-08-15"
+		)
+		self.assertAlmostEqual(flt(first["total_exigido"]), 24000.0, places=2)
+		self.assertEqual(len(first["ajustes"]), 1)
+		self.assertTrue(first["credit_notes"])
+
+		second = preparar_facturas_cobro_con_mora(
+			socio.name, [inv], posting_date="2026-08-15"
+		)
+		self.assertAlmostEqual(flt(second["total_exigido"]), 24000.0, places=2)
+		self.assertEqual(second["ajustes"], first["ajustes"])
+		self.assertEqual(len(second["ajustes"]), 1)
+
+		frappe.set_user(self._secretaria)
+		try:
+			result = registrar_cobro_compuesto(
+				socio.name,
+				[inv],
+				[{"mode_of_payment": "Cash", "amount": 24000}],
+				posting_date="2026-08-15",
+			)
+		finally:
+			frappe.set_user("Administrator")
+		self.assertTrue(result["payment_entries"])
+		self.assertAlmostEqual(flt(result["total_exigido"]), 24000.0, places=2)
+		self.assertEqual(flt(sync_saldo_deuda_socio(socio.name)), 0)
 
 
 class TestBonificacionRecurrenteAlCobro(_BonificacionArancelFixtures):
