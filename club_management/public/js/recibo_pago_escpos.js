@@ -20,11 +20,24 @@ club_management_recibo_pago._get_print_frame = function () {
 
 club_management_recibo_pago.imprimir_html = function (recibo) {
 	const ancho = club_management_recibo_pago._ancho_mm_css(recibo.ancho_papel_mm);
+	const densidad = (recibo.densidad_impresion || "Máxima").trim();
+	const peso = densidad === "Normal" ? "600" : "700";
+	const tamaño = densidad === "Máxima" ? "12px" : "11px";
 	const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${__(
 		"Recibo"
 	)}</title><style>
 @page { size: ${ancho} auto; margin: 2mm; }
-body { font-family: "Courier New", Courier, monospace; font-size: 11px; width: ${ancho}; margin: 0 auto; white-space: pre-wrap; }
+body {
+	font-family: "Courier New", Courier, monospace;
+	font-size: ${tamaño};
+	font-weight: ${peso};
+	color: #000;
+	-webkit-print-color-adjust: exact;
+	print-color-adjust: exact;
+	width: ${ancho};
+	margin: 0 auto;
+	white-space: pre-wrap;
+}
 </style></head><body>${frappe.utils.escape_html(recibo.texto || "")}</body></html>`;
 	const frame = club_management_recibo_pago._get_print_frame();
 	const win = frame.contentWindow;

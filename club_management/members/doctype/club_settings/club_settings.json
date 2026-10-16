@@ -36,6 +36,7 @@
   "column_break_recibo",
   "recibo_mensaje_pie",
   "recibo_ancho_papel_mm",
+  "recibo_densidad_impresion",
   "recibo_impresora_url"
  ],
  "fields": [
@@ -237,6 +238,14 @@
    "options": "58\n80"
   },
   {
+   "default": "Máxima",
+   "fieldname": "recibo_densidad_impresion",
+   "fieldtype": "Select",
+   "label": "Densidad de impresión",
+   "options": "Normal\nAlta\nMáxima",
+   "description": "Oscuridad del ticket térmico. Máxima = negrita + doble golpe (recomendado si la letra sale clara)."
+  },
+  {
    "fieldname": "recibo_impresora_url",
    "fieldtype": "Data",
    "label": "URL impresora Star WebPRNT",
@@ -245,7 +254,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-09-12 00:00:00",
+ "modified": "2026-10-16 16:40:00",
  "modified_by": "Administrator",
  "module": "Members",
  "name": "Club Settings",

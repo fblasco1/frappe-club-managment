@@ -13,8 +13,12 @@ from club_management.members.services.cobranza_periodica import generar_deuda_me
 from club_management.members.services.cuotas_sociales_setup import sync_cuotas_sociales_club
 from club_management.members.services.recibo_pago import (
 	ANCHO_CARACTERES,
+	DENSIDAD_ALTA,
+	DENSIDAD_MAXIMA,
+	DENSIDAD_NORMAL,
 	build_recibo_pago,
 	format_monto_ar,
+	normalizar_densidad_impresion,
 	render_recibo_escpos,
 	render_recibo_texto,
 )
@@ -22,6 +26,8 @@ from club_management.members.services.socio_transitions import cambiar_estado
 from club_management.members.test_helpers import MembersTestCase, insert_socio, make_secretaria_user
 
 _ESC_INIT = b"\x1b\x40"
+_ESC_BOLD_ON = b"\x1b\x45\x01"
+_ESC_DOUBLE_STRIKE_ON = b"\x1b\x47\x01"
 _ESC_CUT = b"\x1d\x56"
 
 
@@ -91,6 +97,74 @@ class TestReciboPagoFormato(MembersTestCase):
 		decoded = raw.decode("latin-1", errors="ignore")
 		self.assertIn("CLUB TEST", decoded)
 		self.assertIn("CUOTA", decoded)
+
+	def test_densidad_default_es_maxima(self) -> None:
+		self.assertEqual(normalizar_densidad_impresion(None), DENSIDAD_MAXIMA)
+		self.assertEqual(normalizar_densidad_impresion(""), DENSIDAD_MAXIMA)
+		self.assertEqual(normalizar_densidad_impresion("rara"), DENSIDAD_MAXIMA)
+
+	def test_render_escpos_densidad_maxima_activa_negrita_y_doble_golpe(self) -> None:
+		data = {
+			"encabezado": {
+				"institucion_nombre": "CLUB TEST",
+				"institucion_direccion": "CALLE 123",
+				"cuit": "",
+				"condicion_iva": "",
+			},
+			"comprobante": "PE-001",
+			"fecha": "01/07/2026",
+			"hora": "10:00",
+			"lineas": [{"concepto": "CUOTA", "monto": 1000}],
+			"total": 1000,
+			"mensaje_pie": "",
+			"ancho_papel_mm": 58,
+			"densidad_impresion": DENSIDAD_MAXIMA,
+		}
+		raw = render_recibo_escpos(data)
+		self.assertTrue(raw.startswith(_ESC_INIT + _ESC_BOLD_ON + _ESC_DOUBLE_STRIKE_ON))
+
+	def test_render_escpos_densidad_normal_sin_doble_golpe(self) -> None:
+		data = {
+			"encabezado": {
+				"institucion_nombre": "CLUB TEST",
+				"institucion_direccion": "CALLE 123",
+				"cuit": "",
+				"condicion_iva": "",
+			},
+			"comprobante": "PE-001",
+			"fecha": "01/07/2026",
+			"hora": "10:00",
+			"lineas": [{"concepto": "CUOTA", "monto": 1000}],
+			"total": 1000,
+			"mensaje_pie": "",
+			"ancho_papel_mm": 58,
+			"densidad_impresion": DENSIDAD_NORMAL,
+		}
+		raw = render_recibo_escpos(data)
+		self.assertTrue(raw.startswith(_ESC_INIT))
+		self.assertNotIn(_ESC_DOUBLE_STRIKE_ON, raw)
+		self.assertIn(_ESC_BOLD_ON, raw)  # COMPROBANTE / TOTAL
+
+	def test_render_escpos_densidad_alta_negrita_sin_doble_golpe(self) -> None:
+		data = {
+			"encabezado": {
+				"institucion_nombre": "CLUB TEST",
+				"institucion_direccion": "CALLE 123",
+				"cuit": "",
+				"condicion_iva": "",
+			},
+			"comprobante": "PE-001",
+			"fecha": "01/07/2026",
+			"hora": "10:00",
+			"lineas": [{"concepto": "CUOTA", "monto": 1000}],
+			"total": 1000,
+			"mensaje_pie": "",
+			"ancho_papel_mm": 58,
+			"densidad_impresion": DENSIDAD_ALTA,
+		}
+		raw = render_recibo_escpos(data)
+		self.assertTrue(raw.startswith(_ESC_INIT + _ESC_BOLD_ON))
+		self.assertNotIn(_ESC_DOUBLE_STRIKE_ON, raw)
 
 
 class TestReciboPagoIntegracion(MembersTestCase):

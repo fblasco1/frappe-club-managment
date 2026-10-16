@@ -11,6 +11,7 @@ _RECIBO_ICDPE = {
 	"recibo_condicion_iva": "IVA EXENTO",
 	"recibo_mensaje_pie": "SOMOS ECHAGUE, SOMOS FAMILIA !!",
 	"recibo_ancho_papel_mm": "58",
+	"recibo_densidad_impresion": "Máxima",
 }
 
 

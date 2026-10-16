@@ -18,7 +18,15 @@ _ESC_ALIGN_CENTER = b"\x1b\x61\x01"
 _ESC_ALIGN_LEFT = b"\x1b\x61\x00"
 _ESC_BOLD_ON = b"\x1b\x45\x01"
 _ESC_BOLD_OFF = b"\x1b\x45\x00"
+_ESC_DOUBLE_STRIKE_ON = b"\x1b\x47\x01"
+_ESC_DOUBLE_STRIKE_OFF = b"\x1b\x47\x00"
 _GS_CUT = b"\x1d\x56\x00"
+
+DENSIDAD_NORMAL = "Normal"
+DENSIDAD_ALTA = "Alta"
+DENSIDAD_MAXIMA = "Máxima"
+_DENSIDADES_VALIDAS = frozenset({DENSIDAD_NORMAL, DENSIDAD_ALTA, DENSIDAD_MAXIMA})
+_DEFAULT_DENSIDAD = DENSIDAD_MAXIMA
 
 _DEFAULT_ENCABEZADO = {
 	"institucion_nombre": "Institucion Cultural y Deportiva Pedro Echague",
@@ -27,6 +35,13 @@ _DEFAULT_ENCABEZADO = {
 	"condicion_iva": "IVA EXENTO",
 }
 _DEFAULT_PIE = "SOMOS ECHAGUE, SOMOS FAMILIA !!"
+
+
+def normalizar_densidad_impresion(valor: str | None) -> str:
+	raw = (valor or "").strip()
+	if raw in _DENSIDADES_VALIDAS:
+		return raw
+	return _DEFAULT_DENSIDAD
 
 
 def format_monto_ar(monto: float) -> str:
@@ -86,6 +101,9 @@ def get_recibo_config() -> dict[str, Any]:
 	ancho = int(settings.recibo_ancho_papel_mm or 58)
 	if ancho not in ANCHO_CARACTERES:
 		ancho = 58
+	densidad = normalizar_densidad_impresion(
+		getattr(settings, "recibo_densidad_impresion", None)
+	)
 	return {
 		"encabezado": {
 			"institucion_nombre": (
@@ -101,6 +119,7 @@ def get_recibo_config() -> dict[str, Any]:
 		},
 		"mensaje_pie": (settings.recibo_mensaje_pie or _DEFAULT_PIE).strip(),
 		"ancho_papel_mm": ancho,
+		"densidad_impresion": densidad,
 		"impresora_url": (settings.recibo_impresora_url or "").strip(),
 	}
 
@@ -319,6 +338,7 @@ def build_recibo_pago(payment_entry_name: str) -> dict[str, Any]:
 		"total": total,
 		"mensaje_pie": config["mensaje_pie"],
 		"ancho_papel_mm": config["ancho_papel_mm"],
+		"densidad_impresion": config["densidad_impresion"],
 		"impresora_url": config["impresora_url"],
 		"encabezado": config["encabezado"],
 	}
@@ -392,6 +412,9 @@ def render_recibo_escpos(data: dict[str, Any]) -> bytes:
 	"""Genera bytes ESC/POS para impresora térmica Star / compatible."""
 	lineas = render_recibo_texto(data).split("\n")
 	enc = data.get("encabezado") or {}
+	densidad = normalizar_densidad_impresion(data.get("densidad_impresion"))
+	negrita_global = densidad in {DENSIDAD_ALTA, DENSIDAD_MAXIMA}
+	doble_golpe = densidad == DENSIDAD_MAXIMA
 	centradas: set[str] = set()
 	for campo in ("institucion_nombre", "institucion_direccion"):
 		valor = (enc.get(campo) or "").strip()
@@ -417,14 +440,29 @@ def render_recibo_escpos(data: dict[str, Any]) -> bytes:
 			centradas.add(linea.strip())
 
 	chunks: list[bytes] = [_ESC_INIT]
+	if negrita_global:
+		chunks.append(_ESC_BOLD_ON)
+	if doble_golpe:
+		chunks.append(_ESC_DOUBLE_STRIKE_ON)
+
 	for linea in lineas:
 		encoded = linea.encode("latin-1", errors="replace")
+		destacar = linea.startswith("COMPROBANTE") or linea.startswith("TOTAL:")
 		if linea.strip() in centradas:
-			chunks.extend([_ESC_ALIGN_CENTER, encoded, b"\n"])
-		elif linea.startswith("COMPROBANTE") or linea.startswith("TOTAL:"):
-			chunks.extend([_ESC_ALIGN_LEFT, _ESC_BOLD_ON, encoded, _ESC_BOLD_OFF, b"\n"])
+			align = _ESC_ALIGN_CENTER
 		else:
-			chunks.extend([_ESC_ALIGN_LEFT, encoded, b"\n"])
+			align = _ESC_ALIGN_LEFT
+		if negrita_global:
+			# Ya activo a nivel documento; COMPROBANTE/TOTAL siguen en el mismo modo.
+			chunks.extend([align, encoded, b"\n"])
+		elif destacar:
+			chunks.extend([align, _ESC_BOLD_ON, encoded, _ESC_BOLD_OFF, b"\n"])
+		else:
+			chunks.extend([align, encoded, b"\n"])
 
+	if doble_golpe:
+		chunks.append(_ESC_DOUBLE_STRIKE_OFF)
+	if negrita_global:
+		chunks.append(_ESC_BOLD_OFF)
 	chunks.extend([b"\n\n", _GS_CUT])
 	return b"".join(chunks)

@@ -16,6 +16,7 @@ comprobante impreso en la impresora térmica **Star Micronics BSC-10UD**
 | `recibo_condicion_iva` | Data | IVA EXENTO | Leyenda fiscal |
 | `recibo_mensaje_pie` | Small Text | SOMOS ECHAGUE... | Pie del recibo |
 | `recibo_ancho_papel_mm` | Select (58, 80) | 58 | Ancho del rollo |
+| `recibo_densidad_impresion` | Select (Normal, Alta, Máxima) | Máxima | Oscuridad ESC/POS: Alta = negrita global; Máxima = negrita + doble golpe |
 | `recibo_impresora_url` | Data | vacío | URL Star WebPRNT opcional |
 
 ---
@@ -105,6 +106,18 @@ Then el texto incluye (en este orden):
 And los montos usan formato argentino (`$29.000`).
 
 ---
+
+## Scenario: densidad de impresión configurable
+
+Given `recibo_densidad_impresion = Máxima` (default)
+When se genera ESC/POS
+Then activa negrita (`ESC E`) y doble golpe (`ESC G`) en todo el ticket.
+
+Given `recibo_densidad_impresion = Alta`
+Then solo activa negrita global.
+
+Given `recibo_densidad_impresion = Normal`
+Then conserva el comportamiento previo (negrita solo en `COMPROBANTE` / `TOTAL`).
 
 ## Scenario: ESC/POS válido
 
