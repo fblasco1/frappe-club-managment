@@ -28,8 +28,30 @@ Tipo / modalidad online externo: `Alquiler externo` + `modalidad_alquiler = Temp
 
 Given `espacios_reserva_externa_habilitada = 0` (o ausente)
 When un guest llama `abrir_sesion_reserva_externa` u otra API externa
-Then `PermissionError`
-And no se crea reserva.
+  (Frappe method o BFF `GET/POST /api/alquiler`)
+Then responde **HTTP 403** con cuerpo estructurado exactamente:
+
+```json
+{
+  "status": "error",
+  "code": "CHANNEL_DISABLED",
+  "message": "Canal de alquileres externo deshabilitado"
+}
+```
+
+And no se crea reserva
+And no se emite `sesion_token`
+And la validación HMAC / rate-limit del BFF no se bypasea (el gate de canal
+falla **antes** de abrir sesión firmada).
+
+## Scenario: canal habilitado — solicitud sin solape
+
+Given `espacios_reserva_externa_habilitada = 1`
+And sesión HMAC válida y franja libre en el calendario
+When `solicitar_reserva_externa(...)`
+Then crea `Reserva Espacio` `Alquiler externo` / `Temporal` / `Pendiente`
+And el slot ocupa el calendario (sin solapamiento)
+And la respuesta incluye `reserva` + `token_acceso`.
 
 ---
 

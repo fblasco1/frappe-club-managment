@@ -153,7 +153,7 @@ class TestSuperviellePublicacionInvoice(MembersTestCase):
 				"customer": customer,
 				"company": _default_company(),
 				"posting_date": frappe.utils.today(),
-				"due_date": "2026-09-10",
+				"due_date": frappe.utils.add_days(frappe.utils.today(), 10),
 				campo_socio: socio.name,
 				"items": [{"item_code": self._item_code, "qty": 1, "rate": rate}],
 			}
@@ -187,6 +187,15 @@ class TestSuperviellePublicacionInvoice(MembersTestCase):
 		self.assertEqual(log.sales_invoice, inv.name)
 		self.assertEqual(log.socio, socio.name)
 		self.assertNotIn(SANDBOX_SECRET, frappe.as_json(log.payload_json or {}))
+		self.assertTrue(
+			frappe.db.exists(
+				"Payment Gateway Event",
+				{
+					"merchant_transaction_id": result.transaction_id,
+					"processing_result": "Iniciado",
+				},
+			)
+		)
 		session.post.assert_called_once()
 		posted_url = session.post.call_args.args[0]
 		self.assertEqual(posted_url, SANDBOX_API_URL)

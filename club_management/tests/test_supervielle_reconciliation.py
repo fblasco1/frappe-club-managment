@@ -13,6 +13,7 @@ from club_management.finance.services.payment_log import (
 )
 from club_management.integrations.supervielle.reconciliation import (
 	build_callback_hash,
+	can_auto_create_payment_entry,
 	process_callback,
 	validate_callback_payload,
 )
@@ -59,6 +60,12 @@ class TestCallbackContract(unittest.TestCase):
 		payload = _callback()
 		validated = validate_callback_payload(payload, SECRET)
 		self.assertEqual(validated["IdPago"], "SIC-CALLBACK-100")
+
+	def test_solo_estado_5_habilita_payment_entry_automatico(self) -> None:
+		self.assertTrue(can_auto_create_payment_entry("5"))
+		self.assertTrue(can_auto_create_payment_entry(5))
+		for code in ("0", "1", "2", "3", "4", "6", "7", "8", "9", "AC", "", None):
+			self.assertFalse(can_auto_create_payment_entry(code), msg=repr(code))
 
 	def test_hash_incorrecto_y_campos_extra_fallan(self) -> None:
 		bad = {**_callback(), "Hash": "bad"}
