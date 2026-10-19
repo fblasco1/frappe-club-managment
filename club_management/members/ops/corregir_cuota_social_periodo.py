@@ -77,6 +77,20 @@ def _clasificar(
 		and all(_igual(r, anterior) or _igual(r, nuevo) for r in rates)
 	):
 		return "a_corregir", {**base, "monto_anterior": anterior, "monto_nuevo": nuevo}
+	# Tarifa de otra categoría del catálogo (p. ej. Menor facturado a 36.000 = Activo).
+	catalogo = [flt(v) for v in list(nuevos.values()) + list(anteriores.values())]
+	if (
+		nuevo is not None
+		and len({round(r, 2) for r in rates}) == 1
+		and any(_igual(rates[0], c) for c in catalogo)
+		and not _igual(rates[0], nuevo)
+	):
+		return "a_corregir", {
+			**base,
+			"monto_anterior": rates[0],
+			"monto_nuevo": nuevo,
+			"motivo": "tarifa_otra_categoria",
+		}
 	return "revisar", {**base, "montos": rates, "anterior": anterior, "nuevo": nuevo}
 
 
@@ -102,6 +116,7 @@ def _enmendar(name: str, *, items_cuota: set[str], anterior: float, nuevo: float
 			row.price_list_rate = nuevo
 			row.discount_percentage = 0
 			row.discount_amount = 0
+	nueva.flags.ignore_pricing_rule = True
 	nueva.insert(ignore_permissions=True)
 	nueva.submit()
 	return nueva.name

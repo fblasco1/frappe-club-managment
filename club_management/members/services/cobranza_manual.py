@@ -423,6 +423,8 @@ def _submit_sales_invoice_concepto(
 
 	invoice = frappe.get_doc(payload)
 	apply_patch()
+	# Evitar que Item Price / Pricing Rule (tarifa referencia Activo) pise el rate por categoría.
+	invoice.flags.ignore_pricing_rule = True
 	invoice.insert(ignore_permissions=True)
 	invoice.submit()
 	return invoice.name

@@ -81,5 +81,20 @@ Then figura en `con_pagos` y no se modifica.
 ## Scenario: monto inesperado va a revisar
 
 Given una factura impaga con cuota a un monto que no es ni el anterior ni el nuevo de la categoría
+And ese monto **no** coincide con ninguna tarifa del catálogo vigente/anterior
 When corre `run`
 Then figura en `revisar` y no se modifica.
+
+## Scenario: Menor (u otra categoría) facturada con tarifa de Activo se corrige
+
+**Caso Desk (10/2026):** socio `Menor` con línea `CUOTA SOCIAL MENOR` a **36.000** (tarifa Activo vigente)
+en lugar de **33.000**. El label del detalle de deuda usa la categoría actual del socio; el `rate`
+de la factura es el que hay que alinear.
+
+Given una factura impaga del período con cuota al monto vigente de **otra** categoría del catálogo
+(p. ej. Menor con rate = 36.000 = Activo vigente)
+When corre `run(periodo, apply=False)`
+Then figura en `a_corregir` con `monto_anterior` = rate actual y `monto_nuevo` = vigente de su categoría
+
+When corre `run(..., apply=True, confirm="local-dev")`
+Then se enmienda y la línea de cuota queda en el monto vigente de la categoría del socio.

@@ -156,3 +156,47 @@ class TestCorregirCuotaSocialPeriodo(MembersTestCase):
 		report = self._run(categoria, apply=True, confirm="local-dev")
 		self.assertIsNotNone(self._row(report, "revisar", name))
 		self.assertEqual(frappe.db.get_value(SALES_INVOICE_DOCTYPE, name, "docstatus"), 1)
+
+	def test_menor_con_tarifa_activo_se_corrige(self) -> None:
+		"""Menor facturado a 36.000 (Activo) → enmienda a 33.000."""
+		socio = insert_socio(
+			dni="74001006",
+			email="corr.menor36000@example.com",
+			categoria="Menor",
+		)
+		customer = ensure_customer_for_socio(socio.name, skip_permission_check=True)
+		from club_management.integrations.payment_ledger_postgres import apply_patch
+
+		apply_patch()
+		inv = frappe.get_doc(
+			{
+				"doctype": SALES_INVOICE_DOCTYPE,
+				"customer": customer,
+				"company": _default_company(),
+				"posting_date": today(),
+				"due_date": today(),
+				_campo_socio_en(SALES_INVOICE_DOCTYPE): socio.name,
+				_campo_periodo_cobro(): PERIODO,
+				"remarks": f"Cuota mensual {PERIODO}",
+				"items": [
+					{"item_code": CUOTA_SOCIAL_ITEM_CODE, "qty": 1, "rate": 36_000},
+				],
+			}
+		)
+		inv.flags.ignore_pricing_rule = True
+		inv.insert(ignore_permissions=True)
+		inv.submit()
+
+		report = run(
+			periodo=PERIODO,
+			nuevos=dict(CUOTAS_SOCIALES_VIGENTES),
+			anteriores=dict(CUOTAS_SOCIALES_ANTERIORES),
+			apply=True,
+			confirm="local-dev",
+		)
+		row = self._row(report, "corregidas", inv.name)
+		self.assertIsNotNone(row, report.get("revisar"))
+		self.assertEqual(row["monto_anterior"], 36_000.0)
+		self.assertEqual(row["monto_nuevo"], 33_000.0)
+		nueva = frappe.get_doc(SALES_INVOICE_DOCTYPE, row["factura_nueva"])
+		self.assertEqual(flt(nueva.items[0].rate), 33_000.0)

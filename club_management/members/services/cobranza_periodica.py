@@ -143,6 +143,8 @@ def generar_deuda_mensual_socio(
 	from club_management.integrations.payment_ledger_postgres import apply_patch
 
 	apply_patch()
+	# Evitar que Item Price (referencia Activo) pise el rate resuelto por categoría.
+	invoice.flags.ignore_pricing_rule = True
 	invoice.insert(ignore_permissions=True)
 	invoice.submit()
 	sync_saldo_deuda_socio(socio_name)
@@ -248,6 +250,7 @@ def complementar_aranceles_periodo_socio(
 	from club_management.integrations.payment_ledger_postgres import apply_patch
 
 	apply_patch()
+	invoice.flags.ignore_pricing_rule = True
 	invoice.insert(ignore_permissions=True)
 	invoice.submit()
 	sync_saldo_deuda_socio(socio_name)
