@@ -117,6 +117,16 @@ Then recibe `PermissionError`.
 
 ---
 
+## Scenario: cobrabilidad con el mismo criterio que la tendencia (bonificaciones)
+
+Given una factura del período con una **nota de crédito** de bonificación (`is_return = 1`, mismo `periodo_cobro`)
+When se calcula la card «Tasa de cobrabilidad del mes»
+Then el **Emitido** es **neto** de la nota de crédito (sus líneas negativas restan en la vista que corresponda)
+And el **Total cobrado** suma solo los **Payment Entry** enviados aplicados a facturas del período (prorrateados por línea), no la reducción de saldo producida por la nota de crédito
+And en cada vista, Emitido, Total cobrado y Saldo coinciden con el resumen de **Tendencia de recaudación** del mismo mes y vista.
+
+---
+
 ## Scenario: porcentaje cuotas sociales recaudadas en el mes
 
 Given facturas mensuales del período corriente (`periodo_cobro = MM/YYYY`) con líneas de cuota social

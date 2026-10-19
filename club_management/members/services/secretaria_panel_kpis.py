@@ -445,6 +445,40 @@ def _linea_entra_en_vista(vista: str, linea_vista: str) -> bool:
 	return linea_vista == vista_norm
 
 
+def _pagos_payment_entry_por_factura(invoice_names: list[str]) -> list[dict[str, Any]]:
+	"""Imputaciones de Payment Entry enviados a facturas (no incluye notas de crédito ni asientos)."""
+	if not invoice_names:
+		return []
+	refs = frappe.get_all(
+		PAYMENT_ENTRY_REFERENCE_DOCTYPE,
+		filters={
+			"reference_doctype": SALES_INVOICE_DOCTYPE,
+			"reference_name": ["in", invoice_names],
+			"parenttype": PAYMENT_ENTRY_DOCTYPE,
+		},
+		fields=["parent", "reference_name", "allocated_amount"],
+	)
+	if not refs:
+		return []
+	posting_by_pe = {
+		row.name: row.posting_date
+		for row in frappe.get_all(
+			PAYMENT_ENTRY_DOCTYPE,
+			filters={"name": ["in", sorted({row.parent for row in refs})], "docstatus": 1},
+			fields=["name", "posting_date"],
+		)
+	}
+	return [
+		{
+			"reference_name": row.reference_name,
+			"allocated_amount": flt(row.allocated_amount),
+			"posting_date": posting_by_pe[row.parent],
+		}
+		for row in refs
+		if row.parent in posting_by_pe
+	]
+
+
 def get_recaudacion_tendencia_payload(
 	*,
 	reference_date: str | date | None = None,
@@ -528,63 +562,40 @@ def get_recaudacion_tendencia_payload(
 				continue
 			by_day[day]["emitido_dia"] += flt(line.get("amount"))
 
-	pe_names = frappe.get_all(
-		PAYMENT_ENTRY_REFERENCE_DOCTYPE,
-		filters={
-			"reference_doctype": SALES_INVOICE_DOCTYPE,
-			"reference_name": ["in", list(invoice_by_name)],
-			"parenttype": PAYMENT_ENTRY_DOCTYPE,
-		},
-		fields=["parent", "reference_name", "allocated_amount"],
-	)
-	if pe_names:
-		parent_names = sorted({row.parent for row in pe_names})
-		pe_by_name = {
-			row.name: row
-			for row in frappe.get_all(
-				PAYMENT_ENTRY_DOCTYPE,
-				filters={
-					"name": ["in", parent_names],
-					"docstatus": 1,
-				},
-				fields=["name", "posting_date"],
+	for ref_row in _pagos_payment_entry_por_factura(list(invoice_by_name)):
+		invoice = invoice_by_name.get(ref_row["reference_name"])
+		if not invoice:
+			continue
+		grand_total = flt(invoice.grand_total)
+		if grand_total <= 0:
+			continue
+		categoria_socio = socio_categorias.get(invoice.get(campo_socio))
+		relevant_total = sum(
+			flt(line.get("amount"))
+			for line in lines_by_parent.get(invoice.name, [])
+			if _linea_entra_en_vista(
+				vista_norm,
+				_clasificar_linea_vista(
+					line.get("item_code") or "",
+					line.get("description"),
+					cuota_items=cuota_items,
+					arancel_map=arancel_map,
+					categoria_socio=categoria_socio,
+				),
 			)
-		}
-		for ref_row in pe_names:
-			pe = pe_by_name.get(ref_row.parent)
-			invoice = invoice_by_name.get(ref_row.reference_name)
-			if not pe or not invoice:
-				continue
-			grand_total = flt(invoice.grand_total)
-			if grand_total <= 0:
-				continue
-			categoria_socio = socio_categorias.get(invoice.get(campo_socio))
-			relevant_total = sum(
-				flt(line.get("amount"))
-				for line in lines_by_parent.get(invoice.name, [])
-				if _linea_entra_en_vista(
-					vista_norm,
-					_clasificar_linea_vista(
-						line.get("item_code") or "",
-						line.get("description"),
-						cuota_items=cuota_items,
-						arancel_map=arancel_map,
-						categoria_socio=categoria_socio,
-					),
-				)
-			)
-			if relevant_total <= 0:
-				continue
-			paid = flt(ref_row.allocated_amount) * (relevant_total / grand_total)
-			day = _dia_en_mes_periodo(
-				pe.posting_date,
-				period_first=first,
-				period_last=last,
-				fallback_day=emit_day,
-			)
-			if day is None:
-				continue
-			by_day[day]["recaudado_dia"] += paid
+		)
+		if relevant_total <= 0:
+			continue
+		paid = flt(ref_row["allocated_amount"]) * (relevant_total / grand_total)
+		day = _dia_en_mes_periodo(
+			ref_row["posting_date"],
+			period_first=first,
+			period_last=last,
+			fallback_day=emit_day,
+		)
+		if day is None:
+			continue
+		by_day[day]["recaudado_dia"] += paid
 
 	resumen = _finalize_tendencia_dias(dias)
 	return {**payload, "dias": dias, "disponible": True, "resumen": resumen}
@@ -814,7 +825,7 @@ def get_recaudacion_mes_payload(*, reference_date: str | date | None = None) -> 
 	cuota_items = _cuota_item_codes(settings)
 	arancel_map = _arancel_item_actividad_map()
 
-	invoice_fields = ["name", "grand_total", "outstanding_amount", campo_socio]
+	invoice_fields = ["name", "grand_total", campo_socio]
 	invoices = frappe.get_all(
 		SALES_INVOICE_DOCTYPE,
 		filters={campo_periodo: periodo, "docstatus": 1},
@@ -834,6 +845,10 @@ def get_recaudacion_mes_payload(*, reference_date: str | date | None = None) -> 
 			socio_categorias[socio.name] = socio.categoria
 
 	lines_by_parent = _invoice_lines_by_parent([row.name for row in invoices])
+	pagado_por_factura: dict[str, float] = {}
+	for ref_row in _pagos_payment_entry_por_factura([row.name for row in invoices]):
+		name = ref_row["reference_name"]
+		pagado_por_factura[name] = pagado_por_factura.get(name, 0.0) + ref_row["allocated_amount"]
 
 	total_emitido = 0.0
 	total_recaudado = 0.0
@@ -855,13 +870,11 @@ def get_recaudacion_mes_payload(*, reference_date: str | date | None = None) -> 
 
 	for invoice in invoices:
 		grand_total = flt(invoice.grand_total)
-		if grand_total <= 0:
-			continue
-		paid_ratio = max(flt(invoice.grand_total) - flt(invoice.outstanding_amount), 0) / grand_total
+		paid_ratio = pagado_por_factura.get(invoice.name, 0.0) / grand_total if grand_total > 0 else 0.0
 		categoria_socio = socio_categorias.get(invoice.get(campo_socio))
 		for line in lines_by_parent.get(invoice.name, []):
 			amount = flt(line.amount)
-			if amount <= 0:
+			if not amount:
 				continue
 			paid = amount * paid_ratio
 			item_code = line.item_code or ""

@@ -6,9 +6,12 @@ import frappe
 
 from club_management.activities.services.inscripcion_socio import inscribir_socio_selecciones
 from club_management.members.data.cuotas_sociales_vigentes import CUOTA_SOCIAL_ITEM_CODE
+from frappe.utils import flt
+
 from club_management.members.services.cobranza_manual import (
 	SALES_INVOICE_DOCTYPE,
 	erpnext_cobranza_disponible,
+	registrar_cobro_compuesto,
 	registrar_cobro_manual,
 )
 from club_management.members.services.cobranza_periodica import format_periodo_cobro
@@ -236,3 +239,96 @@ class TestSecretariaPanelRecaudacion(MembersTestCase):
 		self.assertIn(actividad, actividades)
 		self.assertIn("total", data)
 		self.assertIn("cobrabilidad_vistas", data)
+
+	def _factura_con_bonificacion(self, *, dni: str, email: str, monto_bonif: float) -> tuple[str, str]:
+		from club_management.members.services.bonificacion_arancel import (
+			asegurar_credit_note_bonificacion,
+		)
+
+		item_bonif = "TEST-ITEM-BONIF-KPI"
+		if not frappe.db.exists("Item", item_bonif):
+			item_group = frappe.db.get_value("Item Group", {}, "name") or "All Item Groups"
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": item_bonif,
+					"item_name": "Bonificacion KPI",
+					"item_group": item_group,
+					"is_stock_item": 0,
+					"is_sales_item": 1,
+					"standard_rate": 0,
+				}
+			).insert(ignore_permissions=True)
+		frappe.db.set_single_value("Club Settings", "item_bonificacion_arancel", item_bonif)
+
+		socio = self._socio_con_deuda(dni=dni, email=email, actividad="KPI Bonificada")
+		campo_socio = "socio" if frappe.get_meta(SALES_INVOICE_DOCTYPE).has_field("socio") else "custom_socio"
+		invoice_name = frappe.db.get_value(
+			SALES_INVOICE_DOCTYPE,
+			{campo_socio: socio.name, "docstatus": 1, "is_return": 0},
+			"name",
+		)
+		self.assertTrue(invoice_name)
+		cn = asegurar_credit_note_bonificacion(invoice_name, monto=monto_bonif)
+		self.assertTrue(cn["credit_note"])
+		return socio.name, invoice_name
+
+	def _assert_igual_a_tendencia(self, data: dict) -> None:
+		from club_management.members.services.secretaria_panel_kpis import (
+			get_recaudacion_tendencia_payload,
+		)
+
+		for vista, clave in (("total", "total"), ("cuota", "cuotas_sociales"), ("arancel", "aranceles")):
+			resumen = get_recaudacion_tendencia_payload(reference_date=self._REFERENCE, vista=vista)["resumen"]
+			slice_ = data[clave]
+			self.assertAlmostEqual(slice_["emitido"], resumen["emitido"], places=2, msg=vista)
+			self.assertAlmostEqual(slice_["recaudado"], resumen["recaudado"], places=2, msg=vista)
+			self.assertAlmostEqual(slice_["saldo_por_cobrar"], resumen["saldo"], places=2, msg=vista)
+
+	def test_bonificacion_no_cuenta_como_cobrado_y_neta_emitido(self) -> None:
+		antes = get_recaudacion_mes_payload(reference_date=self._REFERENCE)
+		_socio, invoice_name = self._factura_con_bonificacion(
+			dni="73102003", email="rec.bonif@example.com", monto_bonif=1_000
+		)
+		bruto = frappe.db.get_value(SALES_INVOICE_DOCTYPE, invoice_name, "grand_total")
+		arancel_bruto = frappe.db.get_value(
+			"Sales Invoice Item",
+			{"parent": invoice_name, "item_code": frappe.db.get_value("Actividad", "KPI Bonificada", "item")},
+			"amount",
+		)
+		self.assertTrue(arancel_bruto)
+
+		data = get_recaudacion_mes_payload(reference_date=self._REFERENCE)
+		total = data["total"]
+		self.assertAlmostEqual(total["emitido"] - antes["total"]["emitido"], bruto - 1_000, places=2)
+		self.assertAlmostEqual(total["recaudado"] - antes["total"]["recaudado"], 0.0, places=2)
+		self.assertAlmostEqual(
+			data["aranceles"]["emitido"] - antes["aranceles"]["emitido"],
+			arancel_bruto - 1_000,
+			places=2,
+		)
+		self._assert_igual_a_tendencia(data)
+
+	def test_bonificacion_con_cobro_coincide_con_tendencia(self) -> None:
+		from club_management.members.services.mora_al_cobro import preparar_facturas_cobro_con_mora
+
+		antes = get_recaudacion_mes_payload(reference_date=self._REFERENCE)
+		socio_name, invoice_name = self._factura_con_bonificacion(
+			dni="73102004", email="rec.bonif.pago@example.com", monto_bonif=1_000
+		)
+		bruto = frappe.db.get_value(SALES_INVOICE_DOCTYPE, invoice_name, "grand_total")
+		# CN ya aplicada: cobrar el outstanding neto (no el preview bruto de registrar_cobro_manual).
+		prep = preparar_facturas_cobro_con_mora(socio_name, [invoice_name])
+		neto = flt(prep["total_exigido"])
+		self.assertAlmostEqual(neto, flt(bruto) - 1_000, places=2)
+		registrar_cobro_compuesto(
+			socio_name,
+			[invoice_name],
+			[{"mode_of_payment": "Cash", "amount": neto}],
+		)
+
+		data = get_recaudacion_mes_payload(reference_date=self._REFERENCE)
+		self.assertAlmostEqual(
+			data["total"]["recaudado"] - antes["total"]["recaudado"], neto, places=2
+		)
+		self._assert_igual_a_tendencia(data)
