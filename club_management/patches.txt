@@ -101,3 +101,5 @@ club_management.patches.v1_0.gimnasio_precios_entrenamiento_hora
 club_management.patches.v1_0.sync_secretaria_sidebar_deuda_cuotas_sociales
 club_management.patches.v1_0.menu_deuda_de_socios
 club_management.patches.v1_0.seed_recibo_densidad_maxima
+club_management.patches.v1_0.backfill_inscripcion_socio_nombre
+club_management.patches.v1_0.sync_actividades_sidebar_inscriptos_report

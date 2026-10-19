@@ -7,6 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "socio",
+  "socio_nombre",
   "actividad",
   "grupo_actividad",
   "equipo_actividad",
@@ -24,9 +25,17 @@
    "reqd": 1
   },
   {
+   "fieldname": "socio_nombre",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Nombre del socio",
+   "read_only": 1,
+   "fetch_from": "socio.nombre_completo"
+  },
+  {
    "fieldname": "actividad",
    "fieldtype": "Link",
-   "in_list_view": 1,
+   "in_list_view": 0,
    "in_standard_filter": 1,
    "label": "Actividad",
    "options": "Actividad",
@@ -35,7 +44,8 @@
   {
    "fieldname": "grupo_actividad",
    "fieldtype": "Link",
-   "in_list_view": 1,
+   "in_list_view": 0,
+   "in_standard_filter": 1,
    "label": "Grupo / tira",
    "options": "Grupo Actividad"
   },
@@ -43,6 +53,7 @@
    "fieldname": "equipo_actividad",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Equipo / categor\u00eda",
    "options": "Equipo Actividad"
   },
@@ -51,6 +62,7 @@
    "fieldname": "estado",
    "fieldtype": "Select",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Estado",
    "options": "Activa\nBaja",
    "reqd": 1
@@ -65,7 +77,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-04 00:00:00",
+ "modified": "2026-10-19 00:00:00",
  "modified_by": "Administrator",
  "module": "Activities",
  "name": "Inscripcion Actividad",

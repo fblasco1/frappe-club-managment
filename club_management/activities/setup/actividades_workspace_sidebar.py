@@ -59,6 +59,14 @@ SIDEBAR_ITEMS: list[dict] = [
 		"indent": 1,
 	},
 	{
+		"label": "Inscriptos por Actividad",
+		"type": "Link",
+		"link_type": "Report",
+		"link_to": "Inscriptos por Actividad",
+		"icon": "table",
+		"child": 1,
+	},
+	{
 		"label": "Cobranza por fechas",
 		"type": "Link",
 		"link_type": "Report",

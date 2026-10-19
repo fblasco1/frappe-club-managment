@@ -12,9 +12,30 @@ from club_management.activities.permissions import assert_inscripcion_socio_matc
 class InscripcionActividad(Document):
 	def validate(self) -> None:
 		assert_inscripcion_socio_matches_session(self)
+		self._sync_socio_nombre()
 		self._validate_actividad_grupo_equipo()
 		self._validate_condicion_socio()
 		self._validate_unica_activa()
+
+	def _sync_socio_nombre(self) -> None:
+		"""Lista/reporte: nombre legible (el Link Socio muestra el número)."""
+		from club_management.members.doctype.socio.socio import format_socio_nombre_completo
+
+		if not self.socio:
+			self.socio_nombre = ""
+			return
+		row = frappe.db.get_value(
+			"Socio",
+			self.socio,
+			["nombre_completo", "apellido", "nombre"],
+			as_dict=True,
+		)
+		if not row:
+			self.socio_nombre = ""
+			return
+		self.socio_nombre = (row.nombre_completo or "").strip() or format_socio_nombre_completo(
+			row.apellido, row.nombre
+		)
 
 	def _validate_condicion_socio(self) -> None:
 		"""Spec gimnasio_cobro_socios_no_socios.md: grupo y actividad según categoría."""

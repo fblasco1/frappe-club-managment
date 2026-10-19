@@ -6,6 +6,10 @@
 	const SIDEBAR_KEY = "gestión de actividades";
 
 	const REPORT_META = {
+		"Inscriptos por Actividad": {
+			report_type: "Script Report",
+			ref_doctype: "Inscripcion Actividad",
+		},
 		"Cobranza por fechas": {
 			report_type: "Script Report",
 			ref_doctype: "Payment Entry",
@@ -69,6 +73,14 @@
 			icon: "file-text",
 			indent: 1,
 			collapsible: 1,
+		},
+		{
+			label: __("Inscriptos por Actividad"),
+			type: "Link",
+			link_type: "Report",
+			link_to: "Inscriptos por Actividad",
+			icon: "table",
+			child: 1,
 		},
 		{
 			label: __("Cobranza por fechas"),
