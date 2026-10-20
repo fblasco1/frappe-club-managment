@@ -1925,6 +1925,20 @@ club_management_socio_desk.render_historial_pagos = function (frm) {
 					club_management_socio_desk.corregir_medio_pago_historial(frm, row);
 				});
 				$acciones.append($detalleBtn, $imprimirBtn, $corrBtn);
+				if (
+					frappe.user.has_role("Secretaria") ||
+					frappe.user.has_role("System Manager")
+				) {
+					const $cancelBtn = $(
+						`<button type="button" class="btn btn-xs btn-danger ml-1">${__(
+							"Cancelar pago"
+						)}</button>`
+					);
+					$cancelBtn.on("click", () => {
+						club_management_socio_desk.cancelar_pago_historial(frm, row);
+					});
+					$acciones.append($cancelBtn);
+				}
 				$tbody.append($tr);
 			});
 			$panel.empty().append($title, $btn, $table);
@@ -2061,6 +2075,70 @@ club_management_socio_desk.corregir_medio_pago_historial = function (frm, row) {
 			d.show();
 		},
 	});
+};
+
+club_management_socio_desk.cancelar_pago_historial = function (frm, row) {
+	const pe = row?.payment_entry;
+	if (!pe || !frm?.doc?.name) {
+		frappe.msgprint(__("No hay Payment Entry para cancelar."));
+		return;
+	}
+	const monto = frappe.format(row.paid_amount || 0, { fieldtype: "Currency" });
+	const concepto = row.concepto || "—";
+	const d = new frappe.ui.Dialog({
+		title: __("Cancelar pago por mala imputación"),
+		fields: [
+			{
+				fieldtype: "HTML",
+				fieldname: "info",
+				options: `<p class="text-muted small">${frappe.utils.escape_html(
+					__("Cobro")
+				)}: <strong>${frappe.utils.escape_html(pe)}</strong><br/>
+				${frappe.utils.escape_html(__("Concepto"))}: ${frappe.utils.escape_html(concepto)}<br/>
+				${frappe.utils.escape_html(__("Importe"))}: <strong>${monto}</strong></p>
+				<p class="text-muted small">${__(
+					"Se anula este cobro. Las facturas imputadas vuelven a quedar con saldo. No se registra un cobro nuevo."
+				)}</p>`,
+			},
+			{
+				fieldname: "motivo",
+				fieldtype: "Small Text",
+				label: __("Motivo"),
+				reqd: 1,
+				description: __("Por ejemplo: mala imputación de concepto o de socio."),
+			},
+		],
+		primary_action_label: __("Cancelar pago"),
+		primary_action(values) {
+			if (!(values.motivo || "").trim()) {
+				frappe.msgprint(__("Indicá el motivo de la cancelación."));
+				return;
+			}
+			d.hide();
+			frappe.call({
+				method: "club_management.members.api.cobranza_desk.cancelar_pago",
+				args: {
+					payment_entry: pe,
+					socio: frm.doc.name,
+					motivo: values.motivo,
+				},
+				freeze: true,
+				freeze_message: __("Cancelando pago…"),
+				callback(res) {
+					if (res.exc || !res.message) {
+						frappe.msgprint(__("No se pudo cancelar el pago."));
+						return;
+					}
+					frappe.show_alert({
+						message: __("Pago cancelado. Las facturas volvieron a quedar pendientes."),
+						indicator: "green",
+					});
+					frm.reload_doc();
+				},
+			});
+		},
+	});
+	d.show();
 };
 
 club_management_socio_desk.show_historial_pago_detalle = function (row) {

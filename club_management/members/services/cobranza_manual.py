@@ -1326,3 +1326,88 @@ def corregir_medio_pago_cobro(
 		"socio": socio_name,
 		"recibo": recibo,
 	}
+
+
+def cancelar_pago_mala_imputacion(
+	payment_entry_name: str,
+	*,
+	socio: str,
+	motivo: str,
+) -> dict[str, Any]:
+	"""Cancela un PE submitted mal imputado. Las facturas vuelven a quedar con saldo.
+
+	No crea un cobro nuevo y no aplica a cobros vinculados a Payment Log.
+	"""
+	from club_management.integrations.payment_ledger_postgres import apply_patch
+
+	apply_patch()
+	ensure_secretaria_operacion_access()
+
+	pe_name = (payment_entry_name or "").strip()
+	socio_name = (socio or "").strip()
+	motivo_txt = (motivo or "").strip()
+	if not pe_name:
+		frappe.throw(_("Payment Entry es obligatorio."), frappe.ValidationError)
+	if not socio_name:
+		frappe.throw(_("Socio es obligatorio."), frappe.ValidationError)
+	if not motivo_txt:
+		frappe.throw(_("Indicá el motivo de la cancelación."), frappe.ValidationError)
+	if not frappe.db.exists("Payment Entry", pe_name):
+		frappe.throw(_("Payment Entry no encontrado."), frappe.DoesNotExistError)
+	if not frappe.db.exists(SOCIO_DOCTYPE, socio_name):
+		frappe.throw(_("Socio no encontrado."), frappe.DoesNotExistError)
+
+	pe = frappe.get_doc("Payment Entry", pe_name)
+	if pe.docstatus != 1:
+		frappe.throw(_("Solo se pueden cancelar cobros confirmados."), frappe.ValidationError)
+
+	if frappe.db.exists("DocType", "Payment Log") and frappe.db.exists(
+		"Payment Log", {"payment_entry": pe_name}
+	):
+		frappe.throw(
+			_(
+				"Este cobro está vinculado a la pasarela (Supervielle/Cobrand). "
+				"No se puede cancelar desde Desk."
+			),
+			frappe.ValidationError,
+		)
+
+	_assert_pago_pertenece_a_socio(pe, socio_name)
+
+	pe.flags.ignore_permissions = True
+	pe.cancel()
+
+	nota = _("Cobro cancelado por mala imputación. Motivo: {0}").format(motivo_txt)
+	frappe.get_doc("Payment Entry", pe_name).add_comment("Comment", text=nota)
+
+	saldo = sync_saldo_deuda_socio(socio_name)
+	return {
+		"status": "ok",
+		"payment_entry": pe_name,
+		"socio": socio_name,
+		"saldo_deuda": saldo,
+	}
+
+
+def _assert_pago_pertenece_a_socio(pe: Any, socio_name: str) -> None:
+	refs = frappe.get_all(
+		"Payment Entry Reference",
+		filters={"parent": pe.name, "reference_doctype": SALES_INVOICE_DOCTYPE},
+		pluck="reference_name",
+	)
+	campo = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	if refs and campo:
+		socios = {frappe.db.get_value(SALES_INVOICE_DOCTYPE, name, campo) for name in refs}
+		if socios != {socio_name}:
+			frappe.throw(
+				_("El cobro no corresponde al socio {0}.").format(socio_name),
+				frappe.ValidationError,
+			)
+		return
+
+	customer = frappe.db.get_value(SOCIO_DOCTYPE, socio_name, "customer")
+	if not customer or pe.party != customer:
+		frappe.throw(
+			_("El cobro no corresponde al socio {0}.").format(socio_name),
+			frappe.ValidationError,
+		)

@@ -226,6 +226,14 @@ def corregir_medio_pago(
 
 
 @frappe.whitelist()
+def cancelar_pago(payment_entry: str, socio: str, motivo: str) -> dict:
+	"""Cancela un cobro submitted por mala imputación (Secretaría)."""
+	from club_management.members.services.cobranza_manual import cancelar_pago_mala_imputacion
+
+	return cancelar_pago_mala_imputacion(payment_entry, socio=socio, motivo=motivo)
+
+
+@frappe.whitelist()
 def actualizar_saldo_deuda(socio: str) -> dict[str, float]:
 	ensure_secretaria_operacion_access()
 	saldo = sync_saldo_deuda_socio(socio)
