@@ -84,6 +84,61 @@ class TestSocioOperacionesSecretaria(MembersTestCase):
 			frappe.set_user("Administrator")
 		socio.reload()
 		self.assertEqual(socio.estado, "Baja")
+		self.assertEqual(getdate(socio.fecha_baja), getdate(today()))
+
+	def test_dar_baja_acepta_fecha_historica(self) -> None:
+		socio = insert_socio()
+		cambiar_estado(socio.name, "Activo", motivo="Test")
+		frappe.set_user(self._secretaria)
+		try:
+			dar_baja_socio(socio.name, motivo="Baja sistema viejo", fecha_baja="2024-03-15")
+		finally:
+			frappe.set_user("Administrator")
+		socio.reload()
+		self.assertEqual(socio.estado, "Baja")
+		self.assertEqual(getdate(socio.fecha_baja), getdate("2024-03-15"))
+		self.assertEqual(getdate(socio.ultimo_cambio_estado_en), getdate(today()))
+
+	def test_dar_baja_rechaza_fecha_futura(self) -> None:
+		socio = insert_socio()
+		cambiar_estado(socio.name, "Activo", motivo="Test")
+		frappe.set_user(self._secretaria)
+		try:
+			with self.assertRaises(frappe.ValidationError):
+				dar_baja_socio(socio.name, motivo="Renuncia", fecha_baja=add_days(today(), 1))
+		finally:
+			frappe.set_user("Administrator")
+		socio.reload()
+		self.assertEqual(socio.estado, "Activo")
+		self.assertFalse(socio.fecha_baja)
+
+	def test_corregir_fecha_baja_en_socio_ya_dado_de_baja(self) -> None:
+		from club_management.members.services.socio_operaciones_secretaria import (
+			corregir_fecha_baja_socio,
+		)
+
+		socio = insert_socio()
+		cambiar_estado(socio.name, "Activo", motivo="Test")
+		frappe.set_user(self._secretaria)
+		try:
+			dar_baja_socio(socio.name, motivo="Carga inicial")
+			socio.reload()
+			auditoria = socio.ultimo_cambio_estado_en
+			corregir_fecha_baja_socio(socio.name, "2023-11-02")
+		finally:
+			frappe.set_user("Administrator")
+		socio.reload()
+		self.assertEqual(getdate(socio.fecha_baja), getdate("2023-11-02"))
+		self.assertEqual(socio.ultimo_cambio_estado_en, auditoria)
+
+	def test_prompt_desk_pide_fecha_de_baja(self) -> None:
+		from pathlib import Path
+
+		js = (
+			Path(__file__).resolve().parents[1] / "doctype" / "socio" / "socio.js"
+		).read_text(encoding="utf-8")
+		self.assertIn('fieldname: "fecha_baja"', js)
+		self.assertIn("corregir_fecha_baja", js)
 
 	def test_dar_alta_desde_baja(self) -> None:
 		socio = insert_socio()
@@ -101,6 +156,7 @@ class TestSocioOperacionesSecretaria(MembersTestCase):
 		self.assertEqual(socio.estado, "Activo")
 		self.assertEqual(socio.numero_socio, numero)
 		self.assertEqual(str(socio.fecha_alta), str(fecha_alta))
+		self.assertFalse(socio.fecha_baja)
 		self.assertIn("volver", (socio.motivo_ultimo_cambio_estado or "").lower())
 
 	def test_dar_alta_conserva_fecha_alta_al_cumplirse_6_meses(self) -> None:
@@ -114,8 +170,10 @@ class TestSocioOperacionesSecretaria(MembersTestCase):
 			frappe.db.set_value(
 				"Socio",
 				socio.name,
-				"ultimo_cambio_estado_en",
-				add_months(now(), -6),
+				{
+					"ultimo_cambio_estado_en": add_months(now(), -6),
+					"fecha_baja": add_months(today(), -6),
+				},
 			)
 			dar_alta_socio(socio.name, motivo="Vuelve al límite")
 		finally:
@@ -135,8 +193,10 @@ class TestSocioOperacionesSecretaria(MembersTestCase):
 			frappe.db.set_value(
 				"Socio",
 				socio.name,
-				"ultimo_cambio_estado_en",
-				add_days(add_months(now(), -6), -1),
+				{
+					"ultimo_cambio_estado_en": add_days(add_months(now(), -6), -1),
+					"fecha_baja": add_days(add_months(today(), -6), -1),
+				},
 			)
 			dar_alta_socio(socio.name, motivo="Vuelve tarde")
 		finally:

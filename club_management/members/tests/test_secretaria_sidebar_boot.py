@@ -32,6 +32,10 @@ class TestSecretariaSidebarBoot(MembersTestCase):
 		deuda = items["Deuda de socios"].get("report") or {}
 		self.assertEqual(deuda.get("report_type"), "Script Report")
 		self.assertEqual(deuda.get("ref_doctype"), "Socio")
+		if "Bajas de socios" in items:
+			bajas = items["Bajas de socios"].get("report") or {}
+			self.assertEqual(bajas.get("report_type"), "Script Report")
+			self.assertEqual(bajas.get("ref_doctype"), "Socio")
 
 
 	def test_apply_boot_inyecta_sidebar_para_secretaria(self) -> None:

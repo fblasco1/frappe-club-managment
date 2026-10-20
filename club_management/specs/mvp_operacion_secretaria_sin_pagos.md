@@ -52,7 +52,16 @@ When Secretaría ejecuta **Dar de baja** con motivo
 Then `estado` = `Baja`
 And todas esas inscripciones pasan a `Baja`
 And `Socio.actividad` (resumen) queda vacío
-And las inscripciones de **otros** socios no se modifican.
+And las inscripciones de **otros** socios no se modifican
+And se pide **fecha de baja** (default hoy) para bajas históricas no migradas
+And `Socio.fecha_baja` guarda esa fecha (no la de carga)
+And una fecha futura se rechaza
+And `ultimo_cambio_estado_en` sigue siendo la auditoría de cuándo se registró en este sistema.
+
+Given un `Socio` ya en `Baja` con `fecha_baja` incorrecta (p. ej. cargada como hoy)
+When Secretaría ejecuta **Corregir fecha de baja**
+Then solo cambia `fecha_baja`
+And el estado y la auditoría de carga no se pisan.
 
 Given un `Socio` `Baja`
 When Secretaría ejecuta **Dar de alta**

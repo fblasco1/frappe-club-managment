@@ -20,8 +20,8 @@ crear un segundo `Socio` con el mismo DNI.
 - **Antigüedad (`fecha_alta`):** se conserva si el alta ocurre **dentro de los
   6 meses** posteriores a la baja (inclusive). Si pasaron **más de 6 meses**,
   `fecha_alta` se reinicia a la fecha de hoy (nueva antigüedad, p. ej. Vitalicio).
-- La ventana se mide desde el timestamp de la baja
-  (`ultimo_cambio_estado_en` mientras el socio está en `Baja`).
+- La ventana se mide desde `fecha_baja` (fecha de negocio). Si está vacía,
+  se usa `ultimo_cambio_estado_en` (legado).
 - Al pasar a `Activo` se re-sincroniza la suscripción de cuota social
   (la baja la había cancelado).
 - Las inscripciones históricas en `Baja` **no** se reactivan solas:

@@ -24,6 +24,7 @@ from club_management.members.services.socio_alta_secretaria import (
 from club_management.members.services.datos_criticos_socio import get_datos_criticos_faltantes_socio
 from club_management.members.services.socio_operaciones_secretaria import (
 	activar_socio_manual,
+	corregir_fecha_baja_socio,
 	dar_alta_socio,
 	dar_baja_socio,
 	ensure_secretaria_operacion_access,
@@ -149,9 +150,16 @@ def suspender_socio_desk(socio: str, motivo: str | None = None) -> dict[str, str
 
 
 @frappe.whitelist()
-def dar_baja(socio: str, motivo: str) -> dict[str, str]:
+def dar_baja(socio: str, motivo: str, fecha_baja: str | None = None) -> dict[str, str]:
 	ensure_secretaria_operacion_access()
-	estado = dar_baja_socio(socio, motivo=motivo)
+	estado = dar_baja_socio(socio, motivo=motivo, fecha_baja=fecha_baja)
+	return {"status": "ok", "estado": estado}
+
+
+@frappe.whitelist()
+def corregir_fecha_baja(socio: str, fecha_baja: str) -> dict[str, str]:
+	ensure_secretaria_operacion_access()
+	estado = corregir_fecha_baja_socio(socio, fecha_baja)
 	return {"status": "ok", "estado": estado}
 
 

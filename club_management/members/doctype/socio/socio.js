@@ -268,11 +268,16 @@ club_management_socio_desk.add_operaciones_buttons = function (frm) {
 			() => club_management_socio_desk.prompt_motivo(frm, "dar_alta"),
 			group
 		);
+		frm.add_custom_button(
+			__("Corregir fecha de baja"),
+			() => club_management_socio_desk.prompt_fecha_baja(frm, "corregir_fecha_baja"),
+			group
+		);
 	}
 	if (["Activo", "Moroso", "Suspendido", "Pendiente de Pago", "Pendiente de Inscripción"].includes(estado)) {
 		frm.add_custom_button(
 			__("Dar de baja"),
-			() => club_management_socio_desk.prompt_motivo(frm, "dar_baja", { require_motivo: true }),
+			() => club_management_socio_desk.prompt_baja(frm),
 			group
 		);
 	}
@@ -399,6 +404,46 @@ club_management_socio_desk.prompt_motivo = function (frm, method, opts = {}) {
 		(values) => club_management_socio_desk.call_op(frm, method, { motivo: values.motivo }),
 		__("Confirmar"),
 		__("Continuar")
+	);
+};
+
+club_management_socio_desk.prompt_baja = function (frm) {
+	frappe.prompt(
+		[
+			{
+				fieldname: "fecha_baja",
+				fieldtype: "Date",
+				label: __("Fecha de baja"),
+				reqd: 1,
+				default: frappe.datetime.get_today(),
+				description: __("Usá la fecha real si la baja fue en el sistema anterior."),
+			},
+			{ fieldname: "motivo", fieldtype: "Small Text", label: __("Motivo"), reqd: 1 },
+		],
+		(values) =>
+			club_management_socio_desk.call_op(frm, "dar_baja", {
+				motivo: values.motivo,
+				fecha_baja: values.fecha_baja,
+			}),
+		__("Dar de baja"),
+		__("Continuar")
+	);
+};
+
+club_management_socio_desk.prompt_fecha_baja = function (frm, method) {
+	frappe.prompt(
+		[
+			{
+				fieldname: "fecha_baja",
+				fieldtype: "Date",
+				label: __("Fecha de baja"),
+				reqd: 1,
+				default: frm.doc.fecha_baja || frappe.datetime.get_today(),
+			},
+		],
+		(values) => club_management_socio_desk.call_op(frm, method, { fecha_baja: values.fecha_baja }),
+		__("Corregir fecha de baja"),
+		__("Guardar")
 	);
 };
 

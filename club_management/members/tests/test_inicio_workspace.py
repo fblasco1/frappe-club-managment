@@ -77,10 +77,10 @@ class TestInicioWorkspace(MembersTestCase):
 		)
 
 	def test_informes_club_no_estan_en_pestanas_superiores(self) -> None:
-		self.assertEqual(len(CLUB_DESK_REPORTS), 3)
+		self.assertEqual(len(CLUB_DESK_REPORTS), 4)
 		self.assertEqual(
 			list(CLUB_DESK_REPORTS),
-			["Cobranza por fechas", "Pagos por equipo", "Deuda de socios"],
+			["Cobranza por fechas", "Pagos por equipo", "Deuda de socios", "Bajas de socios"],
 		)
 		self.assertNotIn("Pagos del dia", CLUB_DESK_REPORTS)
 		self.assertNotIn("Recaudacion por concepto", CLUB_DESK_REPORTS)

@@ -103,3 +103,5 @@ club_management.patches.v1_0.menu_deuda_de_socios
 club_management.patches.v1_0.seed_recibo_densidad_maxima
 club_management.patches.v1_0.backfill_inscripcion_socio_nombre
 club_management.patches.v1_0.sync_actividades_sidebar_inscriptos_report
+club_management.patches.v1_0.add_bajas_de_socios_report_link
+club_management.patches.v1_0.backfill_socio_fecha_baja

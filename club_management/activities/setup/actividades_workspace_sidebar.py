@@ -90,6 +90,14 @@ SIDEBAR_ITEMS: list[dict] = [
 		"icon": "table",
 		"child": 1,
 	},
+	{
+		"label": "Bajas de socios",
+		"type": "Link",
+		"link_type": "Report",
+		"link_to": "Bajas de socios",
+		"icon": "table",
+		"child": 1,
+	},
 ]
 
 

@@ -31,18 +31,35 @@ def debe_conservar_fecha_alta_tras_baja(fecha_baja: date | str | None) -> bool:
 	return getdate(today()) <= getdate(limite)
 
 
+def resolver_fecha_baja_negocio(fecha_baja: date | str | None) -> date:
+	"""Fecha de negocio de la baja: informada o hoy; no admite futuras."""
+	parsed = getdate(fecha_baja) if fecha_baja else getdate(today())
+	if not parsed:
+		frappe.throw(frappe._("Fecha de baja inválida."), frappe.ValidationError)
+	if parsed > getdate(today()):
+		frappe.throw(frappe._("La fecha de baja no puede ser futura."), frappe.ValidationError)
+	return parsed
+
+
 def cambiar_estado(
 	socio_name: str,
 	nuevo_estado: str,
 	*,
 	motivo: str | None = None,
+	fecha_baja: date | str | None = None,
 ) -> None:
 	"""Mueve un `Socio` a `nuevo_estado` y registra la auditoría."""
 	socio = frappe.get_doc("Socio", socio_name)
 	estado_anterior = socio.estado
-	fecha_baja_ref = socio.ultimo_cambio_estado_en if estado_anterior == "Baja" else None
+	fecha_baja_ref = (
+		(socio.fecha_baja or socio.ultimo_cambio_estado_en) if estado_anterior == "Baja" else None
+	)
 	socio.flags.estado_change_authorized = True
 	socio.estado = nuevo_estado
+	if nuevo_estado == "Baja":
+		socio.fecha_baja = resolver_fecha_baja_negocio(fecha_baja)
+	elif estado_anterior == "Baja":
+		socio.fecha_baja = None
 	if estado_anterior == "Baja" and nuevo_estado == "Activo":
 		if not debe_conservar_fecha_alta_tras_baja(fecha_baja_ref):
 			socio.fecha_alta = today()

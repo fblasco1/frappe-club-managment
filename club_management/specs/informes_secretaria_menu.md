@@ -4,7 +4,7 @@ Informes operativos visibles en Desk (Secretaría y Gestión de Actividades).
 
 ---
 
-## Scenario: tres informes canónicos
+## Scenario: informes canónicos
 
 Given rol Secretaría o System Manager
 When abre el menú de informes
@@ -12,6 +12,7 @@ Then ve exactamente estos Script Reports (labels):
 - **Cobranza por fechas**
 - **Pagos por equipo**
 - **Deuda de socios** (spec `deuda_socios.md`)
+- **Bajas de socios** (spec `informe_bajas_socios.md`)
 And **no** ve como ítems de menú: «Pagos del dia», «Recaudacion por concepto», «Deuda por equipo», «Deuda por actividad», «Deuda cuotas sociales».
 
 ---

@@ -18,6 +18,10 @@
 			report_type: "Script Report",
 			ref_doctype: "Socio",
 		},
+		"Bajas de socios": {
+			report_type: "Script Report",
+			ref_doctype: "Socio",
+		},
 	};
 
 	const SIDEBAR_ITEMS = [
@@ -69,6 +73,14 @@
 			type: "Link",
 			link_type: "Report",
 			link_to: "Deuda de socios",
+			icon: "table",
+			child: 1,
+		},
+		{
+			label: __("Bajas de socios"),
+			type: "Link",
+			link_type: "Report",
+			link_to: "Bajas de socios",
 			icon: "table",
 			child: 1,
 		},

@@ -20,6 +20,7 @@ CLUB_DESK_REPORTS: tuple[str, ...] = (
 	"Cobranza por fechas",
 	"Pagos por equipo",
 	"Deuda de socios",
+	"Bajas de socios",
 )
 
 # Informes retirados del menú (aliases / absorbidos).

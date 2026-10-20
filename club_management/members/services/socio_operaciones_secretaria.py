@@ -56,6 +56,7 @@ def _aplicar_transicion(
 	operacion: str,
 	*,
 	motivo: str | None = None,
+	**kwargs,
 ) -> str:
 	ensure_secretaria_operacion_access()
 	if not frappe.db.exists("Socio", socio_name):
@@ -72,7 +73,10 @@ def _aplicar_transicion(
 		)
 
 	motivo_final = (motivo or "").strip() or operacion.replace("_", " ").title()
-	cambiar_estado(socio_name, estado_destino, motivo=motivo_final)
+	extra: dict[str, object] = {}
+	if operacion == "dar_baja":
+		extra["fecha_baja"] = kwargs.get("fecha_baja")
+	cambiar_estado(socio_name, estado_destino, motivo=motivo_final, **extra)
 	return estado_destino
 
 
@@ -98,10 +102,34 @@ def suspender_socio(socio_name: str, *, motivo: str | None = None) -> str:
 	return _aplicar_transicion(socio_name, "suspender", motivo=motivo or "Suspensión manual Secretaría")
 
 
-def dar_baja_socio(socio_name: str, *, motivo: str | None = None) -> str:
+def dar_baja_socio(
+	socio_name: str,
+	*,
+	motivo: str | None = None,
+	fecha_baja: str | None = None,
+) -> str:
 	if not (motivo or "").strip():
 		frappe.throw(_("Indique el motivo de baja."), frappe.ValidationError)
-	return _aplicar_transicion(socio_name, "dar_baja", motivo=motivo)
+	return _aplicar_transicion(socio_name, "dar_baja", motivo=motivo, fecha_baja=fecha_baja)
+
+
+def corregir_fecha_baja_socio(socio_name: str, fecha_baja: str) -> str:
+	"""Ajusta la fecha de negocio de un socio ya en Baja (carga histórica)."""
+	from club_management.members.services.socio_transitions import resolver_fecha_baja_negocio
+
+	ensure_secretaria_operacion_access()
+	if not frappe.db.exists("Socio", socio_name):
+		frappe.throw(_("Socio no encontrado"), frappe.DoesNotExistError)
+	socio = frappe.get_doc("Socio", socio_name)
+	if socio.estado != "Baja":
+		frappe.throw(
+			_("Solo se puede corregir la fecha de baja de un socio en Baja."),
+			frappe.ValidationError,
+		)
+	socio.flags.estado_change_authorized = True
+	socio.fecha_baja = resolver_fecha_baja_negocio(fecha_baja)
+	socio.save(ignore_permissions=True)
+	return socio.estado
 
 
 def dar_alta_socio(socio_name: str, *, motivo: str | None = None) -> str:

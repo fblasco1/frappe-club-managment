@@ -95,6 +95,8 @@
 
 		"Deuda de socios",
 
+		"Bajas de socios",
+
 	]);
 
 
@@ -111,6 +113,8 @@
 
 		"Deuda de socios",
 
+		"Bajas de socios",
+
 	]);
 
 
@@ -124,6 +128,8 @@
 		"Deuda por actividad",
 
 		"Deuda de socios",
+
+		"Bajas de socios",
 
 	]);
 
