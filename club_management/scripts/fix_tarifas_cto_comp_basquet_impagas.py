@@ -32,7 +32,8 @@ def tarifa_cto_comp_basquet(descripcion_o_titulo: str | None) -> float | None:
 	clave = normalizar_clave_cuota_complementaria(descripcion_o_titulo)
 	if not clave.startswith("CTO COMP BASQ"):
 		return None
-	if CLAVE_ESC_FEM in clave or "ESC/FEM" in clave:
+	# ESC/FEM canónico, alias ESC solo, o FEM sin ESC.
+	if CLAVE_ESC_FEM in clave or "ESC/FEM" in clave or " ESC" in clave or clave.endswith(" FEM"):
 		return TARIFA_ESC_FEM
 	return TARIFA_RESTO_BASQ
 

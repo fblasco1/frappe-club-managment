@@ -39,6 +39,10 @@ class TestTarifaCtoCompBasquetHelper(MembersTestCase):
 			TARIFA_ESC_FEM,
 		)
 		self.assertEqual(
+			tarifa_cto_comp_basquet("CTO COMP BASQUET ESC"),
+			TARIFA_ESC_FEM,
+		)
+		self.assertEqual(
 			tarifa_cto_comp_basquet("CTO COMP BASQ TIRA A/B/FLEX (11/2026)"),
 			TARIFA_RESTO_BASQ,
 		)
