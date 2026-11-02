@@ -7,7 +7,13 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, getdate
 
-TIPOS_CARGO_GIMNASIO_NO_SOCIO = frozenset({"Quincena Gimnasio", "Entrenamiento por Hora Gimnasio"})
+TIPOS_CARGO_GIMNASIO_UNICO = frozenset(
+	{
+		"Quincena Gimnasio",
+		"Entrenamiento por Hora Gimnasio",
+		"Entrenamiento Personalizado Gimnasio",
+	}
+)
 
 
 class CargoSocio(Document):
@@ -20,11 +26,17 @@ class CargoSocio(Document):
 		self._validate_vigencia()
 
 	def _validate_tipo_gimnasio(self) -> None:
-		"""Quincena / Entrenamiento por hora (socios y No Socios): siempre cobro único."""
-		if self.tipo_cargo not in TIPOS_CARGO_GIMNASIO_NO_SOCIO:
+		"""Cargos de pases/entrenamientos del gimnasio: siempre cobro único."""
+		if self.tipo_cargo not in TIPOS_CARGO_GIMNASIO_UNICO:
 			return
 		self.modo_cobro = "Unico"
 		self.fecha_hasta = None
+		if self.tipo_cargo == "Entrenamiento Personalizado Gimnasio" and self.socio:
+			from club_management.members.services.gimnasio_pases import (
+				ensure_elegible_entrenamiento_personalizado,
+			)
+
+			ensure_elegible_entrenamiento_personalizado(self.socio)
 
 	def _validate_monto(self) -> None:
 		if flt(self.monto) <= 0:

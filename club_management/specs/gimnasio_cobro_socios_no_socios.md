@@ -11,6 +11,7 @@ socios y no socios. Aranceles:
 | Socio con descuento | 21.600 | Grupo Socio + **Bonificacion Recurrente** 10 % |
 | Quincena (15 días) | 31.000 | `Cargo Socio` Único `Quincena Gimnasio` (`ICDPE-GYM-QUINCENA-NO-SOCIO`) |
 | Entrenamiento por hora | 5.000 | `Cargo Socio` Único `Entrenamiento por Hora Gimnasio` (`ICDPE-GYM-ENTRENAMIENTO-HORA-NO-SOCIO`) |
+| Entrenamiento personalizado | 30.000 | `Cargo Socio` Único `Entrenamiento Personalizado Gimnasio` (`ICDPE-GYM-ENTRENAMIENTO-PERSONALIZADO`) — **solo socios con pase de gimnasio** |
 
 El antiguo "Pase por día" se reemplaza por **Entrenamiento por hora**: el patch
 `gimnasio_precios_entrenamiento_hora` renombra el ítem
@@ -45,18 +46,28 @@ El antiguo "Pase por día" se reemplaza por **Entrenamiento por hora**: el patch
 ### Quincena y Entrenamiento por hora
 
 - Para practicantes No Socio **y socios** (cualquier categoría; 02/10/2026), mismo precio; no exigen inscripción activa.
-  Se cobran desde la ficha del socio / No Socio (botón «Cobrar quincena / entrenamiento por hora»);
+  Se cobran desde la ficha del socio / No Socio (botón «Cobrar quincena / entrenamiento…»);
   el panel de Secretaría **no** tiene acceso rápido para esto.
 - Se generan desde Secretaría como `Cargo Socio` `modo_cobro = Unico` (factura al crearse).
 - Opcionalmente se registra el pago en el mismo paso (`Payment Entry`).
 - Monto: `Item Price` / `standard_rate` del ítem (editable); si es 0, se rechaza
   hasta que Secretaría cargue el precio (o se informa un monto explícito).
 
+### Entrenamiento personalizado
+
+- Cargo **único**, no recurrente, monto oficial **30.000**.
+- **Solo** para socios (categoría distinta de `No Socio`) con inscripción **Activa**
+  en `Gimnasio Fitness` grupo con `condicion_socio = Socio` (pase mensual de socio).
+- No Socio / practicante: **rechazado**.
+- Socio sin pase de gimnasio activo: **rechazado**.
+- Mismo diálogo Desk de pases del gimnasio; fuerza `modo_cobro = Unico`.
+
 ### Sincronización de precios
 
-`sincronizar_precios_gimnasio()` aplica los precios de la tabla a los cuatro
-ítems del gimnasio en todos los lugares donde se leen: `Item.standard_rate`, los
-`Item Price` existentes y el `cost` del `Subscription Plan` del ítem, si existe.
+`sincronizar_precios_gimnasio()` aplica los precios de la tabla a los ítems del
+gimnasio (mensuales + pases + entrenamiento personalizado) en
+`Item.standard_rate`, los `Item Price` existentes y el `cost` del
+`Subscription Plan` del ítem, si existe.
 
 ### Bonificacion Recurrente
 
@@ -140,6 +151,26 @@ When Secretaría genera `Entrenamiento por Hora Gimnasio` o `Quincena Gimnasio`
 Then se crea el `Cargo Socio` Único facturado al mismo precio que para No Socio (5.000 / 31.000)
 And el tipo de cargo fuerza `modo_cobro = Unico`.
 
+## Scenario: entrenamiento personalizado para socio con pase
+
+Given un socio Activo inscripto en `Gimnasio Fitness / Socio`
+And el ítem `ICDPE-GYM-ENTRENAMIENTO-PERSONALIZADO` sincronizado a 30.000
+When Secretaría genera `Entrenamiento Personalizado Gimnasio`
+Then se crea un `Cargo Socio` Único Facturado por 30.000 con su `Sales Invoice`
+And el tipo fuerza `modo_cobro = Unico`.
+
+## Scenario: entrenamiento personalizado rechazado a No Socio
+
+Given un practicante No Socio (con o sin inscripción al gimnasio)
+When Secretaría intenta generar `Entrenamiento Personalizado Gimnasio`
+Then se rechaza con error claro (solo socios con pase de gimnasio).
+
+## Scenario: entrenamiento personalizado rechazado sin pase
+
+Given un socio Activo **sin** inscripción Activa en el grupo Socio del gimnasio
+When Secretaría intenta generar `Entrenamiento Personalizado Gimnasio`
+Then se rechaza indicando que requiere pase de gimnasio activo.
+
 ## Scenario: ex socio dado de baja vuelve como practicante No Socio
 
 Given un `Socio` en estado `Baja` con DNI 30111222
@@ -160,7 +191,8 @@ Then se rechaza indicando que el DNI ya pertenece a un socio vigente.
 Given el ítem `ICDPE-GYM-PASE-LIBRE-SOCIO` con `Item Price` y `Subscription Plan` en 22.000
 When se ejecuta `sincronizar_precios_gimnasio()`
 Then `standard_rate`, el `Item Price` y el `cost` del plan quedan en 24.000
-And No Socio queda en 49.000, Quincena en 31.000 y Entrenamiento por hora en 5.000.
+And No Socio queda en 49.000, Quincena en 31.000, Entrenamiento por hora en 5.000
+And Entrenamiento personalizado en 30.000.
 
 ## Scenario: migración del pase diario
 

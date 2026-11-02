@@ -1,4 +1,4 @@
-"""Quincena y Entrenamiento por hora del gimnasio, socios y No Socios (spec gimnasio_cobro_socios_no_socios.md)."""
+"""Pases y cargos únicos del gimnasio (spec gimnasio_cobro_socios_no_socios.md)."""
 
 from __future__ import annotations
 
@@ -12,25 +12,31 @@ from club_management.activities.data.otras_actividades_aranceles_icdpe import (
 	GYM_ITEM_CODES,
 	GYM_PASES_ITEM_SPECS,
 	ITEM_GYM_ENTRENAMIENTO_HORA_NO_SOCIO,
+	ITEM_GYM_ENTRENAMIENTO_PERSONALIZADO,
 	ITEM_GYM_PASE_DIARIO_LEGACY,
 	ITEM_GYM_QUINCENA_NO_SOCIO,
 	OTRAS_ACTIVIDADES_ITEM_SPECS,
 )
+from club_management.members.doctype.socio.socio import CATEGORIA_NO_SOCIO
 from club_management.members.services.socio_operaciones_secretaria import (
 	ensure_secretaria_operacion_access,
 )
 
 CARGO_DOCTYPE = "Cargo Socio"
+ACTIVIDAD_GIMNASIO = "Gimnasio Fitness"
 TIPO_QUINCENA = "Quincena Gimnasio"
 TIPO_ENTRENAMIENTO_HORA = "Entrenamiento por Hora Gimnasio"
+TIPO_ENTRENAMIENTO_PERSONALIZADO = "Entrenamiento Personalizado Gimnasio"
 TIPO_PASE_DIARIO_LEGACY = "Pase Diario Gimnasio"
 ITEM_POR_TIPO: dict[str, str] = {
 	TIPO_QUINCENA: ITEM_GYM_QUINCENA_NO_SOCIO,
 	TIPO_ENTRENAMIENTO_HORA: ITEM_GYM_ENTRENAMIENTO_HORA_NO_SOCIO,
+	TIPO_ENTRENAMIENTO_PERSONALIZADO: ITEM_GYM_ENTRENAMIENTO_PERSONALIZADO,
 }
 _TITULO_POR_TIPO: dict[str, str] = {
 	TIPO_QUINCENA: "Quincena gimnasio",
 	TIPO_ENTRENAMIENTO_HORA: "Entrenamiento por hora gimnasio",
+	TIPO_ENTRENAMIENTO_PERSONALIZADO: "Entrenamiento personalizado gimnasio",
 }
 
 
@@ -106,6 +112,50 @@ def precios_gimnasio() -> dict[str, float]:
 	return {tipo: precio_item_gimnasio(item) for tipo, item in ITEM_POR_TIPO.items()}
 
 
+def grupos_pase_gimnasio_socio() -> list[str]:
+	"""Grupos de Gimnasio Fitness con condición Socio (pase mensual de socio)."""
+	if not frappe.db.exists("DocType", "Grupo Actividad"):
+		return [f"{ACTIVIDAD_GIMNASIO} / Socio"]
+	grupos = frappe.get_all(
+		"Grupo Actividad",
+		filters={"actividad": ACTIVIDAD_GIMNASIO, "condicion_socio": "Socio"},
+		pluck="name",
+	)
+	return grupos or [f"{ACTIVIDAD_GIMNASIO} / Socio"]
+
+
+def socio_tiene_pase_gimnasio_activo(socio_name: str) -> bool:
+	"""True si el socio tiene inscripción Activa en el grupo Socio del gimnasio."""
+	if not socio_name or not frappe.db.exists("DocType", "Inscripcion Actividad"):
+		return False
+	grupos = grupos_pase_gimnasio_socio()
+	return bool(
+		frappe.db.exists(
+			"Inscripcion Actividad",
+			{
+				"socio": socio_name,
+				"estado": "Activa",
+				"grupo_actividad": ["in", grupos],
+			},
+		)
+	)
+
+
+def ensure_elegible_entrenamiento_personalizado(socio_name: str) -> None:
+	"""Rechaza No Socios y socios sin pase de gimnasio activo."""
+	categoria = frappe.db.get_value("Socio", socio_name, "categoria")
+	if categoria == CATEGORIA_NO_SOCIO:
+		frappe.throw(
+			_("El entrenamiento personalizado solo aplica a socios con pase de gimnasio."),
+			frappe.ValidationError,
+		)
+	if not socio_tiene_pase_gimnasio_activo(socio_name):
+		frappe.throw(
+			_("El socio debe tener pase de gimnasio activo (inscripción en grupo Socio)."),
+			frappe.ValidationError,
+		)
+
+
 def generar_cargo_gimnasio(
 	socio_name: str,
 	tipo: str,
@@ -120,6 +170,8 @@ def generar_cargo_gimnasio(
 		frappe.throw(_("Tipo de cargo de gimnasio inválido: {0}").format(tipo), frappe.ValidationError)
 	if not frappe.db.exists("Socio", socio_name):
 		frappe.throw(_("Socio no encontrado"), frappe.DoesNotExistError)
+	if tipo == TIPO_ENTRENAMIENTO_PERSONALIZADO:
+		ensure_elegible_entrenamiento_personalizado(socio_name)
 
 	item_code = ITEM_POR_TIPO[tipo]
 	if not frappe.db.exists("Item", item_code):

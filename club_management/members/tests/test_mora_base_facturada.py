@@ -1,7 +1,7 @@
-"""Tests de mora con base sobre el valor facturado (spec carga_masiva_cobranzas.md).
+"""Tests de mora con base sobre el valor facturado.
 
-El importer consolidado valida la mora esperada sobre el `rate` facturado de la
-línea de la SI, no sobre el valor vigente del ítem.
+Specs: `recargos_mora_dos_tramos.md` (D3), `carga_masiva_cobranzas.md`.
+Desk e importer usan el `rate` facturado de la SI, no el `standard_rate` vigente.
 """
 
 from __future__ import annotations
@@ -21,7 +21,10 @@ from club_management.members.services.cobranza_manual import (
 	erpnext_cobranza_disponible,
 )
 from club_management.members.services.cuotas_sociales_setup import sync_cuotas_sociales_club
-from club_management.members.services.mora_al_cobro import calcular_exigido_linea_factura
+from club_management.members.services.mora_al_cobro import (
+	calcular_detalle_mora_factura,
+	calcular_exigido_linea_factura,
+)
 from club_management.members.services.socio_transitions import cambiar_estado
 from club_management.members.test_helpers import MembersTestCase, insert_socio
 
@@ -87,9 +90,9 @@ class TestMoraBaseFacturada(MembersTestCase):
 		self.assertEqual(info["tramo"], "post_segundo")
 		self.assertAlmostEqual(flt(info["monto_exigido"]), flt(21000 * 1.15, 2), places=2)
 
-	def test_base_default_sigue_usando_valor_vigente(self) -> None:
-		socio = insert_socio(dni="88906002", email="mora.vigente@example.com")
-		cambiar_estado(socio.name, "Activo", motivo="Test mora vigente")
+	def test_base_default_usa_facturado_no_vigente(self) -> None:
+		socio = insert_socio(dni="88906002", email="mora.default.fact@example.com")
+		cambiar_estado(socio.name, "Activo", motivo="Test mora default facturado")
 		frappe.db.set_value("Item", ITEM_ARANCEL, "standard_rate", 25000)
 		invoice = self._factura_arancel(socio.name, periodo="07/2026", rate=21000)
 
@@ -99,4 +102,32 @@ class TestMoraBaseFacturada(MembersTestCase):
 			socio.name,
 			posting_date="2026-08-10",
 		)
+		self.assertAlmostEqual(flt(info["monto_exigido"]), flt(21000 * 1.15, 2), places=2)
+
+	def test_base_vigente_opt_in_sigue_disponible(self) -> None:
+		socio = insert_socio(dni="88906003", email="mora.vigente.opt@example.com")
+		cambiar_estado(socio.name, "Activo", motivo="Test mora vigente opt-in")
+		frappe.db.set_value("Item", ITEM_ARANCEL, "standard_rate", 25000)
+		invoice = self._factura_arancel(socio.name, periodo="07/2026", rate=21000)
+
+		info = calcular_exigido_linea_factura(
+			invoice,
+			ITEM_ARANCEL,
+			socio.name,
+			posting_date="2026-08-10",
+			base="vigente",
+		)
 		self.assertAlmostEqual(flt(info["monto_exigido"]), flt(25000 * 1.15, 2), places=2)
+
+	def test_desk_detalle_octubre_no_revaloriza_noviembre(self) -> None:
+		"""SI octubre a 28.500; ítem ya en 32.000; mora Desk usa 28.500 × 1,15."""
+		socio = insert_socio(dni="88906004", email="mora.oct.nov@example.com")
+		cambiar_estado(socio.name, "Activo", motivo="Test mora octubre")
+		frappe.db.set_value("Item", ITEM_ARANCEL, "standard_rate", 32000)
+		invoice = self._factura_arancel(socio.name, periodo="10/2026", rate=28500)
+
+		detalle = calcular_detalle_mora_factura(invoice, posting_date="2026-11-02")
+		self.assertEqual(detalle["tramo"], "post_segundo")
+		self.assertAlmostEqual(flt(detalle["valor_actual"]), 28500.0, places=2)
+		self.assertAlmostEqual(flt(detalle["monto_exigido"]), flt(28500 * 1.15, 2), places=2)
+		self.assertNotAlmostEqual(flt(detalle["monto_exigido"]), flt(32000 * 1.15, 2), places=2)

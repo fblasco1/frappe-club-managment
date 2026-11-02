@@ -312,7 +312,7 @@ club_management_socio_desk.add_operaciones_buttons = function (frm) {
 	const cobranza = __("Cobranza manual");
 	if (estado !== "Baja") {
 		frm.add_custom_button(
-			__("Cobrar quincena / entrenamiento por hora"),
+			__("Cobrar quincena / entrenamiento gimnasio"),
 			() => club_management_socio_desk.dialog_pase_gimnasio(frm),
 			cobranza
 		);
@@ -546,6 +546,19 @@ club_management_socio_desk.dialog_nuevo_cargo_extra = function (frm, conceptos) 
 	conceptos.forEach((c) => {
 		by_code[c.item_code] = c;
 	});
+	const mes_corriente_dia_1 = frappe.datetime.month_start(frappe.datetime.get_today());
+	const sync_fecha_desde_label = (dialog) => {
+		const unico = dialog.get_value("modo_cobro") === "Unico";
+		const field = dialog.get_field("fecha_desde");
+		if (!field) return;
+		field.df.label = unico
+			? __("Período deuda (día 1 del mes)")
+			: __("Vigente desde");
+		field.df.description = unico
+			? __("Usá el día 1 del mes de la deuda (p. ej. septiembre aunque cobres en octubre).")
+			: "";
+		field.refresh();
+	};
 	const d = new frappe.ui.Dialog({
 		title: __("Nuevo cargo extra"),
 		fields: [
@@ -566,6 +579,7 @@ club_management_socio_desk.dialog_nuevo_cargo_extra = function (frm, conceptos) 
 					if (!d.get_value("titulo")) {
 						d.set_value("titulo", tipo);
 					}
+					sync_fecha_desde_label(d);
 				},
 			},
 			{
@@ -581,6 +595,15 @@ club_management_socio_desk.dialog_nuevo_cargo_extra = function (frm, conceptos) 
 				options: "Unico\nRecurrente",
 				default: "Unico",
 				reqd: 1,
+				onchange() {
+					sync_fecha_desde_label(d);
+					if (d.get_value("modo_cobro") === "Unico") {
+						const actual = d.get_value("fecha_desde");
+						if (!actual || actual === frappe.datetime.get_today()) {
+							d.set_value("fecha_desde", mes_corriente_dia_1);
+						}
+					}
+				},
 			},
 			{
 				fieldname: "item",
@@ -611,9 +634,12 @@ club_management_socio_desk.dialog_nuevo_cargo_extra = function (frm, conceptos) 
 			{
 				fieldname: "fecha_desde",
 				fieldtype: "Date",
-				label: __("Vigente desde"),
-				default: frappe.datetime.get_today(),
+				label: __("Período deuda (día 1 del mes)"),
+				default: mes_corriente_dia_1,
 				reqd: 1,
+				description: __(
+					"Usá el día 1 del mes de la deuda (p. ej. septiembre aunque cobres en octubre)."
+				),
 			},
 			{
 				fieldname: "fecha_hasta",
@@ -710,7 +736,11 @@ club_management_socio_desk.crear_bonificacion_arancel = function (frm) {
 
 club_management_socio_desk.CATEGORIA_NO_SOCIO = "No Socio";
 club_management_socio_desk.ESTADOS_INSCRIBIBLES = ["Pendiente de Inscripción", "Activo", "Vitalicio"];
-club_management_socio_desk.TIPOS_PASE_GIMNASIO = ["Entrenamiento por Hora Gimnasio", "Quincena Gimnasio"];
+club_management_socio_desk.TIPOS_PASE_GIMNASIO = [
+	"Entrenamiento por Hora Gimnasio",
+	"Quincena Gimnasio",
+	"Entrenamiento Personalizado Gimnasio",
+];
 
 club_management_socio_desk.crear_bonificacion_recurrente = function (frm) {
 	frappe.route_options = { socio: frm.doc.name };
@@ -724,7 +754,7 @@ club_management_socio_desk.dialog_pase_gimnasio = function (frm) {
 			const precios = r.message || {};
 			const tipos = club_management_socio_desk.TIPOS_PASE_GIMNASIO;
 			const d = new frappe.ui.Dialog({
-				title: __("Cobrar quincena / entrenamiento por hora"),
+				title: __("Cobrar quincena / entrenamiento gimnasio"),
 				fields: [
 					{
 						fieldname: "tipo",
@@ -2085,8 +2115,12 @@ club_management_socio_desk.cancelar_pago_historial = function (frm, row) {
 	}
 	const monto = frappe.format(row.paid_amount || 0, { fieldtype: "Currency" });
 	const concepto = row.concepto || "—";
+	const facturasHtml = club_management_socio_desk.facturas_imputadas_html(
+		(row.detalle && row.detalle.facturas) || []
+	);
 	const d = new frappe.ui.Dialog({
 		title: __("Cancelar pago por mala imputación"),
+		size: "large",
 		fields: [
 			{
 				fieldtype: "HTML",
@@ -2096,9 +2130,10 @@ club_management_socio_desk.cancelar_pago_historial = function (frm, row) {
 				)}: <strong>${frappe.utils.escape_html(pe)}</strong><br/>
 				${frappe.utils.escape_html(__("Concepto"))}: ${frappe.utils.escape_html(concepto)}<br/>
 				${frappe.utils.escape_html(__("Importe"))}: <strong>${monto}</strong></p>
-				<p class="text-muted small">${__(
-					"Se anula este cobro. Las facturas imputadas vuelven a quedar con saldo. No se registra un cobro nuevo."
-				)}</p>`,
+				<p class="text-muted small mb-2">${__(
+					"Se anula este cobro. Estas facturas vuelven a quedar con saldo. No se registra un cobro nuevo."
+				)}</p>
+				${facturasHtml}`,
 			},
 			{
 				fieldname: "motivo",
@@ -2141,6 +2176,42 @@ club_management_socio_desk.cancelar_pago_historial = function (frm, row) {
 	d.show();
 };
 
+club_management_socio_desk.facturas_imputadas_html = function (facturas) {
+	const rows = facturas || [];
+	if (!rows.length) {
+		return `<p class="text-muted">${__("Sin facturas asociadas.")}</p>`;
+	}
+	const rowsHtml = rows
+		.map((f) => {
+			const alloc = frappe.format(f.allocated_amount || 0, { fieldtype: "Currency" });
+			const total = frappe.format(f.grand_total || 0, { fieldtype: "Currency" });
+			const label = f.es_mora ? ` <span class="badge badge-warning">${__("Mora")}</span>` : "";
+			return `<tr>
+				<td><a href="/app/sales-invoice/${encodeURIComponent(f.name)}">${frappe.utils.escape_html(
+					f.name
+				)}</a>${label}</td>
+				<td>${frappe.utils.escape_html(f.periodo_cobro || "—")}</td>
+				<td>${frappe.utils.escape_html(f.concepto || "")}</td>
+				<td>${total}</td>
+				<td>${alloc}</td>
+			</tr>`;
+		})
+		.join("");
+	return `
+		<table class="table table-bordered table-sm">
+			<thead>
+				<tr>
+					<th>${__("Factura")}</th>
+					<th>${__("Período")}</th>
+					<th>${__("Concepto")}</th>
+					<th>${__("Total")}</th>
+					<th>${__("Imputado")}</th>
+				</tr>
+			</thead>
+			<tbody>${rowsHtml}</tbody>
+		</table>`;
+};
+
 club_management_socio_desk.show_historial_pago_detalle = function (row) {
 	const detalle = row.detalle || {};
 	const facturas = detalle.facturas || [];
@@ -2148,38 +2219,7 @@ club_management_socio_desk.show_historial_pago_detalle = function (row) {
 	const monto = frappe.format(detalle.paid_amount || row.paid_amount || 0, {
 		fieldtype: "Currency",
 	});
-	let facturasHtml = `<p class="text-muted">${__("Sin facturas asociadas.")}</p>`;
-	if (facturas.length) {
-		const rowsHtml = facturas
-			.map((f) => {
-				const alloc = frappe.format(f.allocated_amount || 0, { fieldtype: "Currency" });
-				const total = frappe.format(f.grand_total || 0, { fieldtype: "Currency" });
-				const label = f.es_mora ? ` <span class="badge badge-warning">${__("Mora")}</span>` : "";
-				return `<tr>
-					<td><a href="/app/sales-invoice/${encodeURIComponent(f.name)}">${frappe.utils.escape_html(
-						f.name
-					)}</a>${label}</td>
-					<td>${frappe.utils.escape_html(f.periodo_cobro || "—")}</td>
-					<td>${frappe.utils.escape_html(f.concepto || "")}</td>
-					<td>${total}</td>
-					<td>${alloc}</td>
-				</tr>`;
-			})
-			.join("");
-		facturasHtml = `
-			<table class="table table-bordered table-sm">
-				<thead>
-					<tr>
-						<th>${__("Factura")}</th>
-						<th>${__("Período")}</th>
-						<th>${__("Concepto")}</th>
-						<th>${__("Total")}</th>
-						<th>${__("Imputado")}</th>
-					</tr>
-				</thead>
-				<tbody>${rowsHtml}</tbody>
-			</table>`;
-	}
+	const facturasHtml = club_management_socio_desk.facturas_imputadas_html(facturas);
 
 	const d = new frappe.ui.Dialog({
 		title: __("Detalle del pago"),

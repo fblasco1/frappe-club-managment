@@ -42,7 +42,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Tipo de cargo",
-   "options": "Cuota Federativa\nMulta\nViaje\nOtro\nQuincena Gimnasio\nEntrenamiento por Hora Gimnasio",
+   "options": "Cuota Federativa\nMulta\nViaje\nOtro\nQuincena Gimnasio\nEntrenamiento por Hora Gimnasio\nEntrenamiento Personalizado Gimnasio",
    "reqd": 1
   },
   {
@@ -74,9 +74,10 @@
   },
   {
    "default": "Today",
+   "description": "En modo Único: día 1 del período de deuda (permite meses anteriores). En Recurrente: inicio de vigencia.",
    "fieldname": "fecha_desde",
    "fieldtype": "Date",
-   "label": "Vigente desde",
+   "label": "Vigente desde / Período deuda",
    "reqd": 1
   },
   {
@@ -111,7 +112,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-01 12:00:00",
+ "modified": "2026-10-30 18:00:00",
  "modified_by": "Administrator",
  "module": "Members",
  "name": "Cargo Socio",

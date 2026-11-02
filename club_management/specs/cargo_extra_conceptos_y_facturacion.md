@@ -68,12 +68,32 @@ And no falla aunque el socio no tenga actividades.
 
 Given un `Socio` `Activo` con `Customer`
 When la Secretaría crea un `Cargo Socio` con `modo_cobro = Unico`, ítem y monto
+  (sin indicar período pasado: `fecha_desde` = mes corriente)
 Then se crea automáticamente una `Sales Invoice` submitted con una línea
-And la factura tiene `periodo_cobro` del mes de emisión y centro de costo del ítem
+And la factura tiene `periodo_cobro` del mes de `fecha_desde` (mes corriente) y centro de costo del ítem
+And la descripción de línea incluye el título y el período `(MM/YYYY)` si aún no estaba
 And el `Cargo Socio` queda `estado = Facturado` con `sales_invoice` poblado
   **en el documento devuelto al cliente** (no solo en base)
 And la factura aparece en `list_facturas_pendientes` del socio
 And `Socio.saldo_deuda` se actualiza.
+
+---
+
+## Scenario: cargo único de un mes anterior (p. ej. CTO COMP de septiembre cobrado en octubre)
+
+Given hoy es octubre 2026
+And un `Socio` `Activo` con `Customer`
+When la Secretaría crea un `Cargo Socio` `Unico` con `fecha_desde = 2026-09-01`
+  (período deuda septiembre; p. ej. título «CTO COMP BASQ TIRA A/B/FLEX»)
+Then la `Sales Invoice` tiene `periodo_cobro = 09/2026`
+And `posting_date` es la fecha de creación (hoy)
+And la descripción de línea incluye `(09/2026)`
+And el cargo queda Facturado y cobrable en octubre con el monto indicado
+And en **Cobranza por fechas** / filtros por período deuda aparece bajo `09/2026`.
+
+> Desk: en el diálogo **Nuevo cargo extra**, modo `Unico`, el campo se etiqueta
+> **Período deuda (día 1 del mes)** (mismo `fecha_desde`). Default = día 1 del mes
+> corriente. Para recurrentes sigue siendo «Vigente desde».
 
 ---
 
@@ -113,8 +133,9 @@ And en Desk hay acción **Facturar mes corriente** para volverlo cobrable.
 Given Secretaría está en el formulario `Socio`
 When pulsa **Nuevo cargo extra**
 Then se abre un **diálogo** (no navega a un formulario vacío de `Cargo Socio`)
-And al confirmar un cargo `Unico` se factura y se ofrece **Registrar cobro**
-  de esa factura
+And en modo `Unico` puede elegir el **Período deuda** (día 1 del mes)
+And al confirmar un cargo `Unico` se factura con ese `periodo_cobro` y se ofrece
+  **Registrar cobro** de esa factura
 And al confirmar un cargo `Recurrente` se factura el mes corriente (checkbox
   marcado por defecto) y se ofrece **Registrar cobro**.
 

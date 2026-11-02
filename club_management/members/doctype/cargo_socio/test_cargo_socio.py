@@ -92,6 +92,7 @@ class TestCargoSocio(MembersTestCase):
 
 	def test_crear_cargo_unico_se_factura_automaticamente(self) -> None:
 		socio = self._socio_activo(dni="74001001", email="cargo.unico@example.com")
+		fecha_desde = frappe.utils.get_first_day(frappe.utils.today())
 		doc = frappe.get_doc(
 			{
 				"doctype": "Cargo Socio",
@@ -101,7 +102,7 @@ class TestCargoSocio(MembersTestCase):
 				"modo_cobro": "Unico",
 				"item": self._item,
 				"monto": 15_000,
-				"fecha_desde": "2026-06-01",
+				"fecha_desde": fecha_desde,
 				"estado": "Pendiente",
 			}
 		)
@@ -113,15 +114,40 @@ class TestCargoSocio(MembersTestCase):
 		self.assertEqual(invoice.docstatus, 1)
 		self.assertEqual(len(invoice.items), 1)
 		self.assertEqual(invoice.items[0].item_code, self._item)
+		periodo = format_periodo_cobro(fecha_desde)
 		campo_periodo = _campo_periodo_cobro()
 		if campo_periodo:
-			self.assertEqual(
-				invoice.get(campo_periodo),
-				format_periodo_cobro(frappe.utils.today()),
-			)
+			self.assertEqual(invoice.get(campo_periodo), periodo)
+		self.assertIn(f"({periodo})", invoice.items[0].description or "")
 		pendientes = list_facturas_pendientes_socio(socio.name)
 		self.assertTrue(any(row["name"] == doc.sales_invoice for row in pendientes))
 		self.assertGreater(sync_saldo_deuda_socio(socio.name), 0)
+
+	def test_crear_cargo_unico_periodo_anterior(self) -> None:
+		"""CTO COMP / cargo único de un mes pasado conserva periodo_cobro de ese mes."""
+		socio = self._socio_activo(dni="74001011", email="cargo.periodo.pasado@example.com")
+		doc = frappe.get_doc(
+			{
+				"doctype": "Cargo Socio",
+				"socio": socio.name,
+				"titulo": "CTO COMP BASQ TIRA A/B/FLEX",
+				"tipo_cargo": "Otro",
+				"modo_cobro": "Unico",
+				"item": self._item,
+				"monto": 6_000,
+				"fecha_desde": "2026-09-01",
+				"estado": "Pendiente",
+			}
+		)
+		doc.insert(ignore_permissions=True)
+
+		self.assertEqual(doc.estado, "Facturado")
+		invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, doc.sales_invoice)
+		campo_periodo = _campo_periodo_cobro()
+		if campo_periodo:
+			self.assertEqual(invoice.get(campo_periodo), "09/2026")
+		self.assertIn("(09/2026)", invoice.items[0].description or "")
+		self.assertEqual(str(invoice.posting_date), str(frappe.utils.getdate(frappe.utils.today())))
 
 	def test_crear_cargo_unico_como_secretaria_se_factura(self) -> None:
 		socio = self._socio_activo(dni="74001002", email="cargo.fact@example.com")

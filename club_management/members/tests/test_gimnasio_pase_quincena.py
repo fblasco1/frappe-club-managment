@@ -7,16 +7,21 @@ from frappe.utils import flt
 
 from club_management.activities.data.otras_actividades_aranceles_icdpe import (
 	ITEM_GYM_ENTRENAMIENTO_HORA_NO_SOCIO,
+	ITEM_GYM_ENTRENAMIENTO_PERSONALIZADO,
 	ITEM_GYM_NO_SOCIO,
 	ITEM_GYM_PASE_DIARIO_LEGACY,
 	ITEM_GYM_QUINCENA_NO_SOCIO,
 	ITEM_GYM_SOCIO,
+)
+from club_management.activities.services.estructura_actividades_seed import (
+	seed_estructura_actividades_completa,
 )
 from club_management.members.doctype.socio.socio import CATEGORIA_NO_SOCIO
 from club_management.members.services.cobranza_manual import erpnext_cobranza_disponible
 from club_management.members.services.cuotas_sociales_setup import sync_cuotas_sociales_club
 from club_management.members.services.gimnasio_pases import (
 	TIPO_ENTRENAMIENTO_HORA,
+	TIPO_ENTRENAMIENTO_PERSONALIZADO,
 	TIPO_PASE_DIARIO_LEGACY,
 	TIPO_QUINCENA,
 	ensure_gimnasio_pases_items,
@@ -30,6 +35,9 @@ from club_management.members.test_helpers import (
 	ensure_role_socio_exists,
 	insert_socio,
 )
+
+ACTIVIDAD_GYM = "Gimnasio Fitness"
+GRUPO_GYM_SOCIO = f"{ACTIVIDAD_GYM} / Socio"
 
 
 class TestGimnasioPaseQuincena(MembersTestCase):
@@ -160,6 +168,42 @@ class TestGimnasioPaseQuincena(MembersTestCase):
 		finally:
 			frappe.set_user(previous)
 
+	def _socio_con_pase_gimnasio(self, dni: str, email: str) -> str:
+		seed_estructura_actividades_completa(crear_equipos=False)
+		socio = insert_socio(dni=dni, email=email)
+		cambiar_estado(socio.name, "Activo", motivo="Test entrenamiento personalizado")
+		frappe.get_doc(
+			{
+				"doctype": "Inscripcion Actividad",
+				"socio": socio.name,
+				"actividad": ACTIVIDAD_GYM,
+				"grupo_actividad": GRUPO_GYM_SOCIO,
+				"estado": "Activa",
+			}
+		).insert(ignore_permissions=True)
+		return socio.name
+
+	def test_entrenamiento_personalizado_socio_con_pase(self) -> None:
+		socio = self._socio_con_pase_gimnasio("79001030", "gym.pers.ok@example.com")
+		result = generar_cargo_gimnasio(socio, TIPO_ENTRENAMIENTO_PERSONALIZADO, registrar_pago=False)
+		cargo = frappe.get_doc("Cargo Socio", result["cargo"])
+		self.assertEqual(cargo.estado, "Facturado")
+		self.assertEqual(cargo.modo_cobro, "Unico")
+		self.assertEqual(cargo.tipo_cargo, TIPO_ENTRENAMIENTO_PERSONALIZADO)
+		self.assertEqual(cargo.item, ITEM_GYM_ENTRENAMIENTO_PERSONALIZADO)
+		self.assertEqual(flt(cargo.monto), 30000)
+
+	def test_entrenamiento_personalizado_rechaza_no_socio(self) -> None:
+		ns = self._no_socio("79001031", "gym.pers.ns@example.com")
+		with self.assertRaises(frappe.ValidationError):
+			generar_cargo_gimnasio(ns, TIPO_ENTRENAMIENTO_PERSONALIZADO, registrar_pago=False)
+
+	def test_entrenamiento_personalizado_rechaza_sin_pase(self) -> None:
+		socio = insert_socio(dni="79001032", email="gym.pers.sinpase@example.com")
+		cambiar_estado(socio.name, "Activo", motivo="Test sin pase gym")
+		with self.assertRaises(frappe.ValidationError):
+			generar_cargo_gimnasio(socio.name, TIPO_ENTRENAMIENTO_PERSONALIZADO, registrar_pago=False)
+
 
 class TestSincronizarPreciosGimnasio(MembersTestCase):
 	def setUp(self) -> None:
@@ -194,6 +238,7 @@ class TestSincronizarPreciosGimnasio(MembersTestCase):
 			ITEM_GYM_NO_SOCIO: 49000,
 			ITEM_GYM_QUINCENA_NO_SOCIO: 31000,
 			ITEM_GYM_ENTRENAMIENTO_HORA_NO_SOCIO: 5000,
+			ITEM_GYM_ENTRENAMIENTO_PERSONALIZADO: 30000,
 		}
 		for item_code, rate in esperados.items():
 			self.assertEqual(flt(frappe.db.get_value("Item", item_code, "standard_rate")), rate, item_code)

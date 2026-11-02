@@ -45,13 +45,16 @@ def facturar_cargo_socio(cargo_name: str) -> dict[str, Any]:
 
 	customer = ensure_customer_for_socio(doc.socio, skip_permission_check=True)
 	company = _default_company()
-	periodo = format_periodo_cobro(today())
+	# Unico: fecha_desde = día 1 del período de deuda (permite meses anteriores).
+	periodo = format_periodo_cobro(doc.fecha_desde or today())
+	titulo = (doc.titulo or "").strip() or _("Cargo extra")
+	descripcion = titulo if f"({periodo})" in titulo else _("{0} ({1})").format(titulo, periodo)
 	cost_center = resolve_cost_center_item(doc.item, company)
 	item: dict[str, Any] = {
 		"item_code": doc.item,
 		"qty": 1,
 		"rate": flt(doc.monto),
-		"description": doc.titulo,
+		"description": descripcion,
 	}
 	if cost_center:
 		item["cost_center"] = cost_center

@@ -3,8 +3,8 @@
 Spec: `club_management/specs/recargos_mora_dos_tramos.md`
 
 - Hasta 1.er venc. (día 10 del mes del período): sin mora
-- Tras 1.er y hasta 2.º (default día 20): +10 %
-- Tras 2.º venc.: valor del mes de pago × 1,15 (10 % + 5 %)
+- Tras 1.er y hasta 2.º (default día 20): +10 % sobre **valor facturado**
+- Tras 2.º venc.: +15 % (10 % + 5 %) sobre **valor facturado** (sin revalorizar)
 """
 
 from __future__ import annotations
@@ -194,7 +194,7 @@ def calcular_monto_exigido_mora(
 	pct_mes_vencido: float | None = None,
 	pct_post_vencimiento: float | None = None,
 ) -> float:
-	"""Aplica % según tramo. Post 2.º = 10 % + 5 % sobre valor del mes de pago."""
+	"""Aplica % según tramo. Post 2.º = 10 % + 5 % sobre la base (valor facturado)."""
 	base = flt(valor_actual)
 	if base <= 0:
 		return 0.0
@@ -278,9 +278,17 @@ def resolve_valor_actual_linea(
 	socio_name: str,
 	item_cuota: str | None,
 	monto_cuota: float,
+	base: str = "facturado",
 ) -> float:
-	"""Valor vigente de una línea (qty × rate vigente)."""
+	"""Base de mora de una línea.
+
+	Default ``facturado``: qty × rate de la SI (spec D3).
+	``vigente``: cuota categoría / ``Item.standard_rate`` (opt-in / legado).
+	"""
 	q = flt(qty) or 1.0
+	if (base or "facturado").strip().lower() != "vigente":
+		return flt(rate_facturado) * q
+
 	code = (item_code or "").strip()
 	if code and item_cuota and code == item_cuota:
 		return flt(monto_cuota) * q
@@ -291,10 +299,15 @@ def resolve_valor_actual_linea(
 	return flt(rate_facturado) * q
 
 
-def resolve_valor_actual_factura(invoice_name: str, socio_name: str) -> float:
-	"""Suma del precio vigente de **todas** las líneas de la SI.
+def resolve_valor_actual_factura(
+	invoice_name: str,
+	socio_name: str,
+	*,
+	base: str = "facturado",
+) -> float:
+	"""Suma de la base de mora de **todas** las líneas de la SI.
 
-	Spec: ``recargos_mora_dos_tramos.md`` (factura multi-línea).
+	Default: valor **facturado** (spec ``recargos_mora_dos_tramos.md`` D3).
 	"""
 	invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, invoice_name)
 	monto_cuota, item_cuota = resolve_cuota_social(socio_name)
@@ -307,6 +320,7 @@ def resolve_valor_actual_factura(invoice_name: str, socio_name: str) -> float:
 			socio_name=socio_name,
 			item_cuota=item_cuota,
 			monto_cuota=flt(monto_cuota),
+			base=base,
 		)
 	if total > 0:
 		return flt(total, 2)
@@ -321,7 +335,7 @@ def monto_exigido_con_piso(
 	pct_post_primer: float,
 	pct_extra_segundo: float,
 ) -> float:
-	"""Aplica % sobre valor vigente; no baja del outstanding de la SI × mismo factor.
+	"""Aplica % sobre la base (facturada); no baja del outstanding de la SI × factor.
 
 	El piso usa solo el outstanding de la factura origen (sin SI de mora ya creadas),
 	para no recomponer mora sobre mora.
@@ -537,13 +551,12 @@ def calcular_exigido_linea_factura(
 	socio_name: str,
 	*,
 	posting_date: str | date | None = None,
-	base: str = "vigente",
+	base: str = "facturado",
 ) -> dict[str, Any]:
 	"""Monto exigido de **una** línea (informe por concepto), con mora si aplica.
 
-	`base="vigente"` (default) calcula sobre el valor actual del ítem/cuota;
-	`base="facturado"` calcula sobre el importe facturado de la línea
-	(spec carga_masiva_cobranzas.md, importer consolidado).
+	`base="facturado"` (default, Desk e importer): importe facturado de la línea.
+	`base="vigente"`: opt-in — `Item.standard_rate` / cuota categoría actual.
 	"""
 	settings = get_club_settings()
 	ref = getdate(posting_date or today())
@@ -568,17 +581,15 @@ def calcular_exigido_linea_factura(
 
 	monto_cuota, item_cuota = resolve_cuota_social(socio_name)
 	line_base = flt(line.amount)
-	if base == "facturado":
-		valor_linea = line_base
-	else:
-		valor_linea = resolve_valor_actual_linea(
-			item_code=code,
-			qty=flt(line.qty),
-			rate_facturado=flt(line.rate),
-			socio_name=socio_name,
-			item_cuota=item_cuota,
-			monto_cuota=flt(monto_cuota),
-		)
+	valor_linea = resolve_valor_actual_linea(
+		item_code=code,
+		qty=flt(line.qty),
+		rate_facturado=flt(line.rate),
+		socio_name=socio_name,
+		item_cuota=item_cuota,
+		monto_cuota=flt(monto_cuota),
+		base=base,
+	)
 
 	result: dict[str, Any] = {
 		"invoice": invoice_name,
