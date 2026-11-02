@@ -903,7 +903,8 @@
 						this.render_cuota_complementaria_input(
 							"Actividad",
 							act.name,
-							act.monto_cuota_complementaria
+							act.monto_cuota_complementaria,
+							act.titulo_cuota_complementaria
 						)
 					: "";
 
@@ -977,6 +978,7 @@
 							"Equipo Actividad",
 							eq.name,
 							eq.monto_cuota_complementaria,
+							eq.titulo_cuota_complementaria,
 							eq.cuota_complementaria
 						)}
 					</div>`;
@@ -1022,7 +1024,8 @@
 					${this.render_cuota_complementaria_input(
 						"Grupo Actividad",
 						grupo.name,
-						grupo.monto_cuota_complementaria
+						grupo.monto_cuota_complementaria,
+						grupo.titulo_cuota_complementaria
 					)}
 					<div class="club-equipos-wrap">${equipos_html}</div>
 				</div>
@@ -1073,10 +1076,12 @@
 				return __("Sin cuota complementaria");
 			}
 			const origen = data.origen || "";
-			return `$${monto.toLocaleString()} (${origen})`;
+			const titulo = (data.titulo || "").trim();
+			const label = titulo ? `${titulo} · ` : "";
+			return `${label}$${monto.toLocaleString()} (${origen})`;
 		},
 
-		render_cuota_complementaria_input(doctype, name, monto, efectivo) {
+		render_cuota_complementaria_input(doctype, name, monto, titulo, efectivo) {
 			const resumen =
 				doctype === "Equipo Actividad" && efectivo
 					? `<span class="text-muted small club-cto-comp-efectivo">${frappe.utils.escape_html(
@@ -1085,6 +1090,10 @@
 					: "";
 			return `
 			<div class="club-cto-comp-row" data-doctype="${frappe.utils.escape_html(doctype)}" data-name="${frappe.utils.escape_html(name)}">
+				<label class="small text-muted">${__("Concepto CTO COMP")}</label>
+				<input type="text" class="form-control form-control-sm club-cto-comp-titulo"
+					value="${frappe.utils.escape_html(titulo || "")}"
+					placeholder="${__("Ej.: CTO COMP VOLEY ESC")}">
 				<label class="small text-muted">${__("Cuota complementaria ($)")}</label>
 				<input type="number" class="form-control form-control-sm club-cto-comp-monto"
 					min="0" step="0.01" value="${frappe.utils.escape_html(String(monto || 0))}">
@@ -1766,7 +1775,7 @@
 				panel.save_arancel_row($(e.currentTarget).closest(".club-arancel-row"));
 			});
 
-			$panel.on("change.club-actividades", ".club-cto-comp-monto", (e) => {
+			$panel.on("change.club-actividades", ".club-cto-comp-monto, .club-cto-comp-titulo", (e) => {
 				panel.save_cuota_complementaria_row($(e.currentTarget).closest(".club-cto-comp-row"));
 			});
 
@@ -1847,6 +1856,7 @@
 			const doctype = $row.attr("data-doctype");
 			const name = $row.attr("data-name");
 			const monto = parseFloat($row.find(".club-cto-comp-monto").val());
+			const titulo = ($row.find(".club-cto-comp-titulo").val() || "").trim();
 			if (!doctype || !name || Number.isNaN(monto)) {
 				return;
 			}
@@ -1854,7 +1864,7 @@
 			frappe.call({
 				method:
 					"club_management.activities.api.gestion_actividades_workspace.set_cuota_complementaria_desk",
-				args: { doctype, name, monto },
+				args: { doctype, name, monto, titulo },
 				callback: (r) => {
 					if (!r.message) {
 						return;

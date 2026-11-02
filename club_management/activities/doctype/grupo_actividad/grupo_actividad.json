@@ -10,6 +10,7 @@
   "titulo",
   "item",
   "monto_cuota_complementaria",
+  "titulo_cuota_complementaria",
   "pct_liquidacion_entrenador",
   "portal_socio_elige",
   "condicion_socio",
@@ -48,6 +49,12 @@
    "fieldtype": "Currency",
    "label": "Cuota complementaria ($)",
    "description": "Tarifa CTO COMP de esta tira/división (p. ej. ESC/FEM o TIRA)."
+  },
+  {
+   "fieldname": "titulo_cuota_complementaria",
+   "fieldtype": "Data",
+   "label": "Concepto CTO COMP",
+   "description": "Texto canónico del cargo (ej. CTO COMP BASQ ESC/FEM)."
   },
   {
    "fieldname": "pct_liquidacion_entrenador",

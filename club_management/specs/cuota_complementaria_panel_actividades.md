@@ -58,8 +58,39 @@ Then llama `set_cuota_complementaria` y refresca el catálogo.
 
 Given la estructura Basquet sincronizada
 When corre el seed de tarifas CTO COMP
-Then nodos Escuelita / Femenino quedan en `6000`
-And nodos Masculino (Azul / Amarillo / Flex) quedan en `7000`.
+Then nodos Escuelita / Femenino quedan en `6000` con título `CTO COMP BASQ ESC/FEM`
+And nodos Masculino (Azul / Amarillo / Flex) quedan en `7000` con título `CTO COMP BASQ TIRA A/B/FLEX`.
+
+---
+
+## Scenario: seed enlaza CTO COMP de todos los deportes con cuota
+
+Given la estructura de actividades sincronizada
+When corre `seed_cuota_complementaria_tarifas`
+Then cada grupo con concepto CTO COMP conocido queda con `monto_cuota_complementaria` y `titulo_cuota_complementaria`:
+
+| Actividad | Grupo | Título CTO COMP | Monto |
+|-----------|-------|-----------------|------:|
+| Basquet | Masculino / Azul\|Amarillo\|Flex | CTO COMP BASQ TIRA A/B/FLEX | 7000 |
+| Basquet | Femenino / Formativa\|Superior, Mixto / Escuela | CTO COMP BASQ ESC/FEM | 6000 |
+| Futbol | FAFI, TABI A | CTO COMP FUTBOL FAFI/TABI | 8400 |
+| Futbol | TABI B | CTO COMP FUTBOL ESC | 7400 |
+| Voley Femenino | Tira | CTO COMP VOLEY | 6100 |
+| Voley Femenino | Escuela Adolescente, Escuelita* | CTO COMP VOLEY ESC | 4300 |
+| Patin Artistico | Patin Avanzado | CTO COMP PATIN AVANZADO | 2520 |
+| Patin Artistico | Patin Intermedio | CTO COMP PATIN INTERMEDIO | 2160 |
+| Patin Artistico | Patin Mini\|Teens\|Danza | CTO COMP PATIN INICIAL | 1230 |
+| Patin Artistico | Adulto | CTO COMP PATIN ADULTOS | 1590 |
+
+---
+
+## Scenario: título CTO COMP editable en panel
+
+Given un grupo con cuota complementaria
+When Secretaría ve el panel
+Then junto al monto aparece el campo **Concepto CTO COMP** (`titulo_cuota_complementaria`)
+When guarda monto y/o título vía `set_cuota_complementaria`
+Then ambos persisten en el nodo.
 
 ---
 
@@ -67,6 +98,7 @@ And nodos Masculino (Azul / Amarillo / Flex) quedan en `7000`.
 
 - La facturación sigue usando ítem `ICDPE-CARGO-VARIOS` + descripción `CTO COMP …`; este campo es **catálogo de tarifa**, no crea ítems ERP.
 - Auto-alta de cargos desde el catálogo queda fuera de este sprint.
+- Deportes sin CTO COMP histórico (Boxeo, Yoga, etc.) quedan en 0 / vacío.
 
 ## Artefactos
 

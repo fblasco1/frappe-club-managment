@@ -122,11 +122,14 @@ def set_cuota_complementaria_desk(
 	doctype: str,
 	name: str,
 	monto: float | int | str | None = None,
+	titulo: str | None = None,
 ) -> dict[str, Any]:
 	_ensure_panel_access()
 	if not frappe.has_permission(doctype, "write"):
 		frappe.throw(frappe._("No autorizado"), frappe.PermissionError)
-	return set_cuota_complementaria(doctype=doctype, name=name, monto=monto)
+	return set_cuota_complementaria(
+		doctype=doctype, name=name, monto=monto, titulo=titulo
+	)
 
 
 @frappe.whitelist()

@@ -11,6 +11,7 @@
   "titulo",
   "item",
   "monto_cuota_complementaria",
+  "titulo_cuota_complementaria",
   "pct_liquidacion_entrenador",
   "habilitada",
   "capacidad",
@@ -49,6 +50,12 @@
    "fieldtype": "Currency",
    "label": "Cuota complementaria ($)",
    "description": "Tarifa CTO COMP propia del equipo/categoría (opcional; si vacío hereda del grupo)."
+  },
+  {
+   "fieldname": "titulo_cuota_complementaria",
+   "fieldtype": "Data",
+   "label": "Concepto CTO COMP",
+   "description": "Texto canónico del cargo; si vacío hereda del grupo/actividad."
   },
   {
    "fieldname": "pct_liquidacion_entrenador",

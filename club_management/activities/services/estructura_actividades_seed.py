@@ -167,48 +167,90 @@ def seed_estructura_actividades_completa(*, crear_equipos: bool = True) -> dict[
 
 	actividades_habilitadas = frappe.db.count("Actividad", {"habilitada": 1})
 	disable_legacy_basquet_actividades()
-	cto_comp = seed_basquet_cuota_complementaria_tarifas()
+	cto_comp = seed_cuota_complementaria_tarifas()
 	return {
 		"actividades": actividades_habilitadas,
 		"grupos": grupos_creados,
 		"equipos": equipos_creados,
-		"cto_comp_basquet": cto_comp,
+		"cto_comp": cto_comp,
 	}
 
 
+# (actividad_titulo, grupo_titulo) → (monto, concepto CTO COMP canónico)
+# Montos vigentes según cargos/informe prod (nov 2026).
+CTO_COMP_TARIFAS_POR_GRUPO: dict[tuple[str, str], tuple[float, str]] = {
+	("Basquet", "Masculino / Azul"): (7000.0, "CTO COMP BASQ TIRA A/B/FLEX"),
+	("Basquet", "Masculino / Amarillo"): (7000.0, "CTO COMP BASQ TIRA A/B/FLEX"),
+	("Basquet", "Masculino / Flex"): (7000.0, "CTO COMP BASQ TIRA A/B/FLEX"),
+	("Basquet", "Femenino / Formativa"): (6000.0, "CTO COMP BASQ ESC/FEM"),
+	("Basquet", "Femenino / Superior"): (6000.0, "CTO COMP BASQ ESC/FEM"),
+	("Basquet", "Mixto / Escuela"): (6000.0, "CTO COMP BASQ ESC/FEM"),
+	("Futbol", "FAFI"): (8400.0, "CTO COMP FUTBOL FAFI/TABI"),
+	("Futbol", "TABI A"): (8400.0, "CTO COMP FUTBOL FAFI/TABI"),
+	("Futbol", "TABI B"): (7400.0, "CTO COMP FUTBOL ESC"),
+	("Voley Femenino", "Tira"): (6100.0, "CTO COMP VOLEY"),
+	("Voley Femenino", "Escuela Adolescente"): (4300.0, "CTO COMP VOLEY ESC"),
+	("Voley Femenino", "Escuelita Minivoley"): (4300.0, "CTO COMP VOLEY ESC"),
+	("Voley Femenino", "escuelita"): (4300.0, "CTO COMP VOLEY ESC"),
+	("Patin Artistico", "Patin Avanzado"): (2520.0, "CTO COMP PATIN AVANZADO"),
+	("Patin Artistico", "Patin Intermedio"): (2160.0, "CTO COMP PATIN INTERMEDIO"),
+	("Patin Artistico", "Patin Mini"): (1230.0, "CTO COMP PATIN INICIAL"),
+	("Patin Artistico", "Patin Teens"): (1230.0, "CTO COMP PATIN INICIAL"),
+	("Patin Artistico", "Patin Danza"): (1230.0, "CTO COMP PATIN INICIAL"),
+	("Patin Artistico", "Adulto"): (1590.0, "CTO COMP PATIN ADULTOS"),
+}
+
+
 def _tarifa_cto_comp_basquet_grupo(titulo: str) -> float | None:
-	"""ESC/FEM → 6000; Masculino (resto) → 7000."""
-	t = (titulo or "").strip().upper()
-	if not t:
-		return None
-	if "FEMENINO" in t or "ESCUELA" in t or "ESCUELITA" in t:
-		return 6000.0
-	if "MASCULINO" in t:
-		return 7000.0
-	return None
+	"""Compat: ESC/FEM → 6000; Masculino → 7000."""
+	key = ("Basquet", (titulo or "").strip())
+	row = CTO_COMP_TARIFAS_POR_GRUPO.get(key)
+	return row[0] if row else None
 
 
 def seed_basquet_cuota_complementaria_tarifas() -> dict[str, int]:
-	"""Asigna montos CTO COMP en grupos Basquet (nov 2026: ESC/FEM 6000, resto 7000)."""
-	actividad = _actividad_docname("Basquet")
-	if not actividad or not frappe.db.exists("Actividad", actividad):
-		return {"grupos_actualizados": 0}
+	"""Compat: solo Basquet. Preferir `seed_cuota_complementaria_tarifas`."""
+	return seed_cuota_complementaria_tarifas(solo_actividad="Basquet")
 
+
+def seed_cuota_complementaria_tarifas(*, solo_actividad: str | None = None) -> dict[str, int]:
+	"""Enlaza monto + título CTO COMP a cada grupo de deporte con concepto conocido."""
 	updated = 0
-	for row in frappe.get_all(
-		"Grupo Actividad",
-		filters={"actividad": actividad, "habilitada": 1},
-		fields=["name", "titulo"],
-	):
-		tarifa = _tarifa_cto_comp_basquet_grupo(row.titulo or "")
-		if tarifa is None:
+	por_actividad: dict[str, int] = {}
+
+	for (act_titulo, grupo_titulo), (monto, concepto) in CTO_COMP_TARIFAS_POR_GRUPO.items():
+		if solo_actividad and act_titulo != solo_actividad:
+			continue
+		actividad = _actividad_docname(act_titulo)
+		if not actividad or not frappe.db.exists("Actividad", actividad):
+			continue
+		grupo_name = frappe.db.get_value(
+			"Grupo Actividad",
+			{"actividad": actividad, "titulo": grupo_titulo, "habilitada": 1},
+			"name",
+		)
+		if not grupo_name:
+			# Match case-insensitive for legacy titles (p. ej. «escuelita»).
+			for row in frappe.get_all(
+				"Grupo Actividad",
+				filters={"actividad": actividad, "habilitada": 1},
+				fields=["name", "titulo"],
+			):
+				if (row.titulo or "").strip().casefold() == grupo_titulo.casefold():
+					grupo_name = row.name
+					break
+		if not grupo_name:
 			continue
 		frappe.db.set_value(
 			"Grupo Actividad",
-			row.name,
-			"monto_cuota_complementaria",
-			tarifa,
+			grupo_name,
+			{
+				"monto_cuota_complementaria": monto,
+				"titulo_cuota_complementaria": concepto,
+			},
 			update_modified=True,
 		)
 		updated += 1
-	return {"grupos_actualizados": updated}
+		por_actividad[act_titulo] = por_actividad.get(act_titulo, 0) + 1
+
+	return {"grupos_actualizados": updated, "por_actividad": por_actividad}

@@ -9,6 +9,7 @@
   "titulo",
   "item",
   "monto_cuota_complementaria",
+  "titulo_cuota_complementaria",
   "usa_grupos",
   "tipo_inscripcion_portal",
   "admite_no_socios",
@@ -40,6 +41,12 @@
    "fieldtype": "Currency",
    "label": "Cuota complementaria ($)",
    "description": "Tarifa CTO COMP de la actividad (cascada hacia grupos/equipos sin monto propio)."
+  },
+  {
+   "fieldname": "titulo_cuota_complementaria",
+   "fieldtype": "Data",
+   "label": "Concepto CTO COMP",
+   "description": "Texto canónico del cargo (ej. CTO COMP VOLEY ESC)."
   },
   {
    "default": "0",

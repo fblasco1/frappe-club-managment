@@ -26,6 +26,7 @@ def get_catalog_payload() -> dict[str, Any]:
 			"titulo",
 			"item",
 			"monto_cuota_complementaria",
+			"titulo_cuota_complementaria",
 			"usa_grupos",
 			"orden",
 			"descripcion",
@@ -35,7 +36,15 @@ def get_catalog_payload() -> dict[str, Any]:
 	grupos = frappe.get_all(
 		GRUPO_DOCTYPE,
 		filters={"habilitada": 1},
-		fields=["name", "titulo", "actividad", "item", "monto_cuota_complementaria", "orden"],
+		fields=[
+			"name",
+			"titulo",
+			"actividad",
+			"item",
+			"monto_cuota_complementaria",
+			"titulo_cuota_complementaria",
+			"orden",
+		],
 		order_by="orden asc, titulo asc",
 	)
 	equipos = frappe.get_all(
@@ -47,6 +56,7 @@ def get_catalog_payload() -> dict[str, Any]:
 			"grupo_actividad",
 			"item",
 			"monto_cuota_complementaria",
+			"titulo_cuota_complementaria",
 			"orden",
 		],
 		order_by="orden asc, titulo asc",
@@ -66,10 +76,12 @@ def get_catalog_payload() -> dict[str, Any]:
 		act_row["grupos"] = []
 		actividad_item = actividad.get("item") or ""
 		act_cto = flt(actividad.get("monto_cuota_complementaria") or 0)
+		act_cto_titulo = (actividad.get("titulo_cuota_complementaria") or "").strip()
 		for grupo in grupos_by_actividad.get(actividad["name"], []):
 			grupo_row = _format_grupo_row(grupo)
 			grupo_item = grupo.get("item") or ""
 			grupo_cto = flt(grupo.get("monto_cuota_complementaria") or 0)
+			grupo_cto_titulo = (grupo.get("titulo_cuota_complementaria") or "").strip()
 			grupo_row["equipos"] = [
 				_format_equipo_row(
 					equipo,
@@ -77,6 +89,8 @@ def get_catalog_payload() -> dict[str, Any]:
 					actividad_item=actividad_item,
 					grupo_cto=grupo_cto,
 					actividad_cto=act_cto,
+					grupo_cto_titulo=grupo_cto_titulo,
+					actividad_cto_titulo=act_cto_titulo,
 				)
 				for equipo in equipos_by_grupo.get(grupo["name"], [])
 			]
@@ -248,8 +262,9 @@ def set_cuota_complementaria(
 	doctype: str,
 	name: str,
 	monto: float | int | str | None = None,
+	titulo: str | None = None,
 ) -> dict[str, Any]:
-	"""Persiste tarifa CTO COMP en Actividad / Grupo / Equipo."""
+	"""Persiste tarifa / concepto CTO COMP en Actividad / Grupo / Equipo."""
 	if doctype not in ARANCEL_DOCTYPES:
 		frappe.throw(frappe._("DocType no soportado para cuota complementaria."))
 	if not frappe.db.exists(doctype, name):
@@ -257,14 +272,21 @@ def set_cuota_complementaria(
 	monto_value = flt(monto)
 	if monto_value < 0:
 		frappe.throw(frappe._("El monto de cuota complementaria no puede ser negativo."))
-	frappe.db.set_value(
-		doctype,
-		name,
-		"monto_cuota_complementaria",
-		monto_value,
-		update_modified=True,
+	values: dict[str, Any] = {"monto_cuota_complementaria": monto_value}
+	if titulo is not None:
+		values["titulo_cuota_complementaria"] = (titulo or "").strip()
+	frappe.db.set_value(doctype, name, values, update_modified=True)
+	titulo_actual = (
+		values.get("titulo_cuota_complementaria")
+		if titulo is not None
+		else (frappe.db.get_value(doctype, name, "titulo_cuota_complementaria") or "")
 	)
-	return {"doctype": doctype, "name": name, "monto": monto_value}
+	return {
+		"doctype": doctype,
+		"name": name,
+		"monto": monto_value,
+		"titulo": titulo_actual or "",
+	}
 
 
 def set_arancel(
@@ -536,6 +558,7 @@ def _format_actividad_row(row: dict[str, Any]) -> dict[str, Any]:
 		"item": item,
 		"rate": _resolve_item_rate(item),
 		"monto_cuota_complementaria": monto_cto,
+		"titulo_cuota_complementaria": (row.get("titulo_cuota_complementaria") or "").strip(),
 	}
 
 
@@ -549,6 +572,7 @@ def _format_grupo_row(row: dict[str, Any]) -> dict[str, Any]:
 		"item": item,
 		"rate": _resolve_item_rate(item),
 		"monto_cuota_complementaria": monto_cto,
+		"titulo_cuota_complementaria": (row.get("titulo_cuota_complementaria") or "").strip(),
 	}
 
 
@@ -559,9 +583,12 @@ def _format_equipo_row(
 	actividad_item: str = "",
 	grupo_cto: float = 0.0,
 	actividad_cto: float = 0.0,
+	grupo_cto_titulo: str = "",
+	actividad_cto_titulo: str = "",
 ) -> dict[str, Any]:
 	item = row.get("item") or ""
 	equipo_cto = flt(row.get("monto_cuota_complementaria") or 0)
+	equipo_cto_titulo = (row.get("titulo_cuota_complementaria") or "").strip()
 	arancel = resolve_arancel_efectivo_from_chain(
 		equipo_item=item,
 		grupo_item=grupo_item,
@@ -571,6 +598,9 @@ def _format_equipo_row(
 		equipo_monto=equipo_cto,
 		grupo_monto=grupo_cto,
 		actividad_monto=actividad_cto,
+		equipo_titulo=equipo_cto_titulo,
+		grupo_titulo=grupo_cto_titulo,
+		actividad_titulo=actividad_cto_titulo,
 	)
 	return {
 		"name": row["name"],
@@ -580,6 +610,7 @@ def _format_equipo_row(
 		"rate": _resolve_item_rate(item),
 		"arancel": arancel,
 		"monto_cuota_complementaria": equipo_cto,
+		"titulo_cuota_complementaria": equipo_cto_titulo,
 		"cuota_complementaria": cto,
 	}
 
@@ -638,18 +669,33 @@ def resolve_cuota_complementaria_from_chain(
 	equipo_monto: float | int | None = None,
 	grupo_monto: float | int | None = None,
 	actividad_monto: float | int | None = None,
+	equipo_titulo: str | None = None,
+	grupo_titulo: str | None = None,
+	actividad_titulo: str | None = None,
 ) -> dict[str, Any]:
 	"""Cascada CTO COMP: equipo → grupo → actividad (monto > 0 cuenta como definido)."""
 	eq = flt(equipo_monto or 0)
 	if eq > 0:
-		return {"monto": eq, "origen": "Equipo"}
+		return {
+			"monto": eq,
+			"titulo": (equipo_titulo or "").strip(),
+			"origen": "Equipo",
+		}
 	gr = flt(grupo_monto or 0)
 	if gr > 0:
-		return {"monto": gr, "origen": "Grupo"}
+		return {
+			"monto": gr,
+			"titulo": (grupo_titulo or "").strip(),
+			"origen": "Grupo",
+		}
 	act = flt(actividad_monto or 0)
 	if act > 0:
-		return {"monto": act, "origen": "Actividad"}
-	return {"monto": 0.0, "origen": "Sin cuota complementaria"}
+		return {
+			"monto": act,
+			"titulo": (actividad_titulo or "").strip(),
+			"origen": "Actividad",
+		}
+	return {"monto": 0.0, "titulo": "", "origen": "Sin cuota complementaria"}
 
 
 def resolve_cuota_complementaria_efectiva_equipo(equipo_name: str) -> dict[str, Any]:
@@ -661,33 +707,43 @@ def resolve_cuota_complementaria_efectiva_equipo(equipo_name: str) -> dict[str, 
 	equipo = frappe.db.get_value(
 		EQUIPO_DOCTYPE,
 		name,
-		["monto_cuota_complementaria", "grupo_actividad"],
+		["monto_cuota_complementaria", "titulo_cuota_complementaria", "grupo_actividad"],
 		as_dict=True,
 	)
 	grupo_monto = 0.0
 	actividad_monto = 0.0
+	grupo_titulo = ""
+	actividad_titulo = ""
 	grupo_name = (equipo.grupo_actividad or "").strip() if equipo else ""
 	if grupo_name and frappe.db.exists(GRUPO_DOCTYPE, grupo_name):
 		grupo = frappe.db.get_value(
 			GRUPO_DOCTYPE,
 			grupo_name,
-			["monto_cuota_complementaria", "actividad"],
+			["monto_cuota_complementaria", "titulo_cuota_complementaria", "actividad"],
 			as_dict=True,
 		)
 		grupo_monto = flt(grupo.monto_cuota_complementaria) if grupo else 0.0
+		grupo_titulo = (grupo.titulo_cuota_complementaria or "").strip() if grupo else ""
 		actividad_name = (grupo.actividad or "").strip() if grupo else ""
 		if actividad_name and frappe.db.exists(ACTIVIDAD_DOCTYPE, actividad_name):
-			actividad_monto = flt(
-				frappe.db.get_value(
-					ACTIVIDAD_DOCTYPE, actividad_name, "monto_cuota_complementaria"
-				)
-				or 0
+			act = frappe.db.get_value(
+				ACTIVIDAD_DOCTYPE,
+				actividad_name,
+				["monto_cuota_complementaria", "titulo_cuota_complementaria"],
+				as_dict=True,
+			)
+			actividad_monto = flt(act.monto_cuota_complementaria) if act else 0.0
+			actividad_titulo = (
+				(act.titulo_cuota_complementaria or "").strip() if act else ""
 			)
 
 	return resolve_cuota_complementaria_from_chain(
 		equipo_monto=flt(equipo.monto_cuota_complementaria) if equipo else 0.0,
 		grupo_monto=grupo_monto,
 		actividad_monto=actividad_monto,
+		equipo_titulo=(equipo.titulo_cuota_complementaria or "").strip() if equipo else "",
+		grupo_titulo=grupo_titulo,
+		actividad_titulo=actividad_titulo,
 	)
 
 

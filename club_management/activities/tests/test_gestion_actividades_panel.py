@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import frappe
 from frappe.exceptions import PermissionError
-
 from frappe.exceptions import ValidationError
+from frappe.utils import flt
 
 from club_management.activities.api.gestion_actividades_workspace import (
 	create_actividad_desk,
@@ -221,12 +221,23 @@ class TestGestionActividadesPanelService(MembersTestCase):
 		grupo = create_grupo(actividad=actividad, titulo="Tira CTO")["name"]
 		equipo = create_equipo(grupo_actividad=grupo, titulo="Cat CTO")["name"]
 
-		set_cuota_complementaria(doctype="Actividad", name=actividad, monto=7000)
-		set_cuota_complementaria(doctype="Grupo Actividad", name=grupo, monto=6000)
+		set_cuota_complementaria(
+			doctype="Actividad",
+			name=actividad,
+			monto=7000,
+			titulo="CTO COMP TEST ACT",
+		)
+		set_cuota_complementaria(
+			doctype="Grupo Actividad",
+			name=grupo,
+			monto=6000,
+			titulo="CTO COMP TEST GRUPO",
+		)
 
 		heredado = resolve_cuota_complementaria_efectiva_equipo(equipo)
 		self.assertEqual(heredado["monto"], 6000.0)
 		self.assertEqual(heredado["origen"], "Grupo")
+		self.assertEqual(heredado["titulo"], "CTO COMP TEST GRUPO")
 
 		set_cuota_complementaria(doctype="Equipo Actividad", name=equipo, monto=5000)
 		propio = resolve_cuota_complementaria_efectiva_equipo(equipo)
@@ -236,11 +247,49 @@ class TestGestionActividadesPanelService(MembersTestCase):
 		data = get_catalog_payload()
 		act = next(a for a in data["actividades"] if a["name"] == actividad)
 		self.assertEqual(act["monto_cuota_complementaria"], 7000.0)
+		self.assertEqual(act["titulo_cuota_complementaria"], "CTO COMP TEST ACT")
 		self.assertEqual(act["grupos"][0]["monto_cuota_complementaria"], 6000.0)
+		self.assertEqual(act["grupos"][0]["titulo_cuota_complementaria"], "CTO COMP TEST GRUPO")
 		eq = act["grupos"][0]["equipos"][0]
 		self.assertEqual(eq["monto_cuota_complementaria"], 5000.0)
 		self.assertEqual(eq["cuota_complementaria"]["monto"], 5000.0)
 		self.assertEqual(eq["cuota_complementaria"]["origen"], "Equipo")
+
+	def test_seed_cuota_complementaria_enlaza_deportes(self) -> None:
+		from club_management.activities.services.estructura_actividades_seed import (
+			CTO_COMP_TARIFAS_POR_GRUPO,
+			seed_cuota_complementaria_tarifas,
+		)
+
+		# Asegura nodos mínimos de Futbol / Voley para el seed.
+		futbol = self._ensure_actividad("Futbol", usa_grupos=1)
+		if not frappe.db.exists("Grupo Actividad", {"actividad": futbol, "titulo": "FAFI"}):
+			create_grupo(actividad=futbol, titulo="FAFI")
+		voley = self._ensure_actividad("Voley Femenino", usa_grupos=1)
+		if not frappe.db.exists("Grupo Actividad", {"actividad": voley, "titulo": "Tira"}):
+			create_grupo(actividad=voley, titulo="Tira")
+
+		result = seed_cuota_complementaria_tarifas()
+		self.assertGreaterEqual(result["grupos_actualizados"], 2)
+
+		fafi = frappe.db.get_value(
+			"Grupo Actividad",
+			{"actividad": futbol, "titulo": "FAFI"},
+			["monto_cuota_complementaria", "titulo_cuota_complementaria"],
+			as_dict=True,
+		)
+		self.assertEqual(flt(fafi.monto_cuota_complementaria), 8400.0)
+		self.assertEqual(fafi.titulo_cuota_complementaria, "CTO COMP FUTBOL FAFI/TABI")
+
+		tira = frappe.db.get_value(
+			"Grupo Actividad",
+			{"actividad": voley, "titulo": "Tira"},
+			["monto_cuota_complementaria", "titulo_cuota_complementaria"],
+			as_dict=True,
+		)
+		self.assertEqual(flt(tira.monto_cuota_complementaria), 6100.0)
+		self.assertEqual(tira.titulo_cuota_complementaria, "CTO COMP VOLEY")
+		self.assertIn(("Futbol", "FAFI"), CTO_COMP_TARIFAS_POR_GRUPO)
 
 
 class TestCatalogoActividadesAltaGuiada(MembersTestCase):
