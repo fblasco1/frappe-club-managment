@@ -5,9 +5,10 @@
  "creation": "2026-05-27 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
- "field_order": [
+  "field_order": [
   "titulo",
   "item",
+  "monto_cuota_complementaria",
   "usa_grupos",
   "tipo_inscripcion_portal",
   "admite_no_socios",
@@ -33,6 +34,12 @@
    "label": "\u00cdtem (arancel mensual)",
    "options": "Item",
    "description": "Arancel por defecto si la actividad no usa grupos/tiras."
+  },
+  {
+   "fieldname": "monto_cuota_complementaria",
+   "fieldtype": "Currency",
+   "label": "Cuota complementaria ($)",
+   "description": "Tarifa CTO COMP de la actividad (cascada hacia grupos/equipos sin monto propio)."
   },
   {
    "default": "0",

@@ -167,8 +167,48 @@ def seed_estructura_actividades_completa(*, crear_equipos: bool = True) -> dict[
 
 	actividades_habilitadas = frappe.db.count("Actividad", {"habilitada": 1})
 	disable_legacy_basquet_actividades()
+	cto_comp = seed_basquet_cuota_complementaria_tarifas()
 	return {
 		"actividades": actividades_habilitadas,
 		"grupos": grupos_creados,
 		"equipos": equipos_creados,
+		"cto_comp_basquet": cto_comp,
 	}
+
+
+def _tarifa_cto_comp_basquet_grupo(titulo: str) -> float | None:
+	"""ESC/FEM → 6000; Masculino (resto) → 7000."""
+	t = (titulo or "").strip().upper()
+	if not t:
+		return None
+	if "FEMENINO" in t or "ESCUELA" in t or "ESCUELITA" in t:
+		return 6000.0
+	if "MASCULINO" in t:
+		return 7000.0
+	return None
+
+
+def seed_basquet_cuota_complementaria_tarifas() -> dict[str, int]:
+	"""Asigna montos CTO COMP en grupos Basquet (nov 2026: ESC/FEM 6000, resto 7000)."""
+	actividad = _actividad_docname("Basquet")
+	if not actividad or not frappe.db.exists("Actividad", actividad):
+		return {"grupos_actualizados": 0}
+
+	updated = 0
+	for row in frappe.get_all(
+		"Grupo Actividad",
+		filters={"actividad": actividad, "habilitada": 1},
+		fields=["name", "titulo"],
+	):
+		tarifa = _tarifa_cto_comp_basquet_grupo(row.titulo or "")
+		if tarifa is None:
+			continue
+		frappe.db.set_value(
+			"Grupo Actividad",
+			row.name,
+			"monto_cuota_complementaria",
+			tarifa,
+			update_modified=True,
+		)
+		updated += 1
+	return {"grupos_actualizados": updated}

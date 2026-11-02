@@ -5,11 +5,12 @@
  "creation": "2026-06-04 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
- "field_order": [
+  "field_order": [
   "grupo_actividad",
   "column_break_grupo_equipo",
   "titulo",
   "item",
+  "monto_cuota_complementaria",
   "pct_liquidacion_entrenador",
   "habilitada",
   "capacidad",
@@ -42,6 +43,12 @@
    "fieldtype": "Link",
    "label": "\u00cdtem arancel",
    "options": "Item"
+  },
+  {
+   "fieldname": "monto_cuota_complementaria",
+   "fieldtype": "Currency",
+   "label": "Cuota complementaria ($)",
+   "description": "Tarifa CTO COMP propia del equipo/categoría (opcional; si vacío hereda del grupo)."
   },
   {
    "fieldname": "pct_liquidacion_entrenador",

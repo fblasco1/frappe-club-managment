@@ -268,6 +268,28 @@
 	margin-bottom: 0.75rem;
 }
 
+.club-cto-comp-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 140px;
+	gap: 0.35rem 0.75rem;
+	align-items: center;
+	max-width: 420px;
+	margin-bottom: 0.75rem;
+}
+
+.club-cto-comp-row label {
+	grid-column: 1 / -1;
+	margin-bottom: 0;
+}
+
+.club-cto-comp-monto {
+	max-width: 140px;
+}
+
+.club-cto-comp-efectivo {
+	grid-column: 1 / -1;
+}
+
 .club-arancel-item-picker {
 	display: flex;
 	gap: 0.4rem;

@@ -16,6 +16,7 @@ from club_management.activities.services.gestion_actividades_panel import (
 	get_catalog_payload,
 	resolve_item_arancel_rate,
 	set_arancel,
+	set_cuota_complementaria,
 	update_actividad,
 	update_equipo,
 	update_grupo,
@@ -114,6 +115,18 @@ def set_arancel_desk(
 	if not frappe.has_permission(doctype, "write"):
 		frappe.throw(frappe._("No autorizado"), frappe.PermissionError)
 	return set_arancel(doctype=doctype, name=name, item=item, rate=rate)
+
+
+@frappe.whitelist()
+def set_cuota_complementaria_desk(
+	doctype: str,
+	name: str,
+	monto: float | int | str | None = None,
+) -> dict[str, Any]:
+	_ensure_panel_access()
+	if not frappe.has_permission(doctype, "write"):
+		frappe.throw(frappe._("No autorizado"), frappe.PermissionError)
+	return set_cuota_complementaria(doctype=doctype, name=name, monto=monto)
 
 
 @frappe.whitelist()

@@ -24,7 +24,9 @@ from club_management.activities.services.gestion_actividades_panel import (
 	create_equipo,
 	create_grupo,
 	get_catalog_payload,
+	resolve_cuota_complementaria_efectiva_equipo,
 	set_arancel,
+	set_cuota_complementaria,
 	suggest_arancel_item_code,
 	update_actividad,
 	update_equipo,
@@ -213,6 +215,32 @@ class TestGestionActividadesPanelService(MembersTestCase):
 		self.assertEqual(result["item"], "TEST-NUEVO-AR-PANEL")
 		self.assertEqual(result["rate"], 999.0)
 		self.assertTrue(frappe.db.exists("Item", "TEST-NUEVO-AR-PANEL"))
+
+	def test_set_cuota_complementaria_y_cascada(self) -> None:
+		actividad = self._ensure_actividad("Panel CTO COMP Act", usa_grupos=1)
+		grupo = create_grupo(actividad=actividad, titulo="Tira CTO")["name"]
+		equipo = create_equipo(grupo_actividad=grupo, titulo="Cat CTO")["name"]
+
+		set_cuota_complementaria(doctype="Actividad", name=actividad, monto=7000)
+		set_cuota_complementaria(doctype="Grupo Actividad", name=grupo, monto=6000)
+
+		heredado = resolve_cuota_complementaria_efectiva_equipo(equipo)
+		self.assertEqual(heredado["monto"], 6000.0)
+		self.assertEqual(heredado["origen"], "Grupo")
+
+		set_cuota_complementaria(doctype="Equipo Actividad", name=equipo, monto=5000)
+		propio = resolve_cuota_complementaria_efectiva_equipo(equipo)
+		self.assertEqual(propio["monto"], 5000.0)
+		self.assertEqual(propio["origen"], "Equipo")
+
+		data = get_catalog_payload()
+		act = next(a for a in data["actividades"] if a["name"] == actividad)
+		self.assertEqual(act["monto_cuota_complementaria"], 7000.0)
+		self.assertEqual(act["grupos"][0]["monto_cuota_complementaria"], 6000.0)
+		eq = act["grupos"][0]["equipos"][0]
+		self.assertEqual(eq["monto_cuota_complementaria"], 5000.0)
+		self.assertEqual(eq["cuota_complementaria"]["monto"], 5000.0)
+		self.assertEqual(eq["cuota_complementaria"]["origen"], "Equipo")
 
 
 class TestCatalogoActividadesAltaGuiada(MembersTestCase):

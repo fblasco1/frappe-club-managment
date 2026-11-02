@@ -5,10 +5,11 @@
  "creation": "2026-06-04 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
- "field_order": [
+  "field_order": [
   "actividad",
   "titulo",
   "item",
+  "monto_cuota_complementaria",
   "pct_liquidacion_entrenador",
   "portal_socio_elige",
   "condicion_socio",
@@ -41,6 +42,12 @@
    "label": "\u00cdtem (arancel mensual)",
    "options": "Item",
    "description": "Arancel de esta tira o divisi\u00f3n (puede diferir por grupo)."
+  },
+  {
+   "fieldname": "monto_cuota_complementaria",
+   "fieldtype": "Currency",
+   "label": "Cuota complementaria ($)",
+   "description": "Tarifa CTO COMP de esta tira/división (p. ej. ESC/FEM o TIRA)."
   },
   {
    "fieldname": "pct_liquidacion_entrenador",

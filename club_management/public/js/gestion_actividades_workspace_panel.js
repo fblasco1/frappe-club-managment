@@ -899,7 +899,12 @@
 			const grupos = act.grupos || [];
 			const arancel_row =
 				!act.usa_grupos || !grupos.length
-					? this.render_arancel_inputs("Actividad", act.name, act.item, act.rate, [act.titulo])
+					? this.render_arancel_inputs("Actividad", act.name, act.item, act.rate, [act.titulo]) +
+						this.render_cuota_complementaria_input(
+							"Actividad",
+							act.name,
+							act.monto_cuota_complementaria
+						)
 					: "";
 
 			const grupos_html = grupos.length
@@ -968,6 +973,12 @@
 							</div>
 						</div>
 						${this.render_arancel_inputs("Equipo Actividad", eq.name, eq.item, eq.rate, [act.titulo, grupo.titulo, eq.titulo])}
+						${this.render_cuota_complementaria_input(
+							"Equipo Actividad",
+							eq.name,
+							eq.monto_cuota_complementaria,
+							eq.cuota_complementaria
+						)}
 					</div>`;
 						})
 						.join("")}
@@ -1008,6 +1019,11 @@
 						</div>
 					</div>
 					${this.render_arancel_inputs("Grupo Actividad", grupo.name, grupo.item, grupo.rate, [act.titulo, grupo.titulo])}
+					${this.render_cuota_complementaria_input(
+						"Grupo Actividad",
+						grupo.name,
+						grupo.monto_cuota_complementaria
+					)}
 					<div class="club-equipos-wrap">${equipos_html}</div>
 				</div>
 			</div>
@@ -1046,6 +1062,33 @@
 				<label class="small text-muted">${__("Monto mensual ($)")}</label>
 				<input type="number" class="form-control form-control-sm club-arancel-rate"
 					min="0" step="0.01" value="${frappe.utils.escape_html(String(rate || 0))}">
+			</div>
+		`;
+		},
+
+		format_cuota_complementaria_efectiva(cto) {
+			const data = cto || {};
+			const monto = Number(data.monto || 0);
+			if (!(monto > 0)) {
+				return __("Sin cuota complementaria");
+			}
+			const origen = data.origen || "";
+			return `$${monto.toLocaleString()} (${origen})`;
+		},
+
+		render_cuota_complementaria_input(doctype, name, monto, efectivo) {
+			const resumen =
+				doctype === "Equipo Actividad" && efectivo
+					? `<span class="text-muted small club-cto-comp-efectivo">${frappe.utils.escape_html(
+							this.format_cuota_complementaria_efectiva(efectivo)
+					  )}</span>`
+					: "";
+			return `
+			<div class="club-cto-comp-row" data-doctype="${frappe.utils.escape_html(doctype)}" data-name="${frappe.utils.escape_html(name)}">
+				<label class="small text-muted">${__("Cuota complementaria ($)")}</label>
+				<input type="number" class="form-control form-control-sm club-cto-comp-monto"
+					min="0" step="0.01" value="${frappe.utils.escape_html(String(monto || 0))}">
+				${resumen}
 			</div>
 		`;
 		},
@@ -1723,6 +1766,10 @@
 				panel.save_arancel_row($(e.currentTarget).closest(".club-arancel-row"));
 			});
 
+			$panel.on("change.club-actividades", ".club-cto-comp-monto", (e) => {
+				panel.save_cuota_complementaria_row($(e.currentTarget).closest(".club-cto-comp-row"));
+			});
+
 			$panel.on("click.club-actividades", ".club-pick-arancel-item, .club-arancel-item", (e) => {
 				e.preventDefault();
 				e.stopPropagation();
@@ -1793,6 +1840,34 @@
 					name,
 					name
 				);
+			});
+		},
+
+		save_cuota_complementaria_row($row) {
+			const doctype = $row.attr("data-doctype");
+			const name = $row.attr("data-name");
+			const monto = parseFloat($row.find(".club-cto-comp-monto").val());
+			if (!doctype || !name || Number.isNaN(monto)) {
+				return;
+			}
+			const anchor_selector = `.club-cto-comp-row[data-doctype="${CSS.escape(doctype)}"][data-name="${CSS.escape(name)}"]`;
+			frappe.call({
+				method:
+					"club_management.activities.api.gestion_actividades_workspace.set_cuota_complementaria_desk",
+				args: { doctype, name, monto },
+				callback: (r) => {
+					if (!r.message) {
+						return;
+					}
+					frappe.show_alert({
+						message: __("Cuota complementaria actualizada"),
+						indicator: "green",
+					});
+					const $panel = $(`#${PANEL_ID}`);
+					if ($panel.length) {
+						this.rerender_catalog($panel, anchor_selector);
+					}
+				},
 			});
 		},
 

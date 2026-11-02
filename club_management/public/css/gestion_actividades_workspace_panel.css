@@ -270,6 +270,27 @@
 	max-width: 140px;
 }
 
+.club-cto-comp-row {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0.35rem 0.75rem;
+	align-items: center;
+	max-width: 420px;
+	margin-bottom: 0.75rem;
+}
+
+.club-cto-comp-row label {
+	margin-bottom: 0;
+}
+
+.club-cto-comp-monto {
+	max-width: 140px;
+}
+
+.club-cto-comp-efectivo {
+	display: block;
+}
+
 @media (max-width: 992px) {
 	.club-actividades-accordion {
 		max-height: none;
