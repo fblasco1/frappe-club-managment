@@ -1,7 +1,8 @@
-"""Tests de mora con base sobre el valor facturado.
+"""Tests de mora: base según mes de fecha de cobro (spec recargos_mora_dos_tramos D3).
 
-Specs: `recargos_mora_dos_tramos.md` (D3), `carga_masiva_cobranzas.md`.
-Desk e importer usan el `rate` facturado de la SI, no el `standard_rate` vigente.
+- Cobro en el mes del período → rate facturado de la SI.
+- Cobro en mes posterior → valor vigente.
+- Importer puede forzar ``base="facturado"``.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from club_management.members.services.cobranza_manual import (
 )
 from club_management.members.services.cuotas_sociales_setup import sync_cuotas_sociales_club
 from club_management.members.services.mora_al_cobro import (
+	base_mora_por_fecha_cobro,
 	calcular_detalle_mora_factura,
 	calcular_exigido_linea_factura,
 )
@@ -32,7 +34,7 @@ ITEM_ARANCEL = "ICDPE-BASQUET-ESCUELITA"
 
 
 class TestMoraBaseFacturada(MembersTestCase):
-	_FROZEN_TODAY = "2026-08-10"
+	_FROZEN_TODAY = "2026-11-02"
 
 	def setUp(self) -> None:
 		super().setUp()
@@ -73,7 +75,13 @@ class TestMoraBaseFacturada(MembersTestCase):
 		doc.submit()
 		return doc.name
 
-	def test_base_facturada_usa_rate_de_linea(self) -> None:
+	def test_base_mora_por_fecha_cobro_elige_modo(self) -> None:
+		self.assertEqual(base_mora_por_fecha_cobro("10/2026", "2026-10-31"), "facturado")
+		self.assertEqual(base_mora_por_fecha_cobro("10/2026", "2026-11-02"), "vigente")
+		self.assertEqual(base_mora_por_fecha_cobro("03/2026", "2026-03-21"), "facturado")
+		self.assertEqual(base_mora_por_fecha_cobro("03/2026", "2026-04-08"), "vigente")
+
+	def test_importer_fuerza_facturado(self) -> None:
 		"""Con `base='facturado'` la mora 15 % se calcula sobre el rate de la línea."""
 		socio = insert_socio(dni="88906001", email="mora.base@example.com")
 		cambiar_estado(socio.name, "Activo", motivo="Test mora base")
@@ -90,9 +98,9 @@ class TestMoraBaseFacturada(MembersTestCase):
 		self.assertEqual(info["tramo"], "post_segundo")
 		self.assertAlmostEqual(flt(info["monto_exigido"]), flt(21000 * 1.15, 2), places=2)
 
-	def test_base_default_usa_facturado_no_vigente(self) -> None:
-		socio = insert_socio(dni="88906002", email="mora.default.fact@example.com")
-		cambiar_estado(socio.name, "Activo", motivo="Test mora default facturado")
+	def test_cobro_mes_posterior_usa_vigente(self) -> None:
+		socio = insert_socio(dni="88906002", email="mora.vigente.mes@example.com")
+		cambiar_estado(socio.name, "Activo", motivo="Test mora vigente mes cobro")
 		frappe.db.set_value("Item", ITEM_ARANCEL, "standard_rate", 25000)
 		invoice = self._factura_arancel(socio.name, periodo="07/2026", rate=21000)
 
@@ -101,33 +109,29 @@ class TestMoraBaseFacturada(MembersTestCase):
 			ITEM_ARANCEL,
 			socio.name,
 			posting_date="2026-08-10",
-		)
-		self.assertAlmostEqual(flt(info["monto_exigido"]), flt(21000 * 1.15, 2), places=2)
-
-	def test_base_vigente_opt_in_sigue_disponible(self) -> None:
-		socio = insert_socio(dni="88906003", email="mora.vigente.opt@example.com")
-		cambiar_estado(socio.name, "Activo", motivo="Test mora vigente opt-in")
-		frappe.db.set_value("Item", ITEM_ARANCEL, "standard_rate", 25000)
-		invoice = self._factura_arancel(socio.name, periodo="07/2026", rate=21000)
-
-		info = calcular_exigido_linea_factura(
-			invoice,
-			ITEM_ARANCEL,
-			socio.name,
-			posting_date="2026-08-10",
-			base="vigente",
 		)
 		self.assertAlmostEqual(flt(info["monto_exigido"]), flt(25000 * 1.15, 2), places=2)
 
-	def test_desk_detalle_octubre_no_revaloriza_noviembre(self) -> None:
-		"""SI octubre a 28.500; ítem ya en 32.000; mora Desk usa 28.500 × 1,15."""
-		socio = insert_socio(dni="88906004", email="mora.oct.nov@example.com")
-		cambiar_estado(socio.name, "Activo", motivo="Test mora octubre")
+	def test_desk_octubre_fecha_octubre_usa_facturado(self) -> None:
+		"""SI octubre 28.500; ítem ya 32.000; cobro 31/10 → 28.500 × 1,15."""
+		socio = insert_socio(dni="88906004", email="mora.oct.fecha@example.com")
+		cambiar_estado(socio.name, "Activo", motivo="Test mora octubre fecha")
+		frappe.db.set_value("Item", ITEM_ARANCEL, "standard_rate", 32000)
+		invoice = self._factura_arancel(socio.name, periodo="10/2026", rate=28500)
+
+		detalle = calcular_detalle_mora_factura(invoice, posting_date="2026-10-31")
+		self.assertEqual(detalle["tramo"], "post_segundo")
+		self.assertAlmostEqual(flt(detalle["valor_actual"]), 28500.0, places=2)
+		self.assertAlmostEqual(flt(detalle["monto_exigido"]), flt(28500 * 1.15, 2), places=2)
+
+	def test_desk_octubre_fecha_noviembre_usa_vigente(self) -> None:
+		"""SI octubre 28.500; ítem 32.000; cobro 02/11 → 32.000 × 1,15."""
+		socio = insert_socio(dni="88906005", email="mora.nov.fecha@example.com")
+		cambiar_estado(socio.name, "Activo", motivo="Test mora noviembre fecha")
 		frappe.db.set_value("Item", ITEM_ARANCEL, "standard_rate", 32000)
 		invoice = self._factura_arancel(socio.name, periodo="10/2026", rate=28500)
 
 		detalle = calcular_detalle_mora_factura(invoice, posting_date="2026-11-02")
 		self.assertEqual(detalle["tramo"], "post_segundo")
-		self.assertAlmostEqual(flt(detalle["valor_actual"]), 28500.0, places=2)
-		self.assertAlmostEqual(flt(detalle["monto_exigido"]), flt(28500 * 1.15, 2), places=2)
-		self.assertNotAlmostEqual(flt(detalle["monto_exigido"]), flt(32000 * 1.15, 2), places=2)
+		self.assertAlmostEqual(flt(detalle["valor_actual"]), 32000.0, places=2)
+		self.assertAlmostEqual(flt(detalle["monto_exigido"]), flt(32000 * 1.15, 2), places=2)

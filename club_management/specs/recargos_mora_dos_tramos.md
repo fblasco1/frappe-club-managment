@@ -3,22 +3,37 @@
 Al cobrar, el recargo depende de la **fecha de pago** respecto de los
 vencimientos del **período de la factura** (`periodo_cobro` = `MM/YYYY`):
 
-| Momento de pago | Recargo | Base |
-|-----------------|---------|------|
-| Hasta el **1.er vencimiento** (día 10 del mes del período) inclusive | **0 %** | Saldo / valor facturado |
-| Después del 1.er vencimiento y hasta el **2.º vencimiento** (**día 20** del mes del período) inclusive | **+10 %** | **Valor facturado** (rate de la SI) |
-| **Después** del 2.º vencimiento | **+15 %** (= 10 % + 5 %) | **Valor facturado** (rate de la SI) |
+| Momento de pago | Recargo | Base del importe |
+|-----------------|---------|------------------|
+| Hasta el **1.er vencimiento** (día 10 del mes del período) inclusive | **0 %** | Saldo / valor del mes de la **fecha de cobro** |
+| Después del 1.er vencimiento y hasta el **2.º vencimiento** (**día 20** del mes del período) inclusive | **+10 %** | Valor del mes de la **fecha de cobro** |
+| **Después** del 2.º vencimiento | **+15 %** (= 10 % + 5 %) | Valor del mes de la **fecha de cobro** |
 
 ```
 si pago ≤ 1.er venc. del período     → sin mora
-si 1.er < pago ≤ 2.º venc. del período → valor_facturado × (1 + 0,10)
-si pago > 2.º venc. del período        → valor_facturado × (1 + 0,15)
+si 1.er < pago ≤ 2.º venc. del período → valor_mes_fecha_cobro × (1 + 0,10)
+si pago > 2.º venc. del período        → valor_mes_fecha_cobro × (1 + 0,15)
 ```
 
 **No** se multiplica ningún % por la cantidad de meses de atraso.
-**No** se revaloriza al `Item.standard_rate` / precio del mes de pago: si la SI
-de octubre tiene arancel 28.500 y en noviembre el ítem pasó a 32.000, al cobrar
-octubre con mora la base sigue siendo **28.500**.
+
+### Base = mes de la fecha de cobro (D3)
+
+La base (cuota / arancel) y la mora se calculan con el **valor del mes de la
+fecha de cobro** elegida en Desk — no con “hoy” a ciegas ni siempre con el rate
+congelado de la SI:
+
+| Fecha de cobro | Base |
+|----------------|------|
+| Mismo mes calendario que `periodo_cobro` (p. ej. cobro 28/10 de deuda `10/2026`) | Rate **facturado** en la SI (tarifas de ese período), aunque el `Item.standard_rate` ya se haya subido para el mes siguiente |
+| Mes **posterior** al período (p. ej. cobro 02/11 de deuda `10/2026`) | Valor **vigente** del mes de cobro (`Item.standard_rate` / cuota categoría actual) |
+
+Así, un fin de semana de cobranzas de octubre con fecha 31/10 usa aranceles de
+octubre + mora sobre esos; si la fecha es de noviembre, se cobra y mora sobre
+noviembre.
+
+Importer masivo puede forzar `base="facturado"` para cruzar el CSV
+(`carga_masiva_cobranzas.md`).
 
 ### Conceptos sujetos a mora
 
@@ -44,16 +59,16 @@ Al cobrar esas facturas el monto exigido = outstanding del grupo (sin SI de ajus
 ## Ejemplo canónico (período marzo)
 
 - 1.er vencimiento = **10/03**; 2.º = **20/03**.
-- SI de marzo facturada a **10** (aunque luego el ítem suba).
+- SI de marzo facturada a **10**; en abril la cuota vigente = **12**.
 
 | Fecha de pago | Tramo | Monto |
 |---------------|-------|-------|
-| 08/03 | ninguno | outstanding / valor facturado (sin %) |
-| 15/03 | post 1.er | `10 × 1,10` = **11,00** |
-| 20/03 | post 1.er | `10 × 1,10` (aún dentro del 2.º vencimiento) |
-| 21/03 | post 2.º | `10 × 1,15` = **11,50** |
-| 08/04 | post 2.º | `10 × 1,15` = **11,50** (sigue la base facturada) |
-| 15/07 | post 2.º | `10 × 1,15` = **11,50** |
+| 08/03 | ninguno | outstanding (sin %) |
+| 15/03 | post 1.er | `10 × 1,10` = **11,00** (fecha en marzo → facturado) |
+| 20/03 | post 1.er | `10 × 1,10` |
+| 21/03 | post 2.º | `10 × 1,15` = **11,50** (sigue marzo) |
+| 08/04 | post 2.º | `12 × 1,15` = **13,80** (fecha en abril → vigente abril) |
+| 15/07 | post 2.º | valor vigente julio × **1,15** |
 
 ---
 
@@ -63,7 +78,7 @@ Al cobrar esas facturas el monto exigido = outstanding del grupo (sin SI de ajus
 |----|----------|
 | **D1** | El 10 % aplica si `posting_date` es **posterior** al 1.er vencimiento del **período adeudado** (día `dia_primer_vencimiento` de ese mes). |
 | **D2** | El 5 % extra aplica solo si `posting_date` es **posterior** al 2.º vencimiento del período (default operativo: **día 20**). Junto con el 10 % suma **15 %**. |
-| **D3** | Base de mora (post 1.er y post 2.º) = **valor facturado** de las líneas sujetas (rate/amount de la SI). **No** revalorizar al precio vigente del mes de pago. Ej.: SI octubre a 28.500, ítem ya en 32.000 en noviembre → mora `28.500 × 1,15`. |
+| **D3** | Base = valor del **mes de la fecha de cobro**: si el cobro cae en el mismo mes que `periodo_cobro`, usar rate **facturado** de la SI; si el cobro es de un mes posterior, usar valor **vigente** (mes de pago). Ej.: deuda octubre 28.500, ítem ya 32.000 → cobro 31/10 = `28.500×(1+% )`; cobro 02/11 = `32.000×(1+% )`. |
 | **D4** | El job legado `recargo_segundo_vencimiento_pct` **no** es la fuente de verdad; la mora se calcula **al cobrar**. |
 | **D5** | Federativas y cargos extra **no** sufren mora (ni tramo post 1.er ni post 2.º vencimiento). |
 
@@ -106,7 +121,7 @@ Then tramo = post_primer.
 
 ---
 
-## Scenario: mismo mes, después del día 20 (+15 % sobre facturado)
+## Scenario: mismo mes, después del día 20 (+15 % sobre facturado del período)
 
 Given deuda período `03/2026` facturada a 12
 And `dia_segundo_vencimiento = 20`
@@ -116,35 +131,44 @@ And monto = `12 * 1.15` = 13,80.
 
 ---
 
-## Scenario: mes siguiente (+15 % sobre valor facturado, sin revalorizar)
+## Scenario: mes siguiente (+15 % sobre valor vigente del mes de cobro)
 
 Given deuda período `03/2026` facturada a 10
-And en abril el ítem vigente vale 12
+And en abril el ítem / cuota vigente vale 12
 And `recargo_post_vencimiento_pct = 10`, `recargo_mes_vencido_pct = 5`
 When paga el 2026-04-08 (posterior al 20/03)
 Then tramo = post_segundo
-And monto = `10 * 1.15` = 11,50
-And la composición muestra la base **facturada**, **sin** `×N meses`.
+And monto = `12 * 1.15` = 13,80
+And la composición usa la base del **mes de cobro**, **sin** `×N meses`.
 
 ---
 
-## Scenario: varios meses después sigue +15 % fijo sobre lo facturado
+## Scenario: varios meses después sigue +15 % fijo sobre el mes de cobro
 
-Given deuda de abril facturada a 11, paga en agosto cuando el ítem vale 13
+Given deuda de abril facturada a 11, paga en agosto con valor agosto = 13
 When calcula mora
-Then monto = `11 * 1.15` = 12,65
-And **no** usa el 13 vigente ni escala el % con la cantidad de meses.
+Then monto = `13 * 1.15` = 14,95
+And **no** escala el % con la cantidad de meses.
 
 ---
 
-## Scenario: arancel de octubre cobrado en noviembre tras aumento
+## Scenario: arancel octubre con fecha de cobro en octubre (aunque el ítem ya subió)
 
 Given SI de arancel período `10/2026` con rate facturado 28.500
-And el `Item.standard_rate` ya es 32.000 (aumento de noviembre)
-When Secretaría registra el cobro en noviembre (tramo post 2.º)
-Then `valor_actual` / base de mora = **28.500**
-And monto exigido = `28.500 × 1,15`
-And **no** aplica 15 % sobre 32.000.
+And el `Item.standard_rate` ya es 32.000 (aumento cargado para noviembre)
+When Secretaría registra el cobro con fecha `2026-10-31` (tramo post 2.º)
+Then base = **28.500** (mes de cobro = mes del período → facturado)
+And monto exigido = `28.500 × 1,15`.
+
+---
+
+## Scenario: arancel octubre con fecha de cobro en noviembre
+
+Given la misma SI a 28.500 y `standard_rate` = 32.000
+When Secretaría registra el cobro con fecha `2026-11-02`
+Then base = **32.000** (mes de cobro posterior → vigente)
+And monto exigido = `32.000 × 1,15`
+And se cobra / ajusta con arancel de noviembre.
 
 ---
 
@@ -153,6 +177,7 @@ And **no** aplica 15 % sobre 32.000.
 Given facturas seleccionadas
 When Secretaría abre Registrar cobro / llama `preview_mora_al_cobro`
 Then ve total y composición por tramo
+And al cambiar la **Fecha de cobro** se recalcula la base (mes de esa fecha) y la mora
 And al confirmar se crea SI de ajuste si hace falta (`item_recargo_mora` obligatorio)
 And la suma de medios coincide con el total a cobrar.
 
@@ -163,9 +188,9 @@ And la suma de medios coincide con el total a cobrar.
 Given una `Sales Invoice` del período con **más de una línea** (p. ej. cuota social + arancel)
 And outstanding del grupo = suma de esas líneas (p. ej. 57.000)
 When se calcula mora en tramo `post_primer` o `post_segundo`
-Then `valor_actual` es la **suma** del valor **facturado** de **todas** las líneas
+Then `valor_actual` es la **suma** del valor del **mes de la fecha de cobro** de **todas** las líneas
 And `monto_exigido` = ese valor × factor del tramo
-And si la base facturada fuera incompleta, el piso es `outstanding_factura × factor`
+And si la base calculada fuera incompleta, el piso es `outstanding_factura × factor`
 (sin recomponer sobre SI de mora ya creadas; no puede “achicar” la deuda al pasar del día 10 al 11).
 
 ---

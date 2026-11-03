@@ -3,8 +3,10 @@
 Spec: `club_management/specs/recargos_mora_dos_tramos.md`
 
 - Hasta 1.er venc. (día 10 del mes del período): sin mora
-- Tras 1.er y hasta 2.º (default día 20): +10 % sobre **valor facturado**
-- Tras 2.º venc.: +15 % (10 % + 5 %) sobre **valor facturado** (sin revalorizar)
+- Tras 1.er y hasta 2.º (default día 20): +10 %
+- Tras 2.º venc.: +15 % (10 % + 5 %)
+- Base = valor del **mes de la fecha de cobro** (facturado si cobro en el mes
+  del período; vigente si cobro en un mes posterior)
 """
 
 from __future__ import annotations
@@ -182,6 +184,25 @@ def resolver_tramo_mora(
 	return "post_segundo"
 
 
+def base_mora_por_fecha_cobro(
+	periodo_cobro: str | None,
+	posting_date: str | date | None,
+) -> str:
+	"""Elige base ``facturado`` o ``vigente`` según el mes de la fecha de cobro.
+
+	- Cobro en el mismo mes calendario que ``periodo_cobro`` → facturado (tarifas
+	  del período, aunque el ítem ya tenga el precio del mes siguiente).
+	- Cobro en un mes posterior → vigente (valor del mes de pago).
+	"""
+	periodo = parse_periodo_cobro((periodo_cobro or "").strip())
+	if not periodo:
+		return "facturado"
+	pago = getdate(posting_date or today())
+	if (pago.year, pago.month) <= (periodo.year, periodo.month):
+		return "facturado"
+	return "vigente"
+
+
 def calcular_monto_exigido_mora(
 	*,
 	valor_actual: float,
@@ -194,7 +215,7 @@ def calcular_monto_exigido_mora(
 	pct_mes_vencido: float | None = None,
 	pct_post_vencimiento: float | None = None,
 ) -> float:
-	"""Aplica % según tramo. Post 2.º = 10 % + 5 % sobre la base (valor facturado)."""
+	"""Aplica % según tramo. Post 2.º = 10 % + 5 % sobre la base del mes de cobro."""
 	base = flt(valor_actual)
 	if base <= 0:
 		return 0.0
@@ -282,11 +303,12 @@ def resolve_valor_actual_linea(
 ) -> float:
 	"""Base de mora de una línea.
 
-	Default ``facturado``: qty × rate de la SI (spec D3).
-	``vigente``: cuota categoría / ``Item.standard_rate`` (opt-in / legado).
+	``facturado``: qty × rate de la SI (mes del período / cobro en ese mes).
+	``vigente``: cuota categoría / ``Item.standard_rate`` (mes de cobro posterior).
 	"""
 	q = flt(qty) or 1.0
-	if (base or "facturado").strip().lower() != "vigente":
+	mode = (base or "facturado").strip().lower()
+	if mode != "vigente":
 		return flt(rate_facturado) * q
 
 	code = (item_code or "").strip()
@@ -303,13 +325,17 @@ def resolve_valor_actual_factura(
 	invoice_name: str,
 	socio_name: str,
 	*,
-	base: str = "facturado",
+	posting_date: str | date | None = None,
+	base: str | None = None,
 ) -> float:
 	"""Suma de la base de mora de **todas** las líneas de la SI.
 
-	Default: valor **facturado** (spec ``recargos_mora_dos_tramos.md`` D3).
+	Default ``base``: según mes de ``posting_date`` vs ``periodo_cobro`` (D3).
 	"""
 	invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, invoice_name)
+	campo_periodo = _campo_periodo_cobro()
+	periodo = (invoice.get(campo_periodo) if campo_periodo else None) or ""
+	resolved = (base or "").strip().lower() or base_mora_por_fecha_cobro(periodo, posting_date)
 	monto_cuota, item_cuota = resolve_cuota_social(socio_name)
 	total = 0.0
 	for row in invoice.get("items") or []:
@@ -320,7 +346,7 @@ def resolve_valor_actual_factura(
 			socio_name=socio_name,
 			item_cuota=item_cuota,
 			monto_cuota=flt(monto_cuota),
-			base=base,
+			base=resolved,
 		)
 	if total > 0:
 		return flt(total, 2)
@@ -335,7 +361,7 @@ def monto_exigido_con_piso(
 	pct_post_primer: float,
 	pct_extra_segundo: float,
 ) -> float:
-	"""Aplica % sobre la base (facturada); no baja del outstanding de la SI × factor.
+	"""Aplica % sobre la base del mes de cobro; no baja del outstanding × factor.
 
 	El piso usa solo el outstanding de la factura origen (sin SI de mora ya creadas),
 	para no recomponer mora sobre mora.
@@ -478,7 +504,9 @@ def calcular_detalle_mora_factura(
 		result["monto_exigido"] = outstanding_grupo
 		return _aplicar_bonificacion_detalle(result, invoice_name, socio_name)
 
-	valor_actual = resolve_valor_actual_factura(invoice_name, socio_name)
+	valor_actual = resolve_valor_actual_factura(
+		invoice_name, socio_name, posting_date=ref
+	)
 	monto_exigido = monto_exigido_con_piso(
 		valor_actual=valor_actual,
 		outstanding_factura=outstanding,
@@ -551,12 +579,13 @@ def calcular_exigido_linea_factura(
 	socio_name: str,
 	*,
 	posting_date: str | date | None = None,
-	base: str = "facturado",
+	base: str | None = None,
 ) -> dict[str, Any]:
 	"""Monto exigido de **una** línea (informe por concepto), con mora si aplica.
 
-	`base="facturado"` (default, Desk e importer): importe facturado de la línea.
-	`base="vigente"`: opt-in — `Item.standard_rate` / cuota categoría actual.
+	Default: base según mes de ``posting_date`` vs período (D3).
+	``base="facturado"``: fuerza rate de la SI (importer CSV).
+	``base="vigente"``: fuerza ``Item.standard_rate`` / cuota categoría.
 	"""
 	settings = get_club_settings()
 	ref = getdate(posting_date or today())
@@ -564,6 +593,7 @@ def calcular_exigido_linea_factura(
 	invoice = frappe.get_doc(SALES_INVOICE_DOCTYPE, invoice_name)
 	periodo = (invoice.get(campo_periodo) if campo_periodo else None) or ""
 	code = (item_code or "").strip()
+	resolved_base = (base or "").strip().lower() or base_mora_por_fecha_cobro(periodo, ref)
 
 	line = next(
 		(row for row in (invoice.get("items") or []) if (row.item_code or "").strip() == code),
@@ -588,7 +618,7 @@ def calcular_exigido_linea_factura(
 		socio_name=socio_name,
 		item_cuota=item_cuota,
 		monto_cuota=flt(monto_cuota),
-		base=base,
+		base=resolved_base,
 	)
 
 	result: dict[str, Any] = {
@@ -789,7 +819,9 @@ def asegurar_ajuste_mora_factura(
 	outstanding_bruto_grupo = flt(outstanding_grupo + ya_cn, 2)
 	outstanding_bruto_factura = flt(flt(invoice.outstanding_amount) + ya_cn, 2)
 
-	valor_actual = resolve_valor_actual_factura(invoice_name, socio_name)
+	valor_actual = resolve_valor_actual_factura(
+		invoice_name, socio_name, posting_date=ref
+	)
 	monto_exigido = monto_exigido_con_piso(
 		valor_actual=valor_actual,
 		outstanding_factura=outstanding_bruto_factura,

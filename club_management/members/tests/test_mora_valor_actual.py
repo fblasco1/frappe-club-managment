@@ -91,7 +91,7 @@ class TestMoraValorActualFormula(MembersTestCase):
 		)
 
 	def test_post_segundo_15_pct(self) -> None:
-		# valor facturado × 1.15
+		# base del mes de cobro × 1.15
 		self.assertEqual(
 			calcular_monto_exigido_mora(
 				valor_actual=12,
@@ -265,7 +265,7 @@ class TestMoraValorActualIntegracion(MembersTestCase):
 		return name
 
 	def test_preparar_marzo_en_abril_antes_del_10(self) -> None:
-		# Abril ya es post 2.º venc. de marzo → 15 % sobre valor facturado de marzo
+		# Abril ya es post 2.º venc. de marzo → 15 % sobre cuota vigente de abril
 		socio = self._socio_activo(dni="76001001", email="mora.antes@example.com")
 		invoice = self._factura_marzo(socio.name)
 		self._set_cuota_activo(self._VALOR_ABRIL)
@@ -275,11 +275,11 @@ class TestMoraValorActualIntegracion(MembersTestCase):
 			[invoice],
 			posting_date=self._PAGO_ANTES,
 		)
-		self.assertAlmostEqual(prep["total_exigido"], 11500.0, places=2)
+		self.assertAlmostEqual(prep["total_exigido"], 13800.0, places=2)
 		self.assertEqual(len(prep["sales_invoices"]), 2)
 		ajuste = frappe.get_doc(SALES_INVOICE_DOCTYPE, prep["ajustes"][0])
 		self.assertEqual(ajuste.docstatus, 1)
-		self.assertAlmostEqual(flt(ajuste.grand_total), 1500.0, places=2)
+		self.assertAlmostEqual(flt(ajuste.grand_total), 3800.0, places=2)
 
 	def test_preparar_marzo_en_abril_despues_del_10(self) -> None:
 		socio = self._socio_activo(dni="76001002", email="mora.despues@example.com")
@@ -291,9 +291,9 @@ class TestMoraValorActualIntegracion(MembersTestCase):
 			[invoice],
 			posting_date=self._PAGO_DESPUES,
 		)
-		self.assertAlmostEqual(prep["total_exigido"], 11500.0, places=2)
+		self.assertAlmostEqual(prep["total_exigido"], 13800.0, places=2)
 		ajuste = frappe.get_doc(SALES_INVOICE_DOCTYPE, prep["ajustes"][0])
-		self.assertAlmostEqual(flt(ajuste.grand_total), 1500.0, places=2)
+		self.assertAlmostEqual(flt(ajuste.grand_total), 3800.0, places=2)
 
 	def test_cobro_manual_aplica_mora_y_salda(self) -> None:
 		socio = self._socio_activo(dni="76001003", email="mora.cobro@example.com")
@@ -389,14 +389,13 @@ class TestMoraValorActualIntegracion(MembersTestCase):
 		finally:
 			frappe.set_user("Administrator")
 
-		self.assertAlmostEqual(preview["total_exigido"], 11500.0, places=2)
+		self.assertAlmostEqual(preview["total_exigido"], 13800.0, places=2)
 		self.assertTrue(preview["aplica_mora"])
 		self.assertEqual(len(preview["detalle"]), 1)
 		comp = preview["detalle"][0]["composicion"]
 		self.assertIn("10%", comp)
 		self.assertIn("5%", comp)
 		self.assertNotIn("5%×", comp)
-		self.assertIn("10.000", comp)
 		self.assertEqual(frappe.db.count(SALES_INVOICE_DOCTYPE, {"docstatus": 1}), antes)
 
 	def test_preview_factura_multilinea_dia_11_no_achica(self) -> None:
