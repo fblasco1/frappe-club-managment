@@ -17,7 +17,8 @@ vuelven a quedar con saldo para cobrarlas de nuevo.
 
 1. Solo roles `Secretaria` / `System Manager`.
 2. El cobro tiene que ser del socio abierto en el formulario.
-3. Diálogo con **motivo** obligatorio (mala imputación u otro error de caja).
+3. Diálogo con el detalle de las facturas imputadas (factura, período,
+   concepto, total e importe imputado) y **motivo** obligatorio.
 4. Cancela el PE. No crea otro. Las Sales Invoice imputadas recuperan
    su `outstanding_amount`.
 5. Deja un `Comment` en el PE cancelado con el motivo.
@@ -35,7 +36,9 @@ generada al cobro (sigue el flujo de cancelar factura impaga).
 ## Scenario: Secretaría cancela un cobro mal imputado
 
 Given un PE submitted del socio que imputa una factura por $10.000
-When Secretaría elige **Cancelar pago** con motivo
+When Secretaría elige **Cancelar pago**
+Then el diálogo lista cada factura imputada con período, concepto, total e importe imputado
+When confirma con motivo
 Then el PE queda cancelado (`docstatus=2`)
 And la factura vuelve a tener `outstanding_amount` igual a su total
 And `saldo_deuda` del socio incluye ese saldo
