@@ -101,6 +101,33 @@ And un segundo cobro/preview no duplica la misma CN (idempotencia por remarks / 
 
 ---
 
+## Scenario: anular bonificación revierte CN huérfana
+
+Tras un intento de cobro (o `preparar`) puede quedar una Credit Note de bonificación
+aunque el Payment Entry no se haya confirmado. Si Secretaría **anula** la
+`Bonificacion Arancel`, esa NC no debe seguir bajando el outstanding: es la causa
+del error «suma de medios ≠ total a cobrar» (casos Bruñe 10937, Ponce 12168).
+
+Given una SI impaga / parcialmente pagada del período de la bonificación
+And una Credit Note submitted de bonificación (`remarks` = `Bonificacion arancel {SI}`)
+contra esa SI
+When la `Bonificacion Arancel` pasa a estado **Anulada**
+(vía ficha del socio, formulario Desk u otro save)
+Then esa Credit Note se **cancela** (`docstatus = 2`)
+And el outstanding de la SI origen se restaura (sin el descuento de la NC)
+And el saldo del socio se sincroniza.
+
+Given la SI origen ya tiene un **Payment Entry submitted** (cobro completado con esa NC)
+When se anula la bonificación
+Then la Credit Note **no** se cancela (no deshacer un cobro cerrado).
+
+Given una bonificación **masiva** (sin socio) del período
+When se anula
+Then se cancelan las NC de bonificación de facturas **no Paid** de ese período
+cuyo socio matcheaba el alcance (actividad / grupo / equipo).
+
+---
+
 ## Scenario: Desk — alta
 
 Given rol Secretaria

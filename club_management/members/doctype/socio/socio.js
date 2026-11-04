@@ -1050,7 +1050,7 @@ club_management_socio_desk.cancelar_bonificacion = function (frm, row) {
 		mensaje +=
 			"<br><br>" +
 			__(
-				"Si esta bonificación ya se aplicó en un cobro, la nota de crédito emitida no se revierte."
+				"Se cancelarán notas de crédito de bonificación pendientes sobre facturas aún no cobradas. Si el cobro ya está cerrado, la nota de crédito no se toca."
 			);
 	}
 	frappe.confirm(mensaje, () => {

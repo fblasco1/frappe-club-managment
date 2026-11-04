@@ -392,6 +392,85 @@ class TestBonificacionArancelIntegracion(_BonificacionArancelFixtures):
 		self.assertAlmostEqual(flt(result["total_exigido"]), 24000.0, places=2)
 		self.assertEqual(flt(sync_saldo_deuda_socio(socio.name)), 0)
 
+	def test_anular_bonificacion_cancela_cn_huerfana(self) -> None:
+		"""Regresión Ponce/Bruñe: anular bonif debe cancelar NC si la SI no está Paid."""
+		from club_management.members.api.socio_operaciones_desk import cancelar_bonificacion_socio
+
+		socio = self._socio_activo(dni="88001010", email="bonif.anular.cn@example.com")
+		inv = self._crear_si(socio.name, con_cuota=False, con_arancel=True)
+		bonif = self._crear_bonif(socio=socio.name, tipo_descuento="Monto fijo", valor=5000)
+
+		prep = preparar_facturas_cobro_con_mora(
+			socio.name, [inv], posting_date="2026-08-10"
+		)
+		self.assertTrue(prep["credit_notes"])
+		cn = prep["credit_notes"][0]
+		self.assertEqual(frappe.db.get_value(SALES_INVOICE_DOCTYPE, cn, "docstatus"), 1)
+		out_con_cn = flt(frappe.db.get_value(SALES_INVOICE_DOCTYPE, inv, "outstanding_amount"))
+		self.assertAlmostEqual(out_con_cn, 23500.0, places=2)
+
+		frappe.set_user(self._secretaria)
+		try:
+			cancelar_bonificacion_socio("Bonificacion Arancel", bonif, socio.name)
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(
+			frappe.db.get_value("Bonificacion Arancel", bonif, "estado"), "Anulada"
+		)
+		self.assertEqual(frappe.db.get_value(SALES_INVOICE_DOCTYPE, cn, "docstatus"), 2)
+		out_tras = flt(frappe.db.get_value(SALES_INVOICE_DOCTYPE, inv, "outstanding_amount"))
+		self.assertAlmostEqual(out_tras, 28500.0, places=2)
+
+		# Cobro completo sin bonif: medios = outstanding restaurado.
+		frappe.set_user(self._secretaria)
+		try:
+			result = registrar_cobro_compuesto(
+				socio.name,
+				[inv],
+				[{"mode_of_payment": "Cash", "amount": 28500}],
+				posting_date="2026-08-10",
+			)
+		finally:
+			frappe.set_user("Administrator")
+		self.assertTrue(result["payment_entries"])
+		self.assertEqual(flt(sync_saldo_deuda_socio(socio.name)), 0)
+
+	def test_anular_bonificacion_no_cancela_cn_si_ya_hay_pe(self) -> None:
+		from club_management.members.api.socio_operaciones_desk import cancelar_bonificacion_socio
+
+		socio = self._socio_activo(dni="88001011", email="bonif.anular.paid@example.com")
+		inv = self._crear_si(socio.name, con_cuota=False, con_arancel=True)
+		bonif = self._crear_bonif(socio=socio.name, tipo_descuento="Monto fijo", valor=5000)
+
+		frappe.set_user(self._secretaria)
+		try:
+			result = registrar_cobro_compuesto(
+				socio.name,
+				[inv],
+				[{"mode_of_payment": "Cash", "amount": 23500}],
+				posting_date="2026-08-10",
+			)
+		finally:
+			frappe.set_user("Administrator")
+		self.assertTrue(result["credit_notes"])
+		self.assertTrue(result["payment_entries"])
+		cn = result["credit_notes"][0]
+		self.assertEqual(frappe.db.get_value(SALES_INVOICE_DOCTYPE, cn, "docstatus"), 1)
+		self.assertEqual(flt(frappe.db.get_value(SALES_INVOICE_DOCTYPE, inv, "outstanding_amount")), 0)
+
+		frappe.set_user(self._secretaria)
+		try:
+			cancelar_bonificacion_socio("Bonificacion Arancel", bonif, socio.name)
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(
+			frappe.db.get_value("Bonificacion Arancel", bonif, "estado"), "Anulada"
+		)
+		self.assertEqual(frappe.db.get_value(SALES_INVOICE_DOCTYPE, cn, "docstatus"), 1)
+		self.assertEqual(flt(frappe.db.get_value(SALES_INVOICE_DOCTYPE, inv, "outstanding_amount")), 0)
+
 
 class TestBonificacionRecurrenteAlCobro(_BonificacionArancelFixtures):
 	"""Recurrente creada con la factura del mes ya emitida (spec gimnasio_cobro_socios_no_socios.md)."""

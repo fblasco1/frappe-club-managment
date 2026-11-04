@@ -39,10 +39,15 @@ Then **no** aparece en la ficha del socio (cancelarla afectaría a otros socios)
 Given Secretaría pulsa **Cancelar** en una fila y confirma
 Then la Beca pasa a estado «Cancelada» y las bonificaciones (recurrente / arancel) a «Anulada»
 And la fila deja de mostrarse
-And el cambio solo afecta deuda futura; lo ya facturado no se modifica.
+And para Beca / Recurrente el cambio afecta la deuda que se genere de ahora en adelante.
 
-Given es una Bonificacion Arancel
-Then el diálogo de confirmación advierte que, si ya se aplicó en un cobro, la nota de crédito emitida no se revierte.
+Given es una **Bonificacion Arancel**
+And existía una Credit Note de bonificación sobre una SI sin Payment Entry submitted
+When se cancela / anula
+Then esa NC se cancela y el outstanding de la SI se restaura
+(ver `bonificacion_arancel_al_cobro.md` — anular bonificación revierte CN huérfana)
+And el diálogo de confirmación advierte que se revertirán notas de crédito
+pendientes de facturas no cobradas; si el cobro ya está cerrado, la NC no se toca.
 
 ---
 

@@ -372,3 +372,98 @@ def asegurar_credit_note_bonificacion(
 	result["credit_note"] = cn.name
 	result["monto"] = faltante
 	return result
+
+
+def _socios_alcanzados_por_bonificacion(bonif: Any) -> list[str]:
+	"""Socios cuyas facturas pudieron recibir CN por esta bonificación."""
+	socio = (getattr(bonif, "socio", None) or "").strip()
+	if socio:
+		return [socio]
+	# Masiva: socios con inscripción activa que matchea el alcance.
+	inscripciones = frappe.get_all(
+		"Inscripcion Actividad",
+		filters={"estado": "Activa"},
+		fields=["socio", "actividad", "grupo_actividad", "equipo_actividad"],
+	) if frappe.db.exists("DocType", "Inscripcion Actividad") else []
+	bonif_dict = {
+		"socio": None,
+		"actividad": getattr(bonif, "actividad", None),
+		"grupo_actividad": getattr(bonif, "grupo_actividad", None),
+		"equipo_actividad": getattr(bonif, "equipo_actividad", None),
+	}
+	socios: list[str] = []
+	seen: set[str] = set()
+	for insc in inscripciones:
+		if not insc.socio or insc.socio in seen:
+			continue
+		if _bonificacion_matchea_inscripcion(bonif_dict, insc):
+			seen.add(insc.socio)
+			socios.append(insc.socio)
+	return socios
+
+
+def _facturas_periodo_socio(socio_name: str, periodo_cobro: str) -> list[str]:
+	campo_socio = _campo_socio_en(SALES_INVOICE_DOCTYPE)
+	campo_periodo = _campo_periodo_cobro()
+	if not campo_socio or not campo_periodo:
+		return []
+	periodo = (periodo_cobro or "").strip()
+	if not periodo:
+		return []
+	return frappe.get_all(
+		SALES_INVOICE_DOCTYPE,
+		filters={
+			campo_socio: socio_name,
+			campo_periodo: periodo,
+			"docstatus": 1,
+			"is_return": 0,
+		},
+		pluck="name",
+	)
+
+
+def _invoice_tiene_cobro_submitted(invoice_name: str) -> bool:
+	"""True si hay Payment Entry submitted imputado a la SI (cobro cerrado)."""
+	return bool(
+		frappe.db.sql(
+			"""
+			SELECT pe.name
+			FROM "tabPayment Entry Reference" per
+			INNER JOIN "tabPayment Entry" pe ON pe.name = per.parent
+			WHERE per.reference_doctype = %s
+			  AND per.reference_name = %s
+			  AND pe.docstatus = 1
+			LIMIT 1
+			""",
+			(SALES_INVOICE_DOCTYPE, invoice_name),
+		)
+	)
+
+
+def revertir_credit_notes_por_anulacion(bonif: Any) -> list[str]:
+	"""Cancela CN de bonificación huérfanas al anular.
+
+	Spec: ``bonificacion_arancel_al_cobro.md`` — anular bonificación revierte CN huérfana.
+	No toca CN si la SI origen ya tiene un Payment Entry submitted (cobro cerrado).
+	"""
+	if not erpnext_cobranza_disponible():
+		return []
+	periodo = (getattr(bonif, "periodo_cobro", None) or "").strip()
+	if not periodo:
+		return []
+
+	canceladas: list[str] = []
+	for socio_name in _socios_alcanzados_por_bonificacion(bonif):
+		for invoice_name in _facturas_periodo_socio(socio_name, periodo):
+			if _invoice_tiene_cobro_submitted(invoice_name):
+				continue
+			for cn_row in _credit_notes_pendientes(socio_name, invoice_name):
+				cn_name = cn_row["name"]
+				cn = frappe.get_doc(SALES_INVOICE_DOCTYPE, cn_name)
+				if cn.docstatus != 1 or not cn.is_return:
+					continue
+				cn.flags.ignore_permissions = True
+				cn.cancel()
+				canceladas.append(cn_name)
+			sync_saldo_deuda_socio(socio_name)
+	return canceladas

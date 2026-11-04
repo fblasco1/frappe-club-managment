@@ -20,6 +20,17 @@ class BonificacionArancel(Document):
 		if not (self.motivo or "").strip():
 			frappe.throw(_("El motivo es obligatorio."))
 
+	def on_update(self) -> None:
+		if self.estado != "Anulada":
+			return
+		if not self.has_value_changed("estado"):
+			return
+		from club_management.members.services.bonificacion_arancel import (
+			revertir_credit_notes_por_anulacion,
+		)
+
+		revertir_credit_notes_por_anulacion(self)
+
 	def _validate_periodo(self) -> None:
 		raw = (self.periodo_cobro or "").strip()
 		if not _PERIODO_RE.match(raw):
